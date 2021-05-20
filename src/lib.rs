@@ -17,3 +17,8 @@ extern {
 pub fn greet() {
     alert("Hello, msh!");
 }
+
+#[wasm_bindgen]
+pub fn handle_line(line: String) -> String {
+    format!("# msh returns\r\n{}", line)
+}
