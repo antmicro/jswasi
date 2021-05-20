@@ -1,0 +1,3 @@
+[submodule "hterminal-pure"]
+	path = hterminal-pure
+	url = ./hterminal-pure
