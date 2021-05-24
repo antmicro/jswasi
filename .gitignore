@@ -7,3 +7,10 @@ Cargo.lock
 bin/
 pkg/
 wasm-pack.log
+
+node_modules/
+
+# ci
+ci/*.webm
+ci/images.txt
+ci/images
