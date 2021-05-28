@@ -15,11 +15,8 @@ macro_rules! log {
 }
 
 #[wasm_bindgen]
-extern "C" {
+extern {
     fn alert(s: &str);
-    fn writeFileSync(filename: String, data: String) -> String; // &str?
-    fn readFileSync(filename: String) -> String;
-    fn readdir(filepath: String, options: String) -> String;
 }
 
 // #[wasm_bindgen(module = "/wasmfs-bindings.js")] // TODO(tkarwowski): add wasmfs-bindings.js file
@@ -59,13 +56,13 @@ fn echo(args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
 
 fn cat(mut args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
     let filename = args.remove(0);
-    let content = readFileSync(filename);
+    // let content = readFileSync(filename);
     Ok(format!("{}", content))
 }
 
 fn save(mut args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
     let filename = args.remove(0);
-    writeFileSync(filename, args.join(" "));
+    // writeFileSync(filename, args.join(" "));
     Ok("".to_owned())
 }
 
