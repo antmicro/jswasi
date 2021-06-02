@@ -19,11 +19,12 @@ extern {
     fn alert(s: &str);
 }
 
-#[wasm_bindgen(module = "/utils.js")]
-extern {
-    #[wasm_bindgen(catch)]
-    fn read_file(path: &str) -> Result<String, JsValue>;
-}
+// // Go through js for fs, this would only work on node
+// #[wasm_bindgen(module = "/utils.js")]
+// extern {
+//     #[wasm_bindgen(catch)]
+//     fn read_file(path: &str) -> Result<String, JsValue>;
+// }
 
 // #[wasm_bindgen(module = "/wasmfs-bindings.js")] // TODO(tkarwowski): add wasmfs-bindings.js file
 // extern {
