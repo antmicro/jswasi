@@ -15,6 +15,7 @@
     hterm.defaultStorage = new lib.Storage.Local();
 
     let input = "";
+    let cursor = 0;
 
     function setupHterm() {
         // profileId is the name of the terminal profile to load, or "default" if
@@ -36,15 +37,19 @@
                     t.io.print("\r\n" + output + "\r\n");
                     t.io.print("$ ");
                     input = "";
+                    cursor = 0;
                 } else if (code < 32 || code === 127) { // Control
                     if (code === 127) {
-                        console.log(code);
-                        input = input.slice(0, -1);
-                        t.io.print("\r$ " + input);
+                        if (cursor > 0) {
+                            t.io.print('\b \b');
+                            input = input.slice(0, -1);
+                            cursor -= 1;
+                        }
                     }
                 } else { // Visible
                     t.io.print(data);
                     input += data;
+                    cursor += 1;
                 }
             };
 
