@@ -1,6 +1,9 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
+// use std::collections::HashMap;
+// use std::collections::hash_map::RandomState;
+use std::fs;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -86,13 +89,18 @@ fn echo(args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
 
 fn cat(mut args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
     let filename = args.remove(0);
-    let content = read_file(&filename).unwrap();
-    Ok(format!("{:?}", content))
+    let content = fs::read_to_string(&filename).unwrap_or_else(|e| {
+        alert(&format!("failed reading file: {}", e));
+        "".to_owned()
+    });
+    Ok(content)
 }
 
 fn save(mut args: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
     let filename = args.remove(0);
-    // writeFileSync(filename, args.join(" "));
+    fs::write(filename, args.join("")).unwrap_or_else(|e| {
+        alert(&format!("failed reading file: {}", e));
+    });
     Ok("".to_owned())
 }
 

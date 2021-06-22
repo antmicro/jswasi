@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>hello-wasm example</title>
+</head>
+<body>
+<script type="module">
+    import init, {handle_line} from "./pkg/msh.js";
+    import {hterm, lib} from "./hterm-all.js";
+
+    await init();
+
+    // If you are a cross-browser web app and want to use window.localStorage.
+    hterm.defaultStorage = new lib.Storage.Local();
+
+    let input = "";
+
+    function setupHterm() {
+        // profileId is the name of the terminal profile to load, or "default" if
+        // not specified.  If you're using one of the persistent storage
+        // implementations then this will scope all preferences read/writes to this
+        // name.
+        const t = new hterm.Terminal("profile-id");
+
+        t.onTerminalReady = function() {
+            // Create a new terminal IO object and give it the foreground.
+            // (The default IO object just prints warning messages about unhandled
+            // things to the the JS console.)
+            const io = t.io.push();
+
+            io.onVTKeystroke = io.sendString = (data) => {
+                const code = data.charCodeAt(0);
+                if (code === 13) { // CR
+                    const output = handle_line(input);
+                    t.io.print("\r\n" + output + "\r\n");
+                    t.io.print("$ ");
+                    input = "";
+                } else if (code < 32 || code === 127) { // Control
+                    if (code === 127) {
+                        console.log(code);
+                        input = input.slice(0, -1);
+                        t.io.print("\r$ " + input);
+                    }
+                } else { // Visible
+                    t.io.print(data);
+                    input += data;
+                }
+            };
+
+            io.onTerminalResize = (columns, rows) => {
+                // React to size changes here.
+                // Secure Shell pokes at NaCl, which eventually results in
+                // some ioctls on the host.
+            };
+
+            // You can call io.push() to foreground a fresh io context, which can
+            // be uses to give control of the terminal to something else.  When that
+            // thing is complete, should call io.pop() to restore control to the
+            // previous io object.
+        };
+
+        t.decorate(document.querySelector('#terminal'));
+        t.installKeyboard();
+
+        t.io.print('$ ');
+
+        return t;
+    }
+
+    // This will be whatever normal entry/initialization point your project uses.
+    await lib.init();
+    setupHterm();
+</script>
+<div id="terminal"></div>
+</body>
+</html>
