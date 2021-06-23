@@ -10,11 +10,21 @@
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
 
-    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), {
-        // index: {
-        //     consoleLog: value => console.log(value)
-        // }
-    });
+    const importObject = {
+        env: {
+            // stdio: code => console.log(code),
+            // stderr: code => console.log("ERR: " + code),
+            logHello: () => console.log("Hello env")
+        },
+        wasi_snapshot_preview1: {
+            fd_write: () => {},
+            proc_exit: () => {},
+            environ_sizes_get: () => {},
+            environ_get: () => {},
+        },
+    };
+
+    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), importObject);
     const instance = wasm.instance;
     const module = wasm.module;
 
@@ -39,7 +49,9 @@
 
             io.onVTKeystroke = io.sendString = (data) => {
                 const code = data.charCodeAt(0);
-                t.io.print(instance.exports.stdin(code).toString());
+                const result = instance.exports.stdin(code);
+                console.log(result);
+                t.io.print(String.fromCharCode(result));
             };
 
             io.onTerminalResize = (columns, rows) => {
