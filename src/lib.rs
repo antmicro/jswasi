@@ -5,17 +5,20 @@ use std::fs;
 //         web_sys::console::log_1(&format!( $( $t )* ).into());
 //     }
 // }
+
 // #[link(wasm_import_module = "env")]
 extern {
     fn logHello();
+    fn stdio(code: i32);
 }
 
 // one of these two must be here
 #[export_name = "stdin"]
 // #[no_mangle]
-pub extern fn stdin(code: i32) -> i32 {
+pub extern fn stdin(code: i32) {
     unsafe { logHello(); };
-    code + 1
+    unsafe { stdio(code); };
+
     // parse input
     // let mut words = line.split_whitespace();
     // let command_name = words.next().unwrap();

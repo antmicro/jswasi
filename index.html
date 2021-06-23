@@ -10,27 +10,6 @@
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
 
-    const importObject = {
-        env: {
-            // stdio: code => console.log(code),
-            // stderr: code => console.log("ERR: " + code),
-            logHello: () => console.log("Hello env")
-        },
-        wasi_snapshot_preview1: {
-            fd_write: () => {},
-            proc_exit: () => {},
-            environ_sizes_get: () => {},
-            environ_get: () => {},
-        },
-    };
-
-    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), importObject);
-    const instance = wasm.instance;
-    const module = wasm.module;
-
-    console.log(instance.exports);
-    console.log(instance.exports.stdin);
-
     let input = "";
     let cursor = 0;
 
@@ -76,7 +55,25 @@
 
     // This will be whatever normal entry/initialization point your project uses.
     await lib.init();
-    setupHterm();
+    const terminal = setupHterm();
+
+    const importObject = {
+        env: {
+            stdio: code => terminal.io.print(String.fromCharCode(code)),
+            stderr: code => console.log("ERR: " + code),
+            logHello: () => console.log("Hello env")
+        },
+        wasi_snapshot_preview1: {
+            fd_write: () => {},
+            proc_exit: () => {},
+            environ_sizes_get: () => {},
+            environ_get: () => {},
+        },
+    };
+
+    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), importObject);
+    const instance = wasm.instance;
+    const module = wasm.module;
 </script>
 <div id="terminal"></div>
 </body>
