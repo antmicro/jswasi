@@ -6,13 +6,20 @@
 </head>
 <body>
 <script type="module">
-    import init, {handle_line} from "./pkg/msh.js";
     import {hterm, lib} from "./hterm-all.js";
-
-    await init();
-
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
+
+    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), {
+        // index: {
+        //     consoleLog: value => console.log(value)
+        // }
+    });
+    const instance = wasm.instance;
+    const module = wasm.module;
+
+    console.log(instance.exports);
+    console.log(instance.exports.stdin);
 
     let input = "";
     let cursor = 0;
@@ -32,25 +39,7 @@
 
             io.onVTKeystroke = io.sendString = (data) => {
                 const code = data.charCodeAt(0);
-                if (code === 13) { // CR
-                    const output = handle_line(input);
-                    t.io.print("\r\n" + output + "\r\n");
-                    t.io.print("$ ");
-                    input = "";
-                    cursor = 0;
-                } else if (code < 32 || code === 127) { // Control
-                    if (code === 127) {
-                        if (cursor > 0) {
-                            t.io.print('\b \b');
-                            input = input.slice(0, -1);
-                            cursor -= 1;
-                        }
-                    }
-                } else { // Visible
-                    t.io.print(data);
-                    input += data;
-                    cursor += 1;
-                }
+                t.io.print(instance.exports.stdin(code).toString());
             };
 
             io.onTerminalResize = (columns, rows) => {

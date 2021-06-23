@@ -1,11 +1,10 @@
-You must have `wasm-pack` installed (curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh, I will provide Dockerfile with it in short future).
-
 Run
 ```
-wasm-pack build --target web
+cargo build --target wasm32-wasi
 python -m http.server
 ```
 and go to http://localhost:8000.
 
-`wasm-pack` builds wasm file and js bindings to `/pkg` folder.
-There are `index.html` and `hterm-all.js` files in main folder that provide the terminal.
+Cargo builds `wasm32-wasi` target to `target/wasm32-wasi/debug/msh.wasm`
+There are `index.html` and `hterm-all.js` files in main folder 
+that use the wasm module and provide the terminal.
