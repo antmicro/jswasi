@@ -28,7 +28,7 @@ pub unsafe extern fn stdin(code: u32) {
         }
         INPUT.clear();
     } else {
-        stdio(c);
+        stdio(code);
         INPUT.push(char::from_u32(code).unwrap());
     }
 
