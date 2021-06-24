@@ -28,9 +28,9 @@
 
             io.onVTKeystroke = io.sendString = (data) => {
                 const code = data.charCodeAt(0);
-                const result = instance.exports.stdin(code);
-                console.log(result);
-                t.io.print(String.fromCharCode(result));
+                instance.exports.stdin(code);
+                //t.io.print(String.fromCharCode(result));
+                console.log(data, code);
             };
 
             io.onTerminalResize = (columns, rows) => {

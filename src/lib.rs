@@ -9,15 +9,29 @@ use std::fs;
 // #[link(wasm_import_module = "env")]
 extern {
     fn logHello();
-    fn stdio(code: i32);
+    fn stdio(code: u32);
 }
+
+static mut INPUT: String = String::new();
 
 // one of these two must be here
 #[export_name = "stdin"]
 // #[no_mangle]
-pub extern fn stdin(code: i32) {
-    unsafe { logHello(); };
-    unsafe { stdio(code); };
+pub unsafe extern fn stdin(code: u32) {
+    logHello();
+    // unsafe { stdio(code); };
+
+    if code == 13 {
+        // stdio('\r' as u32);
+        for c in INPUT.chars().rev() {
+            stdio(c as u32);
+        }
+        INPUT.clear();
+    } else {
+        stdio(c);
+        INPUT.push(char::from_u32(code).unwrap());
+    }
+
 
     // parse input
     // let mut words = line.split_whitespace();
