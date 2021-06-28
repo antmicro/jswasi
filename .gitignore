@@ -12,3 +12,5 @@ wasm-pack.log
 node_modules
 ci/images.txt
 ci/images
+
+output

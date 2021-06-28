@@ -77,7 +77,7 @@
             },
         };
 
-        const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/release/msh.wasm'), importObject);
+        const wasm = await WebAssembly.instantiateStreaming(fetch('./msh.wasm'), importObject);
         const instance = wasm.instance;
         const module = wasm.module;
     }
