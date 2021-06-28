@@ -7,73 +7,82 @@
 <body>
 <script type="module">
     import {hterm, lib} from "./hterm-all.js";
-    // If you are a cross-browser web app and want to use window.localStorage.
-    hterm.defaultStorage = new lib.Storage.Local();
 
-    let input = "";
-    let cursor = 0;
+    async function init_all() {
+        // If you are a cross-browser web app and want to use window.localStorage.
+        hterm.defaultStorage = new lib.Storage.Local();
 
-    function setupHterm() {
-        // profileId is the name of the terminal profile to load, or "default" if
-        // not specified.  If you're using one of the persistent storage
-        // implementations then this will scope all preferences read/writes to this
-        // name.
-        const t = new hterm.Terminal("profile-id");
+        let input = "";
+        let cursor = 0;
 
-        t.onTerminalReady = function() {
-            // Create a new terminal IO object and give it the foreground.
-            // (The default IO object just prints warning messages about unhandled
-            // things to the the JS console.)
-            const io = t.io.push();
+        function setupHterm() {
+            // profileId is the name of the terminal profile to load, or "default" if
+            // not specified.  If you're using one of the persistent storage
+            // implementations then this will scope all preferences read/writes to this
+            // name.
+            const t = new hterm.Terminal("profile-id");
 
-            io.onVTKeystroke = io.sendString = (data) => {
-                const code = data.charCodeAt(0);
-                instance.exports.stdin(code);
-                //t.io.print(String.fromCharCode(result));
-                console.log(data, code);
+            t.onTerminalReady = function () {
+                // Create a new terminal IO object and give it the foreground.
+                // (The default IO object just prints warning messages about unhandled
+                // things to the the JS console.)
+                const io = t.io.push();
+
+                io.onVTKeystroke = io.sendString = (data) => {
+                    const code = data.charCodeAt(0);
+                    instance.exports.stdin(code);
+                    //t.io.print(String.fromCharCode(result));
+                    console.log(data, code);
+                };
+
+                io.onTerminalResize = (columns, rows) => {
+                    // React to size changes here.
+                    // Secure Shell pokes at NaCl, which eventually results in
+                    // some ioctls on the host.
+                };
+
+                // You can call io.push() to foreground a fresh io context, which can
+                // be uses to give control of the terminal to something else.  When that
+                // thing is complete, should call io.pop() to restore control to the
+                // previous io object.
             };
 
-            io.onTerminalResize = (columns, rows) => {
-                // React to size changes here.
-                // Secure Shell pokes at NaCl, which eventually results in
-                // some ioctls on the host.
-            };
+            t.decorate(document.querySelector('#terminal'));
+            t.installKeyboard();
 
-            // You can call io.push() to foreground a fresh io context, which can
-            // be uses to give control of the terminal to something else.  When that
-            // thing is complete, should call io.pop() to restore control to the
-            // previous io object.
+            t.io.print('$ ');
+
+            return t;
+        }
+
+        // This will be whatever normal entry/initialization point your project uses.
+        await lib.init();
+        const terminal = setupHterm();
+
+        const importObject = {
+            env: {
+                stdio: code => terminal.io.print(String.fromCharCode(code)),
+                stderr: code => console.log("ERR: " + code),
+                logHello: () => console.log("Hello env")
+            },
+            wasi_snapshot_preview1: {
+                fd_write: () => {
+                },
+                proc_exit: () => {
+                },
+                environ_sizes_get: () => {
+                },
+                environ_get: () => {
+                },
+            },
         };
 
-        t.decorate(document.querySelector('#terminal'));
-        t.installKeyboard();
-
-        t.io.print('$ ');
-
-        return t;
+        const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/release/msh.wasm'), importObject);
+        const instance = wasm.instance;
+        const module = wasm.module;
     }
 
-    // This will be whatever normal entry/initialization point your project uses.
-    await lib.init();
-    const terminal = setupHterm();
-
-    const importObject = {
-        env: {
-            stdio: code => terminal.io.print(String.fromCharCode(code)),
-            stderr: code => console.log("ERR: " + code),
-            logHello: () => console.log("Hello env")
-        },
-        wasi_snapshot_preview1: {
-            fd_write: () => {},
-            proc_exit: () => {},
-            environ_sizes_get: () => {},
-            environ_get: () => {},
-        },
-    };
-
-    const wasm = await WebAssembly.instantiateStreaming(fetch('./target/wasm32-wasi/debug/msh.wasm'), importObject);
-    const instance = wasm.instance;
-    const module = wasm.module;
+    window.onload = init_all;
 </script>
 <div id="terminal"></div>
 </body>

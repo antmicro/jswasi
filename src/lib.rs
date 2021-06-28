@@ -22,10 +22,11 @@ pub unsafe extern fn stdin(code: u32) {
     // unsafe { stdio(code); };
 
     if code == 13 {
-        // stdio('\r' as u32);
+        stdio(' ' as u32);
         for c in INPUT.chars().rev() {
             stdio(c as u32);
         }
+        stdio(' ' as u32);
         INPUT.clear();
     } else {
         stdio(code);

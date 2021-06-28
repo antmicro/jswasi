@@ -8,3 +8,7 @@ bin/
 pkg/
 wasm-pack.log
 
+*.webm
+node_modules
+ci/images.txt
+ci/images
