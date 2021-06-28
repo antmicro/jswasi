@@ -1,4 +1,7 @@
-function wasi_snapshot_preview1() {
+// All credit goes to WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
+
+function barebonesWASI(terminal) {
+
     var moduleInstanceExports = null;
 
     var WASI_ESUCCESS = 0;
@@ -97,7 +100,7 @@ function wasi_snapshot_preview1() {
             //   void* buf,
             //   size_t buf_len,
             // }
-            var buffers = Array.from({ length: iovsLen }, function (_, i) {
+            var buffers = Array.from({length: iovsLen}, function (_, i) {
                 var ptr = iovs + i * 8;
                 var buf = view.getUint32(ptr, !0);
                 var bufLen = view.getUint32(ptr + 4, !0);
@@ -109,6 +112,7 @@ function wasi_snapshot_preview1() {
         }
 
         var buffers = getiovs(iovs, iovsLen);
+
         function writev(iov) {
 
             for (var b = 0; b < iov.byteLength; b++) {
@@ -121,7 +125,7 @@ function wasi_snapshot_preview1() {
 
         buffers.forEach(writev);
 
-        if (fd === WASI_STDOUT_FILENO) console.log(String.fromCharCode.apply(null, bufferBytes));
+        if (fd === WASI_STDOUT_FILENO) terminal.io.println(String.fromCharCode.apply(null, bufferBytes));
 
         view.setUint32(nwritten, written, !0);
 
@@ -153,18 +157,41 @@ function wasi_snapshot_preview1() {
     }
 
     return {
-        setModuleInstance : setModuleInstance,
-        environ_sizes_get : environ_sizes_get,
-        args_sizes_get : args_sizes_get,
-        fd_prestat_get : fd_prestat_get,
-        fd_fdstat_get : fd_fdstat_get,
-        fd_write : fd_write,
-        fd_prestat_dir_name : fd_prestat_dir_name,
-        environ_get : environ_get,
-        args_get : args_get,
-        poll_oneoff : poll_oneoff,
-        proc_exit : proc_exit,
-        fd_close : fd_close,
-        fd_seek : fd_seek
+        setModuleInstance: setModuleInstance,
+        environ_sizes_get: environ_sizes_get,
+        args_sizes_get: args_sizes_get,
+        fd_prestat_get: fd_prestat_get,
+        fd_fdstat_get: fd_fdstat_get,
+        fd_write: fd_write,
+        fd_prestat_dir_name: fd_prestat_dir_name,
+        environ_get: environ_get,
+        args_get: args_get,
+        poll_oneoff: poll_oneoff,
+        proc_exit: proc_exit,
+        fd_close: fd_close,
+        fd_seek: fd_seek
     }
+}
+
+function importWasmModule(moduleName, wasiPolyfill) {
+
+    var memory = new WebAssembly.Memory({initial: 2, maximum: 10});
+    const moduleImports = {wasi_snapshot_preview1: wasiPolyfill, env: {}, js: {mem: memory}};
+
+    (async () => {
+        var module = null;
+
+        if (WebAssembly.compileStreaming) {
+            module = await WebAssembly.compileStreaming(fetch(moduleName));
+        } else {
+            const response = await fetch(moduleName);
+            const buffer = await response.arrayBuffer();
+            module = await WebAssembly.compile(buffer);
+        }
+
+        const instance = await WebAssembly.instantiate(module, moduleImports);
+
+        wasiPolyfill.setModuleInstance(instance);
+        instance.exports._start();
+    })();
 }

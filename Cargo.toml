@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Tomek Karwowski <tkarwowski@internships.antmicro.com>"]
 edition = "2018"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+#[lib]
+#crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
