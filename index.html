@@ -5,6 +5,7 @@
     <title>hello-wasm example</title>
 </head>
 <body>
+<script src="index.js"></script>
 <script type="module">
     import {hterm, lib} from "./hterm-all.js";
 
@@ -30,7 +31,7 @@
 
                 io.onVTKeystroke = io.sendString = (data) => {
                     const code = data.charCodeAt(0);
-                    instance.exports.stdin(code);
+                    // instance.exports.stdin(code);
                     //t.io.print(String.fromCharCode(result));
                     console.log(data, code);
                 };
@@ -65,21 +66,14 @@
                 stderr: code => console.log("ERR: " + code),
                 logHello: () => console.log("Hello env")
             },
-            wasi_snapshot_preview1: {
-                fd_write: () => {
-                },
-                proc_exit: () => {
-                },
-                environ_sizes_get: () => {
-                },
-                environ_get: () => {
-                },
-            },
+            wasi_snapshot_preview1: wasi_snapshot_preview1(),
         };
 
-        const wasm = await WebAssembly.instantiateStreaming(fetch('./msh.wasm'), importObject);
+        const wasm = await WebAssembly.instantiateStreaming(fetch('./main.wasm'), importObject);
         const instance = wasm.instance;
         const module = wasm.module;
+
+        instance.exports._start;
     }
 
     window.onload = init_all;
