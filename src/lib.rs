@@ -32,9 +32,9 @@ pub unsafe extern fn stdin(code: u32) {
         stdio(code);
         INPUT.push(char::from_u32(code).unwrap());
     }
-
-
-    // parse input
+    //
+    //
+    // // parse input
     // let mut words = line.split_whitespace();
     // let command_name = words.next().unwrap();
     // let args = words.map(|arg| arg.to_owned()).collect();
