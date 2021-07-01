@@ -175,8 +175,8 @@ function barebonesWASI() {
     let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
 
     onmessage = function(e) {
-         buffer = buffer + e;      
-         console.log("got "+e+ " buffer now " + buffer);         
+         buffer = buffer + e.data;      
+         console.log("got "+e.data+ " buffer now " + buffer);         
     }
 
     class Stdin {
