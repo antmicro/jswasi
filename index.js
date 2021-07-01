@@ -4,6 +4,18 @@
 
 let started = false;
 
+let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
+
+onmessage = function(e) {
+         if (!started) {
+            if (e.data == "start") started = true;   
+         } else {
+            buffer = buffer + e.data;      
+            console.log("got "+e.data+ " buffer now " + buffer);         
+         }
+}
+
+
 function barebonesWASI() {
 
     let moduleInstanceExports = null;
@@ -174,17 +186,6 @@ function barebonesWASI() {
         }
     }
     
-    let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
-
-    onmessage = function(e) {
-         if (!started) {
-            if (e.data == "start") started = true;   
-         } else {
-            buffer = buffer + e.data;      
-            console.log("got "+e.data+ " buffer now " + buffer);         
-         }
-    }
-
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
