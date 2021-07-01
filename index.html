@@ -16,6 +16,8 @@
 
         let input = "";
         let cursor = 0;
+        
+        let myWorker = new Worker('index.js');
 
         function setupHterm() {
             // profileId is the name of the terminal profile to load, or "default" if
@@ -35,6 +37,7 @@
                     // instance.exports.stdin(code);
                     //t.io.print(String.fromCharCode(result));
                     console.log(data, code);
+                    myWorker.postMessage(data);
                 };
 
                 io.onTerminalResize = (columns, rows) => {
@@ -64,7 +67,6 @@
         // const wasiPolyfill = barebonesWASI(terminal);
         // importWasmModule("msh.wasm", wasiPolyfill);
 
-        let myWorker = new Worker('index.js');
         myWorker.onmessage = (event) => {
             const action = event.data[0];
             if (action === "stdout") {
