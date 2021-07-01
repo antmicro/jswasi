@@ -17,8 +17,11 @@ fn main() {
     // println!("You entered: {}", buff);
 
     // Throws hard to debug - Uncaught (in promise) RuntimeError: unreachable
-    let mut buff = fs::read_to_string("hello.rs").unwrap_or("failed reading file".to_owned());
-    println!("{}", buff);
+   
+   
+   // TODO: this breaks stuff
+   // let mut buff = fs::read_to_string("hello.rs").unwrap_or("failed reading file".to_owned());
+   // println!("{}", buff);
 
     return;
 }
