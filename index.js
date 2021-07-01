@@ -176,6 +176,7 @@ function barebonesWASI() {
 
     onmessage = function(e) {
          buffer = buffer + e;      
+         console.log("got "+e+ " buffer now " + buffer);         
     }
 
     class Stdin {
