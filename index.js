@@ -2,6 +2,8 @@
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
+let started = false;
+
 function barebonesWASI() {
 
     let moduleInstanceExports = null;
@@ -173,7 +175,6 @@ function barebonesWASI() {
     }
     
     let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
-    let started = false;
 
     onmessage = function(e) {
          if (!started) {
