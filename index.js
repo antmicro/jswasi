@@ -174,9 +174,18 @@ function barebonesWASI() {
     
     let buffer = "hardcoded stdin1\nhardcoded stdin2\nhardcoded stdin3\nhardcoded stdin4\nhardcoded stdin5\nhardcoded stdin6\nhardcoded stdin7\nhardcoded stdin8\nhardcoded stdin9\nhardcoded stdin10\nhardcoded stdin11\nhardcoded stdin12\nhardcoded stdin13\nhardcoded stdin14\n";
 
+    onmessage = function(e) {
+         buffer = buffer + e;      
+    }
+
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
+            if (len == 0) return ["", 0];
+            while (buffer.len < len) {
+                
+                // TODO:
+            }
             let data = buffer.slice(0, len);
             buffer = buffer.slice(len, buffer.len);
             return [new TextEncoder().encode(data).slice(0, len), 0];
