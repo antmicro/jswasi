@@ -12,10 +12,12 @@ fn main() {
         //thread::sleep(delay);
     }
 
-    println!("Type something:");
+    println!("Type something (10 tries):");
     let mut buff = String::new();
-    io::stdin().read_line(&mut buff);
-    println!("You entered: {}", buff);
+    for _ in 0..10 {
+       io::stdin().read_line(&mut buff);
+       println!("You entered: {}", buff);
+    }
 
     // // This wouldn't work, hands whole site, doesn't even render terminal
     // loop {
