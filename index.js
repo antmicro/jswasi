@@ -681,10 +681,17 @@ function importWasmModule(moduleName, wasiPolyfill) {
         const instance = await WebAssembly.instantiate(module, moduleImports);
 
         wasiPolyfill.setModuleInstance(instance);
-        while (!started) { }
         instance.exports._start();
     })();
 }
 
-const wasiPolyfill = barebonesWASI();
-importWasmModule("msh.wasm", wasiPolyfill);
+function start_wasm() {
+    if (started) {
+        const wasiPolyfill = barebonesWASI();
+        importWasmModule("msh.wasm", wasiPolyfill);    
+    } else {
+        setTimeout(function(){ start_wasm; }, 1000); 
+    }
+}
+
+setTimeout(function(){ start_wasm(); }, 1000);
