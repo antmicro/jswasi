@@ -6,8 +6,9 @@ fn main() {
     let delay = time::Duration::from_millis(1000);
     
     // This works, but maybe because stdin errors and process finishes
+    println!("Going to do an iteration 30 times and sleep 1s in between");
     for _ in 0..30 {
-        println!("Hello from Rust/WASM!");
+        println!("Iteration -- Hello from Rust/WASM!");
         thread::sleep(delay);
     }
 
