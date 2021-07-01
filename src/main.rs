@@ -1,11 +1,14 @@
-use std::{env, fs, thread};
+use std::{env, fs, thread, time};
 use std::io::{self, Write};
 use std::time::Duration;
 
 fn main() {
+    let delay = time::Duration::from_millis(1000);
+    
     // This works, but maybe because stdin errors and process finishes
-    for _ in 0..3 {
+    for _ in 0..30 {
         println!("Hello from Rust/WASM!");
+        thread::sleep(delay);
     }
 
     let mut buff = String::new();
