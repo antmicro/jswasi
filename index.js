@@ -172,10 +172,31 @@ function barebonesWASI() {
         }
     }
 
+    class Stdin {
+        read(len) {
+            // TODO: store input somewhere and replace hardcoded
+            return [new TextEncoder().encode("hardcoded stdin\n").slice(0, len), 0];
+        }
+    }
+
+    class Stdout {
+        write(content) {
+            postMessage(["stdout", content]);
+            return WASI_ESUCCESS;
+        }
+    }
+
+    class Stderr {
+        write(content) {
+            postMessage(["stderr", content]);
+            return WASI_ESUCCESS;
+        }
+    }
+
     let fds = [
-        {},
-        {},
-        {},
+        new Stdin(),
+        new Stdout(),
+        new Stderr(),
         // new PreopenDirectory("/tmp", {}),
         // new PreopenDirectory(".", {
         //     "hello.rs": new File(new TextEncoder("utf-8").encode(`fn main() { println!("Hello World!"); }`)),
