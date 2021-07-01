@@ -2,7 +2,7 @@
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
-function barebonesWASI(terminal) {
+function barebonesWASI() {
 
     let moduleInstanceExports = null;
 
@@ -264,9 +264,9 @@ function barebonesWASI(terminal) {
         const content = String.fromCharCode.apply(null, bufferBytes);
 
         if (fd === WASI_STDOUT_FILENO) {
-            terminal.io.println(content);
+            postMessage(["stdout", content]);
         } else if (fd === WASI_STDERR_FILENO) {
-            console.log(content);
+            postMessage(["stderr", content]);
         } else {
             let err = fds[fd].write(content);
             console.log("err on write: " + err)
@@ -640,3 +640,6 @@ function importWasmModule(moduleName, wasiPolyfill) {
         instance.exports._start();
     })();
 }
+
+const wasiPolyfill = barebonesWASI();
+importWasmModule("msh.wasm", wasiPolyfill);

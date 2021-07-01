@@ -1,27 +1,21 @@
-use std::{env, fs};
+use std::{env, fs, thread};
 use std::io::{self, Write};
+use std::time::Duration;
 
 fn main() {
-    println!("Hello from Rust/WASM!");
-    io::stdout().write_all(b"hello world\n").unwrap();
-    eprintln!("Error print");
-    eprintln!("Error print");
-
-    for argument in env::args() {
-        println!("one is:");
-        println!("{}", argument);
+    // This works, but maybe because stdin errors and process finishes
+    for _ in 0..3 {
+        println!("Hello from Rust/WASM!");
     }
 
-    // let mut buff = String::new();
-    // io::stdin().read_line(&mut buff);
-    // println!("You entered: {}", buff);
+    let mut buff = String::new();
+    io::stdin().read_line(&mut buff);
+    println!("You entered: {}", buff);
 
-    // Throws hard to debug - Uncaught (in promise) RuntimeError: unreachable
-   
-   
-   // TODO: this breaks stuff
-   // let mut buff = fs::read_to_string("hello.rs").unwrap_or("failed reading file".to_owned());
-   // println!("{}", buff);
+    // // This wouldn't work, hands whole site, doesn't even render terminal
+    // loop {
+    //     println!("Hello from infinite loop!")
+    // }
 
     return;
 }

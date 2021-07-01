@@ -61,8 +61,19 @@
         await lib.init();
         const terminal = setupHterm();
 
-        const wasiPolyfill = barebonesWASI(terminal);
-        importWasmModule("msh.wasm", wasiPolyfill);
+        // const wasiPolyfill = barebonesWASI(terminal);
+        // importWasmModule("msh.wasm", wasiPolyfill);
+
+        let myWorker = new Worker('index.js');
+        myWorker.onmessage = (event) => {
+            const action = event.data[0];
+            if (action === "stdout") {
+                terminal.io.println(event.data[1]);
+            } else if (action === "stderr") {
+                console.log(event.data[1]);
+            }
+        }
+        myWorker.postMessage("start");
 
         // const importObject = {
         //     env: {
