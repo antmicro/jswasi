@@ -173,15 +173,21 @@ function barebonesWASI() {
     }
     
     let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
+    let started = false;
 
     onmessage = function(e) {
-         buffer = buffer + e.data;      
-         console.log("got "+e.data+ " buffer now " + buffer);         
+         if (!started) {
+            if (e.data == "start") started = true;   
+         } else {
+            buffer = buffer + e.data;      
+            console.log("got "+e.data+ " buffer now " + buffer);         
+         }
     }
 
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
+            console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.len);
             if (len == 0) return ["", 0];
             while (buffer.len < len) {
                 
@@ -677,4 +683,5 @@ function importWasmModule(moduleName, wasiPolyfill) {
 }
 
 const wasiPolyfill = barebonesWASI();
+while (!started) { }
 importWasmModule("msh.wasm", wasiPolyfill);
