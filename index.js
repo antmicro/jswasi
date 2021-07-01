@@ -171,11 +171,15 @@ function barebonesWASI() {
             this.prestat_name = new TextEncoder("utf-8").encode(name);
         }
     }
+    
+    let buffer = "hardcoded stdin1\nhardcoded stdin2\nhardcoded stdin3\nhardcoded stdin4\nhardcoded stdin5\nhardcoded stdin6\nhardcoded stdin7\nhardcoded stdin8\nhardcoded stdin9\nhardcoded stdin10\nhardcoded stdin11\nhardcoded stdin12\nhardcoded stdin13\nhardcoded stdin14\n";
 
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
-            return [new TextEncoder().encode("hardcoded stdin\n").slice(0, len), 0];
+            let data = buffer.slice(0, len);
+            buffer = buffer.slice(len, buffer.len);
+            return [new TextEncoder().encode(data).slice(0, len), 0];
         }
     }
 
