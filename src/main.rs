@@ -12,6 +12,7 @@ fn main() {
         thread::sleep(delay);
     }
 
+    println!("Type something:");
     let mut buff = String::new();
     io::stdin().read_line(&mut buff);
     println!("You entered: {}", buff);
