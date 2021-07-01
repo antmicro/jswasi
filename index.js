@@ -8,6 +8,7 @@ let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
 
 onmessage = function(e) {
          if (!started) {
+             console.log("not yet started, we got "+e.data);
             if (e.data == "start") started = true;   
          } else {
             buffer = buffer + e.data;      
@@ -680,10 +681,10 @@ function importWasmModule(moduleName, wasiPolyfill) {
         const instance = await WebAssembly.instantiate(module, moduleImports);
 
         wasiPolyfill.setModuleInstance(instance);
+        while (!started) { }
         instance.exports._start();
     })();
 }
 
 const wasiPolyfill = barebonesWASI();
-while (!started) { }
 importWasmModule("msh.wasm", wasiPolyfill);
