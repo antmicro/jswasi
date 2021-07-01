@@ -9,7 +9,7 @@ fn main() {
     println!("Going to do an iteration 30 times and sleep 1s in between");
     for _ in 0..30 {
         println!("Iteration -- Hello from Rust/WASM!");
-        thread::sleep(delay);
+        //thread::sleep(delay);
     }
 
     println!("Type something:");
