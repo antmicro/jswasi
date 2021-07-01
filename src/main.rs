@@ -12,8 +12,8 @@ fn main() {
         //thread::sleep(delay);
     }
 
-    println!("Type something (3 tries):");
-    for _ in 0..3 {
+    println!("Type something (4 tries):");
+    for _ in 0..4 {
        let mut buff = String::new();
        io::stdin().read_line(&mut buff);
        println!("You entered: {}", buff);
