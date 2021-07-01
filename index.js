@@ -172,7 +172,7 @@ function barebonesWASI() {
         }
     }
     
-    let buffer = "hardcoded stdin1\nhardcoded stdin2\nhardcoded stdin3\nhardcoded stdin4\nhardcoded stdin5\nhardcoded stdin6\nhardcoded stdin7\nhardcoded stdin8\nhardcoded stdin9\nhardcoded stdin10\nhardcoded stdin11\nhardcoded stdin12\nhardcoded stdin13\nhardcoded stdin14\n";
+    let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
 
     onmessage = function(e) {
          buffer = buffer + e;      
