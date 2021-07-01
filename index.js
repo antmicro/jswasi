@@ -190,9 +190,9 @@ function barebonesWASI() {
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
-            console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.len);
+            console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.length);
             if (len == 0) return ["", 0];
-            while (buffer.len < len) {
+            while (buffer.length < len) {
                 
                 // TODO:
             }
@@ -433,6 +433,7 @@ function barebonesWASI() {
             buffer.setUint32(nread_ptr, 0, true);
             for (let i = 0; i < iovs_len; i++) {
                 let [ptr, len] = [buffer.getUint32(iovs_ptr + 8 * i, true), buffer.getUint32(iovs_ptr + 8 * i + 4, true)];
+                if ((len == 8192) && ((i+1) == iovs_len)) len = 1;
                 let [data, err] = fds[fd].read(len);
                 if (err != 0) {
                     return err;
