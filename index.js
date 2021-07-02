@@ -187,7 +187,7 @@ function barebonesWASI() {
         }
     }
     
-    let buffer = "";
+    let buffer = "first line\n";
     
     class Stdin {
         read(len) {
