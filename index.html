@@ -69,7 +69,9 @@
 
         myWorker.onmessage = (event) => {
             const action = event.data[0];
-            if (action === "stdout") {
+            if (action === "buffer") {
+                console.log("TODO: got buffer request");
+            } else if (action === "stdout") {
                 terminal.io.println(event.data[1]);
             } else if (action === "stderr") {
                 console.log(event.data[1]);
