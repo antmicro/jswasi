@@ -76,7 +76,7 @@
                 lck[0] = 1;
                 len[0] = 1;
                 const sbuf = new Uint16Array(event.data[1], 8, len[0]);
-                str = "d";
+                let str = "d";
                 sbuf[0] = str.charCodeAt(0);
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
