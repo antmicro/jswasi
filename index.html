@@ -10,6 +10,8 @@
 <script type="module">
     import {hterm, lib} from "./hterm-all.js";
 
+    let buffer = "";
+
     async function init_all() {
         // If you are a cross-browser web app and want to use window.localStorage.
         hterm.defaultStorage = new lib.Storage.Local();
@@ -18,7 +20,7 @@
         let cursor = 0;
         
         let myWorker = new Worker('index.js');
-
+        
         function setupHterm() {
             // profileId is the name of the terminal profile to load, or "default" if
             // not specified.  If you're using one of the persistent storage
@@ -37,7 +39,7 @@
                     // instance.exports.stdin(code);
                     //t.io.print(String.fromCharCode(result));
                     console.log(data, code);
-                    myWorker.postMessage(data);
+                    buffer = buffer + data;
                 };
 
                 io.onTerminalResize = (columns, rows) => {
@@ -74,10 +76,12 @@
                 const len = new Int32Array(event.data[1], 4, 1);    
                 console.log("got buffer request of len "+len[0]+", notifying");
                 lck[0] = 1;
-                len[0] = 1;
                 const sbuf = new Uint16Array(event.data[1], 8, len[0]);
-                let str = "d";
-                sbuf[0] = str.charCodeAt(0);
+                len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
+                for (j = 0; j++; j < len[0]) {
+                    sbuf[j] = buffer.charCodeAt(j);
+                }
+                buffer = buffer.slice(len[0], buffer.length);
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
                 terminal.io.println(event.data[1]);
