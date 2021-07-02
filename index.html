@@ -75,7 +75,7 @@
                 console.log("got buffer request of len "+len[0]+", notifying");
                 lck[0] = 1;
                 len[0] = 1;
-                const sbuf = new UInt16Array(event.data[1], 8, len[0]);
+                const sbuf = new Uint16Array(event.data[1], 8, len[0]);
                 str = "d";
                 sbuf[0] = str.charCodeAt(0);
                 Atomics.notify(lck, 0);
