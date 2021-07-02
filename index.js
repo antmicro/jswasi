@@ -208,9 +208,9 @@ function barebonesWASI() {
                 if (buffer.length >= len) break;
             }
             console.log("Out of Waiting...");
-            let data = buffer.slice(0, len);
+            let data = buffer.slice(0, len).replace("\r", "\n");
             buffer = buffer.slice(len, buffer.length);
-            return [new TextEncoder().encode(data).slice(0, len), 0];
+            return [new TextEncoder().encode(data), 0];
         }
     }
 
