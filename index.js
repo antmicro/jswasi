@@ -193,7 +193,8 @@ function barebonesWASI() {
             console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.length);
             if (len == 0) return ["", 0];
             while (buffer.length < len) {
-                
+                console.log("Waiting...");                
+                await new Promise(r => setTimeout(r, 1000));
                 // TODO:
             }
             let data = buffer.slice(0, len);
