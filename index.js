@@ -194,8 +194,8 @@ function barebonesWASI() {
             // TODO: store input somewhere and replace hardcoded
             console.log("read is happening, requested len is "+len);
             if (len == 0) return ["", 0];
+            console.log("Waiting...");
             while (1) {
-                console.log("Waiting...");
                 const buf = new SharedArrayBuffer((len*2) + 8); // lock, len, data
                 const lck = new Int32Array(buf, 0, 1);
                 const request_len = new Int32Array(buf, 4, 1);
@@ -204,7 +204,7 @@ function barebonesWASI() {
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                console.log("buffer len is now " + buffer.length + " and contents is '"+buffer+"'");
+                if (buffer.length > 0) console.log("buffer len is now " + buffer.length + " and contents is '"+buffer+"'");
                 if (buffer.length >= len) break;
             }
             console.log("Out of Waiting...");
