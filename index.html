@@ -78,6 +78,7 @@
                 lck[0] = 1;
                 const sbuf = new Uint16Array(event.data[1], 8, len[0]);
                 len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
+                console.log("current buffer is " + buffer + ", copying len " + len[0]);
                 for (let j = 0; j++; j < len[0]) {
                     sbuf[j] = buffer.charCodeAt(j);
                 }
