@@ -4,7 +4,7 @@
 
 let started = false;
 
-let buffer = "hardcoded stdin1\nhardcoded stdin2\n";
+//let buffer = "";
 
 onmessage = function(e) {
          if (!started) {
@@ -187,12 +187,14 @@ function barebonesWASI() {
         }
     }
     
+    let buffer = "";
+    
     class Stdin {
         read(len) {
             // TODO: store input somewhere and replace hardcoded
-            console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.length);
+            console.log("read is happening, requested len is "+len);
             if (len == 0) return ["", 0];
-            while (buffer.length < len) {
+            while (1) {
                 console.log("Waiting...");
                 const buf = new SharedArrayBuffer((len*2) + 8); // lock, len, data
                 const lck = new Int32Array(buf, 0, 1);
@@ -204,9 +206,10 @@ function barebonesWASI() {
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
                 console.log("buffer len is now " + buffer.length);
+                if (buffer.length >= len) break;
             }
             let data = buffer.slice(0, len);
-            buffer = buffer.slice(len, buffer.len);
+            buffer = buffer.slice(len, buffer.length);
             return [new TextEncoder().encode(data).slice(0, len), 0];
         }
     }
