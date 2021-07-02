@@ -193,9 +193,10 @@ function barebonesWASI() {
             console.log("read is happening, requested len is "+len+ ", buffer len is "+buffer.length);
             if (len == 0) return ["", 0];
             while (buffer.length < len) {
-                console.log("Waiting...");                
-                await new Promise(r => setTimeout(r, 1000));
-                // TODO:
+                console.log("Waiting...");
+                const buf = new SharedArrayBuffer(len + 4);
+                const lck = new Int32Array(buf, 0, 1);
+                Atomics.wait(lck, 0, 0);
             }
             let data = buffer.slice(0, len);
             buffer = buffer.slice(len, buffer.len);
