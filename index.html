@@ -70,9 +70,11 @@
         myWorker.onmessage = (event) => {
             const action = event.data[0];
             if (action === "buffer") {
-                console.log("got buffer request, notifying");
                 const lck = new Int32Array(event.data[1], 0, 1);
+                const len = new Int32Array(event.data[1], 4, 1);    
+                console.log("got buffer request of len "+len[0]+", notifying");
                 lck[0] = 1;
+                len[0] = 666;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
                 terminal.io.println(event.data[1]);
