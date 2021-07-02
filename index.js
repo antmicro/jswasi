@@ -202,12 +202,12 @@ function barebonesWASI() {
                 request_len[0] = len;
                 postMessage(["buffer", buf]);
                 Atomics.wait(lck, 0, 0);
-                console.log("got len = " + request_len[0]);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                console.log("buffer len is now " + buffer.length);
+                console.log("buffer len is now " + buffer.length + " and contents is '"+buffer+"'");
                 if (buffer.length >= len) break;
             }
+            console.log("Out of Waiting...");
             let data = buffer.slice(0, len);
             buffer = buffer.slice(len, buffer.length);
             return [new TextEncoder().encode(data).slice(0, len), 0];
