@@ -196,7 +196,7 @@ function barebonesWASI() {
                 console.log("Waiting...");
                 const buf = new SharedArrayBuffer(len + 4);
                 const lck = new Int32Array(buf, 0, 1);
-                postMessage({type: "buffer", buffer : buf});
+                postMessage(["buffer", buf]);
                 Atomics.wait(lck, 0, 0);
             }
             let data = buffer.slice(0, len);
