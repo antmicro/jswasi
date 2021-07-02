@@ -11,8 +11,8 @@ onmessage = function(e) {
              console.log("not yet started, we got "+e.data);
             if (e.data == "start") started = true;   
          } else {
-            buffer = buffer + e.data;      
-            console.log("got "+e.data+ " buffer now " + buffer);         
+    /*        buffer = buffer + e.data;      
+            console.log("got "+e.data+ " buffer now " + buffer);         */
          }
 }
 
@@ -203,6 +203,7 @@ function barebonesWASI() {
                 console.log("got len = " + request_len[0]);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
+                console.log("buffer len is now " + buffer.length);
             }
             let data = buffer.slice(0, len);
             buffer = buffer.slice(len, buffer.len);
