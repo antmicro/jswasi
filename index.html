@@ -19,8 +19,6 @@
         let input = "";
         let cursor = 0;
         
-        let myWorker = new Worker('index.js');
-        
         function setupHterm() {
             // profileId is the name of the terminal profile to load, or "default" if
             // not specified.  If you're using one of the persistent storage
@@ -66,9 +64,8 @@
         await lib.init();
         const terminal = setupHterm();
 
-        // const wasiPolyfill = barebonesWASI(terminal);
-        // importWasmModule("msh.wasm", wasiPolyfill);
-
+        let myWorker = new Worker('index.js');
+        
         myWorker.onmessage = (event) => {
             const action = event.data[0];
             if (action === "buffer") {
@@ -95,19 +92,6 @@
             }
         }
         myWorker.postMessage("start");
-
-        // const importObject = {
-        //     env: {
-        //         stdio: code => terminal.io.print(String.fromCharCode(code)),
-        //         stderr: code => console.log("ERR: " + code),
-        //         logHello: () => console.log("Hello env")
-        //     },
-        //     wasi_snapshot_preview1: wasi_snapshot_preview1,
-        // };
-        //
-        // const wasm = await WebAssembly.instantiateStreaming(fetch('./main.wasm'), importObject);
-        // const instance = wasm.instance;
-        // const module = wasm.module;
     }
 
     window.onload = init_all;
