@@ -8,11 +8,8 @@ let started = false;
 
 onmessage = function(e) {
          if (!started) {
-             console.log("not yet started, we got "+e.data);
+            console.log("not yet started, we got "+e.data);
             if (e.data == "start") started = true;   
-         } else {
-    /*        buffer = buffer + e.data;      
-            console.log("got "+e.data+ " buffer now " + buffer);         */
          }
 }
 
@@ -703,7 +700,7 @@ function start_wasm() {
         const wasiPolyfill = barebonesWASI();
         importWasmModule("msh.wasm", wasiPolyfill);    
     } else {
-        setTimeout(function(){ start_wasm; }, 1000); 
+        setTimeout(function(){ start_wasm(); }, 1000); 
     }
 }
 
