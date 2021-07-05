@@ -1,25 +1,33 @@
 use std::{env, fs, thread, time};
 use std::io::{self, Write};
 use std::time::Duration;
+use std::fs::File;
+use std::process::exit;
 
 fn main() {
-    let delay = time::Duration::from_millis(1000);
-    
-    // This works, but maybe because stdin errors and process finishes
     println!("Going to do an iteration 30 times and sleep 1s in between");
-    for _ in 0..30 {
+    for _ in 0..3 {
         println!("Iteration -- Hello from Rust/WASM!");
-        //thread::sleep(delay);
     }
 
-    fs::write("test.txt", "saved contents").unwrap_or_else(|e| {
-        println!("error occured: {}", e);
-    });
+    // let mut file = File::create("test.txt").unwrap_or_else(|e| {
+    //     println!("error occurred: {}", e);
+    //     exit(1);
+    // });
+
+    // let mut file = File::open("/tmp/test.txt").unwrap_or_else(|e| {
+    //     println!("error occurred: {}", e);
+    //     exit(1);
+    // });
+
+    // fs::write("test.txt", "saved contents").unwrap_or_else(|e| {
+    //     println!("error occurred: {}", e);
+    // });
     // let buffer = fs::read_to_string("hello.rs").unwrap_or_else(|e| {
-    //     println!("error occured: {}", e);
+    //     println!("error occurred: {}", e);
     //     "".to_owned()
     // });
-    // println!("bufer: {}", buffer);
+    // println!("buffer: {}", buffer);
 
     // println!("Type something (4 tries):");
     // for _ in 0..4 {
