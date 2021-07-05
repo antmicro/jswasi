@@ -6,13 +6,13 @@ let started = false;
 
 //let buffer = "";
 
-onmessage = function(e) {
-         if (!started) {
-            console.log("not yet started, we got "+e.data);
-            if (e.data == "start") started = true;   
-         }
-}
+onmessage = function (e) {
+    if (!started) {
+        console.log("not yet started, we got " + e.data);
+        if (e.data === "start") started = true;
+    }
 
+}
 
 function barebonesWASI() {
 
@@ -183,17 +183,16 @@ function barebonesWASI() {
             this.prestat_name = new TextEncoder("utf-8").encode(name);
         }
     }
-    
+
     let buffer = "";
-    
+
     class Stdin {
         read(len) {
-            // TODO: store input somewhere and replace hardcoded
-            console.log("read is happening, requested len is "+len);
-            if (len == 0) return ["", 0];
+            console.log("read is happening, requested len is " + len);
+            if (len === 0) return ["", 0];
             console.log("Waiting...");
             while (1) {
-                const buf = new SharedArrayBuffer((len*2) + 8); // lock, len, data
+                const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
                 const lck = new Int32Array(buf, 0, 1);
                 const request_len = new Int32Array(buf, 4, 1);
                 request_len[0] = len;
@@ -201,7 +200,7 @@ function barebonesWASI() {
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                if (buffer.length > 0) console.log("buffer len is now " + buffer.length + " and contents is '"+buffer+"'");
+                if (buffer.length > 0) console.log("buffer len is now " + buffer.length + " and contents is '" + buffer + "'");
                 if (buffer.length >= len) break;
             }
             console.log("Out of Waiting...");
@@ -229,10 +228,10 @@ function barebonesWASI() {
         new Stdin(),
         new Stdout(),
         new Stderr(),
-        // new PreopenDirectory("/tmp", {}),
-        // new PreopenDirectory(".", {
-        //     "hello.rs": new File(new TextEncoder("utf-8").encode(`fn main() { println!("Hello World!"); }`)),
-        // }),
+        new PreopenDirectory("/tmp", {}),
+        new PreopenDirectory(".", {
+            "hello.rs": new File(new TextEncoder("utf-8").encode(`fn main() { println!("Hello World!"); }`)),
+        }),
     ];
 
     function environ_sizes_get(environCount, environBufSize) {
@@ -442,7 +441,7 @@ function barebonesWASI() {
             buffer.setUint32(nread_ptr, 0, true);
             for (let i = 0; i < iovs_len; i++) {
                 let [ptr, len] = [buffer.getUint32(iovs_ptr + 8 * i, true), buffer.getUint32(iovs_ptr + 8 * i + 4, true)];
-                if ((len == 8192) && ((i+1) == iovs_len)) len = 1;
+                if ((len == 8192) && ((i + 1) == iovs_len)) len = 1;
                 let [data, err] = fds[fd].read(len);
                 if (err != 0) {
                     return err;
@@ -698,10 +697,14 @@ function importWasmModule(moduleName, wasiPolyfill) {
 function start_wasm() {
     if (started) {
         const wasiPolyfill = barebonesWASI();
-        importWasmModule("msh.wasm", wasiPolyfill);    
+        importWasmModule("msh.wasm", wasiPolyfill);
     } else {
-        setTimeout(function(){ start_wasm(); }, 1000); 
+        setTimeout(function () {
+            start_wasm();
+        }, 1000);
     }
 }
 
-setTimeout(function(){ start_wasm(); }, 1000);
+setTimeout(function () {
+    start_wasm();
+}, 1000);

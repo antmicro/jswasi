@@ -12,12 +12,21 @@ fn main() {
         //thread::sleep(delay);
     }
 
-    println!("Type something (4 tries):");
-    for _ in 0..4 {
-       let mut buff = String::new();
-       io::stdin().read_line(&mut buff);
-       println!("You entered: {}", buff);
-    }
+    fs::write("test.txt", "saved contents").unwrap_or_else(|e| {
+        println!("error occured: {}", e);
+    });
+    // let buffer = fs::read_to_string("hello.rs").unwrap_or_else(|e| {
+    //     println!("error occured: {}", e);
+    //     "".to_owned()
+    // });
+    // println!("bufer: {}", buffer);
+
+    // println!("Type something (4 tries):");
+    // for _ in 0..4 {
+    //    let mut buff = String::new();
+    //    io::stdin().read_line(&mut buff);
+    //    println!("You entered: {}", buff);
+    // }
     
     println!("I regret to announce this is the end!");
 

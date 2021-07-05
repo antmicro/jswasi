@@ -71,7 +71,7 @@
             if (action === "buffer") {
                 const lck = new Int32Array(event.data[1], 0, 1);
                 const len = new Int32Array(event.data[1], 4, 1);
-                if (buffer.length != 0) {
+                if (buffer.length !== 0) {
                     console.log("got buffer request of len "+len[0]+", notifying");
                     const sbuf = new Uint16Array(event.data[1], 8, len[0]);
                     len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
