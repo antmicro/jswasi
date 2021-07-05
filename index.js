@@ -4,8 +4,6 @@
 
 let started = false;
 
-//let buffer = "";
-
 onmessage = function (e) {
     if (!started) {
         console.log("not yet started, we got " + e.data);
@@ -37,6 +35,7 @@ function barebonesWASI() {
     const OFLAGS_TRUNC = 0x8;
 
     let args = [];
+    let env = [];
 
     function setModuleInstance(instance) {
 
@@ -62,14 +61,17 @@ function barebonesWASI() {
         }
 
         get size() {
+            console.log("file size");
             return this.data.byteLength;
         }
 
         open() {
+            console.log("file open");
             return new OpenFile(this);
         }
 
         stat() {
+            console.log("file stat");
             return {
                 dev: 0n,
                 ino: 0n,
@@ -83,6 +85,7 @@ function barebonesWASI() {
         }
 
         truncate() {
+            console.log("file truncate");
             this.data = new Uint8Array([]);
         }
     }
@@ -96,10 +99,12 @@ function barebonesWASI() {
         }
 
         get size() {
+            console.log("open file size");
             return this.file.size;
         }
 
         read(len) {
+            console.log("open file read");
             if (this.file_pos < this.file.data.byteLength) {
                 let slice = this.file.data.slice(this.file_pos, this.file_pos + len);
                 this.file_pos += slice.length;
@@ -110,7 +115,7 @@ function barebonesWASI() {
         }
 
         write(buffer) {
-            console.log(this.file.data, this.file_pos, buffer.byteLength);
+            console.log("open file write: ", this.file.data, this.file_pos, buffer.byteLength);
             if (this.file_pos + buffer.byteLength > this.size) {
                 let old = this.file.data;
                 this.file.data = new Uint8Array(this.file_pos + buffer.byteLength);
@@ -127,6 +132,7 @@ function barebonesWASI() {
         }
 
         stat() {
+            console.log("open file stat");
             return this.file.stat();
         }
     }
@@ -139,10 +145,12 @@ function barebonesWASI() {
         }
 
         open() {
+            console.log("directory open");
             return this;
         }
 
         get_entry_for_path(path) {
+            console.log("directory get entry for path");
             let entry = this;
             for (let component of path.split("/")) {
                 if (component == "") break;
@@ -157,6 +165,7 @@ function barebonesWASI() {
         }
 
         create_entry_for_path(path) {
+            console.log("directory create entry for path");
             let entry = this;
             let components = path.split("/").filter((component) => component != "/");
             for (let i in components) {
@@ -228,13 +237,16 @@ function barebonesWASI() {
         new Stdin(),
         new Stdout(),
         new Stderr(),
-        new PreopenDirectory("/tmp", {}),
+        new PreopenDirectory("/tmp", {
+            "test.txt": new File(new TextEncoder().encode('some test content')),
+        }), // 3
         new PreopenDirectory(".", {
-            "hello.rs": new File(new TextEncoder("utf-8").encode(`fn main() { println!("Hello World!"); }`)),
-        }),
+            "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+        }), // 4
     ];
 
     function environ_sizes_get(environCount, environBufSize) {
+        console.log("environ_sizes_get");
 
         const view = getModuleMemoryDataView();
 
@@ -245,6 +257,7 @@ function barebonesWASI() {
     }
 
     function args_sizes_get(argc, argvBufSize) {
+        console.log("args_sizes_get");
 
         const view = getModuleMemoryDataView();
 
@@ -255,6 +268,7 @@ function barebonesWASI() {
     }
 
     function fd_fdstat_get(fd, bufPtr) {
+        console.log("fd_fdstat_get");
 
         const view = getModuleMemoryDataView();
 
@@ -293,6 +307,7 @@ function barebonesWASI() {
     }
 
     function fd_write(fd, iovs, iovsLen, nwritten) {
+        console.log("fd_write");
 
         const view = getModuleMemoryDataView();
 
@@ -330,12 +345,14 @@ function barebonesWASI() {
     }
 
     function poll_oneoff(sin, sout, nsubscriptions, nevents) {
+        console.log("poll_oneoff");
 
         return WASI_ENOSYS;
     }
 
     function proc_exit() {
-        console.log("proc_exit");
+        console.log("proc_exit, shutting down");
+        close();
     }
 
     function random_get() {
@@ -356,9 +373,9 @@ function barebonesWASI() {
     // }
 
     function args_get(argv, argv_buf) {
+        console.log("args_get(", argv, ", ", argv_buf, ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
-        console.log("args_get(", argv, ", ", argv_buf, ")");
         let orig_argv_buf = argv_buf;
         // TODO: args variable
         for (let i = 0; i < args.length; i++) {
@@ -387,14 +404,15 @@ function barebonesWASI() {
     // }
 
     function environ_get(environ, environ_buf) {
+        console.log("environ_get(", environ, ", ", environ_buf, ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
-        console.log("environ_get(", environ, ", ", environ_buf, ")");
         let orig_environ_buf = environ_buf;
+        // TODO: env
         for (let i = 0; i < env.length; i++) {
             buffer.setUint32(environ, environ_buf, true);
             environ += 4;
-            let e = new TextEncoder("utf-8").encode(env[i]);
+            let e = new TextEncoder().encode(env[i]);
             buffer8.set(e, environ_buf);
             buffer.setUint8(environ_buf + e.length, 0);
             environ_buf += e.length + 1;
@@ -404,8 +422,8 @@ function barebonesWASI() {
     }
 
     function clock_time_get(id, precision, time) {
-        let buffer = new DataView(inst.exports.memory.buffer);
-        //console.log("clock_time_get(", id, ", ", precision, ", ", time, ")");
+        console.log("clock_time_get(", id, ", ", precision, ", ", time, ")");
+        let buffer = getModuleMemoryDataView()
         buffer.setBigUint64(time, 0n, true);
         return 0;
     }
@@ -415,8 +433,8 @@ function barebonesWASI() {
     }
 
     function fd_filestat_get(fd, buf) {
+        console.log("fd_filestat_get(", fd, ", ", buf, ")");
         let buffer = getModuleMemoryDataView();
-        console.warn("fd_filestat_get(", fd, ", ", buf, ")");
         if (fds[fd] != undefined) {
             let stat = fds[fd].stat();
             buffer.setBigUint64(buf, stat.dev, true);
@@ -434,9 +452,9 @@ function barebonesWASI() {
     }
 
     function fd_read(fd, iovs_ptr, iovs_len, nread_ptr) {
+        console.log("fd_read(", fd, ", ", iovs_ptr, ", ", iovs_len, ", ", nread_ptr, ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
-        console.log("fd_read(", fd, ", ", iovs_ptr, ", ", iovs_len, ", ", nread_ptr, ")");
         if (fds[fd] != undefined) {
             buffer.setUint32(nread_ptr, 0, true);
             for (let i = 0; i < iovs_len; i++) {
@@ -456,9 +474,9 @@ function barebonesWASI() {
     }
 
     function fd_readdir(fd, buf, buf_len, cookie, bufused) {
+        console.log("fd_readdir(", fd, ", ", buf, ", ", buf_len, ", ", cookie, ", ", bufused, ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
-        console.warn("fd_readdir(", fd, ", ", buf, ", ", buf_len, ", ", cookie, ", ", bufused, ")");
         // 8 ,  3408816 ,  128 ,  0n ,  1032332
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             buffer.setUint32(bufused, 0, true);
@@ -556,8 +574,6 @@ function barebonesWASI() {
     }
 
     function path_open(fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
         console.log("path_open(",
             dirflags, ", ",
             path_ptr, ", ",
@@ -568,6 +584,8 @@ function barebonesWASI() {
             fdflags, ", ",
             opened_fd_ptr, ")",
         );
+        let buffer = getModuleMemoryDataView();
+        let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
             console.log(path);
@@ -616,13 +634,15 @@ function barebonesWASI() {
     }
 
     function fd_prestat_get(fd, buf_ptr) {
-        let buffer = getModuleMemoryDataView();
         console.log("fd_prestat_get(", fd, ", ", buf_ptr, ")");
+        let buffer = getModuleMemoryDataView();
+        // FIXME: this fails for created files, fds[fd] is undefined
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
+            console.log("fd_prestat_get inner");
             const PREOPEN_TYPE_DIR = 0;
             buffer.setUint32(buf_ptr, PREOPEN_TYPE_DIR, true);
             buffer.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
-            return 0;
+            return WASI_ESUCCESS;
         } else {
             return -1;
         }
@@ -632,42 +652,43 @@ function barebonesWASI() {
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
         console.log("fd_prestat_dir_name(", fd, ", ", path_ptr, ", ", path_len, ")");
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
+            console.log("fd_prestat_dir_name inner");
             let buffer8 = getModuleMemoryUint8Array();
             buffer8.set(fds[fd].prestat_name, path_ptr);
-            return 0;
+            return WASI_ESUCCESS;
         } else {
             return -1;
         }
     }
 
     return {
-        setModuleInstance: setModuleInstance,
-        environ_sizes_get: environ_sizes_get,
-        args_sizes_get: args_sizes_get,
-        fd_prestat_get: fd_prestat_get,
-        fd_fdstat_get: fd_fdstat_get,
-        fd_filestat_get: fd_filestat_get,
-        fd_read: fd_read,
-        fd_write: fd_write,
-        fd_prestat_dir_name: fd_prestat_dir_name,
-        environ_get: environ_get,
-        args_get: args_get,
-        poll_oneoff: poll_oneoff,
-        proc_exit: proc_exit,
-        fd_close: fd_close,
-        // fd_seek: fd_seek,
-        // random_get: random_get,
-        // clock_time_get: clock_time_get,
-        // fd_readdir: fd_readdir,
-        // path_create_directory: path_create_directory,
-        // path_filestat_get: path_filestat_get,
-        // path_link: path_link,
-        path_open: path_open,
-        // path_readlink: path_readlink,
-        // path_remove_directory: path_remove_directory,
-        // path_rename: path_rename,
-        // path_unlink_file: path_unlink_file,
-        // sched_yield: sched_yield,
+        setModuleInstance,
+        environ_sizes_get,
+        args_sizes_get,
+        fd_prestat_get,
+        fd_fdstat_get,
+        fd_filestat_get,
+        fd_read,
+        fd_write,
+        fd_prestat_dir_name,
+        environ_get,
+        args_get,
+        poll_oneoff,
+        proc_exit,
+        fd_close,
+        fd_seek,
+        random_get,
+        clock_time_get,
+        fd_readdir,
+        path_create_directory,
+        path_filestat_get,
+        path_link,
+        path_open,
+        path_readlink,
+        path_remove_directory,
+        path_rename,
+        path_unlink_file,
+        sched_yield,
     }
 }
 
