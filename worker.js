@@ -76,6 +76,8 @@ function barebonesWASI() {
     const FILETYPE_DIRECTORY = 3;
     const FILETYPE_REGULAR_FILE = 4;
 
+    const PREOPEN_TYPE_DIR = 0;
+
     const OFLAGS_CREAT = 0x1;
     const OFLAGS_DIRECTORY = 0x2;
     const OFLAGS_EXCL = 0x4;
@@ -91,7 +93,7 @@ function barebonesWASI() {
 
     function getModuleMemoryDataView() {
         // call this any time you'll be reading or writing to a module's memory
-        // the returned DataView tends to be dissaociated with the module's memory buffer at the will of the WebAssembly engine
+        // the returned DataView tends to be dissociated with the module's memory buffer at the will of the WebAssembly engine
         // cache the returned DataView at your own peril!!
 
         return new DataView(moduleInstanceExports.memory.buffer);
@@ -102,6 +104,9 @@ function barebonesWASI() {
     }
 
     class File {
+        file_type = FILETYPE_REGULAR_FILE;
+        data;
+
         constructor(data) {
             this.data = new Uint8Array(data);
         }
@@ -547,35 +552,18 @@ function barebonesWASI() {
         }
     }
 
-    // function fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
-    //     let buffer = getModuleMemoryDataView();
-    //     let buffer8 = getModuleMemoryUint8Array();
-    //     worker_console_log("fd_write(", fd, ", ", iovs_ptr, ", ", iovs_len, ", ", nwritten_ptr, ")");
-    //     if (fd === WASI_STDOUT_FILENO) {
-    //         terminal.io.println(content);
-    //     } else if (fd === WASI_STDERR_FILENO) {
-    //         worker_console_log(content);
-    //     } else if (fds[fd] != undefined) {
-    //         buffer.setUint32(nwritten_ptr, 0, true);
-    //         for (let i = 0; i < iovs_len; i++) {
-    //             let [ptr, len] = [buffer.getUint32(iovs_ptr + 8 * i, true), buffer.getUint32(iovs_ptr + 8 * i + 4, true)];
-    //             worker_console_log(ptr, len, buffer8.slice(ptr, ptr + len));
-    //             let err = fds[fd].write(buffer8.slice(ptr, ptr + len));
-    //             if (err != 0) {
-    //                 return err;
-    //             }
-    //             buffer.setUint32(nwritten_ptr, buffer.getUint32(nwritten_ptr, true) + len, true);
-    //         }
-    //         return 0;
-    //     } else {
-    //         return 1;
-    //     }
-    // }
+    function fd_seek() {
+        worker_console_log("fd_seek");
+    }
+
+    function path_create_directory() {
+        worker_console_log("path_create_directory");
+    }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
-        let buffer = new DataView(inst.exports.memory.buffer);
-        let buffer8 = new Uint8Array(inst.exports.memory.buffer);
-        worker_console_log("path_filestat_get("+ fd+ ", "+ flags+ ", "+ path_ptr+ ", "+ path_len+ ", "+ buf+ ")");
+        console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
+
+        let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
             worker_console_log("file = "+ path);
@@ -625,6 +613,7 @@ function barebonesWASI() {
         worker_console_log("fd_prestat_get("+ fd+ ", "+ buf_ptr+ ")");
         let buffer = getModuleMemoryDataView();
         // FIXME: this fails for created files, fds[fd] is undefined
+        //  what should happen when requesting with not used fd?
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
             worker_console_log("fd_prestat_get inner");
             const PREOPEN_TYPE_DIR = 0;
@@ -650,38 +639,29 @@ function barebonesWASI() {
         }
     }
   
-    let placeholder = function() { worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS; };
+    let placeholder = function() {
+        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS;
+    };
 
-    function fd_datasync() { return placeholder() };
-    function fd_filestat_set_size() { return placeholder() };
-    function fd_sync() { return placeholder() };
-    function path_symlink() { return placeholder() };
-    function clock_res_get() { return placeholder() };
-    function fd_advise() { return placeholder() };
-    function fd_allocate() { return placeholder() };
-    function fd_fdstat_set_flags() { return placeholder() };
-    function fd_fdstat_set_rights() { return placeholder() };
-    function fd_tell() { return placeholder() };
-    function fd_filestat_set_times() { return placeholder() };
-    function fd_pread() { return placeholder() };
-    function fd_pwrite() { return placeholder() };
-    function fd_renumber() { return placeholder() };
-    function path_filestat_set_times() { return placeholder() };
-    function proc_raise() { return placeholder() };
-    function sock_recv() { return placeholder() };
-    function sock_send() { return placeholder() };
-    function sock_shutdown() { return placeholder() };
-    function path_readlink() { return placeholder() };
-    function path_remove_directory() { return placeholder() };
-    function path_rename() { return placeholder() };
-    function path_unlink_file() { return placeholder() };
-    function sched_yield() { return placeholder() };
-    function path_link() { return placeholder() };
-    function fd_seek() { return placeholder() };
-    function random_get() { return placeholder() };
-    function poll_oneoff(sin, sout, nsubscriptions, nevents) { return placeholder() };
-    function path_create_directory() { return placeholder() };
-    function fd_close() { return placeholder() };
+    function fd_datasync() {
+      worker_console_log("fd_datasync");
+      return WASI_ESUCCESS;
+    }
+    
+    function fd_filestat_set_size() {
+      worker_console_log("fd_filestat_set_size");
+      return WASI_ESUCCESS;
+    }
+
+    function fd_sync() {
+        worker_console_log("fd_sync");
+      return WASI_ESUCCESS;
+    }
+
+    function path_symlink() {
+        worker_console_log("path_symlink");
+      return WASI_ESUCCESS;
+    }
 
     return {
         setModuleInstance,

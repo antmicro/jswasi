@@ -48,8 +48,6 @@
             t.decorate(document.querySelector('#terminal'));
             t.installKeyboard();
 
-            t.io.print('$ ');
-
             return t;
         }
 
@@ -80,7 +78,8 @@
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                terminal.io.println(event.data[2]);
+                // terminal.io.println(event.data[2]);
+                terminal.io.print(event.data[1]);
             } else if (action === "stderr") {
                 console.log(event.data[2]);
             } else if (action === "console") {
