@@ -4,31 +4,41 @@
 
 let started = false;
 let fname = "";
+let myself = null;
 
 onmessage = function (e) {
     if (!started) {
-        worker_console_log("not yet started, we got " + e.data);
         if (e.data[0] === "start") {
           fname = e.data[1];
+          myself = e.data[2];
           started = true;
         }
     }
 }
 
+function get_parent_port() {
+    if (is_node) {
+        const { parentPort } = require('worker_threads');
+        return parentPort;
+    }
+    return null;
+}
+
 let is_node = (typeof self === 'undefined');
 
 if (is_node) {
-    const { parentPort } = require('worker_threads');
-    parentPort.once('message', (message) => { let msg = { data: message }; onmessage(msg); });
+    get_parent_port().once('message', (message) => { let msg = { data: message }; onmessage(msg); });
 } else {
     worker_console_log("Running in a browser!");
 }
 
 function worker_send(msg) {
     if (is_node) {
-        msg_ = { data : msg };
+        msg_ = { data: [myself, "", ""] };
+        msg_.data[1] = msg[0];
+        msg_.data[2] = msg[1];
         const { parentPort } = require('worker_threads');
-        parentPort.postMessage(msg_);
+        get_parent_port().postMessage(msg_);
     } else postMessage(msg);
 }
 

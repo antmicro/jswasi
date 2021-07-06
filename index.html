@@ -58,16 +58,17 @@
         await lib.init();
         const terminal = setupHterm();
 
-        let myWorker = new Worker('index.js');
+        let workers = [];
+        workers[0] = { id: 0, worker: new Worker('index.js') };
         
-        myWorker.onmessage = (event) => {
-            const action = event.data[0];
+        workers[0].worker.onmessage = (event) => {
+            const action = event.data[1];
             if (action === "buffer") {
-                const lck = new Int32Array(event.data[1], 0, 1);
-                const len = new Int32Array(event.data[1], 4, 1);
+                const lck = new Int32Array(event.data[2], 0, 1);
+                const len = new Int32Array(event.data[2], 4, 1);
                 if (buffer.length !== 0) {
                     console.log("got buffer request of len "+len[0]+", notifying");
-                    const sbuf = new Uint16Array(event.data[1], 8, len[0]);
+                    const sbuf = new Uint16Array(event.data[2], 8, len[0]);
                     len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
                     console.log("current buffer is " + buffer + ", copying len " + len[0]);
                     for (let j = 0; j < len[0]; j++) {
@@ -80,14 +81,14 @@
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                terminal.io.println(event.data[1]);
+                terminal.io.println(event.data[2]);
             } else if (action === "stderr") {
-                console.log(event.data[1]);
+                console.log(event.data[2]);
             } else if (action === "console") {
-                console.log("WORKER: " + event.data[1]);
+                console.log("WORKER "+ event.data[0] + ": " + event.data[2]);
             }
         }
-        myWorker.postMessage(["start", "msh.wasm"]);
+        workers[0].worker.postMessage(["start", "msh.wasm", 0]);
     }
 
     window.onload = init_all;
