@@ -103,7 +103,6 @@ function barebonesWASI() {
 
     class File {
         constructor(data) {
-            worker_console_log(data);
             this.data = new Uint8Array(data);
         }
 
@@ -791,16 +790,18 @@ function importWasmModule(moduleName, wasiPolyfill) {
 
 function start_wasm() {
     if (started && fname != "") {
+        worker_console_log("Loading " + fname);
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
+        worker_console_log("done.");
     } else {
         setTimeout(function () {
             start_wasm();
-        }, 1000);
+        }, 500);
     }
 }
 
 setTimeout(function () {
     start_wasm();
-}, 1000);
+}, 500);
 

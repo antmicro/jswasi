@@ -59,7 +59,7 @@
         const terminal = setupHterm();
 
         let workers = [];
-        workers[0] = { id: 0, worker: new Worker('index.js') };
+        workers[0] = { id: 0, worker: new Worker('worker.js') };
         
         workers[0].worker.onmessage = (event) => {
             const action = event.data[1];

@@ -8,8 +8,8 @@ if (process.argv.length < 3) {
 }
 
 let workers = [];
-workers[0] = { id: 0, worker: new Worker('./index.js') };
-workers[1] = { id: 1, worker: new Worker('./index.js') };
+workers[0] = { id: 0, worker: new Worker('./worker.js') };
+workers[1] = { id: 1, worker: new Worker('./worker.js') };
 
 let terminated = false;
 
