@@ -3,9 +3,13 @@ const {
 } = require('worker_threads');
       
 let myWorker = new Worker('./index.js');
-        
-        myWorker.onmessage = (event) => {
+
+let terminated = false;
+
+let ev = (event) => {
+            //connsole.log("on message: ", event);
             const action = event.data[0];
+            console.log("action = ", action);
             if (action === "buffer") {
                 const lck = new Int32Array(event.data[1], 0, 1);
                 const len = new Int32Array(event.data[1], 4, 1);
@@ -24,13 +28,31 @@ let myWorker = new Worker('./index.js');
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                terminal.io.println(event.data[1]);
+                console.log(event.data[1]);
             } else if (action === "stderr") {
                 console.log(event.data[1]);
+            } else if (action === "exit") {
+                console.log("We got exit command");
+                myWorker.terminate();
+                terminated = true;
             }
         }
+
+
+myWorker.on('message', ev);
+//myWorker.onmessage = ev;
 
 console.log('sending message!');
 myWorker.postMessage("start");
 console.log('message sent!');
 
+function heartbeat() {
+     console.log("bip");
+     if (terminated) {
+       console.log("Thread finished.");
+     } else {
+         setTimeout(heartbeat, 2000);
+     }
+}
+
+heartbeat();

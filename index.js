@@ -15,7 +15,6 @@ onmessage = function (e) {
 let is_node = (typeof self === 'undefined');
 
 if (is_node) {
-    console.log("Running in Node!");
     const { parentPort } = require('worker_threads');
     parentPort.once('message', (message) => { let msg = { data: message }; onmessage(msg); });
 } else {
@@ -24,9 +23,9 @@ if (is_node) {
 
 function worker_send(msg) {
     if (is_node) {
-        console.log("We are in node");
+        msg_ = { data : msg };
         const { parentPort } = require('worker_threads');
-        parentPort.postMessage(msg);
+        parentPort.postMessage(msg_);
     } else postMessage(msg);
 }
 
@@ -370,7 +369,14 @@ function barebonesWASI() {
 
     function proc_exit() {
         console.log("proc_exit, shutting down");
-        close();
+        if (is_node) {
+           const buf = new SharedArrayBuffer(4); // lock
+           const lck = new Int32Array(buf, 0, 1);
+           worker_send(["exit", lck]); // never return
+           Atomics.wait(lck, 0, 0);
+        } else {
+           close();
+        }
     }
 
     function random_get() {
