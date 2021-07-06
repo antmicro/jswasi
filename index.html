@@ -85,7 +85,7 @@
                 console.log(event.data[1]);
             }
         }
-        myWorker.postMessage("start");
+        myWorker.postMessage(["start", "msh.wasm"]);
     }
 
     window.onload = init_all;

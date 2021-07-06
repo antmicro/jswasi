@@ -43,7 +43,7 @@ myWorker.on('message', ev);
 //myWorker.onmessage = ev;
 
 console.log('sending message!');
-myWorker.postMessage("start");
+myWorker.postMessage(["start", "msh.wasm"]);
 console.log('message sent!');
 
 function heartbeat() {

@@ -3,13 +3,16 @@
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
 let started = false;
+let fname = "";
 
 onmessage = function (e) {
     if (!started) {
         console.log("not yet started, we got " + e.data);
-        if (e.data === "start") started = true;
+        if (e.data[0] === "start") {
+          fname = e.data[1];
+          started = true;
+        }
     }
-
 }
 
 let is_node = (typeof self === 'undefined');
@@ -747,9 +750,9 @@ function importWasmModule(moduleName, wasiPolyfill) {
 }
 
 function start_wasm() {
-    if (started) {
+    if (started && fname != "") {
         const wasiPolyfill = barebonesWASI();
-        importWasmModule("msh.wasm", wasiPolyfill);
+        importWasmModule(fname, wasiPolyfill);
     } else {
         setTimeout(function () {
             start_wasm();
@@ -760,3 +763,4 @@ function start_wasm() {
 setTimeout(function () {
     start_wasm();
 }, 1000);
+
