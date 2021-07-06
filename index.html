@@ -86,6 +86,8 @@
                 console.log(event.data[2]);
             } else if (action === "console") {
                 console.log("WORKER "+ event.data[0] + ": " + event.data[2]);
+            } else if (action === "exit") {
+                console.log("WORKER " + event.data[0] + " exited with result code = "+event.data[2]);
             }
         }
         workers[0].worker.postMessage(["start", "msh.wasm", 0]);

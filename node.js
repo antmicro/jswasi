@@ -38,7 +38,7 @@ let ev = (event) => {
             } else if (action === "stderr") {
                 console.log(event.data[2]);
             } else if (action === "exit") {
-                console.log("We got exit command");
+                console.log("We got exit command, result = " + event.data[2]);
                 workers[event.data[0]].worker.terminate();
                 terminated = true;
             } else if (action === "console") {

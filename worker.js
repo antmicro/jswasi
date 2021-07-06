@@ -48,11 +48,11 @@ function worker_console_log(msg) {
 }
 
 
-function do_exit() {
+function do_exit(exit_code) {
     if (is_node) {
        const buf = new SharedArrayBuffer(4); // lock
        const lck = new Int32Array(buf, 0, 1);
-       worker_send(["exit", lck]); // never return
+       worker_send(["exit", exit_code]); // never return
        Atomics.wait(lck, 0, 0);
     } else {
        close();
@@ -396,9 +396,9 @@ function barebonesWASI() {
         return WASI_ENOSYS;
     }
 
-    function proc_exit() {
-        worker_console_log("proc_exit, shutting down");
-        do_exit(); // never returns!
+    function proc_exit(exit_code) {
+        worker_console_log("proc_exit, shutting down, exit_code = "+exit_code);
+        do_exit(exit_code); // never returns!
     }
 
     function random_get() {
@@ -784,7 +784,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
         } catch {
             worker_console_log("exception while running wasm");
         }
-        do_exit();
+        do_exit(255);
     })();
 }
 
