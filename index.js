@@ -33,7 +33,19 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
-    console.log("WORKER: " + msg);
+     worker_send(["console", msg]);
+}
+
+
+function do_exit() {
+    if (is_node) {
+       const buf = new SharedArrayBuffer(4); // lock
+       const lck = new Int32Array(buf, 0, 1);
+       worker_send(["exit", lck]); // never return
+       Atomics.wait(lck, 0, 0);
+    } else {
+       close();
+    }
 }
 
 function barebonesWASI() {
@@ -376,14 +388,7 @@ function barebonesWASI() {
 
     function proc_exit() {
         worker_console_log("proc_exit, shutting down");
-        if (is_node) {
-           const buf = new SharedArrayBuffer(4); // lock
-           const lck = new Int32Array(buf, 0, 1);
-           worker_send(["exit", lck]); // never return
-           Atomics.wait(lck, 0, 0);
-        } else {
-           close();
-        }
+        do_exit(); // never returns!
     }
 
     function random_get() {
@@ -764,7 +769,12 @@ function importWasmModule(moduleName, wasiPolyfill) {
         const instance = await WebAssembly.instantiate(module, moduleImports);
 
         wasiPolyfill.setModuleInstance(instance);
-        instance.exports._start();
+        try {
+            instance.exports._start();
+        } catch {
+            worker_console_log("exception while running wasm");
+        }
+        do_exit();
     })();
 }
 

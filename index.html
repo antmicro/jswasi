@@ -83,6 +83,8 @@
                 terminal.io.println(event.data[1]);
             } else if (action === "stderr") {
                 console.log(event.data[1]);
+            } else if (action === "console") {
+                console.log("WORKER: " + event.data[1]);
             }
         }
         myWorker.postMessage(["start", "msh.wasm"]);

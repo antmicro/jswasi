@@ -40,6 +40,8 @@ let ev = (event) => {
                 console.log("We got exit command");
                 myWorker.terminate();
                 terminated = true;
+            } else if (action === "console") {
+                console.log("WORKER: " + event.data[1]);
             }
         }
 
