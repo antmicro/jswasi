@@ -12,6 +12,14 @@ onmessage = function (e) {
 
 }
 
+let is_node = (typeof self === 'undefined');
+
+if (is_node) {
+    console.log("Running in Node!");
+} else {
+    console.log("Running in a browser!");
+}
+
 function barebonesWASI() {
 
     let moduleInstanceExports = null;
