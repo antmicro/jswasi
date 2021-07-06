@@ -135,7 +135,7 @@ function barebonesWASI() {
         }
 
         write(buffer) {
-            console.log("open file write: ", this.file.data, this.file_pos, buffer.byteLength);
+            console.log("open file write: "+ this.file.data + " " + this.file_pos + " " + buffer.byteLength);
             if (this.file_pos + buffer.byteLength > this.size) {
                 let old = this.file.data;
                 this.file.data = new Uint8Array(this.file_pos + buffer.byteLength);
@@ -193,7 +193,7 @@ function barebonesWASI() {
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
                 } else {
-                    console.log("create", component);
+                    console.log("create "+ component);
                     if (i == components.length - 1) {
                         entry.directory[component] = new File(new ArrayBuffer(0));
                     } else {
@@ -400,7 +400,7 @@ function barebonesWASI() {
     // }
 
     function args_get(argv, argv_buf) {
-        console.log("args_get(", argv, ", ", argv_buf, ")");
+        console.log("args_get("+ argv+ ", "+ argv_buf+ ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let orig_argv_buf = argv_buf;
@@ -431,7 +431,7 @@ function barebonesWASI() {
     // }
 
     function environ_get(environ, environ_buf) {
-        console.log("environ_get(", environ, ", ", environ_buf, ")");
+        console.log("environ_get("+ environ, ", "+ environ_buf+ ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let orig_environ_buf = environ_buf;
@@ -449,7 +449,7 @@ function barebonesWASI() {
     }
 
     function clock_time_get(id, precision, time) {
-        console.log("clock_time_get(", id, ", ", precision, ", ", time, ")");
+        console.log("clock_time_get("+ id+ ", "+ precision+ ", "+ time+ ")");
         let buffer = getModuleMemoryDataView()
         buffer.setBigUint64(time, 0n, true);
         return 0;
@@ -460,7 +460,7 @@ function barebonesWASI() {
     }
 
     function fd_filestat_get(fd, buf) {
-        console.log("fd_filestat_get(", fd, ", ", buf, ")");
+        console.log("fd_filestat_get("+ fd+ ", "+ buf+ ")");
         let buffer = getModuleMemoryDataView();
         if (fds[fd] != undefined) {
             let stat = fds[fd].stat();
@@ -479,7 +479,7 @@ function barebonesWASI() {
     }
 
     function fd_read(fd, iovs_ptr, iovs_len, nread_ptr) {
-        console.log("fd_read(", fd, ", ", iovs_ptr, ", ", iovs_len, ", ", nread_ptr, ")");
+        console.log("fd_read("+ fd+ ", "+ iovs_ptr+ ", "+ iovs_len+ ", "+ nread_ptr+ ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined) {
@@ -508,7 +508,7 @@ function barebonesWASI() {
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             buffer.setUint32(bufused, 0, true);
 
-            console.log(cookie, Object.keys(fds[fd].directory).slice(Number(cookie)));
+            console.log(cookie +" "+ Object.keys(fds[fd].directory).slice(Number(cookie)));
             if (cookie >= BigInt(Object.keys(fds[fd].directory).length)) {
                 console.log("end of dir");
                 return 0;
@@ -516,7 +516,7 @@ function barebonesWASI() {
             let next_cookie = cookie + 1n;
             for (let name of Object.keys(fds[fd].directory).slice(Number(cookie))) {
                 let entry = fds[fd].directory[name];
-                console.log(name, entry);
+                console.log(name + " "+ entry);
                 let encoded_name = new TextEncoder("utf-8").encode(name);
 
                 let offset = 24 + encoded_name.length;
@@ -525,20 +525,20 @@ function barebonesWASI() {
                     console.log("too small buf");
                     break;
                 } else {
-                    console.log("next_cookie =", next_cookie, buf);
+                    console.log("next_cookie = "+ next_cookie + " " + buf);
                     buffer.setBigUint64(buf, next_cookie, true);
                     next_cookie += 1n;
                     buffer.setBigUint64(buf + 8, 1n, true); // inode
                     buffer.setUint32(buf + 16, encoded_name.length, true);
                     buffer.setUint8(buf + 20, entry.file_type);
                     buffer8.set(encoded_name, buf + 24);
-                    console.log("buffer =", buffer8.slice(buf, buf + offset));
+                    console.log("buffer = "+ buffer8.slice(buf, buf + offset));
                     buf += offset;
                     buffer.setUint32(bufused, buffer.getUint32(bufused, true) + offset, true);
-                    console.log();
+                    console.log("");
                 }
             }
-            console.log("used =", buffer.getUint32(bufused, true));
+            console.log("used ="+ buffer.getUint32(bufused, true));
             return 0;
         } else {
             return -1;
@@ -581,10 +581,10 @@ function barebonesWASI() {
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         let buffer = new DataView(inst.exports.memory.buffer);
         let buffer8 = new Uint8Array(inst.exports.memory.buffer);
-        console.warn("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
+        console.log("path_filestat_get("+ fd+ ", "+ flags+ ", "+ path_ptr+ ", "+ path_len+ ", "+ buf+ ")");
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
-            console.log("file =", path);
+            console.log("file = "+ path);
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
                 return -1;
@@ -601,16 +601,7 @@ function barebonesWASI() {
     }
 
     function path_open(fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
-        console.log("path_open(",
-            dirflags, ", ",
-            path_ptr, ", ",
-            path_len, ", ",
-            oflags, ", ",
-            fs_rights_base, ", ",
-            fs_rights_inheriting, ", ",
-            fdflags, ", ",
-            opened_fd_ptr, ")",
-        );
+        console.log("path_open("+ dirflags+ ", "+ path_ptr+ ", "+ path_len+ ", "+ oflags, " + "+ fs_rights_base + ", " + fs_rights_inheriting + ", " + fdflags + ", " + opened_fd_ptr + ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
@@ -661,7 +652,7 @@ function barebonesWASI() {
     }
 
     function fd_prestat_get(fd, buf_ptr) {
-        console.log("fd_prestat_get(", fd, ", ", buf_ptr, ")");
+        console.log("fd_prestat_get("+ fd+ ", "+ buf_ptr+ ")");
         let buffer = getModuleMemoryDataView();
         // FIXME: this fails for created files, fds[fd] is undefined
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
@@ -678,7 +669,7 @@ function barebonesWASI() {
     }
 
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
-        console.log("fd_prestat_dir_name(", fd, ", ", path_ptr, ", ", path_len, ")");
+        console.log("fd_prestat_dir_name("+ fd+ ", "+ path_ptr+ ", "+ path_len+ ")");
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
             console.log("fd_prestat_dir_name inner");
             let buffer8 = getModuleMemoryUint8Array();
@@ -687,6 +678,26 @@ function barebonesWASI() {
         } else {
             return -1;
         }
+    }
+
+    function fd_datasync() {
+      console.log("fd_datasync");
+      return WASI_ESUCCESS;
+    }
+    
+    function fd_filestat_set_size() {
+      console.log("fd_filestat_set_size");
+      return WASI_ESUCCESS;
+    }
+
+    function fd_sync() {
+        console.log("fd_sync");
+      return WASI_ESUCCESS;
+    }
+
+    function path_symlink() {
+        console.log("path_symlink");
+      return WASI_ESUCCESS;
     }
 
     return {
@@ -717,6 +728,10 @@ function barebonesWASI() {
         path_rename,
         path_unlink_file,
         sched_yield,
+        fd_datasync,
+        fd_filestat_set_size,
+        fd_sync,
+        path_symlink,
     }
 }
 
