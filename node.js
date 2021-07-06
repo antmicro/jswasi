@@ -1,7 +1,12 @@
 const {
   Worker, isMainThread, parentPort, workerData
 } = require('worker_threads');
-      
+
+if (process.argv.length < 3) {
+  console.log("Not enough arguments");
+  process.exit(1);
+}
+
 let myWorker = new Worker('./index.js');
 
 let terminated = false;
@@ -43,7 +48,7 @@ myWorker.on('message', ev);
 //myWorker.onmessage = ev;
 
 console.log('sending message!');
-myWorker.postMessage(["start", "msh.wasm"]);
+myWorker.postMessage(["start", process.argv[2]]);
 console.log('message sent!');
 
 function heartbeat() {
