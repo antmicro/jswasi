@@ -34,12 +34,13 @@ if (is_node) {
 
 function worker_send(msg) {
     if (is_node) {
-        msg_ = { data: [myself, "", ""] };
-        msg_.data[1] = msg[0];
-        msg_.data[2] = msg[1];
+        msg_ = { data: [myself, msg[0], msg[1]] };
         const { parentPort } = require('worker_threads');
         get_parent_port().postMessage(msg_);
-    } else postMessage(msg);
+    } else {
+        msg_ = [myself, msg[0], msg[1]];
+        postMessage(msg_);
+    }
 }
 
 function worker_console_log(msg) {
