@@ -16,8 +16,18 @@ let is_node = (typeof self === 'undefined');
 
 if (is_node) {
     console.log("Running in Node!");
+    const { parentPort } = require('worker_threads');
+    parentPort.once('message', (message) => { let msg = { data: message }; onmessage(msg); });
 } else {
     console.log("Running in a browser!");
+}
+
+function worker_send(msg) {
+    if (is_node) {
+        console.log("We are in node");
+        const { parentPort } = require('worker_threads');
+        parentPort.postMessage(msg);
+    } else postMessage(msg);
 }
 
 function barebonesWASI() {
@@ -213,7 +223,7 @@ function barebonesWASI() {
                 const lck = new Int32Array(buf, 0, 1);
                 const request_len = new Int32Array(buf, 4, 1);
                 request_len[0] = len;
-                postMessage(["buffer", buf]);
+                worker_send(["buffer", buf]);
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
@@ -229,14 +239,14 @@ function barebonesWASI() {
 
     class Stdout {
         write(content) {
-            postMessage(["stdout", content]);
+            worker_send(["stdout", content]);
             return WASI_ESUCCESS;
         }
     }
 
     class Stderr {
         write(content) {
-            postMessage(["stderr", content]);
+            worker_send(["stderr", content]);
             return WASI_ESUCCESS;
         }
     }
@@ -339,9 +349,9 @@ function barebonesWASI() {
         const content = String.fromCharCode.apply(null, bufferBytes);
 
         if (fd === WASI_STDOUT_FILENO) {
-            postMessage(["stdout", content]);
+            worker_send(["stdout", content]);
         } else if (fd === WASI_STDERR_FILENO) {
-            postMessage(["stderr", content]);
+            worker_send(["stderr", content]);
         } else {
             let err = fds[fd].write(content);
             console.log("err on write: " + err)
@@ -712,8 +722,14 @@ function importWasmModule(moduleName, wasiPolyfill) {
         if (WebAssembly.compileStreaming) {
             module = await WebAssembly.compileStreaming(fetch(moduleName));
         } else {
-            const response = await fetch(moduleName);
-            const buffer = await response.arrayBuffer();
+            let buffer = null;
+            if (!is_node) {
+                const response = await fetch(moduleName);
+                buffer = await response.arrayBuffer();
+	    } else {
+		const fs = require('fs');
+		buffer = fs.readFileSync(moduleName, null);
+            }
             module = await WebAssembly.compile(buffer);
         }
 
