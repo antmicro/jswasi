@@ -644,7 +644,8 @@ function barebonesWASI() {
             buffer.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
             return WASI_ESUCCESS;
         } else {
-            return -1;
+            console.log("fd_prestat_get returning EBADF");
+            return WASI_EBADF;
         }
 
     }
