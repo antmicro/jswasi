@@ -12,6 +12,7 @@ workers[0] = { id: 0, worker: new Worker('./worker.js') };
 workers[1] = { id: 1, worker: new Worker('./worker.js') };
 
 let terminated = false;
+let buffer = "";
 
 let ev = (event) => {
             //connsole.log("on message: ", event);
