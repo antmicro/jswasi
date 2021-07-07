@@ -98,8 +98,7 @@
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                // terminal.io.println(event.data[2]);
-                terminal.io.print(event.data[1]);
+                terminal.io.print(event.data[2]);
             } else if (action === "stderr") {
                 console.log(event.data[2]);
             } else if (action === "console") {
@@ -108,7 +107,7 @@
                 console.log("WORKER " + event.data[0] + " exited with result code = "+event.data[2]);
             }
         }
-        workers[0].worker.postMessage(["start", "msh.wasm", 0]);
+        workers[0].worker.postMessage(["start", "shell.wasm", 0]);
     }
 
     window.onload = init_all;
