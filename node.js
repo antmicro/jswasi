@@ -61,9 +61,9 @@ if (debug) workers[1].worker.postMessage(["start", process.argv[2], 1]);
 if (debug) console.log('message sent!');
 
 function heartbeat() {
-     console.log("bip");
+     if (debug) console.log("bip");
      if (terminated) {
-       console.log("Thread finished.");
+       if (debug) console.log("Thread finished.");
      } else {
          setTimeout(heartbeat, 2000);
      }
