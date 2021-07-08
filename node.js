@@ -64,6 +64,7 @@ function heartbeat() {
      if (debug) console.log("bip");
      if (terminated) {
        if (debug) console.log("Thread finished.");
+       return;
      }    
      if (!debug) {
         while (1) {
