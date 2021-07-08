@@ -28,11 +28,12 @@
                 const io = t.io.push();
 
                 io.onVTKeystroke = io.sendString = (data) => {
-		    let code = data.charCodeAt(0);
-		    if (code === 13) {
-		    	data = String.fromCharCode(10);
-		    }
+                    let code = data.charCodeAt(0);
                     console.log(data, code);
+                    if (code === 13) {
+                        data = String.fromCharCode(10);
+                        console.log("turned to 10");
+                    }
                     buffer = buffer + data;
                 };
 
