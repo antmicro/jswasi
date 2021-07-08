@@ -663,6 +663,10 @@ function barebonesWASI() {
       return WASI_ESUCCESS;
     }
 
+    function fd_fdstat_set_flags(a, b) {
+        worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
+    }
+
     return {
         setModuleInstance,
         environ_sizes_get,
@@ -716,7 +720,11 @@ function barebonesWASI() {
 function importWasmModule(moduleName, wasiPolyfill) {
 
     const memory = new WebAssembly.Memory({initial: 2, maximum: 10});
-    const moduleImports = {wasi_snapshot_preview1: wasiPolyfill, wasi_unstable: wasiPolyfill, env: {}, js: {mem: memory}};
+    const moduleImports = {
+        wasi_snapshot_preview1: wasiPolyfill,
+        wasi_unstable: wasiPolyfill,
+        js: {mem: memory}
+    };
 
     (async () => {
         let module = null;
