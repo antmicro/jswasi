@@ -491,18 +491,21 @@ function barebonesWASI() {
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined) {
-            buffer.setUint32(nread_ptr, 0, true);
+            let nread = 0;
             for (let i = 0; i < iovs_len; i++) {
-                let [ptr, len] = [buffer.getUint32(iovs_ptr + 8 * i, true), buffer.getUint32(iovs_ptr + 8 * i + 4, true)];
-                if ((len == 8192) && ((i + 1) == iovs_len)) len = 1;
+                let addr = buffer.getUint32(iovs_ptr + 8 * i, true);
+                let len = buffer.getUint32(iovs_ptr + 8 * i + 4, true);
+                if ((i+1) === iovs_len && len === 1024) len = 1;
+                if ((i+1) === iovs_len && len === 8192) len = 1;
                 let [data, err] = fds[fd].read(len);
-                if (err != 0) {
+                if (err !== 0) {
                     return err;
                 }
-                buffer8.set(data, ptr);
-                buffer.setUint32(nread_ptr, buffer.getUint32(nread_ptr, true) + data.length, true);
+                buffer8.set(data, addr);
+                nread += data.length;
             }
-            return 0;
+            buffer.setUint32(nread_ptr, buffer.getUint32(nread_ptr, true) + nread, true);
+            return WASI_ESUCCESS;
         } else {
             return 1;
         }
