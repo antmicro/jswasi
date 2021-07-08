@@ -353,8 +353,7 @@ function barebonesWASI() {
     }
 
     function fd_write(fd, iovs, iovsLen, nwritten) {
-        worker_console_log("fd_write");
-
+        worker_console_log((new Error()).stack.split("\n")[1].trim().split(" ")[1]);
         const view = getModuleMemoryDataView();
 
         let written = 0;
@@ -390,19 +389,9 @@ function barebonesWASI() {
         return WASI_ESUCCESS;
     }
 
-    function poll_oneoff(sin, sout, nsubscriptions, nevents) {
-        worker_console_log("poll_oneoff");
-
-        return WASI_ENOSYS;
-    }
-
     function proc_exit(exit_code) {
         worker_console_log("proc_exit, shutting down, exit_code = "+exit_code);
         do_exit(exit_code); // never returns!
-    }
-
-    function random_get() {
-        worker_console_log("random_get");
     }
 
     // function args_sizes_get(argc, argv_buf_size) {
@@ -450,7 +439,7 @@ function barebonesWASI() {
     // }
 
     function environ_get(environ, environ_buf) {
-        worker_console_log("environ_get("+ environ, ", "+ environ_buf+ ")");
+        worker_console_log("environ_get("+ environ + ", "+ environ_buf+ ")");
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let orig_environ_buf = environ_buf;
@@ -463,7 +452,6 @@ function barebonesWASI() {
             buffer.setUint8(environ_buf + e.length, 0);
             environ_buf += e.length + 1;
         }
-        worker_console_log(new TextDecoder("utf-8").decode(buffer8.slice(orig_environ_buf, environ_buf)));
         return 0;
     }
 
@@ -472,10 +460,6 @@ function barebonesWASI() {
         let buffer = getModuleMemoryDataView()
         buffer.setBigUint64(time, 0n, true);
         return 0;
-    }
-
-    function fd_close() {
-        worker_console_log("fd_close");
     }
 
     function fd_filestat_get(fd, buf) {
@@ -493,7 +477,7 @@ function barebonesWASI() {
             buffer.setBigUint64(buf + 52, stat.ctim, true);
             return 0;
         } else {
-            return -1;
+            return 1;
         }
     }
 
@@ -515,7 +499,7 @@ function barebonesWASI() {
             }
             return 0;
         } else {
-            return -1;
+            return 1;
         }
     }
 
@@ -554,18 +538,13 @@ function barebonesWASI() {
                     worker_console_log("buffer = "+ buffer8.slice(buf, buf + offset));
                     buf += offset;
                     buffer.setUint32(bufused, buffer.getUint32(bufused, true) + offset, true);
-                    worker_console_log("");
                 }
             }
             worker_console_log("used ="+ buffer.getUint32(bufused, true));
             return 0;
         } else {
-            return -1;
+            return 1;
         }
-    }
-
-    function fd_seek() {
-        worker_console_log("fd_seek");
     }
 
     // function fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
@@ -589,13 +568,9 @@ function barebonesWASI() {
     //         }
     //         return 0;
     //     } else {
-    //         return -1;
+    //         return 1;
     //     }
     // }
-
-    function path_create_directory() {
-        worker_console_log("path_create_directory");
-    }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         let buffer = new DataView(inst.exports.memory.buffer);
@@ -606,17 +581,13 @@ function barebonesWASI() {
             worker_console_log("file = "+ path);
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
-                return -1;
+                return 1;
             }
             // FIXME write filestat_t
             return 0;
         } else {
-            return -1;
+            return 1;
         }
-    }
-
-    function path_link() {
-        worker_console_log("path_link");
     }
 
     function path_open(fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
@@ -631,13 +602,13 @@ function barebonesWASI() {
                 if (oflags & OFLAGS_CREAT == OFLAGS_CREAT) {
                     entry = fds[fd].create_entry_for_path(path);
                 } else {
-                    return -1;
+                    return 1;
                 }
             } else if (oflags & OFLAGS_EXCL == OFLAGS_EXCL) {
-                return -1;
+                return 1;
             }
             if (oflags & OFLAGS_DIRECTORY == OFLAGS_DIRECTORY && fds[fd].file_type != FILETYPE_DIRECTORY) {
-                return -1;
+                return 1;
             }
             if (oflags & OFLAGS_TRUNC == OFLAGS_TRUNC) {
                 entry.truncate();
@@ -646,28 +617,8 @@ function barebonesWASI() {
             let opened_fd = fds.length - 1;
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
         } else {
-            return -1;
+            return 1;
         }
-    }
-
-    function path_readlink() {
-        worker_console_log("path_readlink");
-    }
-
-    function path_remove_directory() {
-        worker_console_log("path_remove_directory");
-    }
-
-    function path_rename() {
-        worker_console_log("path_rename");
-    }
-
-    function path_unlink_file() {
-        worker_console_log("path_unlink_file");
-    }
-
-    function sched_yield() {
-        worker_console_log("sched_yield");
     }
 
     function fd_prestat_get(fd, buf_ptr) {
@@ -695,29 +646,42 @@ function barebonesWASI() {
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;
         } else {
-            return -1;
+            return 1;
         }
     }
+  
+    let placeholder = function() { worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS; };
 
-    function fd_datasync() {
-      worker_console_log("fd_datasync");
-      return WASI_ESUCCESS;
-    }
-    
-    function fd_filestat_set_size() {
-      worker_console_log("fd_filestat_set_size");
-      return WASI_ESUCCESS;
-    }
-
-    function fd_sync() {
-        worker_console_log("fd_sync");
-      return WASI_ESUCCESS;
-    }
-
-    function path_symlink() {
-        worker_console_log("path_symlink");
-      return WASI_ESUCCESS;
-    }
+    function fd_datasync() { return placeholder() };
+    function fd_filestat_set_size() { return placeholder() };
+    function fd_sync() { return placeholder() };
+    function path_symlink() { return placeholder() };
+    function clock_res_get() { return placeholder() };
+    function fd_advise() { return placeholder() };
+    function fd_allocate() { return placeholder() };
+    function fd_fdstat_set_flags() { return placeholder() };
+    function fd_fdstat_set_rights() { return placeholder() };
+    function fd_tell() { return placeholder() };
+    function fd_filestat_set_times() { return placeholder() };
+    function fd_pread() { return placeholder() };
+    function fd_pwrite() { return placeholder() };
+    function fd_renumber() { return placeholder() };
+    function path_filestat_set_times() { return placeholder() };
+    function proc_raise() { return placeholder() };
+    function sock_recv() { return placeholder() };
+    function sock_send() { return placeholder() };
+    function sock_shutdown() { return placeholder() };
+    function path_readlink() { return placeholder() };
+    function path_remove_directory() { return placeholder() };
+    function path_rename() { return placeholder() };
+    function path_unlink_file() { return placeholder() };
+    function sched_yield() { return placeholder() };
+    function path_link() { return placeholder() };
+    function fd_seek() { return placeholder() };
+    function random_get() { return placeholder() };
+    function poll_oneoff(sin, sout, nsubscriptions, nevents) { return placeholder() };
+    function path_create_directory() { return placeholder() };
+    function fd_close() { return placeholder() };
 
     return {
         setModuleInstance,
@@ -751,13 +715,28 @@ function barebonesWASI() {
         fd_filestat_set_size,
         fd_sync,
         path_symlink,
+        clock_res_get,
+        fd_advise,
+        fd_allocate,
+        fd_fdstat_set_flags,
+        fd_fdstat_set_rights,
+        fd_tell,
+        fd_filestat_set_times,
+        fd_pread,
+        fd_pwrite,
+        fd_renumber,
+        path_filestat_set_times,
+        proc_raise,
+        sock_recv,
+        sock_send,
+        sock_shutdown,
     }
 }
 
 function importWasmModule(moduleName, wasiPolyfill) {
 
     const memory = new WebAssembly.Memory({initial: 2, maximum: 10});
-    const moduleImports = {wasi_snapshot_preview1: wasiPolyfill, env: {}, js: {mem: memory}};
+    const moduleImports = {wasi_snapshot_preview1: wasiPolyfill, wasi_unstable: wasiPolyfill, env: {}, js: {mem: memory}};
 
     (async () => {
         let module = null;
@@ -776,15 +755,28 @@ function importWasmModule(moduleName, wasiPolyfill) {
             module = await WebAssembly.compile(buffer);
         }
 
-        const instance = await WebAssembly.instantiate(module, moduleImports);
-
-        wasiPolyfill.setModuleInstance(instance);
+        let instance = null;
         try {
-            instance.exports._start();
-        } catch {
-            worker_console_log("exception while running wasm");
+            instance = await WebAssembly.instantiate(module, moduleImports);
+        } catch(e) {
+            worker_console_log("exception while instantiating wasm");
+            worker_console_log(e.stack);
+            instance = null;
         }
-        do_exit(255);
+
+        if (instance != null) {
+            wasiPolyfill.setModuleInstance(instance);
+            try {
+                instance.exports._start();
+                do_exit(0);
+            } catch(e) {
+                worker_console_log("exception while running wasm");
+                worker_console_log(e.stack);
+                do_exit(255);
+            }
+        } else {
+          do_exit(255);
+        }
     })();
 }
 
@@ -804,4 +796,3 @@ function start_wasm() {
 setTimeout(function () {
     start_wasm();
 }, 500);
-
