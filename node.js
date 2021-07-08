@@ -62,10 +62,16 @@ if (debug) console.log('message sent!');
 
 function heartbeat() {
      if (!debug) {
-         while (1) {
+        while (1) {
              c = process.stdin.read(1);
-             console.log(c);
-         }
+             if (c != null) {
+                 console.log("read character: " + c);
+                 buffer = buffer + c;
+             } else {
+                 setTimeout(heartbeat, 100);
+                 return;
+             }
+        }
      }
      if (debug) console.log("bip");
      if (terminated) {
