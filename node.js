@@ -37,9 +37,9 @@ let ev = (event) => {
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                console.log(event.data[2]);
+                process.stdout.write(event.data[2]);
             } else if (action === "stderr") {
-                console.log(event.data[2]);
+                process.stderr.write(event.data[2]);
             } else if (action === "exit") {
                 if (debug) console.log("We got exit command, result = " + event.data[2]);
                 workers[event.data[0]].worker.terminate();
@@ -61,6 +61,12 @@ if (debug) workers[1].worker.postMessage(["start", process.argv[2], 1]);
 if (debug) console.log('message sent!');
 
 function heartbeat() {
+     if (!debug) {
+         while (1) {
+             c = process.stdin.read(1);
+             console.log(c);
+         }
+     }
      if (debug) console.log("bip");
      if (terminated) {
        if (debug) console.log("Thread finished.");
