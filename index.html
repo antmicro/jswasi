@@ -77,7 +77,8 @@
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
             } else if (action === "stdout") {
-                terminal.io.print(event.data[2]);
+                let output = event.data[2].replace("\n", "\n\r");
+                terminal.io.print(output);
             } else if (action === "stderr") {
                 console.log(event.data[2]);
             } else if (action === "console") {

@@ -11,7 +11,6 @@ fn main() {
 
         let command = input.trim();
 
-        // \r needed to reset cursor position in hterm
-        print!("entered: {}\n\r", command);
+        print!("entered: {}\n", command);
     }
 }

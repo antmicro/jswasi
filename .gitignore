@@ -13,3 +13,5 @@ ci/images.txt
 ci/images
 
 output
+
+run.sh
