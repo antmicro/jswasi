@@ -195,9 +195,9 @@ function barebonesWASI() {
             this.directory = contents;
         }
 
-        open() {
+        open(name) {
             worker_console_log("directory open");
-            return this;
+            return new PreopenDirectory(name, this.directory);
         }
 
         get_entry_for_path(path) {
@@ -240,7 +240,7 @@ function barebonesWASI() {
     class PreopenDirectory extends Directory {
         constructor(name, contents) {
             super(contents);
-            this.prestat_name = new TextEncoder("utf-8").encode(name);
+            this.prestat_name = new TextEncoder().encode(name);
         }
     }
 
@@ -249,7 +249,7 @@ function barebonesWASI() {
     class Stdin {
         read(len) {
             worker_console_log("read is happening, requested len is " + len);
-            if (len === 0) return ["", 0];
+            if (len === 0) return [new Uint8Array([]), 0];
             worker_console_log("Waiting...");
             while (1) {
                 const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
@@ -318,14 +318,14 @@ function barebonesWASI() {
         return WASI_ESUCCESS;
     }
 
-    function fd_fdstat_get(fd, bufPtr) {
+    function fd_fdstat_get(fd, addr) {
         worker_console_log("fd_fdstat_get");
 
         const view = getModuleMemoryDataView();
 
-        view.setUint8(bufPtr, fd);
-        view.setUint16(bufPtr + 2, 0, !0);
-        view.setUint16(bufPtr + 4, 0, !0);
+        view.setUint8(addr, fd);
+        view.setUint16(addr + 2, 0, !0);
+        view.setUint16(addr + 4, 0, !0);
 
         function setBigUint64(byteOffset, value, littleEndian) {
 
@@ -336,8 +336,8 @@ function barebonesWASI() {
             view.setUint32(littleEndian ? 4 : 0, highWord, littleEndian);
         }
 
-        setBigUint64(bufPtr + 8, 0, !0);
-        setBigUint64(bufPtr + 8 + 8, 0, !0);
+        setBigUint64(addr + 8, 0, !0);
+        setBigUint64(addr + 8 + 8, 0, !0);
 
         return WASI_ESUCCESS;
     }
@@ -380,14 +380,8 @@ function barebonesWASI() {
 
         const content = String.fromCharCode.apply(null, bufferBytes);
 
-        if (fd === WASI_STDOUT_FILENO) {
-            worker_send(["stdout", content]);
-        } else if (fd === WASI_STDERR_FILENO) {
-            worker_send(["stderr", content]);
-        } else {
-            let err = fds[fd].write(content);
-            worker_console_log("err on write: " + err)
-        }
+        let err = fds[fd].write(content);
+        worker_console_log("err on write: " + err)
 
         view.setUint32(nwritten, written, !0);
 
@@ -395,22 +389,14 @@ function barebonesWASI() {
     }
 
     function proc_exit(exit_code) {
-        worker_console_log("proc_exit, shutting down, exit_code = "+exit_code);
+        worker_console_log("proc_exit, shutting down, exit_code = " + exit_code);
         do_exit(exit_code); // never returns!
     }
-
-    // function args_sizes_get(argc, argv_buf_size) {
-    //     let buffer = new DataView(inst.exports.memory.buffer);
-    //     worker_console_log("args_sizes_get(", argc, ", ", argv_buf_size, ")");
-    //     buffer.setUint32(argc, args.length, true);
-    //     let buf_size = 0;
-    //     for (let arg of args) {
-    //         buf_size += arg.length + 1;
-    //     }
-    //     buffer.setUint32(argv_buf_size, buf_size, true);
-    //     worker_console_log(buffer.getUint32(argc, true), buffer.getUint32(argv_buf_size, true));
-    //     return 0;
-    // }
+    
+    function random_get(buf_addr, buf_len) {
+        worker_console_log("random_get");
+        return WASI_ESUCCESS;
+    }
 
     function args_get(argv, argv_buf) {
         worker_console_log("args_get("+ argv+ ", "+ argv_buf+ ")");
@@ -427,21 +413,8 @@ function barebonesWASI() {
             argv_buf += arg.length + 1;
         }
         worker_console_log(new TextDecoder("utf-8").decode(buffer8.slice(orig_argv_buf, argv_buf)));
-        return 0;
+        return WASI_ESUCCESS;
     }
-
-    // function environ_sizes_get(environ_count, environ_size) {
-    //     let buffer = new DataView(inst.exports.memory.buffer);
-    //     worker_console_log("environ_sizes_get(", environ_count, ", ", environ_size, ")");
-    //     buffer.setUint32(environ_count, env.length, true);
-    //     let buf_size = 0;
-    //     for (let environ of env) {
-    //         buf_size += environ.length + 1;
-    //     }
-    //     buffer.setUint32(environ_size, buf_size, true);
-    //     worker_console_log(buffer.getUint32(environ_count, true), buffer.getUint32(environ_size, true));
-    //     return 0;
-    // }
 
     function environ_get(environ, environ_buf) {
         worker_console_log("environ_get("+ environ + ", "+ environ_buf+ ")");
@@ -460,12 +433,27 @@ function barebonesWASI() {
         return 0;
     }
 
+    function clock_res_get(a, b) {
+        worker_console_log(`clock_res_get(${a},${b})`);
+        return 1;
+    }
+
+
     function clock_time_get(id, precision, time) {
         worker_console_log("clock_time_get("+ id+ ", "+ precision+ ", "+ time+ ")");
         let buffer = getModuleMemoryDataView()
-        buffer.setBigUint64(time, 0n, true);
-        return 0;
+        buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
+        return WASI_ESUCCESS;
     }
+
+    function fd_close() {
+        worker_console_log("fd_close");
+        return 1;
+    }
+
+    function fd_advice(a, b, c, d) { worker_console_log("fd_advice"); return 1; }
+    function fd_allocate(a, b, c) { worker_console_log("fd_allocate"); return 1; }
+    function fd_fdstat_set_rights(a, b, c) { worker_console_log("fd_fdstat_set_rights"); return 1; }
 
     function fd_filestat_get(fd, buf) {
         worker_console_log("fd_filestat_get("+ fd+ ", "+ buf+ ")");
@@ -557,10 +545,12 @@ function barebonesWASI() {
 
     function fd_seek() {
         worker_console_log("fd_seek");
+        return 1;
     }
 
     function path_create_directory() {
         worker_console_log("path_create_directory");
+        return 1;
     }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
@@ -590,26 +580,51 @@ function barebonesWASI() {
             worker_console_log(path);
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
-                if (oflags & OFLAGS_CREAT == OFLAGS_CREAT) {
+                if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
                     entry = fds[fd].create_entry_for_path(path);
                 } else {
                     return 1;
                 }
-            } else if (oflags & OFLAGS_EXCL == OFLAGS_EXCL) {
+            } else if (oflags & OFLAGS_EXCL === OFLAGS_EXCL) {
                 return 1;
             }
-            if (oflags & OFLAGS_DIRECTORY == OFLAGS_DIRECTORY && fds[fd].file_type != FILETYPE_DIRECTORY) {
+            if (oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[fd].file_type !== FILETYPE_DIRECTORY) {
                 return 1;
             }
-            if (oflags & OFLAGS_TRUNC == OFLAGS_TRUNC) {
+            if (oflags & OFLAGS_TRUNC === OFLAGS_TRUNC) {
                 entry.truncate();
             }
-            fds.push(entry.open());
+            fds.push(entry.open(path));
             let opened_fd = fds.length - 1;
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
         } else {
             return 1;
         }
+    }
+
+    function path_readlink() {
+        worker_console_log("path_readlink");
+        return 1;
+    }
+
+    function path_remove_directory() {
+        worker_console_log("path_remove_directory");
+        return 1;
+    }
+
+    function path_rename() {
+        worker_console_log("path_rename");
+        return 1;
+    }
+
+    function path_unlink_file() {
+        worker_console_log("path_unlink_file");
+        return 1;
+    }
+
+    function sched_yield() {
+        worker_console_log("sched_yield");
+        return 1;
     }
 
     function fd_prestat_get(fd, buf_ptr) {
@@ -627,7 +642,6 @@ function barebonesWASI() {
             worker_console_log("fd_prestat_get returning EBADF");
             return WASI_EBADF;
         }
-
     }
 
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
@@ -641,10 +655,6 @@ function barebonesWASI() {
             return 1;
         }
     }
-  
-    let placeholder = function() {
-        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS;
-    };
 
     function fd_datasync() {
       worker_console_log("fd_datasync");
@@ -668,7 +678,47 @@ function barebonesWASI() {
 
     function fd_fdstat_set_flags(a, b) {
         worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
+        return WASI_ESUCCESS;
     }
+
+    function fd_pwrite(a, b, c ,d, e) {
+        worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
+        return WASI_ESUCCESS;
+    }
+
+    function fd_renumber(a, b) {
+        worker_console_log(`fd_renumber(${a}, ${b})`);
+        return WASI_ESUCCESS;
+    }
+
+    function fd_tell(a, b) {
+        worker_console_log(`fd_tell(${a}, ${b})`);
+        return WASI_ESUCCESS;
+    }
+
+    function path_filestat_set_times(a, b, c, d, e, f, g) {
+        worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g})`);
+        return WASI_ESUCCESS;
+    }
+
+    function proc_raise(a) {
+        worker_console_log(`proc_raise(${a})`);
+        return WASI_ESUCCESS;
+    }
+
+    function sock_recv(a, b, c, d, e, f) { worker_console_log("sock_recv"); return 1; }
+    function sock_send(a, b, c, d, e) { worker_console_log("sock_send"); return 1; }
+    function sock_shutdown(a, b) { worker_console_log("sock_shutdown"); return 1; }
+
+    let placeholder = function() {
+        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS;
+    };
+    
+    function poll_oneoff() { placeholder(); }
+    function path_link() { placeholder(); }
+    function fd_advise() { placeholder(); }
+    function fd_filestat_set_times() { placeholder(); }
+    function fd_pread() { placeholder(); }
 
     return {
         setModuleInstance,
@@ -710,6 +760,7 @@ function barebonesWASI() {
         fd_tell,
         fd_filestat_set_times,
         fd_pread,
+        fd_advice,
         fd_pwrite,
         fd_renumber,
         path_filestat_set_times,

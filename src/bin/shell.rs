@@ -26,7 +26,7 @@ fn main() {
                 },
                 // control codes
                 code if code < 32 => {
-
+                    // ignore for now
                 },
                 // regular characters
                 _ => {
