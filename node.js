@@ -12,14 +12,15 @@ let debug = false;
 let workers = [];
 workers[0] = { id: 0, worker: new Worker('./worker.js') };
 if (debug) workers[1] = { id: 1, worker: new Worker('./worker.js') };
+let workers_count = 1;
 
 let terminated = false;
 let buffer = "";
 
 let ev = (event) => {
-            //connsole.log("on message: ", event);
             const action = event.data[1];
             if (action === "buffer") {
+                if (event.data[0] == 0) {
                 const lck = new Int32Array(event.data[2], 0, 1);
                 const len = new Int32Array(event.data[2], 4, 1);
                 if (buffer.length != 0) {
@@ -29,6 +30,7 @@ let ev = (event) => {
                     if (debug) console.log("current buffer is " + buffer + ", copying len " + len[0]);
                     for (let j = 0; j < len[0]; j++) {
                         sbuf[j] = buffer.charCodeAt(j);
+                        if (buffer.charCodeAt(j) == 13) sbuf[j] = 10;
                     }
                     buffer = buffer.slice(len[0], buffer.length);
                 } else {
@@ -36,16 +38,25 @@ let ev = (event) => {
                 }
                 lck[0] = 1;
                 Atomics.notify(lck, 0);
+                }
             } else if (action === "stdout") {
                 process.stdout.write(event.data[2]);
             } else if (action === "stderr") {
                 process.stderr.write(event.data[2]);
             } else if (action === "exit") {
-                if (debug) console.log("We got exit command, result = " + event.data[2]);
+                //if (debug) 
+                console.log("We got exit command from "+event.data[0]+", result = " + event.data[2]);
                 workers[event.data[0]].worker.terminate();
                 terminated = true;
             } else if (action === "console") {
                 if (debug) console.log("WORKER "+event.data[0]+": " + event.data[2]);
+            } else if (action === "spawn") {
+               console.log("WORKER "+event.data[0]+" SHOULD SPAWN "+event.data[2]);
+               workers[workers_count] = { id: workers_count, worker: new Worker('./worker.js') };
+               workers[workers_count].worker.on('message', ev);
+               workers[workers_count].worker.postMessage(["start", event.data[2]+".wasm", workers_count]);
+               workers_count++;
+               console.log("SPAWNED, total processes == "+workers_count+"!");
             }
         }
 
@@ -70,7 +81,6 @@ function heartbeat() {
         while (1) {
              c = process.stdin.read(1);
              if (c != null) {
-                 console.log("read character: " + c);
                  buffer = buffer + c;
              } else {
                  setTimeout(heartbeat, 100);
