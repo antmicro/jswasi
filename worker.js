@@ -786,6 +786,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
 function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
+        try {
         if (is_node) { // TODO: add spawn for browser!
             if (!fs.existsSync(fname)) {
                 worker_console_log(`File ${fname} not found!`);
@@ -795,6 +796,7 @@ function start_wasm() {
                 return;
             }
         }
+        } catch { }
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
         worker_console_log("done.");
