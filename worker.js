@@ -37,7 +37,6 @@ if (is_node) {
 function worker_send(msg) {
     if (is_node) {
         msg_ = { data: [myself, msg[0], msg[1]] };
-        const { parentPort } = require('worker_threads');
         get_parent_port().postMessage(msg_);
     } else {
         msg_ = [myself, msg[0], msg[1]];
@@ -787,12 +786,14 @@ function importWasmModule(moduleName, wasiPolyfill) {
 function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
-        if (!fs.existsSync(fname)) {
-             worker_console_log(`File ${fname} not found!`);
-             started = false;
-             fname = "";
-             setTimeout(start_wasm, 500);
-             return;
+        if (is_node) { // TODO: add spawn for browser!
+            if (!fs.existsSync(fname)) {
+                worker_console_log(`File ${fname} not found!`);
+                started = false;
+                fname = "";
+                setTimeout(start_wasm, 500);
+                return;
+            }
         }
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
