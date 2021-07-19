@@ -5,6 +5,7 @@
 let started = false;
 let fname = "";
 let myself = null;
+let fs = null;
 
 onmessage = function (e) {
     if (!started) {
@@ -28,6 +29,7 @@ let is_node = (typeof self === 'undefined');
 
 if (is_node) {
     get_parent_port().once('message', (message) => { let msg = { data: message }; onmessage(msg); });
+    fs = require('fs');
 } else {
     worker_console_log("Running in a browser!");
 }
@@ -35,7 +37,6 @@ if (is_node) {
 function worker_send(msg) {
     if (is_node) {
         msg_ = { data: [myself, msg[0], msg[1]] };
-        const { parentPort } = require('worker_threads');
         get_parent_port().postMessage(msg_);
     } else {
         msg_ = [myself, msg[0], msg[1]];
@@ -46,7 +47,6 @@ function worker_send(msg) {
 function worker_console_log(msg) {
      worker_send(["console", msg]);
 }
-
 
 function do_exit(exit_code) {
     if (is_node) {
@@ -260,8 +260,8 @@ function barebonesWASI() {
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                if (buffer.length > 0) worker_console_log("buffer len is now " + buffer.length + " and contents is '" + buffer + "'");
-                if (buffer.length >= len) break;
+                if (buffer.length > 0) worker_console_log("buffer len is now " + buffer.length + " and contents is '" + buffer + "', len is {0}" + len);
+                if (buffer.length > 0) break;
             }
             worker_console_log("Out of Waiting...");
             let data = buffer.slice(0, len).replace("\r", "\n");
@@ -288,56 +288,52 @@ function barebonesWASI() {
         new Stdin(),
         new Stdout(),
         new Stderr(),
-        new PreopenDirectory("/tmp", {
-            "test.txt": new File(new TextEncoder().encode('some test content')),
-        }), // 3
         new PreopenDirectory(".", {
             "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+        }), // 3
+        new PreopenDirectory("/tmp", {
+            "test.txt": new File(new TextEncoder().encode('some test content')),
         }), // 4
+    
     ];
 
-    function environ_sizes_get(environCount, environBufSize) {
-        worker_console_log("environ_sizes_get");
+    function environ_sizes_get(environ_count_ptr, environ_bufsize_ptr) {
+        worker_console_log(`environ_sizes_get(0x${environ_count_ptr.toString(16)}, 0x${environ_bufsize_ptr.toString(16)})`);
 
         const view = getModuleMemoryDataView();
 
-        view.setUint32(environCount, 0, !0);
-        view.setUint32(environBufSize, 0, !0);
+        view.setUint32(environ_count_ptr, 0);
+        view.setUint32(environ_bufsize_ptr, 0);
 
         return WASI_ESUCCESS;
     }
 
     function args_sizes_get(argc, argvBufSize) {
-        worker_console_log("args_sizes_get");
+        worker_console_log(`args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`);
 
         const view = getModuleMemoryDataView();
 
-        view.setUint32(argc, 0, !0);
-        view.setUint32(argvBufSize, 0, !0);
+        view.setUint32(argc, 0);
+        view.setUint32(argvBufSize, 0);
 
         return WASI_ESUCCESS;
     }
 
-    function fd_fdstat_get(fd, addr) {
-        worker_console_log("fd_fdstat_get");
+    function fd_fdstat_get(fd, bufPtr) {
+        worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
 
         const view = getModuleMemoryDataView();
 
-        view.setUint8(addr, fd);
-        view.setUint16(addr + 2, 0, !0);
-        view.setUint16(addr + 4, 0, !0);
-
-        function setBigUint64(byteOffset, value, littleEndian) {
-
-            const lowWord = value;
-            const highWord = 0;
-
-            view.setUint32(littleEndian ? 0 : 4, lowWord, littleEndian);
-            view.setUint32(littleEndian ? 4 : 0, highWord, littleEndian);
+        function setUint64(byteOffset, value) {
+            view.setUint32(byteOffset + 4, value & 0xFFFFFFFF);
+            view.setUint32(byteOffset + 0, (value >> 32) & 0xFFFFFFFF);
         }
 
-        setBigUint64(addr + 8, 0, !0);
-        setBigUint64(addr + 8 + 8, 0, !0);
+        if (fd <= 2) {
+          setUint64(bufPtr, 2); // chardev
+        }
+        setUint64(bufPtr + 8, 0);
+        setUint64(bufPtr + 16, 0);
 
         return WASI_ESUCCESS;
     }
@@ -417,13 +413,15 @@ function barebonesWASI() {
     }
 
     function environ_get(environ, environ_buf) {
-        worker_console_log("environ_get("+ environ + ", "+ environ_buf+ ")");
+        worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let orig_environ_buf = environ_buf;
+        worker_console_log("zwracamy env! len = "+env.length);
         // TODO: env
         for (let i = 0; i < env.length; i++) {
-            buffer.setUint32(environ, environ_buf, true);
+            worker_console_log("zwracamy env!");
+            buffer.setUint32(environ, environ_buf);
             environ += 4;
             let e = new TextEncoder().encode(env[i]);
             buffer8.set(e, environ_buf);
@@ -440,7 +438,7 @@ function barebonesWASI() {
 
 
     function clock_time_get(id, precision, time) {
-        worker_console_log("clock_time_get("+ id+ ", "+ precision+ ", "+ time+ ")");
+        worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
         let buffer = getModuleMemoryDataView()
         buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
         return WASI_ESUCCESS;
@@ -572,12 +570,17 @@ function barebonesWASI() {
     }
 
     function path_open(fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
-        worker_console_log("path_open("+ dirflags+ ", "+ path_ptr+ ", "+ path_len+ ", "+ oflags, " + "+ fs_rights_base + ", " + fs_rights_inheriting + ", " + fdflags + ", " + opened_fd_ptr + ")");
+        worker_console_log(`path_open(${fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
-        if (fds[fd] != undefined && fds[fd].directory != undefined) {
-            let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
-            worker_console_log(path);
+        let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
+        worker_console_log(`We got path ${path} len = ${path_len}`);
+        if (path[0] == '!') {
+            worker_console_log("We are going to send a spawn message!");
+            worker_send(["spawn", path.slice(1, path.length)]);
+            worker_console_log("sent.");
+            return WASI_EBADF; // TODO
+        } else if (fds[fd] != undefined && fds[fd].directory != undefined && path_len != 0) {
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
                 if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
@@ -597,6 +600,7 @@ function barebonesWASI() {
             fds.push(entry.open(path));
             let opened_fd = fds.length - 1;
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
+            return 0;
         } else {
             return 1;
         }
@@ -628,15 +632,15 @@ function barebonesWASI() {
     }
 
     function fd_prestat_get(fd, buf_ptr) {
-        worker_console_log("fd_prestat_get("+ fd+ ", "+ buf_ptr+ ")");
+        worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         let buffer = getModuleMemoryDataView();
         // FIXME: this fails for created files, fds[fd] is undefined
         //  what should happen when requesting with not used fd?
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log("fd_prestat_get inner");
+            worker_console_log(`fd_prestat_get inner -- [${fds[fd].prestat_name}]`);
             const PREOPEN_TYPE_DIR = 0;
             buffer.setUint32(buf_ptr, PREOPEN_TYPE_DIR, true);
-            buffer.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
+            buffer.setUint32(buf_ptr + 8, fds[fd].prestat_name.length);
             return WASI_ESUCCESS;
         } else {
             worker_console_log("fd_prestat_get returning EBADF");
@@ -645,9 +649,9 @@ function barebonesWASI() {
     }
 
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
-        worker_console_log("fd_prestat_dir_name("+ fd+ ", "+ path_ptr+ ", "+ path_len+ ")");
+        worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log("fd_prestat_dir_name inner");
+            worker_console_log(`fd_prestat_dir_name inner --- [${fds[fd].prestat_name}]`);
             let buffer8 = getModuleMemoryUint8Array();
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;
@@ -791,7 +795,6 @@ function importWasmModule(moduleName, wasiPolyfill) {
                 const response = await fetch(moduleName);
                 buffer = await response.arrayBuffer();
 	    } else {
-		const fs = require('fs');
 		buffer = fs.readFileSync(moduleName, null);
             }
             module = await WebAssembly.compile(buffer);
@@ -825,6 +828,17 @@ function importWasmModule(moduleName, wasiPolyfill) {
 function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
+        try {
+        if (is_node) { // TODO: add spawn for browser!
+            if (!fs.existsSync(fname)) {
+                worker_console_log(`File ${fname} not found!`);
+                started = false;
+                fname = "";
+                setTimeout(start_wasm, 500);
+                return;
+            }
+        }
+        } catch { }
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
         worker_console_log("done.");
@@ -835,6 +849,4 @@ function start_wasm() {
     }
 }
 
-setTimeout(function () {
-    start_wasm();
-}, 500);
+setTimeout(start_wasm, 500);
