@@ -83,9 +83,6 @@ function barebonesWASI() {
     const OFLAGS_EXCL = 0x4;
     const OFLAGS_TRUNC = 0x8;
 
-    let args = [];
-    let env = [];
-
     function setModuleInstance(instance) {
 
         moduleInstanceExports = instance.exports;
@@ -260,7 +257,7 @@ function barebonesWASI() {
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
                 buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                if (buffer.length > 0) worker_console_log("buffer len is now " + buffer.length + " and contents is '" + buffer + "', len is {0}" + len);
+                if (buffer.length > 0) worker_console_log("buffer len is now " + buffer.length + " and contents is '" + buffer + "', len is " + len);
                 if (buffer.length > 0) break;
             }
             worker_console_log("Out of Waiting...");
@@ -414,21 +411,21 @@ function barebonesWASI() {
 
     function environ_get(environ, environ_buf) {
         worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
-        let orig_environ_buf = environ_buf;
-        worker_console_log("zwracamy env! len = "+env.length);
-        // TODO: env
-        for (let i = 0; i < env.length; i++) {
-            worker_console_log("zwracamy env!");
-            buffer.setUint32(environ, environ_buf);
-            environ += 4;
-            let e = new TextEncoder().encode(env[i]);
-            buffer8.set(e, environ_buf);
-            buffer.setUint8(environ_buf + e.length, 0);
-            environ_buf += e.length + 1;
-        }
-        return 0;
+        // let buffer = getModuleMemoryDataView();
+        // let buffer8 = getModuleMemoryUint8Array();
+        // let orig_environ_buf = environ_buf;
+        // worker_console_log("zwracamy env! len = "+env.length);
+        // // TODO: env
+        // for (let i = 0; i < env.length; i++) {
+        //     worker_console_log("zwracamy env!");
+        //     buffer.setUint32(environ, environ_buf);
+        //     environ += 4;
+        //     let e = new TextEncoder().encode(env[i]);
+        //     buffer8.set(e, environ_buf);
+        //     buffer.setUint8(environ_buf + e.length, 0);
+        //     environ_buf += e.length + 1;
+        // }
+        return WASI_ESUCCESS;
     }
 
     function clock_res_get(a, b) {
@@ -841,6 +838,7 @@ function start_wasm() {
         } catch { }
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
+        // FIXME: returns done even if it failed
         worker_console_log("done.");
     } else {
         setTimeout(function () {
