@@ -48,6 +48,7 @@ fn main() {
             // built in commands
             "echo" => println!("\n{}", args.join(" ")),
             "cd" => println!("\ncd not yet implemented"),
+            "exit" => exit(0),
             // external commands
             "duk" | "main" | "shell" => {
                 println!();

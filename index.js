@@ -59,15 +59,20 @@ async function init_all() {
 
     let workers = [];
     workers[0] = {id: 0, worker: new Worker('worker.js')};
+    let current_worker = 0;
 
     const worker_onmessage = (event) => {
-        const action = event.data[1];
+        const [worker_id, action, data] = event.data;
         if (action === "buffer") {
-            const lck = new Int32Array(event.data[2], 0, 1);
-            const len = new Int32Array(event.data[2], 4, 1);
+            if (worker_id !== current_worker) {
+                console.log(`WORKER ${worker_id} requested buffer, ignoring. (not ${current_worker})`);
+                return;
+            }
+            const lck = new Int32Array(data, 0, 1);
+            const len = new Int32Array(data, 4, 1);
             if (buffer.length !== 0) {
                 console.log("got buffer request of len " + len[0] + ", notifying");
-                const sbuf = new Uint16Array(event.data[2], 8, len[0]);
+                const sbuf = new Uint16Array(data, 8, len[0]);
                 len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
                 console.log("current buffer is '" + buffer + "', copying len " + len[0]);
                 for (let j = 0; j < len[0]; j++) {
@@ -80,28 +85,29 @@ async function init_all() {
             lck[0] = 1;
             Atomics.notify(lck, 0);
         } else if (action === "stdout") {
-            let output = event.data[2].replace("\n", "\n\r");
+            let output = data.replace("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
-            console.log(`STDERR: ${event.data[2]}`);
+            console.log(`STDERR: ${data}`);
         } else if (action === "console") {
-            console.log("WORKER " + event.data[0] + ": " + event.data[2]);
+            console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
-            console.log("WORKER " + event.data[0] + " exited with result code: " + event.data[2]);
+            console.log("WORKER " + worker_id + " exited with result code: " + data);
         } else if (action === "env") {
-            console.log("WORKER " + event.data[0] + " added env variable: " + event.data[2]);
+            console.log("WORKER " + worker_id + " added env variable: " + data);
             // TODO
-            // let key, value = event.data[2].split(",");
+            // let key, value = data.split(",");
             // env[key] = value;
         } else if (action === "arg") {
-            console.log("WORKER " + event.data[0] + " added arg: " + event.data[2]);
-            args.append(event.data[2]);
+            console.log("WORKER " + worker_id + " added arg: " + data);
+            args.append(data);
         } else if (action === "spawn") {
             const id = workers.length;
             workers.push({id: id, worker: new Worker('worker.js')});
             workers[id].worker.onmessage = worker_onmessage;
-            workers[id].worker.postMessage(["start", event.data[2]+".wasm", id]);
-            console.log("WORKER " + event.data[0] + " spawned: " + event.data[2]);
+            workers[id].worker.postMessage(["start", data+".wasm", id]);
+            console.log("WORKER " + worker_id + " spawned: " + data);
+            current_worker = id;
         }
     }
 
