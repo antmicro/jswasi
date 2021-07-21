@@ -1,6 +1,5 @@
 use std::io;
 use std::io::{Write, Read};
-use std::str;
 
 fn main() {
     let mut input = String::new();
@@ -8,12 +7,12 @@ fn main() {
     loop {
         // prompt for input
         print!("$ ");
-        io::stdout().flush();
+        io::stdout().flush().unwrap();
 
         let mut c = [0];
         // read line
         loop {
-            io::stdin().read_exact(&mut c);
+            io::stdin().read_exact(&mut c).unwrap();
             match c[0] {
                 // enter
                 10 => break,
@@ -21,7 +20,7 @@ fn main() {
                 127 => {
                     if !input.is_empty() {
                         input.remove(input.len() - 1);
-                        print!("{} {}", 8 as char, 8 as char);
+                        print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
                     }
                 },
                 // control codes
@@ -31,11 +30,12 @@ fn main() {
                 // regular characters
                 _ => {
                     input.push(c[0] as char);
+                    // echo
                     print!("{}", c[0] as char);
                     // print!("({},{})", c[0] as u8, c[0] as char);
                 }
             }
-            io::stdout().flush();
+            io::stdout().flush().unwrap();
         }
 
         // handle line

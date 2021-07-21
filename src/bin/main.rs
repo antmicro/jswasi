@@ -5,17 +5,38 @@ use std::fs::File;
 use std::process::exit;
 
 fn main() {
-    println!("Going to do an iteration 30 times and sleep 1s in between");
-    for _ in 0..3 {
-        println!("Iteration -- Hello from Rust/WASM!");
-    }
+    println!("Start script.");
+    let filename = "/tmp/test.txt";
 
-    let _file = File::create("test.txt").unwrap_or_else(|e| {
+    print!("Create file... ");
+    let _file = File::create(filename).unwrap_or_else(|e| {
         println!("error occurred: {}", e);
-        exit(1);
+        exit(3);
     });
+    println!("worked");
 
-    println!("I regret to announce this is the end!");
+    // print!("Open file... ");
+    // let _file = File::open(filename).unwrap_or_else(|e| {
+    //     println!("error occurred: {}", e);
+    //     exit(3);
+    // });
+    // println!("worked");
+
+    // println!("Write to file... ");
+    // fs::write(filename, "test string").unwrap_or_else(|e| {
+    //     println!("error occurred: {:?}", e);
+    //     exit(3);
+    // });
+    // println!("worked");
+
+    println!("Read from file... ");
+    let s = fs::read_to_string(filename).unwrap_or_else(|e| {
+        println!("error occurred: {}", e);
+        exit(3);
+    });
+    println!("worked");
+
+    println!("read from file: {}", s);
 
     return;
 }

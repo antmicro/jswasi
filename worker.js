@@ -198,9 +198,11 @@ function barebonesWASI() {
         }
 
         get_entry_for_path(path) {
-            worker_console_log("directory get entry for path");
+            worker_console_log(`Directory.get_entry_for_path(${path})`);
             let entry = this;
+            worker_console_log(`directory: ${entry.directory}`);
             for (let component of path.split("/")) {
+                worker_console_log(`component: ${component}`);
                 if (component == "") break;
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
@@ -351,7 +353,7 @@ function barebonesWASI() {
     }
 
     function fd_write(fd, iovs, iovsLen, nwritten) {
-        worker_console_log((new Error()).stack.split("\n")[1].trim().split(" ")[1]);
+        worker_console_log(`fd_write(${fd}, ${iovs}, ${iovsLen}, ${nwritten})`);
         const view = getModuleMemoryDataView();
 
         let written = 0;
@@ -362,7 +364,6 @@ function barebonesWASI() {
         function writev(iov) {
 
             for (var b = 0; b < iov.byteLength; b++) {
-
                 bufferBytes.push(iov[b]);
             }
 

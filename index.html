@@ -106,7 +106,7 @@
                 args.append(event.data[2]);
             }
         }
-        workers[0].worker.postMessage(["start", "duk.wasm", 0]);
+        workers[0].worker.postMessage(["start", "main.wasm", 0]);
     }
 
     window.onload = init_all;
