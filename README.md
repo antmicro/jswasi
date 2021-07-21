@@ -1,9 +1,6 @@
 Run
 ```
-make serve
+make # builds wasm binary and copies necesssary files to `output` directory
+python3 -m http.server 8000 --dir output # or use any static server you like
 ```
 and go to http://localhost:8000.
-
-Cargo builds `wasm32-wasi` target.
-There are `index.html` and `hterm-all.js` files in main folder 
-that use the wasm module and provide the terminal.
