@@ -1,8 +1,8 @@
-use std::{env, fs, thread, time};
-use std::io::{self, Write};
-use std::time::Duration;
 use std::fs::File;
+use std::io::{self, Write};
 use std::process::exit;
+use std::time::Duration;
+use std::{env, fs, thread, time};
 
 fn main() {
     println!("Test string.");

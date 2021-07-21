@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use std::process::exit;
 use std::path::Path;
+use std::process::exit;
 
 fn main() {
     let mut pwd = "/".to_owned();
@@ -69,7 +69,7 @@ fn main() {
                     //     println!("cd: no such file or directory: {}", new_pwd);
                     // }
                 }
-            },
+            }
             "pwd" => println!("{}", pwd),
             "exit" => exit(0),
             // external commands
