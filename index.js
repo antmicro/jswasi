@@ -60,7 +60,7 @@ async function init_all() {
     let workers = [];
     workers[0] = {id: 0, worker: new Worker('worker.js')};
 
-    workers[0].worker.onmessage = (event) => {
+    const worker_onmessage = (event) => {
         const action = event.data[1];
         if (action === "buffer") {
             const lck = new Int32Array(event.data[2], 0, 1);
@@ -83,7 +83,7 @@ async function init_all() {
             let output = event.data[2].replace("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
-            console.log(event.data[2]);
+            console.log(`STDERR: ${event.data[2]}`);
         } else if (action === "console") {
             console.log("WORKER " + event.data[0] + ": " + event.data[2]);
         } else if (action === "exit") {
@@ -96,8 +96,16 @@ async function init_all() {
         } else if (action === "arg") {
             console.log("WORKER " + event.data[0] + " added arg: " + event.data[2]);
             args.append(event.data[2]);
+        } else if (action === "spawn") {
+            const id = workers.length;
+            workers.push({id: id, worker: new Worker('worker.js')});
+            workers[id].worker.onmessage = worker_onmessage;
+            workers[id].worker.postMessage(["start", event.data[2]+".wasm", id]);
+            console.log("WORKER " + event.data[0] + " spawned: " + event.data[2]);
         }
     }
+
+    workers[0].worker.onmessage = worker_onmessage;
     workers[0].worker.postMessage(["start", "shell.wasm", 0]);
 }
 
