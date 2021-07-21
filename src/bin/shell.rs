@@ -18,7 +18,7 @@ fn main() {
             match c[0] {
                 // enter
                 10 => break,
-                // CR
+                // backspace
                 127 => {
                     if !input.is_empty() {
                         input.remove(input.len() - 1);
@@ -48,10 +48,13 @@ fn main() {
             // built in commands
             "echo" => println!("\n{}", args.join(" ")),
             "cd" => println!("\ncd not yet implemented"),
-            "duk" | "main" => {
+            // external commands
+            "duk" | "main" | "shell" => {
                 println!();
                 File::open(format!("!{}", command));
             },
+            // edge cases
+            "" => println!(),
             _ => println!("\ncommand not found: {}", command),
         }
         input.clear();
