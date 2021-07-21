@@ -1,5 +1,7 @@
 use std::io;
 use std::io::{Write, Read};
+use std::fs::File;
+use std::process::exit;
 
 fn main() {
     let mut input = String::new();
@@ -32,14 +34,26 @@ fn main() {
                     input.push(c[0] as char);
                     // echo
                     print!("{}", c[0] as char);
-                    // print!("({},{})", c[0] as u8, c[0] as char);
                 }
             }
             io::stdout().flush().unwrap();
         }
 
         // handle line
-        print!("\nentered: {}\n", input);
+        let mut words = input.split_whitespace();
+        let command = words.next().unwrap_or_default();
+        let args: Vec<_> = words.collect();
+
+        match command {
+            // built in commands
+            "echo" => println!("\n{}", args.join(" ")),
+            "cd" => println!("\ncd not yet implemented"),
+            "duk" | "main" => {
+                println!();
+                File::open(format!("!{}", command));
+            },
+            _ => println!("\ncommand not found: {}", command),
+        }
         input.clear();
     }
 }
