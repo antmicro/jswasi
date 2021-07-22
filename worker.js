@@ -345,14 +345,14 @@ function barebonesWASI() {
         });
     }
 
-    function fd_write(fd, iovs, iovsLen, nwritten) {
-        worker_console_log(`fd_write(${fd}, ${iovs}, ${iovsLen}, ${nwritten})`);
+    function fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
+        worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = getModuleMemoryDataView();
 
         let written = 0;
         const bufferBytes = [];
 
-        const buffers = getiovs(view, iovs, iovsLen);
+        const buffers = getiovs(view, iovs_ptr, iovs_len);
 
         function writev(iov) {
 
@@ -370,7 +370,7 @@ function barebonesWASI() {
         let err = fds[fd].write(content);
         worker_console_log("err on write: " + err)
 
-        view.setUint32(nwritten, written, !0);
+        view.setUint32(nwritten_ptr, written, !0);
 
         return WASI_ESUCCESS;
     }
@@ -388,19 +388,19 @@ function barebonesWASI() {
 
     function args_get(argv, argv_buf) {
         worker_console_log("args_get("+ argv+ ", "+ argv_buf+ ")");
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
-        let orig_argv_buf = argv_buf;
-        // TODO: args variable
-        for (let i = 0; i < args.length; i++) {
-            buffer.setUint32(argv, argv_buf, true);
-            argv += 4;
-            let arg = new TextEncoder("utf-8").encode(args[i]);
-            buffer8.set(arg, argv_buf);
-            buffer.setUint8(argv_buf + arg.length, 0);
-            argv_buf += arg.length + 1;
-        }
-        worker_console_log(new TextDecoder("utf-8").decode(buffer8.slice(orig_argv_buf, argv_buf)));
+        // let buffer = getModuleMemoryDataView();
+        // let buffer8 = getModuleMemoryUint8Array();
+        // let orig_argv_buf = argv_buf;
+        // // TODO: args variable
+        // for (let i = 0; i < args.length; i++) {
+        //     buffer.setUint32(argv, argv_buf, true);
+        //     argv += 4;
+        //     let arg = new TextEncoder("utf-8").encode(args[i]);
+        //     buffer8.set(arg, argv_buf);
+        //     buffer.setUint8(argv_buf + arg.length, 0);
+        //     argv_buf += arg.length + 1;
+        // }
+        // worker_console_log(new TextDecoder("utf-8").decode(buffer8.slice(orig_argv_buf, argv_buf)));
         return WASI_ESUCCESS;
     }
 

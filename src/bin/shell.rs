@@ -4,6 +4,10 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
+use std::time::Duration;
+use std::{env, fs, thread, time};
+use std::thread::sleep;
+
 fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
@@ -74,6 +78,18 @@ fn main() {
                 }
             }
             "pwd" => println!("{}", pwd.display()),
+            "sleep" => {
+                // TODO: requires poll_oneoff implementation
+                if let Some(&sec_str) = args.get(0) {
+                    if let Ok(sec) = sec_str.parse() {
+                        thread::sleep(Duration::new(sec, 0));
+                    } else {
+                        println!("sleep: invalid time interval `{}`", sec_str);
+                    }
+                } else {
+                    println!("sleep: missing operand");
+                }
+            }
             "exit" => exit(0),
             // external commands
             "duk" | "main" | "shell" => {
