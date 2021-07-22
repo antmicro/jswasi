@@ -465,24 +465,25 @@ function barebonesWASI() {
     }
 
     function fd_read(fd, iovs_ptr, iovs_len, nread_ptr) {
-        worker_console_log("fd_read("+ fd+ ", "+ iovs_ptr+ ", "+ iovs_len+ ", "+ nread_ptr+ ")");
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
+        worker_console_log("fd_read("+ fd+ ", "+ iovs_ptr + ", "+ iovs_len+ ", "+ nread_ptr+ ")");
+        let view = getModuleMemoryDataView();
+        let view8 = getModuleMemoryUint8Array();
+
         if (fds[fd] != undefined) {
             let nread = 0;
             for (let i = 0; i < iovs_len; i++) {
-                let addr = buffer.getUint32(iovs_ptr + 8 * i, true);
-                let len = buffer.getUint32(iovs_ptr + 8 * i + 4, true);
+                let addr = view.getUint32(iovs_ptr + 8 * i, true);
+                let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
                 if ((i+1) === iovs_len && len === 1024) len = 1;
                 if ((i+1) === iovs_len && len === 8192) len = 1;
                 let [data, err] = fds[fd].read(len);
                 if (err !== 0) {
                     return err;
                 }
-                buffer8.set(data, addr);
+                view8.set(data, addr);
                 nread += data.length;
             }
-            buffer.setUint32(nread_ptr, buffer.getUint32(nread_ptr, true) + nread, true);
+            view.setUint32(nread_ptr, nread, true);
             return WASI_ESUCCESS;
         } else {
             return 1;
