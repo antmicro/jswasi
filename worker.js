@@ -631,15 +631,16 @@ function barebonesWASI() {
     function fd_prestat_get(fd, buf_ptr) {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         let view = getModuleMemoryDataView();
-        // FIXME: this fails for created files, fds[fd] is undefined
-        //  what should happen when requesting with not used fd?
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`${fds[fd].directory}, ${fds[fd].prestat_name}, ${fds[fd].prestat_name.length}`);
+            worker_console_log(`prestat_name: '${new TextDecoder().decode(fds[fd].prestat_name)}', prestat_name.length: ${fds[fd].prestat_name.length}`);
             const PREOPEN_TYPE_DIR = 0;
-            view.setUint32(buf_ptr, PREOPEN_TYPE_DIR, true);
+            view.setUint8(buf_ptr, PREOPEN_TYPE_DIR);
             view.setUint32(buf_ptr + 8, fds[fd].prestat_name.length);
             return WASI_ESUCCESS;
         } else {
+            // FIXME: this fails for created files (when fds[fd] is undefined)
+            //  what should happen when requesting with not used fd?
+            //  for now we get error: 'data provided contains a nul byte' on File::create
             worker_console_log("fd_prestat_get returning EBADF");
             return WASI_EBADF;
         }
@@ -648,12 +649,12 @@ function barebonesWASI() {
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
         worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`${fds[fd].file_type}, ${fds[fd].prestat_name}, ${fds[fd].prestat_name.length}`);
+            worker_console_log(`prestat_name: '${new TextDecoder().decode(fds[fd].prestat_name)}', prestat_name.length: ${fds[fd].prestat_name.length}`);
             let buffer8 = getModuleMemoryUint8Array();
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;
         } else {
-            return 1;
+            return WASI_EBADF; // TODO: what return code?
         }
     }
 

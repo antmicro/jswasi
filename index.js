@@ -117,7 +117,7 @@ async function init_all() {
     }
 
     workers[0].worker.onmessage = worker_onmessage;
-    workers[0].worker.postMessage(["start", "shell.wasm", 0]);
+    workers[0].worker.postMessage(["start", "main.wasm", 0]);
 }
 
 window.onload = init_all;
