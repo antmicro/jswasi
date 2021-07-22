@@ -1,26 +1,31 @@
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::Read;
 use std::process::exit;
 use std::time::Duration;
 use std::{env, fs, thread, time};
 
 fn main() {
-    println!("Test string.");
-    let filename = "!duk";
+    // println!("Test string.");
+    let filename = "./hello.rs";
 
     // print!("Create file... ");
-    // let _file = File::create(filename).unwrap_or_else(|e| {
+    let _file = File::create(filename).unwrap_or_else(|e| {
+        println!("error occurred: {}", e);
+        exit(3);
+    });
+    // println!("worked");
+
+    // print!("Open file '{}'... ", filename);
+    // let _file = File::open(filename).unwrap_or_else(|e| {
     //     println!("error occurred: {}", e);
     //     exit(3);
     // });
     // println!("worked");
 
-    print!("Open file '!duk'... ");
-    let _file = File::open(filename).unwrap_or_else(|e| {
-        println!("error occurred: {}", e);
-        exit(3);
-    });
-    println!("worked");
+    // let mut file = unsafe { File::from_raw_fd(4) };
+    // let mut buf;
+    // file.read_to_string(&mut buf);
+    // println!("{}", buf);
 
     // println!("Write to file... ");
     // fs::write(filename, "test string").unwrap_or_else(|e| {

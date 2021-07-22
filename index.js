@@ -85,6 +85,10 @@ async function init_all() {
             lck[0] = 1;
             Atomics.notify(lck, 0);
         } else if (action === "stdout") {
+            if (worker_id !== current_worker) {
+                console.log(`WORKER ${worker_id} requested stdout, ignoring. (not ${current_worker})`);
+                return;
+            }
             let output = data.replace("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
@@ -92,6 +96,7 @@ async function init_all() {
         } else if (action === "console") {
             console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
+            current_worker -= 1; // TODO: workers stack/tree
             console.log("WORKER " + worker_id + " exited with result code: " + data);
         } else if (action === "env") {
             console.log("WORKER " + worker_id + " added env variable: " + data);

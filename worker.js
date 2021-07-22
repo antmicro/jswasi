@@ -239,6 +239,7 @@ function barebonesWASI() {
     class PreopenDirectory extends Directory {
         constructor(name, contents) {
             super(contents);
+            worker_console_log(`PreopenDirectory(${name}, ${contents}`)
             this.prestat_name = new TextEncoder().encode(name);
         }
     }
@@ -284,16 +285,13 @@ function barebonesWASI() {
     }
 
     let fds = [
-        new Stdin(),
-        new Stdout(),
-        new Stderr(),
+        new Stdin(), // 0
+        new Stdout(), // 1
+        new Stderr(), // 2
         new PreopenDirectory(".", {
             "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
         }), // 3
-        new PreopenDirectory("/tmp", {
-            "test.txt": new File(new TextEncoder().encode('some test content')),
-        }), // 4
-    
+        new OpenFile(new File(new TextEncoder().encode("test string content"))), // 4
     ];
 
     function environ_sizes_get(environ_count_ptr, environ_bufsize_ptr) {
@@ -338,15 +336,10 @@ function barebonesWASI() {
     }
 
     function getiovs(view, iovs, iovsLen) {
-        // iovs* -> [iov, iov, ...]
-        // __wasi_ciovec_t {
-        //   void* buf,
-        //   size_t buf_len,
-        // }
         return Array.from({length: iovsLen}, function (_, i) {
             const ptr = iovs + i * 8;
-            const buf = view.getUint32(ptr, !0);
-            const bufLen = view.getUint32(ptr + 4, !0);
+            const buf = view.getUint32(ptr, true);
+            const bufLen = view.getUint32(ptr + 4, true);
 
             return new Uint8Array(moduleInstanceExports.memory.buffer, buf, bufLen);
         });
@@ -384,6 +377,7 @@ function barebonesWASI() {
 
     function proc_exit(exit_code) {
         worker_console_log("proc_exit, shutting down, exit_code = " + exit_code);
+        worker_send(["exit", exit_code]);
         do_exit(exit_code); // never returns!
     }
     
@@ -573,13 +567,16 @@ function barebonesWASI() {
         let buffer8 = getModuleMemoryUint8Array();
         let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`We got path ${path} len = ${path_len}`);
+        worker_console_log("fd: " + fds[fd]);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             worker_send(["spawn", path.slice(1, path.length)]);
             worker_console_log("sent.");
             return WASI_EBADF; // TODO
         } else if (fds[fd] != undefined && fds[fd].directory != undefined && path_len != 0) {
+            worker_console_log("fd exist and is a directory");
             let entry = fds[fd].get_entry_for_path(path);
+            worker_console_log("entry:" + entry);
             if (entry == null) {
                 if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
                     entry = fds[fd].create_entry_for_path(path);
@@ -600,6 +597,7 @@ function barebonesWASI() {
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
             return 0;
         } else {
+            worker_console_log("fd doesn't exist or is a directory");
             return 1;
         }
     }
@@ -631,14 +629,14 @@ function barebonesWASI() {
 
     function fd_prestat_get(fd, buf_ptr) {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
-        let buffer = getModuleMemoryDataView();
+        let view = getModuleMemoryDataView();
         // FIXME: this fails for created files, fds[fd] is undefined
         //  what should happen when requesting with not used fd?
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`fd_prestat_get inner -- [${fds[fd].prestat_name}]`);
+            worker_console_log(`${fds[fd].directory}, ${fds[fd].prestat_name}, ${fds[fd].prestat_name.length}`);
             const PREOPEN_TYPE_DIR = 0;
-            buffer.setUint32(buf_ptr, PREOPEN_TYPE_DIR, true);
-            buffer.setUint32(buf_ptr + 8, fds[fd].prestat_name.length);
+            view.setUint32(buf_ptr, PREOPEN_TYPE_DIR, true);
+            view.setUint32(buf_ptr + 8, fds[fd].prestat_name.length);
             return WASI_ESUCCESS;
         } else {
             worker_console_log("fd_prestat_get returning EBADF");
@@ -649,7 +647,7 @@ function barebonesWASI() {
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
         worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`fd_prestat_dir_name inner --- [${fds[fd].prestat_name}]`);
+            worker_console_log(`${fds[fd].file_type}, ${fds[fd].prestat_name}, ${fds[fd].prestat_name.length}`);
             let buffer8 = getModuleMemoryUint8Array();
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;

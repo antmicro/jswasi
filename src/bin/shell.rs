@@ -1,11 +1,11 @@
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::exit;
 
 fn main() {
-    let mut pwd = "/".to_owned();
+    let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
     loop {
@@ -54,23 +54,26 @@ fn main() {
             "echo" => println!("{}", args.join(" ")),
             "cd" => {
                 if args.is_empty() {
-                    pwd = "/".to_owned();
+                    pwd = PathBuf::from("/");
                 } else {
                     let path = args[0];
 
-                    let new_pwd = if path.starts_with("/") {
-                        path.to_owned()
+                    let new_path = if path.starts_with("/") {
+                        PathBuf::from(path)
                     } else {
-                        format!("{}{}", pwd, path)
+                        pwd.join(path)
                     };
 
                     // // simply including this in source breaks shell
                     // if !Path::new(&new_pwd).exists() {
                     //     println!("cd: no such file or directory: {}", new_pwd);
+                    // } else {
+                    //     pwd = new_pwd;
                     // }
+                    pwd = new_path;
                 }
             }
-            "pwd" => println!("{}", pwd),
+            "pwd" => println!("{}", pwd.display()),
             "exit" => exit(0),
             // external commands
             "duk" | "main" | "shell" => {
