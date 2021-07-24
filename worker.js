@@ -291,7 +291,7 @@ function barebonesWASI() {
         new PreopenDirectory(".", {
             "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
         }), // 3
-        new OpenFile(new File(new TextEncoder().encode("test string content"))), // 4
+        // new PreopenDirectory("/tmp", new File(new TextEncoder().encode("test string content"))), // 4
     ];
 
     function environ_sizes_get(environ_count_ptr, environ_bufsize_ptr) {
@@ -635,7 +635,7 @@ function barebonesWASI() {
             worker_console_log(`prestat_name: '${new TextDecoder().decode(fds[fd].prestat_name)}', prestat_name.length: ${fds[fd].prestat_name.length}`);
             const PREOPEN_TYPE_DIR = 0;
             view.setUint8(buf_ptr, PREOPEN_TYPE_DIR);
-            view.setUint32(buf_ptr + 8, fds[fd].prestat_name.length);
+            view.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
             return WASI_ESUCCESS;
         } else {
             // FIXME: this fails for created files (when fds[fd] is undefined)
@@ -654,6 +654,7 @@ function barebonesWASI() {
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;
         } else {
+            worker_console_log("fd_prestat_dir_name returning EBADF");
             return WASI_EBADF; // TODO: what return code?
         }
     }
