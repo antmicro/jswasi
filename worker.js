@@ -251,6 +251,7 @@ function barebonesWASI() {
             worker_console_log("read is happening, requested len is " + len);
             if (len === 0) return [new Uint8Array([]), 0];
             worker_console_log("Waiting...");
+            // TODO: what we would like to do is block on read here instead of looping which waists resources
             while (1) {
                 const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
                 const lck = new Int32Array(buf, 0, 1);
@@ -291,7 +292,7 @@ function barebonesWASI() {
         new PreopenDirectory(".", {
             "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
         }), // 3
-        // new PreopenDirectory("/tmp", new File(new TextEncoder().encode("test string content"))), // 4
+        new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
     ];
 
     function environ_sizes_get(environ_count_ptr, environ_bufsize_ptr) {
@@ -474,6 +475,9 @@ function barebonesWASI() {
             for (let i = 0; i < iovs_len; i++) {
                 let addr = view.getUint32(iovs_ptr + 8 * i, true);
                 let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
+                // TODO: remove 2 next lines
+                //  right now it works without them, but tab crashes with multiple shells running
+                //  most likely loops in background crash RAM
                 if ((i+1) === iovs_len && len === 1024) len = 1;
                 if ((i+1) === iovs_len && len === 8192) len = 1;
                 let [data, err] = fds[fd].read(len);
@@ -486,6 +490,7 @@ function barebonesWASI() {
             view.setUint32(nread_ptr, nread, true);
             return WASI_ESUCCESS;
         } else {
+            worker_console_log("fd_read returning 1");
             return 1;
         }
     }
@@ -562,32 +567,32 @@ function barebonesWASI() {
         }
     }
 
-    function path_open(fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
-        worker_console_log(`path_open(${fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
+    function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
+        worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`We got path ${path} len = ${path_len}`);
-        worker_console_log("fd: " + fds[fd]);
+        worker_console_log("fd: " + fds[dir_fd]);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             worker_send(["spawn", path.slice(1, path.length)]);
             worker_console_log("sent.");
             return WASI_EBADF; // TODO
-        } else if (fds[fd] != undefined && fds[fd].directory != undefined && path_len != 0) {
+        } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             worker_console_log("fd exist and is a directory");
-            let entry = fds[fd].get_entry_for_path(path);
+            let entry = fds[dir_fd].get_entry_for_path(path);
             worker_console_log("entry:" + entry);
             if (entry == null) {
                 if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
-                    entry = fds[fd].create_entry_for_path(path);
+                    entry = fds[dir_fd].create_entry_for_path(path);
                 } else {
                     return 1;
                 }
             } else if (oflags & OFLAGS_EXCL === OFLAGS_EXCL) {
                 return 1;
             }
-            if (oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[fd].file_type !== FILETYPE_DIRECTORY) {
+            if (oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY) {
                 return 1;
             }
             if (oflags & OFLAGS_TRUNC === OFLAGS_TRUNC) {
@@ -595,6 +600,7 @@ function barebonesWASI() {
             }
             fds.push(entry.open(path));
             let opened_fd = fds.length - 1;
+            worker_console_log(`new file opened at fd = ${opened_fd}`);
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
             return 0;
         } else {
