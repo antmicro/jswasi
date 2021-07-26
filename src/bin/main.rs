@@ -35,8 +35,8 @@ fn main() {
     });
     println!("worked");
 
-    file.seek(SeekFrom::Start(0));
-    file.sync_all().unwrap();
+    // file.seek(SeekFrom::Start(0));
+    // file.sync_all().unwrap();
 
     let mut buf = String::new();
     file.read_to_string(&mut buf);

@@ -157,6 +157,7 @@ function barebonesWASI() {
 
         read(len) {
             worker_console_log("open file read");
+            worker_console_log(`${typeof this.file_pos}, ${typeof len}`)
             if (this.file_pos < this.file.data.byteLength) {
                 let slice = this.file.data.slice(this.file_pos, this.file_pos + len);
                 this.file_pos += slice.length;
@@ -167,19 +168,21 @@ function barebonesWASI() {
         }
 
         write(buffer) {
-            worker_console_log("open file write: "+ this.file.data + " " + this.file_pos + " " + buffer.byteLength);
-            if (this.file_pos + buffer.byteLength > this.size) {
+            worker_console_log(`OpenFile.write(${buffer})`);
+            worker_console_log("open file before write: "+ this.file.data + " " + this.file_pos + " " + buffer.length);
+            // File.data is and Uint8Array, we need to resize it if necessary
+            if (this.file_pos + buffer.length > this.size) {
                 let old = this.file.data;
-                this.file.data = new Uint8Array(this.file_pos + buffer.byteLength);
+                this.file.data = new Uint8Array(this.file_pos + buffer.length);
                 this.file.data.set(old);
             }
+            worker_console_log(`buffer.length = ${buffer.length}, this.file_pos = ${this.file_pos}, this.file.data.byteLength = ${this.file.data.byteLength}`)
             this.file.data.set(
-                buffer.slice(
-                    0,
-                    this.size - this.file_pos,
-                ), this.file_pos
+                new TextEncoder().encode(buffer), this.file_pos
             );
-            this.file_pos += buffer.byteLength;
+            worker_console_log(`>>> ${typeof buffer}, ${typeof buffer.length}`)
+            this.file_pos += buffer.length;
+            worker_console_log("open file after write: "+ this.file.data + " " + this.file_pos + " " + buffer.length);
             return 0;
         }
 
@@ -360,18 +363,18 @@ function barebonesWASI() {
         const buffers = getiovs(view, iovs_ptr, iovs_len);
 
         function writev(iov) {
-
             for (var b = 0; b < iov.byteLength; b++) {
                 bufferBytes.push(iov[b]);
             }
 
+            worker_console_log(`bufferBytes = ${bufferBytes}`);
             written += b;
         }
 
         buffers.forEach(writev);
 
         const content = String.fromCharCode.apply(null, bufferBytes);
-        worker_console_log("content to write to file: ", content, bufferBytes);
+        worker_console_log(`content to write to file: ${content}`);
 
         let err = fds[fd].write(content);
         worker_console_log("err on write: " + err);

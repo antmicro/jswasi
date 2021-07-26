@@ -89,6 +89,7 @@ async function init_all() {
                 console.log(`WORKER ${worker_id} requested stdout, ignoring. (not ${current_worker})`);
                 return;
             }
+            // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
             let output = data.replace("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
