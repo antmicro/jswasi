@@ -1,27 +1,26 @@
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read, Write, Seek, SeekFrom};
 use std::process::exit;
 use std::time::Duration;
 use std::{env, fs, thread, time};
 
 fn main() {
     println!("Test string.");
-    let filename = "./hello.rs";
 
     // ERRORS
-    // print!("Create file... ");
-    // let _file = File::create(filename).unwrap_or_else(|e| {
-    //     println!("error occurred: {:?}", e);
-    //     exit(3);
-    // });
-    // println!("worked");
-
-    // WORKS
-    // print!("Open file '{}'... ", filename);
-    let mut file = File::open(filename).unwrap_or_else(|e| {
+    print!("Create file... ");
+    let mut file = File::create("./created.txt").unwrap_or_else(|e| {
         println!("error occurred: {:?}", e);
         exit(3);
     });
+    println!("worked");
+
+    // WORKS
+    // print!("Open file '{}'... ", filename);
+    // let mut file = File::open(filename).unwrap_or_else(|e| {
+    //     println!("error occurred: {:?}", e);
+    //     exit(3);
+    // });
     // println!("worked");
 
     // let mut file = unsafe { File::from_raw_fd(4) };
@@ -36,6 +35,12 @@ fn main() {
     });
     println!("worked");
 
+    file.seek(SeekFrom::Start(0));
+    file.sync_all().unwrap();
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf);
+    println!("read after write: {}", buf);
     // println!("Open and write to file... ");
     // fs::write(filename, "test string").unwrap_or_else(|e| {
     //     println!("error occurred: {:?}", e);
@@ -45,7 +50,7 @@ fn main() {
 
     // WORKS
     print!("Read from file... ");
-    let s = fs::read_to_string(filename).unwrap_or_else(|e| {
+    let s = fs::read_to_string("./created.txt").unwrap_or_else(|e| {
         println!("error occurred: {:?}", e);
         exit(3);
     });
@@ -53,14 +58,22 @@ fn main() {
 
     println!("read from file: {}", s);
 
-    print!("Read from file... ");
-    let s = fs::read_to_string("/tmp/").unwrap_or_else(|e| {
-        println!("error occurred: {:?}", e);
-        exit(3);
-    });
-    println!("worked");
+    // WORKS
+    // print!("Open file '{}'... ", filename);
+    // let mut file = File::open(filename).unwrap_or_else(|e| {
+    //     println!("error occurred: {:?}", e);
+    //     exit(3);
+    // });
 
-    println!("read from file: {}", s);
+    // println!("worked");
+    // print!("Read from file... ");
+    // let s = fs::read_to_string("/tmp/test.txt").unwrap_or_else(|e| {
+    //     println!("error occurred: {:?}", e);
+    //     exit(3);
+    // });
+    // println!("worked");
+    // //
+    // println!("read from file: {}", s);
 
     return;
 }

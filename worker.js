@@ -83,6 +83,10 @@ function barebonesWASI() {
     const OFLAGS_EXCL = 0x4;
     const OFLAGS_TRUNC = 0x8;
 
+    const WHENCE_SET = 0;
+    const WHENCE_CUR = 1;
+    const WHENCE_END = 2;
+
     function setModuleInstance(instance) {
 
         moduleInstanceExports = instance.exports;
@@ -367,9 +371,11 @@ function barebonesWASI() {
         buffers.forEach(writev);
 
         const content = String.fromCharCode.apply(null, bufferBytes);
+        worker_console_log("content to write to file: ", content, bufferBytes);
 
         let err = fds[fd].write(content);
-        worker_console_log("err on write: " + err)
+        worker_console_log("err on write: " + err);
+        worker_console_log("file content: " + fds[fd].file?.data);
 
         view.setUint32(nwritten_ptr, written, !0);
 
@@ -539,9 +545,29 @@ function barebonesWASI() {
         }
     }
 
-    function fd_seek() {
-        worker_console_log("fd_seek");
-        return 1;
+    function fd_seek(fd, offset, whence, new_offset) {
+        worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
+        let view = getModuleMemoryDataView();
+        if (fds[fd] !== undefined) {
+            let file = fds[fd];
+            switch (whence) {
+                case WHENCE_SET: {
+                    file.file_pos = offset;
+                    break;
+                }
+                case WHENCE_CUR: {
+                    file.file_pos += offset;
+                    break;
+                }
+                case WHENCE_END: {
+                    file.file_pos = file.data.length + offset;
+                }
+            }
+            view.setBigUint64(new_offset, file.file_pos, true);
+            worker_console_log(`file fd=${fd} has file_pos=${file.file_pos}`)
+            return WASI_ESUCCESS;
+        }
+        return WASI_EBADF;
     }
 
     function path_create_directory() {
