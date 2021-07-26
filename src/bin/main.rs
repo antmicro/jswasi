@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Read, Write, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::exit;
 use std::time::Duration;
 use std::{env, fs, thread, time};

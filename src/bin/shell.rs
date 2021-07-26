@@ -4,9 +4,9 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
+use std::thread::sleep;
 use std::time::Duration;
 use std::{env, fs, thread, time};
-use std::thread::sleep;
 
 fn main() {
     let mut pwd = PathBuf::from("/");
@@ -88,6 +88,17 @@ fn main() {
                     }
                 } else {
                     println!("sleep: missing operand");
+                }
+            }
+            "cat" => {
+                if let Some(&filename) = args.get(0) {
+                    match fs::read_to_string(filename) {
+                        Ok(content) => println!("{}", content),
+                        // TODO: match on error and provide better messages
+                        Err(error) => println!("cat: {}: {}", filename, error),
+                    }
+                } else {
+                    println!("cat: not yet implemented");
                 }
             }
             "exit" => exit(0),

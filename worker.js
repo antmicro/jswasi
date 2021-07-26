@@ -611,12 +611,12 @@ function barebonesWASI() {
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             worker_console_log("fd exist and is a directory");
             let entry = fds[dir_fd].get_entry_for_path(path);
-            worker_console_log("entry:" + entry);
+            worker_console_log("entry: " + entry);
             if (entry == null) {
                 if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
                     entry = fds[dir_fd].create_entry_for_path(path);
                 } else {
-                    return 1;
+                    return WASI_EBADF;
                 }
             } else if (oflags & OFLAGS_EXCL === OFLAGS_EXCL) {
                 return 1;
