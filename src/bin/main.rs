@@ -3,9 +3,13 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::exit;
 use std::time::Duration;
 use std::{env, fs, thread, time};
+use std::net::TcpStream;
 
 fn main() {
     println!("Test string.");
+
+    // WON'T WORK IN CURRENT wasm32-wasi
+    // let mut stream = TcpStream::connect("127.0.0.0:8000").unwrap();
 
     // ERRORS
     print!("Create file... ");

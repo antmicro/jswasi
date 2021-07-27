@@ -1,12 +1,11 @@
+use std::{env, fs, thread, time};
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::exit;
-
 use std::thread::sleep;
 use std::time::Duration;
-use std::{env, fs, thread, time};
 
 fn main() {
     let mut pwd = PathBuf::from("/");
@@ -99,6 +98,27 @@ fn main() {
                     }
                 } else {
                     println!("cat: not yet implemented");
+                }
+            }
+            "touch" => {
+                if let Some(&filename) = args.get(0) {
+                    match File::create(filename) {
+                        Ok(_) => {}
+                        // TODO: match on error and provide better messages
+                        Err(error) => println!("touch: failed creating file: {}", error),
+                    }
+                } else {
+                    println!("touch: missing file operand");
+                }
+            }
+            "write" => {
+                if args.len() < 2 {
+                    println!("missing argument: write <filename> <contents>");
+                } else {
+                    match fs::write(args[0], args[1]) {
+                        Ok(_) => {}
+                        Err(error) => println!("write: failed to write to file: {}", error),
+                    }
                 }
             }
             "exit" => exit(0),

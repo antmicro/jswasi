@@ -65,6 +65,7 @@ function barebonesWASI() {
 
     const WASI_ESUCCESS = 0;
     const WASI_EBADF = 8;
+    const WASI_EEXIST = 20;
     const WASI_EINVAL = 28;
     const WASI_ENOSYS = 52;
 
@@ -619,22 +620,26 @@ function barebonesWASI() {
                     return WASI_EBADF;
                 }
             } else if (oflags & OFLAGS_EXCL === OFLAGS_EXCL) {
-                return 1;
+                // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
+                // worker_console_log("file already exists, return 1");
+                // return WASI_EEXIST;
             }
             if (oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY) {
+                worker_console_log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
                 return 1;
             }
             if (oflags & OFLAGS_TRUNC === OFLAGS_TRUNC) {
+                worker_console_log("entry.truncate()")
                 entry.truncate();
             }
             fds.push(entry.open(path));
             let opened_fd = fds.length - 1;
             worker_console_log(`new file opened at fd = ${opened_fd}`);
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
-            return 0;
+            return WASI_ESUCCESS;
         } else {
             worker_console_log("fd doesn't exist or is a directory");
-            return 1;
+            return WASI_EBADF;
         }
     }
 
