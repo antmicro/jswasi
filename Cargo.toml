@@ -10,3 +10,6 @@ edition = "2018"
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[dependencies]
+rand = "0.8.4"

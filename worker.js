@@ -393,7 +393,11 @@ function barebonesWASI() {
     }
     
     function random_get(buf_addr, buf_len) {
-        worker_console_log("random_get");
+        worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
+        let view8 = getModuleMemoryUint8Array();
+        let numbers = new Uint8Array(buf_len);
+        self.crypto.getRandomValues(numbers);
+        view8.set(numbers, buf_addr);
         return WASI_ESUCCESS;
     }
 
@@ -447,9 +451,13 @@ function barebonesWASI() {
         return WASI_ESUCCESS;
     }
 
-    function fd_close() {
-        worker_console_log("fd_close");
-        return 1;
+    function fd_close(fd) {
+        worker_console_log(`fd_close(${fd})`);
+        if (fds[fd] !== undefined) {
+            fds[fd] = undefined;
+            return WASI_ESUCCESS;
+        }
+        return WASI_EBADF;
     }
 
     function fd_advice(a, b, c, d) { worker_console_log("fd_advice"); return 1; }
