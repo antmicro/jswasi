@@ -50,7 +50,7 @@ fn main() {
         // handle line
         let mut words = input.split_whitespace();
         let command = words.next().unwrap_or_default();
-        let args: Vec<_> = words.collect();
+        let mut args: Vec<_> = words.collect();
 
         match command {
             // built in commands
@@ -113,9 +113,9 @@ fn main() {
             }
             "write" => {
                 if args.len() < 2 {
-                    println!("missing argument: write <filename> <contents>");
+                    println!("write: help: write <filename> <contents>");
                 } else {
-                    match fs::write(args[0], args[1]) {
+                    match fs::write(args.remove(0), args.join(" ")) {
                         Ok(_) => {}
                         Err(error) => println!("write: failed to write to file: {}", error),
                     }
