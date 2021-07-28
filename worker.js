@@ -7,6 +7,16 @@ let fname = "";
 let myself = null;
 let fs = null;
 
+let buffer = "";
+
+// TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
+// TODO: things like fds array, args and env should be stored in terminal
+args = ["some", "test", "args"];
+env = {
+    PATH: "/usr/bin:/usr/local/bin",
+    X: "3"
+};
+
 onmessage = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
@@ -252,8 +262,6 @@ function barebonesWASI() {
         }
     }
 
-    let buffer = "";
-
     class Stdin {
         read(len) {
             worker_console_log("read is happening, requested len is " + len);
@@ -308,8 +316,20 @@ function barebonesWASI() {
 
         const view = getModuleMemoryDataView();
 
-        view.setUint32(environ_count_ptr, 0);
-        view.setUint32(environ_bufsize_ptr, 0);
+        let environ_count = Object.keys(env).length;
+        let environ_bufsize = Object.entries(env).reduce((sum, env) => sum + env[0].length + env[1].length + 2);
+
+        view.setUint32(environ_count_ptr, environ_count);
+        view.setUint32(environ_bufsize_ptr, environ_bufsize);
+
+        return WASI_ESUCCESS;
+    }
+
+    function environ_get(environ, environ_buf) {
+        worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
+        let view = getModuleMemoryDataView();
+        let view8 = getModuleMemoryUint8Array();
+
 
         return WASI_ESUCCESS;
     }
@@ -416,25 +436,6 @@ function barebonesWASI() {
         //     argv_buf += arg.length + 1;
         // }
         // worker_console_log(new TextDecoder("utf-8").decode(buffer8.slice(orig_argv_buf, argv_buf)));
-        return WASI_ESUCCESS;
-    }
-
-    function environ_get(environ, environ_buf) {
-        worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
-        // let buffer = getModuleMemoryDataView();
-        // let buffer8 = getModuleMemoryUint8Array();
-        // let orig_environ_buf = environ_buf;
-        // worker_console_log("zwracamy env! len = "+env.length);
-        // // TODO: env
-        // for (let i = 0; i < env.length; i++) {
-        //     worker_console_log("zwracamy env!");
-        //     buffer.setUint32(environ, environ_buf);
-        //     environ += 4;
-        //     let e = new TextEncoder().encode(env[i]);
-        //     buffer8.set(e, environ_buf);
-        //     buffer.setUint8(environ_buf + e.length, 0);
-        //     environ_buf += e.length + 1;
-        // }
         return WASI_ESUCCESS;
     }
 
