@@ -72,13 +72,13 @@ async function init_all() {
             const len = new Int32Array(data, 4, 1);
             if (buffer.length !== 0) {
                 console.log("got buffer request of len " + len[0] + ", notifying");
-                const sbuf = new Uint16Array(data, 8, len[0]);
+                const sbuf = new Uint8Array(data, 8, len[0]);
                 len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
                 console.log("current buffer is '" + buffer + "', copying len " + len[0]);
                 for (let j = 0; j < len[0]; j++) {
                     sbuf[j] = buffer.charCodeAt(j);
                 }
-                buffer = buffer.slice(len[0], buffer.length);
+                buffer = buffer.slice(len[0]);
             } else {
                 len[0] = 0;
             }

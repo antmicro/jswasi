@@ -72,6 +72,7 @@ function do_exit(exit_code) {
         worker_send(["exit", exit_code]); // never return
         Atomics.wait(lck, 0, 0);
     } else {
+	worker_console_log("calling close()");
         close();
     }
 }
@@ -282,8 +283,8 @@ function barebonesWASI() {
                 request_len[0] = len;
                 worker_send(["buffer", buf]);
                 Atomics.wait(lck, 0, 0);
-                const sbuf = new Uint16Array(buf, 8, request_len[0]);
-                BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint16Array(sbuf));
+                const sbuf = new Uint8Array(buf, 8, request_len[0]);
+                BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
                 if (BUFFER.length > 0) worker_console_log("buffer len is now " + BUFFER.length + " and contents is '" + BUFFER + "', len is " + len);
                 if (BUFFER.length > 0) break;
             }
