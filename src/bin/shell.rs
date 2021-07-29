@@ -13,7 +13,7 @@ fn main() {
 
     loop {
         // prompt for input
-        print!("$ ");
+        print!("{}$ ", pwd.to_str().unwrap());
         io::stdout().flush().unwrap();
 
         let mut c = [0];
