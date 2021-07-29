@@ -2,17 +2,17 @@
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
-let started = false;
-let fname = "";
-let myself = null;
-let fs = null;
+started = false;
+fname = "";
+myself = null;
+fs = null;
 
-let buffer = "";
+BUFFER = "";
 
 // TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
 // TODO: things like fds array, args and env should be stored in terminal
-args = ["program_name", "arg0", "arg1"];
-env = {
+ARGS = ["program_name", "arg0", "arg1"];
+ENV = {
     PATH: "/usr/bin:/usr/local/bin",
     X: "3"
 };
@@ -276,13 +276,13 @@ function barebonesWASI() {
                 worker_send(["buffer", buf]);
                 Atomics.wait(lck, 0, 0);
                 const sbuf = new Uint16Array(buf, 8, request_len[0]);
-                buffer = buffer + String.fromCharCode.apply(null, new Uint16Array(sbuf));
-                if (buffer.length > 0) worker_console_log("buffer len is now " + buffer.length + " and contents is '" + buffer + "', len is " + len);
-                if (buffer.length > 0) break;
+                BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint16Array(sbuf));
+                if (BUFFER.length > 0) worker_console_log("buffer len is now " + BUFFER.length + " and contents is '" + BUFFER + "', len is " + len);
+                if (BUFFER.length > 0) break;
             }
             worker_console_log("Out of Waiting...");
-            let data = buffer.slice(0, len).replace("\r", "\n");
-            buffer = buffer.slice(len, buffer.length);
+            let data = BUFFER.slice(0, len).replace("\r", "\n");
+            BUFFER = BUFFER.slice(len, BUFFER.length);
             return [new TextEncoder().encode(data), 0];
         }
     }
@@ -317,10 +317,10 @@ function barebonesWASI() {
         const view = getModuleMemoryDataView();
 
         let encoder = new TextEncoder();
-        let environ_count = Object.keys(env).length;
+        let environ_count = Object.keys(ENV).length;
 
         view.setUint32(environ_count_ptr, environ_count, true);
-        let variables = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0)
+        let variables = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0)
         view.setUint32(environ_bufsize, variables, true);
 
         worker_console_log(`environ_count = ${environ_count}`)
@@ -338,7 +338,7 @@ function barebonesWASI() {
         let encoder = new TextEncoder();
         let environ_buf_offset = environ_buf;
 
-        Object.entries(env).forEach(([key, val], i) => {
+        Object.entries(ENV).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(environ + i * 4,environ_buf, true);
             // write string describing the variable to WASM memory
@@ -356,8 +356,8 @@ function barebonesWASI() {
 
         const view = getModuleMemoryDataView();
 
-        view.setUint32(argc, args.length, true);
-        view.setUint32(argvBufSize, new TextEncoder().encode(args.join("")).byteLength + args.length, true);
+        view.setUint32(argc, ARGS.length, true);
+        view.setUint32(argvBufSize, new TextEncoder().encode(ARGS.join("")).byteLength + ARGS.length, true);
 
         return WASI_ESUCCESS;
     }
@@ -371,7 +371,7 @@ function barebonesWASI() {
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
-        Object.entries(args).forEach(([i, arg]) => {
+        Object.entries(ARGS).forEach(([i, arg]) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory

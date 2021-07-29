@@ -8,7 +8,7 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     println!("args: {}", args.join(" "));
-    println!("env: {:#?}", env::var("PATH").unwrap_or_else(|e| {
+    println!("env: PATH={}", env::var("PATH").unwrap_or_else(|e| {
         println!("error: {}", e);
         exit(4);
     }));
