@@ -7,12 +7,25 @@ fname = "";
 myself = null;
 fs = null;
 
+
+// TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
+// TODO: things like fds array, args and env should be stored in terminal
+let ARGS = ["program_name", "arg0", "arg1"];
+let ENV = {
+    // RUST_BACKTRACE: "full",
+    PATH: "/usr/bin:/usr/local/bin",
+    X: "3"
+};
+
 onmessage = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
             fname = e.data[1];
             myself = e.data[2];
             started = true;
+	    ARGS = e.data[3];
+	    worker_console_log(`e.data = ${e.data}`);
+	    worker_console_log(`ARGS=${e.data[3]}`);
         }
     }
 }
@@ -43,7 +56,7 @@ function worker_send(msg) {
         msg_ = {data: [myself, msg[0], msg[1]]};
         get_parent_port().postMessage(msg_);
     } else {
-        msg_ = [myself, msg[0], msg[1]];
+        msg_ = [myself, ...msg];
         postMessage(msg_);
     }
 }
@@ -66,16 +79,6 @@ function do_exit(exit_code) {
 function barebonesWASI() {
 
     let BUFFER = "";
-
-    // TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
-    // TODO: things like fds array, args and env should be stored in terminal
-    let ARGS = ["program_name", "arg0", "arg1"];
-    let ENV = {
-        // RUST_BACKTRACE: "full",
-        PATH: "/usr/bin:/usr/local/bin",
-        X: "3"
-    };
-
     let moduleInstanceExports = null;
 
     const WASI_ESUCCESS = 0;
@@ -196,7 +199,6 @@ function barebonesWASI() {
             this.file.data.set(
                 new TextEncoder().encode(buffer), this.file_pos
             );
-            worker_console_log(`>>> ${typeof buffer}, ${typeof buffer.length}`)
             this.file_pos += buffer.length;
             worker_console_log("open file after write: " + this.file.data + " " + this.file_pos + " " + buffer.length);
             return 0;
@@ -654,10 +656,10 @@ function barebonesWASI() {
         worker_console_log("fd: " + fds[dir_fd]);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
-            let path_split = path.split(" ");
-            worker_console_log(path)
-            worker_send(["spawn", path_split[0].slice(1)]);
-            ARGS = path_split.slice(1);
+            let [command, ...args] = path.split(" ");
+	    command = command.slice(1);
+            worker_console_log(`>>> ${command}, ${args}`);
+            worker_send(["spawn", command, args]);
             worker_console_log("sent.");
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {

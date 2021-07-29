@@ -85,10 +85,6 @@ async function init_all() {
             lck[0] = 1;
             Atomics.notify(lck, 0);
         } else if (action === "stdout") {
-            if (worker_id !== current_worker) {
-                console.log(`WORKER ${worker_id} requested stdout, ignoring. (not ${current_worker})`);
-                return;
-            }
             // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
             let output = data.replace("\n", "\n\r");
             terminal.io.print(output);
@@ -99,19 +95,13 @@ async function init_all() {
         } else if (action === "exit") {
             current_worker -= 1; // TODO: workers stack/tree
             console.log("WORKER " + worker_id + " exited with result code: " + data);
-        } else if (action === "env") {
-            console.log("WORKER " + worker_id + " added env variable: " + data);
-            // TODO
-            // let key, value = data.split(",");
-            // env[key] = value;
-        } else if (action === "arg") {
-            console.log("WORKER " + worker_id + " added arg: " + data);
-            args.append(data);
         } else if (action === "spawn") {
+	    const args = event.data[3];
             const id = workers.length;
             workers.push({id: id, worker: new Worker('worker.js')});
+	    console.log(`${worker_id}, ${action}, ${data}, ${args}`);
             workers[id].worker.onmessage = worker_onmessage;
-            workers[id].worker.postMessage(["start", data+".wasm", id]);
+            workers[id].worker.postMessage(["start", `${data}.wasm`, id, args]);
             console.log("WORKER " + worker_id + " spawned: " + data);
             current_worker = id;
         }

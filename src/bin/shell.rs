@@ -1,4 +1,3 @@
-use std::{env, fs, thread, time};
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
@@ -6,6 +5,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{env, fs, thread, time};
 
 fn main() {
     let mut pwd = PathBuf::from("/");
@@ -124,7 +124,7 @@ fn main() {
             "exit" => exit(0),
             // external commands
             "duk" | "main" | "shell" => {
-                File::open(format!("!{} {}", command, args.join(" ")));
+                File::open(format!("!{} {}", command, input));
                 eprintln!("Shell after spawning program");
             }
             // edge cases
