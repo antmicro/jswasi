@@ -371,10 +371,11 @@ function barebonesWASI() {
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
-        Object.entries(args).forEach((arg, i) => {
+        Object.entries(args).forEach(([i, arg]) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
+            worker_console_log(arg);
             let variable = encoder.encode(`${arg}\0`);
             view8.set(variable, argv_buf_offset);
             // calculate pointer to next variable
