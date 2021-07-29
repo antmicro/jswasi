@@ -7,7 +7,7 @@ fn main() {
     println!("{}", rng.gen::<u32>());
 
     let args: Vec<String> = env::args().collect();
-    println!("args: {:#?}", args.join(" "));
+    println!("args: {}", args.join(" "));
     println!("env: {:#?}", env::var("PATH").unwrap_or_else(|e| {
         println!("error: {}", e);
         exit(4);

@@ -11,7 +11,7 @@ let buffer = "";
 
 // TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
 // TODO: things like fds array, args and env should be stored in terminal
-args = ["some", "test", "args"];
+args = ["program_name", "arg0", "arg1"];
 env = {
     PATH: "/usr/bin:/usr/local/bin",
     X: "3"
@@ -320,14 +320,18 @@ function barebonesWASI() {
         let environ_count = Object.keys(env).length;
 
         view.setUint32(environ_count_ptr, environ_count, true);
-        let variables = Object.entries(env).reduce((sum, e) => sum + encoder.encode(e) + 1, 0)
+        let variables = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0)
         view.setUint32(environ_bufsize, variables, true);
+
+        worker_console_log(`environ_count = ${environ_count}`)
+        worker_console_log(`environ_bufsize = ${variables}`)
 
         return WASI_ESUCCESS;
     }
 
     function environ_get(environ, environ_buf) {
         worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
+
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
 
@@ -336,7 +340,7 @@ function barebonesWASI() {
 
         Object.entries(env).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
-            view.setUint32(environ + i * 4,environ_buf);
+            view.setUint32(environ + i * 4,environ_buf, true);
             // write string describing the variable to WASM memory
             let variable = encoder.encode(`${key}=${val}\0`);
             view8.set(variable, environ_buf_offset);
@@ -360,13 +364,14 @@ function barebonesWASI() {
 
     function args_get(argv, argv_buf) {
         worker_console_log("args_get("+ argv+ ", "+ argv_buf+ ")");
+
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
 
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
-        Object.entries(env).forEach((arg, i) => {
+        Object.entries(args).forEach((arg, i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
