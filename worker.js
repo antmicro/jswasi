@@ -7,38 +7,32 @@ fname = "";
 myself = null;
 fs = null;
 
-BUFFER = "";
-
-// TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
-// TODO: things like fds array, args and env should be stored in terminal
-ARGS = ["program_name", "arg0", "arg1"];
-ENV = {
-    PATH: "/usr/bin:/usr/local/bin",
-    X: "3"
-};
-
 onmessage = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
-          fname = e.data[1];
-          myself = e.data[2];
-          started = true;
+            fname = e.data[1];
+            myself = e.data[2];
+            started = true;
         }
     }
 }
 
 function get_parent_port() {
     if (is_node) {
-        const { parentPort } = require('worker_threads');
+        const {parentPort} = require('worker_threads');
         return parentPort;
     }
     return null;
 }
 
+// FIXME: workers have self defined, something happens when calling this directly in file
 let is_node = (typeof self === 'undefined');
 
 if (is_node) {
-    get_parent_port().once('message', (message) => { let msg = { data: message }; onmessage(msg); });
+    get_parent_port().once('message', (message) => {
+        let msg = {data: message};
+        onmessage(msg);
+    });
     fs = require('fs');
 } else {
     worker_console_log("Running in a browser!");
@@ -46,7 +40,7 @@ if (is_node) {
 
 function worker_send(msg) {
     if (is_node) {
-        msg_ = { data: [myself, msg[0], msg[1]] };
+        msg_ = {data: [myself, msg[0], msg[1]]};
         get_parent_port().postMessage(msg_);
     } else {
         msg_ = [myself, msg[0], msg[1]];
@@ -55,21 +49,32 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
-     worker_send(["console", msg]);
+    worker_send(["console", msg]);
 }
 
 function do_exit(exit_code) {
     if (is_node) {
-       const buf = new SharedArrayBuffer(4); // lock
-       const lck = new Int32Array(buf, 0, 1);
-       worker_send(["exit", exit_code]); // never return
-       Atomics.wait(lck, 0, 0);
+        const buf = new SharedArrayBuffer(4); // lock
+        const lck = new Int32Array(buf, 0, 1);
+        worker_send(["exit", exit_code]); // never return
+        Atomics.wait(lck, 0, 0);
     } else {
-       close();
+        close();
     }
 }
 
 function barebonesWASI() {
+
+    let BUFFER = "";
+
+    // TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
+    // TODO: things like fds array, args and env should be stored in terminal
+    let ARGS = ["program_name", "arg0", "arg1"];
+    let ENV = {
+        // RUST_BACKTRACE: "full",
+        PATH: "/usr/bin:/usr/local/bin",
+        X: "3"
+    };
 
     let moduleInstanceExports = null;
 
@@ -180,7 +185,7 @@ function barebonesWASI() {
 
         write(buffer) {
             worker_console_log(`OpenFile.write(${buffer})`);
-            worker_console_log("open file before write: "+ this.file.data + " " + this.file_pos + " " + buffer.length);
+            worker_console_log("open file before write: " + this.file.data + " " + this.file_pos + " " + buffer.length);
             // File.data is and Uint8Array, we need to resize it if necessary
             if (this.file_pos + buffer.length > this.size) {
                 let old = this.file.data;
@@ -193,7 +198,7 @@ function barebonesWASI() {
             );
             worker_console_log(`>>> ${typeof buffer}, ${typeof buffer.length}`)
             this.file_pos += buffer.length;
-            worker_console_log("open file after write: "+ this.file.data + " " + this.file_pos + " " + buffer.length);
+            worker_console_log("open file after write: " + this.file.data + " " + this.file_pos + " " + buffer.length);
             return 0;
         }
 
@@ -241,7 +246,7 @@ function barebonesWASI() {
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
                 } else {
-                    worker_console_log("create "+ component);
+                    worker_console_log("create " + component);
                     if (i == components.length - 1) {
                         entry.directory[component] = new File(new ArrayBuffer(0));
                     } else {
@@ -340,7 +345,7 @@ function barebonesWASI() {
 
         Object.entries(ENV).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
-            view.setUint32(environ + i * 4,environ_buf, true);
+            view.setUint32(environ + i * 4, environ_buf, true);
             // write string describing the variable to WASM memory
             let variable = encoder.encode(`${key}=${val}\0`);
             view8.set(variable, environ_buf_offset);
@@ -363,7 +368,7 @@ function barebonesWASI() {
     }
 
     function args_get(argv, argv_buf) {
-        worker_console_log("args_get("+ argv+ ", "+ argv_buf+ ")");
+        worker_console_log("args_get(" + argv + ", " + argv_buf + ")");
 
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
@@ -396,7 +401,7 @@ function barebonesWASI() {
         }
 
         if (fd <= 2) {
-          setUint64(bufPtr, 2); // chardev
+            setUint64(bufPtr, 2); // chardev
         }
         setUint64(bufPtr + 8, 0);
         setUint64(bufPtr + 16, 0);
@@ -451,12 +456,13 @@ function barebonesWASI() {
         worker_send(["exit", exit_code]);
         do_exit(exit_code); // never returns!
     }
-    
+
     function random_get(buf_addr, buf_len) {
         worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
         let view8 = getModuleMemoryUint8Array();
         let numbers = new Uint8Array(buf_len);
         self.crypto.getRandomValues(numbers);
+        worker_console_log(`self=${self}`)
         view8.set(numbers, buf_addr);
         return WASI_ESUCCESS;
     }
@@ -483,12 +489,23 @@ function barebonesWASI() {
         return WASI_EBADF;
     }
 
-    function fd_advice(a, b, c, d) { worker_console_log("fd_advice"); return 1; }
-    function fd_allocate(a, b, c) { worker_console_log("fd_allocate"); return 1; }
-    function fd_fdstat_set_rights(a, b, c) { worker_console_log("fd_fdstat_set_rights"); return 1; }
+    function fd_advice(a, b, c, d) {
+        worker_console_log("fd_advice");
+        return 1;
+    }
+
+    function fd_allocate(a, b, c) {
+        worker_console_log("fd_allocate");
+        return 1;
+    }
+
+    function fd_fdstat_set_rights(a, b, c) {
+        worker_console_log("fd_fdstat_set_rights");
+        return 1;
+    }
 
     function fd_filestat_get(fd, buf) {
-        worker_console_log("fd_filestat_get("+ fd+ ", "+ buf+ ")");
+        worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
         let buffer = getModuleMemoryDataView();
         if (fds[fd] != undefined) {
             let stat = fds[fd].stat();
@@ -507,7 +524,7 @@ function barebonesWASI() {
     }
 
     function fd_read(fd, iovs_ptr, iovs_len, nread_ptr) {
-        worker_console_log("fd_read("+ fd+ ", "+ iovs_ptr + ", "+ iovs_len+ ", "+ nread_ptr+ ")");
+        worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
 
@@ -519,8 +536,8 @@ function barebonesWASI() {
                 // TODO: remove 2 next lines
                 //  right now it works without them, but tab crashes with multiple shells running
                 //  most likely loops in background crash RAM
-                if ((i+1) === iovs_len && len === 1024) len = 1;
-                if ((i+1) === iovs_len && len === 8192) len = 1;
+                if ((i + 1) === iovs_len && len === 1024) len = 1;
+                if ((i + 1) === iovs_len && len === 8192) len = 1;
                 let [data, err] = fds[fd].read(len);
                 if (err !== 0) {
                     return err;
@@ -544,7 +561,7 @@ function barebonesWASI() {
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             buffer.setUint32(bufused, 0, true);
 
-            worker_console_log(cookie +" "+ Object.keys(fds[fd].directory).slice(Number(cookie)));
+            worker_console_log(cookie + " " + Object.keys(fds[fd].directory).slice(Number(cookie)));
             if (cookie >= BigInt(Object.keys(fds[fd].directory).length)) {
                 worker_console_log("end of dir");
                 return 0;
@@ -552,7 +569,7 @@ function barebonesWASI() {
             let next_cookie = cookie + 1n;
             for (let name of Object.keys(fds[fd].directory).slice(Number(cookie))) {
                 let entry = fds[fd].directory[name];
-                worker_console_log(name + " "+ entry);
+                worker_console_log(name + " " + entry);
                 let encoded_name = new TextEncoder("utf-8").encode(name);
 
                 let offset = 24 + encoded_name.length;
@@ -561,19 +578,19 @@ function barebonesWASI() {
                     worker_console_log("too small buf");
                     break;
                 } else {
-                    worker_console_log("next_cookie = "+ next_cookie + " " + buf);
+                    worker_console_log("next_cookie = " + next_cookie + " " + buf);
                     buffer.setBigUint64(buf, next_cookie, true);
                     next_cookie += 1n;
                     buffer.setBigUint64(buf + 8, 1n, true); // inode
                     buffer.setUint32(buf + 16, encoded_name.length, true);
                     buffer.setUint8(buf + 20, entry.file_type);
                     buffer8.set(encoded_name, buf + 24);
-                    worker_console_log("buffer = "+ buffer8.slice(buf, buf + offset));
+                    worker_console_log("buffer = " + buffer8.slice(buf, buf + offset));
                     buf += offset;
                     buffer.setUint32(bufused, buffer.getUint32(bufused, true) + offset, true);
                 }
             }
-            worker_console_log("used ="+ buffer.getUint32(bufused, true));
+            worker_console_log("used =" + buffer.getUint32(bufused, true));
             return 0;
         } else {
             return 1;
@@ -616,7 +633,7 @@ function barebonesWASI() {
         let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
-            worker_console_log("file = "+ path);
+            worker_console_log("file = " + path);
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
                 return 1;
@@ -637,9 +654,12 @@ function barebonesWASI() {
         worker_console_log("fd: " + fds[dir_fd]);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
-            worker_send(["spawn", path.slice(1, path.length)]);
+            let path_split = path.split(" ");
+            worker_console_log(path)
+            worker_send(["spawn", path_split[0].slice(1)]);
+            ARGS = path_split.slice(1);
             worker_console_log("sent.");
-            return WASI_EBADF; // TODO
+            return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             worker_console_log("fd exist and is a directory");
             let entry = fds[dir_fd].get_entry_for_path(path);
@@ -731,23 +751,23 @@ function barebonesWASI() {
     }
 
     function fd_datasync() {
-      worker_console_log("fd_datasync");
-      return WASI_ESUCCESS;
+        worker_console_log("fd_datasync");
+        return WASI_ESUCCESS;
     }
-    
+
     function fd_filestat_set_size() {
-      worker_console_log("fd_filestat_set_size");
-      return WASI_ESUCCESS;
+        worker_console_log("fd_filestat_set_size");
+        return WASI_ESUCCESS;
     }
 
     function fd_sync() {
         worker_console_log("fd_sync");
-      return WASI_ESUCCESS;
+        return WASI_ESUCCESS;
     }
 
     function path_symlink() {
         worker_console_log("path_symlink");
-      return WASI_ESUCCESS;
+        return WASI_ESUCCESS;
     }
 
     function fd_fdstat_set_flags(a, b) {
@@ -755,7 +775,7 @@ function barebonesWASI() {
         return WASI_ESUCCESS;
     }
 
-    function fd_pwrite(a, b, c ,d, e) {
+    function fd_pwrite(a, b, c, d, e) {
         worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
         return WASI_ESUCCESS;
     }
@@ -780,19 +800,45 @@ function barebonesWASI() {
         return WASI_ESUCCESS;
     }
 
-    function sock_recv(a, b, c, d, e, f) { worker_console_log("sock_recv"); return 1; }
-    function sock_send(a, b, c, d, e) { worker_console_log("sock_send"); return 1; }
-    function sock_shutdown(a, b) { worker_console_log("sock_shutdown"); return 1; }
+    function sock_recv(a, b, c, d, e, f) {
+        worker_console_log("sock_recv");
+        return 1;
+    }
 
-    let placeholder = function() {
-        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]); return WASI_ESUCCESS;
+    function sock_send(a, b, c, d, e) {
+        worker_console_log("sock_send");
+        return 1;
+    }
+
+    function sock_shutdown(a, b) {
+        worker_console_log("sock_shutdown");
+        return 1;
+    }
+
+    let placeholder = function () {
+        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]);
+        return WASI_ESUCCESS;
     };
-    
-    function poll_oneoff() { placeholder(); }
-    function path_link() { placeholder(); }
-    function fd_advise() { placeholder(); }
-    function fd_filestat_set_times() { placeholder(); }
-    function fd_pread() { placeholder(); }
+
+    function poll_oneoff() {
+        placeholder();
+    }
+
+    function path_link() {
+        placeholder();
+    }
+
+    function fd_advise() {
+        placeholder();
+    }
+
+    function fd_filestat_set_times() {
+        placeholder();
+    }
+
+    function fd_pread() {
+        placeholder();
+    }
 
     return {
         setModuleInstance,
@@ -864,8 +910,8 @@ function importWasmModule(moduleName, wasiPolyfill) {
             if (!is_node) {
                 const response = await fetch(moduleName);
                 buffer = await response.arrayBuffer();
-	    } else {
-		buffer = fs.readFileSync(moduleName, null);
+            } else {
+                buffer = fs.readFileSync(moduleName, null);
             }
             module = await WebAssembly.compile(buffer);
         }
@@ -873,7 +919,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
         let instance = null;
         try {
             instance = await WebAssembly.instantiate(module, moduleImports);
-        } catch(e) {
+        } catch (e) {
             worker_console_log("exception while instantiating wasm");
             worker_console_log(e.stack);
             instance = null;
@@ -884,13 +930,13 @@ function importWasmModule(moduleName, wasiPolyfill) {
             try {
                 instance.exports._start();
                 do_exit(0);
-            } catch(e) {
+            } catch (e) {
                 worker_console_log("exception while running wasm");
                 worker_console_log(e.stack);
                 do_exit(255);
             }
         } else {
-          do_exit(255);
+            do_exit(255);
         }
     })();
 }
@@ -899,16 +945,17 @@ function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
         try {
-        if (is_node) { // TODO: add spawn for browser!
-            if (!fs.existsSync(fname)) {
-                worker_console_log(`File ${fname} not found!`);
-                started = false;
-                fname = "";
-                setTimeout(start_wasm, 500);
-                return;
+            if (is_node) { // TODO: add spawn for browser!
+                if (!fs.existsSync(fname)) {
+                    worker_console_log(`File ${fname} not found!`);
+                    started = false;
+                    fname = "";
+                    setTimeout(start_wasm, 500);
+                    return;
+                }
             }
+        } catch {
         }
-        } catch { }
         const wasiPolyfill = barebonesWASI();
         importWasmModule(fname, wasiPolyfill);
         // FIXME: returns done even if it failed

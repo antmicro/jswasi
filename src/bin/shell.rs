@@ -124,7 +124,8 @@ fn main() {
             "exit" => exit(0),
             // external commands
             "duk" | "main" | "shell" => {
-                File::open(format!("!{}", command));
+                File::open(format!("!{} {}", command, args.join(" ")));
+                eprintln!("Shell after spawning program");
             }
             // edge cases
             "" => {}
