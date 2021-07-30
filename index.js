@@ -24,14 +24,7 @@ async function init_all() {
             io.onVTKeystroke = io.sendString = (data) => {
                 let code = data.charCodeAt(0);
                 console.log(data, code);
-                // if (code === 13) {
-                //     data = String.fromCharCode(10);
-                //     console.log("turned to 10");
-                // }
-                // if (code === 10) {
-                //     data = String.fromCharCode(13);
-                //     console.log("turned to 13");
-                // }
+		// t.io.print(data);
                 buffer = buffer + data;
             };
 
@@ -82,24 +75,24 @@ async function init_all() {
             } else {
                 len[0] = 0;
             }
-            lck[0] = 1;
+            lck[0] = 1; //current_worker + 1;
             Atomics.notify(lck, 0);
         } else if (action === "stdout") {
             // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
             let output = data.replace("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
-            console.log(`STDERR: ${data}`);
+            console.log(`STDERR ${worker_id}: ${data}`);
         } else if (action === "console") {
             console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
             current_worker -= 1; // TODO: workers stack/tree
-            console.log("WORKER " + worker_id + " exited with result code: " + data);
+            console.log(`WORKER ${worker_id} exited with result code: ${data}`);
+	    console.log(`Awaiting input from WORKER ${current_worker}`);
         } else if (action === "spawn") {
 	    const args = event.data[3];
             const id = workers.length;
             workers.push({id: id, worker: new Worker('worker.js')});
-	    console.log(`${worker_id}, ${action}, ${data}, ${args}`);
             workers[id].worker.onmessage = worker_onmessage;
             workers[id].worker.postMessage(["start", `${data}.wasm`, id, args]);
             console.log("WORKER " + worker_id + " spawned: " + data);

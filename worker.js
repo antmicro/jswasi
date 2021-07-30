@@ -10,7 +10,7 @@ fs = null;
 
 // TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
 // TODO: things like fds array, args and env should be stored in terminal
-let ARGS = ["program_name", "arg0", "arg1"];
+let ARGS = [];
 let ENV = {
     // RUST_BACKTRACE: "full",
     PATH: "/usr/bin:/usr/local/bin",
@@ -24,8 +24,6 @@ onmessage = function (e) {
             myself = e.data[2];
             started = true;
 	    ARGS = e.data[3];
-	    worker_console_log(`e.data = ${e.data}`);
-	    worker_console_log(`ARGS=${e.data[3]}`);
         }
     }
 }
@@ -73,6 +71,7 @@ function do_exit(exit_code) {
         Atomics.wait(lck, 0, 0);
     } else {
 	worker_console_log("calling close()");
+        worker_send(["exit", 0]);
         close();
     }
 }
@@ -133,17 +132,14 @@ function barebonesWASI() {
         }
 
         get size() {
-            worker_console_log("file size");
             return this.data.byteLength;
         }
 
         open() {
-            worker_console_log("file open");
             return new OpenFile(this);
         }
 
         stat() {
-            worker_console_log("file stat");
             return {
                 dev: 0n,
                 ino: 0n,
@@ -157,7 +153,6 @@ function barebonesWASI() {
         }
 
         truncate() {
-            worker_console_log("file truncate");
             this.data = new Uint8Array([]);
         }
     }
@@ -171,12 +166,10 @@ function barebonesWASI() {
         }
 
         get size() {
-            worker_console_log("open file size");
             return this.file.size;
         }
 
         read(len) {
-            worker_console_log("open file read");
             worker_console_log(`${typeof this.file_pos}, ${typeof len}`)
             if (this.file_pos < this.file.data.byteLength) {
                 let slice = this.file.data.slice(this.file_pos, this.file_pos + len);
@@ -188,25 +181,20 @@ function barebonesWASI() {
         }
 
         write(buffer) {
-            worker_console_log(`OpenFile.write(${buffer})`);
-            worker_console_log("open file before write: " + this.file.data + " " + this.file_pos + " " + buffer.length);
             // File.data is and Uint8Array, we need to resize it if necessary
             if (this.file_pos + buffer.length > this.size) {
                 let old = this.file.data;
                 this.file.data = new Uint8Array(this.file_pos + buffer.length);
                 this.file.data.set(old);
             }
-            worker_console_log(`buffer.length = ${buffer.length}, this.file_pos = ${this.file_pos}, this.file.data.byteLength = ${this.file.data.byteLength}`)
             this.file.data.set(
                 new TextEncoder().encode(buffer), this.file_pos
             );
             this.file_pos += buffer.length;
-            worker_console_log("open file after write: " + this.file.data + " " + this.file_pos + " " + buffer.length);
             return 0;
         }
 
         stat() {
-            worker_console_log("open file stat");
             return this.file.stat();
         }
     }
@@ -219,21 +207,16 @@ function barebonesWASI() {
         }
 
         open(name) {
-            worker_console_log("directory open");
             return new PreopenDirectory(name, this.directory);
         }
 
         get_entry_for_path(path) {
-            worker_console_log(`Directory.get_entry_for_path(${path})`);
             let entry = this;
-            worker_console_log(`directory: ${entry.directory}`);
             for (let component of path.split("/")) {
-                worker_console_log(`component: ${component}`);
                 if (component == "") break;
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
                 } else {
-                    worker_console_log(component);
                     return null;
                 }
             }
@@ -241,7 +224,6 @@ function barebonesWASI() {
         }
 
         create_entry_for_path(path) {
-            worker_console_log("directory create entry for path");
             let entry = this;
             let components = path.split("/").filter((component) => component != "/");
             for (let i in components) {
@@ -249,7 +231,6 @@ function barebonesWASI() {
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
                 } else {
-                    worker_console_log("create " + component);
                     if (i == components.length - 1) {
                         entry.directory[component] = new File(new ArrayBuffer(0));
                     } else {
@@ -265,7 +246,6 @@ function barebonesWASI() {
     class PreopenDirectory extends Directory {
         constructor(name, contents) {
             super(contents);
-            worker_console_log(`PreopenDirectory(${name}, ${contents}`)
             this.prestat_name = new TextEncoder().encode(name);
         }
     }
@@ -331,8 +311,6 @@ function barebonesWASI() {
         let variables = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0)
         view.setUint32(environ_bufsize, variables, true);
 
-        worker_console_log(`environ_count = ${environ_count}`)
-        worker_console_log(`environ_bufsize = ${variables}`)
 
         return WASI_ESUCCESS;
     }
@@ -383,7 +361,6 @@ function barebonesWASI() {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
-            worker_console_log(arg);
             let variable = encoder.encode(`${arg}\0`);
             view8.set(variable, argv_buf_offset);
             // calculate pointer to next variable
@@ -436,18 +413,14 @@ function barebonesWASI() {
                 bufferBytes.push(iov[b]);
             }
 
-            worker_console_log(`bufferBytes = ${bufferBytes}`);
             written += b;
         }
 
         buffers.forEach(writev);
 
         const content = String.fromCharCode.apply(null, bufferBytes);
-        worker_console_log(`content to write to file: ${content}`);
 
         let err = fds[fd].write(content);
-        worker_console_log("err on write: " + err);
-        worker_console_log("file content: " + fds[fd].file?.data);
 
         view.setUint32(nwritten_ptr, written, !0);
 
@@ -455,8 +428,7 @@ function barebonesWASI() {
     }
 
     function proc_exit(exit_code) {
-        worker_console_log("proc_exit, shutting down, exit_code = " + exit_code);
-        worker_send(["exit", exit_code]);
+        worker_console_log(`proc_exit(${exit_code})`);
         do_exit(exit_code); // never returns!
     }
 
@@ -465,7 +437,6 @@ function barebonesWASI() {
         let view8 = getModuleMemoryUint8Array();
         let numbers = new Uint8Array(buf_len);
         self.crypto.getRandomValues(numbers);
-        worker_console_log(`self=${self}`)
         view8.set(numbers, buf_addr);
         return WASI_ESUCCESS;
     }
@@ -619,7 +590,6 @@ function barebonesWASI() {
                 }
             }
             view.setBigUint64(new_offset, file.file_pos, true);
-            worker_console_log(`file fd=${fd} has file_pos=${file.file_pos}`)
             return WASI_ESUCCESS;
         }
         return WASI_EBADF;
@@ -636,7 +606,6 @@ function barebonesWASI() {
         let buffer8 = getModuleMemoryUint8Array();
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
-            worker_console_log("file = " + path);
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
                 return 1;
@@ -653,20 +622,15 @@ function barebonesWASI() {
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
-        worker_console_log(`We got path ${path} len = ${path_len}`);
-        worker_console_log("fd: " + fds[dir_fd]);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");
 	    command = command.slice(1);
-            worker_console_log(`>>> ${command}, ${args}`);
             worker_send(["spawn", command, args]);
             worker_console_log("sent.");
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
-            worker_console_log("fd exist and is a directory");
             let entry = fds[dir_fd].get_entry_for_path(path);
-            worker_console_log("entry: " + entry);
             if (entry == null) {
                 if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
                     entry = fds[dir_fd].create_entry_for_path(path);
@@ -688,7 +652,6 @@ function barebonesWASI() {
             }
             fds.push(entry.open(path));
             let opened_fd = fds.length - 1;
-            worker_console_log(`new file opened at fd = ${opened_fd}`);
             buffer.setUint32(opened_fd_ptr, opened_fd, true);
             return WASI_ESUCCESS;
         } else {
@@ -726,7 +689,6 @@ function barebonesWASI() {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         let view = getModuleMemoryDataView();
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`prestat_name: '${new TextDecoder().decode(fds[fd].prestat_name)}', prestat_name.length: ${fds[fd].prestat_name.length}`);
             const PREOPEN_TYPE_DIR = 0;
             view.setUint8(buf_ptr, PREOPEN_TYPE_DIR);
             view.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
@@ -743,7 +705,6 @@ function barebonesWASI() {
     function fd_prestat_dir_name(fd, path_ptr, path_len) {
         worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
         if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            worker_console_log(`prestat_name: '${new TextDecoder().decode(fds[fd].prestat_name)}', prestat_name.length: ${fds[fd].prestat_name.length}`);
             let buffer8 = getModuleMemoryUint8Array();
             buffer8.set(fds[fd].prestat_name, path_ptr);
             return WASI_ESUCCESS;
