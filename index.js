@@ -8,7 +8,24 @@ async function init_all() {
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
 
-    function setupHterm() {
+
+    let workers = [];
+    workers[0] = {id: 0, worker: new Worker('worker.js'), buffer_request_queue: []};
+    let current_worker = 0;
+
+    function send_buffer_to_worker(lck, len, sbuf) {
+        console.log("got buffer request of len " + len[0] + ", notifying");
+        len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
+        console.log("current buffer is '" + buffer + "', copying len " + len[0]);
+        for (let j = 0; j < len[0]; j++) {
+            sbuf[j] = buffer.charCodeAt(j);
+        }
+        buffer = buffer.slice(len[0]);
+        lck[0] = 1; //current_worker + 1;
+        Atomics.notify(lck, 0);
+    }
+
+    const setupHterm = () => {
         // profileId is the name of the terminal profile to load, or "default" if
         // not specified.  If you're using one of the persistent storage
         // implementations then this will scope all preferences read/writes to this
@@ -26,6 +43,13 @@ async function init_all() {
                 console.log(data, code);
 		// t.io.print(data);
                 buffer = buffer + data;
+		console.log(`current_worker = ${current_worker}`);
+		// each worker was a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+		// now that buffer was filled, look if there are pending buffer requests from current foreground worker
+		while (workers[current_worker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+		    let {lck, len, sbuf} = workers[current_worker].buffer_request_queue.shift();
+		    send_buffer_to_worker(lck, len, sbuf);
+		}
             };
 
             io.onTerminalResize = (columns, rows) => {
@@ -50,33 +74,19 @@ async function init_all() {
     await lib.init();
     const terminal = setupHterm();
 
-    let workers = [];
-    workers[0] = {id: 0, worker: new Worker('worker.js')};
-    let current_worker = 0;
-
     const worker_onmessage = (event) => {
         const [worker_id, action, data] = event.data;
         if (action === "buffer") {
-            if (worker_id !== current_worker) {
-                console.log(`WORKER ${worker_id} requested buffer, ignoring. (not ${current_worker})`);
-                return;
-            }
             const lck = new Int32Array(data, 0, 1);
             const len = new Int32Array(data, 4, 1);
+            const sbuf = new Uint8Array(data, 8, len[0]);
             if (buffer.length !== 0) {
-                console.log("got buffer request of len " + len[0] + ", notifying");
-                const sbuf = new Uint8Array(data, 8, len[0]);
-                len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
-                console.log("current buffer is '" + buffer + "', copying len " + len[0]);
-                for (let j = 0; j < len[0]; j++) {
-                    sbuf[j] = buffer.charCodeAt(j);
-                }
-                buffer = buffer.slice(len[0]);
+		// handle buffer request straight away
+		send_buffer_to_worker(lck, len, sbuf);
             } else {
-                len[0] = 0;
+		// push handle buffer request to queue
+		workers[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf}); 
             }
-            lck[0] = 1; //current_worker + 1;
-            Atomics.notify(lck, 0);
         } else if (action === "stdout") {
             // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
             let output = data.replace("\n", "\n\r");
@@ -86,13 +96,14 @@ async function init_all() {
         } else if (action === "console") {
             console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
+	    workers.splice(current_worker, 1);
             current_worker -= 1; // TODO: workers stack/tree
             console.log(`WORKER ${worker_id} exited with result code: ${data}`);
 	    console.log(`Awaiting input from WORKER ${current_worker}`);
         } else if (action === "spawn") {
 	    const args = event.data[3];
             const id = workers.length;
-            workers.push({id: id, worker: new Worker('worker.js')});
+            workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: []});
             workers[id].worker.onmessage = worker_onmessage;
             workers[id].worker.postMessage(["start", `${data}.wasm`, id, args]);
             console.log("WORKER " + worker_id + " spawned: " + data);

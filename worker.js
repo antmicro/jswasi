@@ -71,7 +71,7 @@ function do_exit(exit_code) {
         Atomics.wait(lck, 0, 0);
     } else {
 	worker_console_log("calling close()");
-        worker_send(["exit", 0]);
+        worker_send(["exit", exit_code]);
         close();
     }
 }
@@ -252,23 +252,18 @@ function barebonesWASI() {
 
     class Stdin {
         read(len) {
-            worker_console_log("read is happening, requested len is " + len);
             if (len === 0) return [new Uint8Array([]), 0];
-            worker_console_log("Waiting...");
-            // TODO: what we would like to do is block on read here instead of looping which waists resources
-            while (1) {
-                const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
-                const lck = new Int32Array(buf, 0, 1);
-                const request_len = new Int32Array(buf, 4, 1);
-                request_len[0] = len;
-                worker_send(["buffer", buf]);
-                Atomics.wait(lck, 0, 0);
-                const sbuf = new Uint8Array(buf, 8, request_len[0]);
-                BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
-                if (BUFFER.length > 0) worker_console_log("buffer len is now " + BUFFER.length + " and contents is '" + BUFFER + "', len is " + len);
-                if (BUFFER.length > 0) break;
-            }
-            worker_console_log("Out of Waiting...");
+            const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
+            const lck = new Int32Array(buf, 0, 1);
+            const request_len = new Int32Array(buf, 4, 1);
+            request_len[0] = len;
+	    // send buffer read request to main thread
+	    // it can either be handled straight away or queued for later
+	    // either way we block with Atomics.wait untill buffer is filled
+            worker_send(["buffer", buf]);
+            Atomics.wait(lck, 0, 0);
+            const sbuf = new Uint8Array(buf, 8, request_len[0]);
+            BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
             let data = BUFFER.slice(0, len).replace("\r", "\n");
             BUFFER = BUFFER.slice(len, BUFFER.length);
             return [new TextEncoder().encode(data), 0];
@@ -429,7 +424,7 @@ function barebonesWASI() {
 
     function proc_exit(exit_code) {
         worker_console_log(`proc_exit(${exit_code})`);
-        do_exit(exit_code); // never returns!
+	close(); // doesn't actually end here
     }
 
     function random_get(buf_addr, buf_len) {
