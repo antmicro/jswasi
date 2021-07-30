@@ -54,7 +54,6 @@ fn main() {
 
         match command {
             // built in commands
-            "echo" => println!("{}", args.join(" ")),
             "cd" => {
                 if args.is_empty() {
                     pwd = PathBuf::from("/");
@@ -123,7 +122,7 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "duk" | "main" | "shell" | "cowsay" => {
+            "echo" | "duk" | "main" | "shell" | "cowsay" => {
                 File::open(format!("!{} {}", command, input));
                 eprintln!("Shell after spawning program");
             }
