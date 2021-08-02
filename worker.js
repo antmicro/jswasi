@@ -12,7 +12,7 @@ fs = null;
 // TODO: things like fds array, args and env should be stored in terminal
 let ARGS = [];
 let ENV = {
-    // RUST_BACKTRACE: "full",
+    RUST_BACKTRACE: "full",
     PATH: "/usr/bin:/usr/local/bin",
     X: "3"
 };
@@ -294,17 +294,17 @@ function barebonesWASI() {
         new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
     ];
 
-    function environ_sizes_get(environ_count_ptr, environ_bufsize) {
-        worker_console_log(`environ_sizes_get(0x${environ_count_ptr.toString(16)}, 0x${environ_bufsize.toString(16)})`);
+    function environ_sizes_get(environ_count_ptr, environ_size_ptr) {
+        worker_console_log(`environ_sizes_get(0x${environ_count_ptr.toString(16)}, 0x${environ_size_ptr.toString(16)})`);
 
         const view = getModuleMemoryDataView();
 
         let encoder = new TextEncoder();
         let environ_count = Object.keys(ENV).length;
-
         view.setUint32(environ_count_ptr, environ_count, true);
-        let variables = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0)
-        view.setUint32(environ_bufsize, variables, true);
+	
+        let environ_size = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
+        view.setUint32(environ_size_ptr, environ_size, true);
 
 
         return WASI_ESUCCESS;
@@ -321,7 +321,7 @@ function barebonesWASI() {
 
         Object.entries(ENV).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
-            view.setUint32(environ + i * 4, environ_buf, true);
+            view.setUint32(environ + i * 4, environ_buf_offset, true);
             // write string describing the variable to WASM memory
             let variable = encoder.encode(`${key}=${val}\0`);
             view8.set(variable, environ_buf_offset);
