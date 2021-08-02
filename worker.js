@@ -468,20 +468,23 @@ function barebonesWASI() {
 
     function fd_filestat_get(fd, buf) {
         worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
-        let buffer = getModuleMemoryDataView();
-        if (fds[fd] != undefined) {
+	
+        let view = getModuleMemoryDataView();
+
+        if (fd > 2 && fds[fd] != undefined) {
             let stat = fds[fd].stat();
-            buffer.setBigUint64(buf, stat.dev, true);
-            buffer.setBigUint64(buf + 8, stat.ino, true);
-            buffer.setUint8(buf + 16, stat.file_type);
-            buffer.setBigUint64(buf + 24, stat.nlink, true);
-            buffer.setBigUint64(buf + 32, stat.size, true);
-            buffer.setBigUint64(buf + 38, stat.atim, true);
-            buffer.setBigUint64(buf + 46, stat.mtim, true);
-            buffer.setBigUint64(buf + 52, stat.ctim, true);
-            return 0;
+            view.setBigUint64(buf, stat.dev, true);
+            view.setBigUint64(buf + 8, stat.ino, true);
+            view.setUint8(buf + 16, stat.file_type);
+            view.setBigUint64(buf + 24, stat.nlink, true);
+            view.setBigUint64(buf + 32, stat.size, true);
+            view.setBigUint64(buf + 38, stat.atim, true);
+            view.setBigUint64(buf + 46, stat.mtim, true);
+            view.setBigUint64(buf + 52, stat.ctim, true);
+            return WASI_ESUCCESS;
         } else {
-            return 1;
+	    worker_console_log(`fd_filestat_get returning WASI_EBADF`);
+            return WASI_EBADF;
         }
     }
 
@@ -591,16 +594,28 @@ function barebonesWASI() {
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
 
-        let buffer8 = getModuleMemoryUint8Array();
+	let view = getModuleMemoryDataView();
+        let view8 = getModuleMemoryUint8Array();
+
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
-            let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
+            let path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
+		worker_console_log(`path_filestat_get: no entry for path '${path}'`);
                 return 1;
             }
-            // FIXME write filestat_t
-            return 0;
+            let stat = entry.stat();
+            view.setBigUint64(buf, stat.dev, true);
+            view.setBigUint64(buf + 8, stat.ino, true);
+            view8.setUint8(buf + 16, stat.file_type);
+            view.setBigUint64(buf + 24, stat.nlink, true);
+            view.setBigUint64(buf + 32, stat.size, true);
+            view.setBigUint64(buf + 38, stat.atim, true);
+            view.setBigUint64(buf + 46, stat.mtim, true);
+            view.setBigUint64(buf + 52, stat.ctim, true);
+            return WASI_ESUCCESS;
         } else {
+	    worker_console_log(`path_filestat_get: undefined or not a directory`);
             return 1;
         }
     }
