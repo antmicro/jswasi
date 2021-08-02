@@ -10,6 +10,8 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, cat, touch, write, exit, echo, duk, main, shell, cowsay");
+
     loop {
         // prompt for input
         print!("{}$ ", pwd.to_str().unwrap());

@@ -72,7 +72,7 @@ async function init_all() {
             }
         } else if (action === "stdout") {
             // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
-            let output = data.replace("\n", "\n\r");
+            let output = data.replaceAll("\n", "\n\r");
             terminal.io.print(output);
         } else if (action === "stderr") {
             console.log(`STDERR ${worker_id}: ${data}`);
