@@ -6,9 +6,6 @@ started = false;
 fname = "";
 myself = null;
 fs = null;
-
-
-// TODO: things like fds array, args and env should be stored in terminal
 let ARGS = [];
 let ENV = {}; 
 
@@ -617,8 +614,14 @@ function barebonesWASI() {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");
 	    command = command.slice(1);
-            worker_send(["spawn", command, args, ENV]);
-            worker_console_log("sent.");
+            const buf = new SharedArrayBuffer(4);
+            const lck = new Int32Array(buf, 0, 1);
+            worker_send(["spawn", command, args, ENV, buf]);
+            worker_console_log("sent." + buf);
+	
+	    // wait for child process to finish
+	    Atomics.wait(lck, 0);
+	    
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             let entry = fds[dir_fd].get_entry_for_path(path);

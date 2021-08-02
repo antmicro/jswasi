@@ -79,15 +79,23 @@ async function init_all() {
         } else if (action === "console") {
             console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
+	    let worker = workers[worker_id];
+            console.log(`WORKER ${worker_id} exited with result code: ${data}`);
+	    // notify parent that they can resume operation
+            Atomics.store(worker.parent_lck, 0, 1);
+            Atomics.notify(worker.parent_lck, 0);
+	    // remove worker from workers array
 	    workers.splice(current_worker, 1);
             current_worker -= 1; // TODO: workers stack/tree
-            console.log(`WORKER ${worker_id} exited with result code: ${data}`);
 	    console.log(`Awaiting input from WORKER ${current_worker}`);
         } else if (action === "spawn") {
 	    const args = event.data[3];
 	    const env = event.data[4];
+            const parent_lck = new Int32Array(event.data[5], 0, 1);
+	    console.log(`event.data[5] = ${event.data[5]}`);
+	    console.log(`parent_lck[0] = ${parent_lck[0]}`);
             const id = workers.length;
-            workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: []});
+            workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: [], parent_lck});
             workers[id].worker.onmessage = worker_onmessage;
             workers[id].worker.postMessage(["start", `${data}.wasm`, id, args, env]);
             console.log("WORKER " + worker_id + " spawned: " + data);
@@ -100,7 +108,7 @@ async function init_all() {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         X: "3"
-    }]);
+    }], null);
 }
 
 window.onload = init_all;
