@@ -498,11 +498,6 @@ function barebonesWASI() {
             for (let i = 0; i < iovs_len; i++) {
                 let addr = view.getUint32(iovs_ptr + 8 * i, true);
                 let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
-                // TODO: remove 2 next lines
-                //  right now it works without them, but tab crashes with multiple shells running
-                //  most likely loops in background crash RAM
-                if ((i + 1) === iovs_len && len === 1024) len = 1;
-                if ((i + 1) === iovs_len && len === 8192) len = 1;
                 let [data, err] = fds[fd].read(len);
                 if (err !== 0) {
                     return err;
