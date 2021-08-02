@@ -1,11 +1,10 @@
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::thread::sleep;
 use std::time::Duration;
-use std::{env, fs, thread, time};
+use std::{fs, thread};
 
 fn main() {
     let mut pwd = PathBuf::from("/");
@@ -66,13 +65,15 @@ fn main() {
                         pwd.join(path)
                     };
 
-                    // // simply including this in source breaks shell
-                    // if !Path::new(&new_pwd).exists() {
-                    //     println!("cd: no such file or directory: {}", new_pwd);
-                    // } else {
-                    //     pwd = new_pwd;
-                    // }
-                    pwd = new_path;
+                    // simply including this in source breaks shell
+                    if !Path::new(&new_path).exists() {
+                        println!(
+                            "cd: no such file or directory: {}",
+                            new_path.to_str().unwrap()
+                        );
+                    } else {
+                        pwd = new_path;
+                    }
                 }
             }
             "pwd" => println!("{}", pwd.display()),
