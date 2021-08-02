@@ -1,8 +1,6 @@
 import {hterm, lib} from "./hterm-all.js";
 
 let buffer = "";
-let args = [];
-let env = {};
 
 async function init_all() {
     // If you are a cross-browser web app and want to use window.localStorage.
@@ -21,21 +19,14 @@ async function init_all() {
             sbuf[j] = buffer.charCodeAt(j);
         }
         buffer = buffer.slice(len[0]);
-        lck[0] = 1; //current_worker + 1;
+        Atomics.store(lck, 0, 1);
         Atomics.notify(lck, 0);
     }
 
     const setupHterm = () => {
-        // profileId is the name of the terminal profile to load, or "default" if
-        // not specified.  If you're using one of the persistent storage
-        // implementations then this will scope all preferences read/writes to this
-        // name.
         const t = new hterm.Terminal("profile-id");
 
         t.onTerminalReady = function () {
-            // Create a new terminal IO object and give it the foreground.
-            // (The default IO object just prints warning messages about unhandled
-            // things to the the JS console.)
             const io = t.io.push();
 
             io.onVTKeystroke = io.sendString = (data) => {
@@ -52,16 +43,8 @@ async function init_all() {
 		}
             };
 
-            io.onTerminalResize = (columns, rows) => {
-                // React to size changes here.
-                // Secure Shell pokes at NaCl, which eventually results in
-                // some ioctls on the host.
-            };
+            io.onTerminalResize = (columns, rows) => {};
 
-            // You can call io.push() to foreground a fresh io context, which can
-            // be uses to give control of the terminal to something else.  When that
-            // thing is complete, should call io.pop() to restore control to the
-            // previous io object.
         };
 
         t.decorate(document.querySelector('#terminal'));
@@ -102,17 +85,22 @@ async function init_all() {
 	    console.log(`Awaiting input from WORKER ${current_worker}`);
         } else if (action === "spawn") {
 	    const args = event.data[3];
+	    const env = event.data[4];
             const id = workers.length;
             workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: []});
             workers[id].worker.onmessage = worker_onmessage;
-            workers[id].worker.postMessage(["start", `${data}.wasm`, id, args]);
+            workers[id].worker.postMessage(["start", `${data}.wasm`, id, args, env]);
             console.log("WORKER " + worker_id + " spawned: " + data);
             current_worker = id;
         }
     }
 
     workers[0].worker.onmessage = worker_onmessage;
-    workers[0].worker.postMessage(["start", "shell.wasm", 0]);
+    workers[0].worker.postMessage(["start", "shell.wasm", 0, [], {
+        RUST_BACKTRACE: "full",
+        PATH: "/usr/bin:/usr/local/bin",
+        X: "3"
+    }]);
 }
 
 window.onload = init_all;

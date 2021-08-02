@@ -8,22 +8,18 @@ myself = null;
 fs = null;
 
 
-// TODO: temporary hardcode, need to decide how to pass arg/env from shell to terminal
 // TODO: things like fds array, args and env should be stored in terminal
 let ARGS = [];
-let ENV = {
-    RUST_BACKTRACE: "full",
-    PATH: "/usr/bin:/usr/local/bin",
-    X: "3"
-};
+let ENV = {}; 
 
 onmessage = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
+            started = true;
             fname = e.data[1];
             myself = e.data[2];
-            started = true;
 	    ARGS = e.data[3];
+	    ENV = e.data[4];
         }
     }
 }
@@ -621,7 +617,7 @@ function barebonesWASI() {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");
 	    command = command.slice(1);
-            worker_send(["spawn", command, args]);
+            worker_send(["spawn", command, args, ENV]);
             worker_console_log("sent.");
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
