@@ -123,7 +123,7 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "echo" | "duk" | "main" | "shell" | "cowsay" => {
+            "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" => {
                 File::open(format!("!{} {}", command, input));
                 eprintln!("Shell after spawning program");
             }
