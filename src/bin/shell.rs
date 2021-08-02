@@ -42,7 +42,7 @@ fn main() {
                 _ => {
                     input.push(c[0] as char);
                     // echo
-                    print!("{}", c[0] as char);
+                    // print!("{}", c[0] as char);
                 }
             }
             io::stdout().flush().unwrap();
@@ -125,7 +125,8 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" => {
+            "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython" => {
+                #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
                 eprintln!("Shell after spawning program");
             }

@@ -32,7 +32,8 @@ async function init_all() {
             io.onVTKeystroke = io.sendString = (data) => {
                 let code = data.charCodeAt(0);
                 console.log(data, code);
-		// t.io.print(data);
+		// echo
+		t.io.print(data);
                 buffer = buffer + data;
 		console.log(`current_worker = ${current_worker}`);
 		// each worker was a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
