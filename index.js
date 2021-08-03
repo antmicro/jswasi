@@ -24,6 +24,7 @@ async function init_all() {
     }
 
     function handle_program_end(worker) {
+	worker.worker.terminate();
         // notify parent that they can resume operation
         Atomics.store(worker.parent_lck, 0, 1);
         Atomics.notify(worker.parent_lck, 0);
