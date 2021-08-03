@@ -29,7 +29,6 @@ function get_parent_port() {
     return null;
 }
 
-// FIXME: workers have self defined, something happens when calling this directly in file
 let is_node = (typeof self === 'undefined');
 
 if (is_node) {
@@ -100,15 +99,10 @@ function barebonesWASI() {
     const WHENCE_END = 2;
 
     function setModuleInstance(instance) {
-
         moduleInstanceExports = instance.exports;
     }
 
     function getModuleMemoryDataView() {
-        // call this any time you'll be reading or writing to a module's memory
-        // the returned DataView tends to be dissociated with the module's memory buffer at the will of the WebAssembly engine
-        // cache the returned DataView at your own peril!!
-
         return new DataView(moduleInstanceExports.memory.buffer);
     }
 
@@ -362,17 +356,14 @@ function barebonesWASI() {
         worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
 
         const view = getModuleMemoryDataView();
-
-        function setUint64(byteOffset, value) {
-            view.setUint32(byteOffset + 4, value & 0xFFFFFFFF);
-            view.setUint32(byteOffset + 0, (value >> 32) & 0xFFFFFFFF);
-        }
+	
+	// const stats = fds[fd].stats();
 
         if (fd <= 2) {
-            setUint64(bufPtr, 2); // chardev
+            view.setBigUint64(bufPtr, BigInt(2)); // chardev
         }
-        setUint64(bufPtr + 8, 0);
-        setUint64(bufPtr + 16, 0);
+        view.setBigUint64(bufPtr + 8, BigInt(0));
+        view.setBigUint64(bufPtr + 16, BigInt(0));
 
         return WASI_ESUCCESS;
     }
