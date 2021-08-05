@@ -6,6 +6,8 @@ async function init_all() {
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
 
+    // setup filesystem
+
 
     let workers = [];
     workers[0] = {id: 0, worker: new Worker('worker.js'), buffer_request_queue: []};
@@ -24,7 +26,7 @@ async function init_all() {
     }
 
     function handle_program_end(worker) {
-	worker.worker.terminate();
+        worker.worker.terminate();
         // notify parent that they can resume operation
         Atomics.store(worker.parent_lck, 0, 1);
         Atomics.notify(worker.parent_lck, 0);
@@ -40,40 +42,41 @@ async function init_all() {
         t.onTerminalReady = function () {
             const io = t.io.push();
 
-            io.onVTKeystroke = io.sendString = (data) => {	
+            io.onVTKeystroke = io.sendString = (data) => {
                 let code = data.charCodeAt(0);
                 console.log(data, code);
 
-		const worker = workers[current_worker];
-		if (code !== 13 && code < 32) {
-		    // control characters
-		    if (code == 3) {
-			console.log(`got ^C control, killing current worker (${worker.id})`);
-			handle_program_end(worker);
-		    } else if (code == 4) {
-			console.log(`got ^D, releasing buffer read lock (if present) with value -1`); 
-			if (worker.buffer_request_queue.length !== 0) {
-			    const lck = worker.buffer_request_queue[0].lck;
-			    Atomics.store(lck, 0, -1);
-        		    Atomics.notify(lck, 0);
-			}
-		    }
-		} else {
-		    // regular characters
+                const worker = workers[current_worker];
+                if (code !== 13 && code < 32) {
+                    // control characters
+                    if (code == 3) {
+                        console.log(`got ^C control, killing current worker (${worker.id})`);
+                        handle_program_end(worker);
+                    } else if (code == 4) {
+                        console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
+                        if (worker.buffer_request_queue.length !== 0) {
+                            const lck = worker.buffer_request_queue[0].lck;
+                            Atomics.store(lck, 0, -1);
+                            Atomics.notify(lck, 0);
+                        }
+                    }
+                } else {
+                    // regular characters
                     buffer = buffer + data;
-		    // echo
-		    t.io.print(data);
+                    // echo
+                    t.io.print(data);
 
-		    // each worker was a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
-		    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-		    while (workers[current_worker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-		        let {lck, len, sbuf} = workers[current_worker].buffer_request_queue.shift();
-		        send_buffer_to_worker(lck, len, sbuf);
-		    }
-		}
+                    // each worker was a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+                    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
+                    while (workers[current_worker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                        let {lck, len, sbuf} = workers[current_worker].buffer_request_queue.shift();
+                        send_buffer_to_worker(lck, len, sbuf);
+                    }
+                }
             };
 
-            io.onTerminalResize = (columns, rows) => {};
+            io.onTerminalResize = (columns, rows) => {
+            };
 
         };
 
@@ -94,11 +97,11 @@ async function init_all() {
             const len = new Int32Array(data, 4, 1);
             const sbuf = new Uint8Array(data, 8, len[0]);
             if (buffer.length !== 0) {
-		// handle buffer request straight away
-		send_buffer_to_worker(lck, len, sbuf);
+                // handle buffer request straight away
+                send_buffer_to_worker(lck, len, sbuf);
             } else {
-		// push handle buffer request to queue
-		workers[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf}); 
+                // push handle buffer request to queue
+                workers[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf});
             }
         } else if (action === "stdout") {
             // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
@@ -109,12 +112,12 @@ async function init_all() {
         } else if (action === "console") {
             console.log("WORKER " + worker_id + ": " + data);
         } else if (action === "exit") {
-	    let worker = workers[worker_id];
-	    handle_program_end(worker);
+            let worker = workers[worker_id];
+            handle_program_end(worker);
             console.log(`WORKER ${worker_id} exited with result code: ${data}`);
         } else if (action === "spawn") {
-	    const args = event.data[3];
-	    const env = event.data[4];
+            const args = event.data[3];
+            const env = event.data[4];
             const parent_lck = new Int32Array(event.data[5], 0, 1);
             const id = workers.length;
             workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: [], parent_lck});

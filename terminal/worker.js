@@ -7,7 +7,7 @@ fname = "";
 myself = null;
 fs = null;
 let ARGS = [];
-let ENV = {}; 
+let ENV = {};
 
 onmessage = function (e) {
     if (!started) {
@@ -15,8 +15,8 @@ onmessage = function (e) {
             started = true;
             fname = e.data[1];
             myself = e.data[2];
-	    ARGS = e.data[3];
-	    ENV = e.data[4];
+            ARGS = e.data[3];
+            ENV = e.data[4];
         }
     }
 }
@@ -62,7 +62,7 @@ function do_exit(exit_code) {
         worker_send(["exit", exit_code]); // never return
         Atomics.wait(lck, 0, 0);
     } else {
-	worker_console_log("calling close()");
+        worker_console_log("calling close()");
         worker_send(["exit", exit_code]);
         close();
     }
@@ -244,14 +244,14 @@ function barebonesWASI() {
             const lck = new Int32Array(buf, 0, 1);
             const request_len = new Int32Array(buf, 4, 1);
             request_len[0] = len;
-	    // send buffer read request to main thread
-	    // it can either be handled straight away or queued for later
-	    // either way we block with Atomics.wait untill buffer is filled
+            // send buffer read request to main thread
+            // it can either be handled straight away or queued for later
+            // either way we block with Atomics.wait untill buffer is filled
             worker_send(["buffer", buf]);
             Atomics.wait(lck, 0, 0);
-	    if (Atomics.load(lck, 0) === -1) {
-		return [new Uint8Array, -1];
-	    }
+            if (Atomics.load(lck, 0) === -1) {
+                return [new Uint8Array, -1];
+            }
             const sbuf = new Uint8Array(buf, 8, request_len[0]);
             BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
             let data = BUFFER.slice(0, len).replace("\r", "\n");
@@ -292,7 +292,7 @@ function barebonesWASI() {
         let encoder = new TextEncoder();
         let environ_count = Object.keys(ENV).length;
         view.setUint32(environ_count_ptr, environ_count, true);
-	
+
         let environ_size = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
         view.setUint32(environ_size_ptr, environ_size, true);
 
@@ -359,8 +359,8 @@ function barebonesWASI() {
         worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
 
         const view = getModuleMemoryDataView();
-	
-	// const stats = fds[fd].stats();
+
+        // const stats = fds[fd].stats();
 
         if (fd <= 2) {
             view.setBigUint64(bufPtr, BigInt(2)); // chardev
@@ -411,7 +411,7 @@ function barebonesWASI() {
 
     function proc_exit(exit_code) {
         worker_console_log(`proc_exit(${exit_code})`);
-	close(); // doesn't actually end here
+        close(); // doesn't actually end here
     }
 
     function random_get(buf_addr, buf_len) {
@@ -462,7 +462,7 @@ function barebonesWASI() {
 
     function fd_filestat_get(fd, buf) {
         worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
-	
+
         let view = getModuleMemoryDataView();
 
         if (fd > 2 && fds[fd] != undefined) {
@@ -477,7 +477,7 @@ function barebonesWASI() {
             view.setBigUint64(buf + 52, stat.ctim, true);
             return WASI_ESUCCESS;
         } else {
-	    worker_console_log(`fd_filestat_get returning WASI_EBADF`);
+            worker_console_log(`fd_filestat_get returning WASI_EBADF`);
             return WASI_EBADF;
         }
     }
@@ -583,14 +583,14 @@ function barebonesWASI() {
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
 
-	let view = getModuleMemoryDataView();
+        let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
 
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             let path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
-		worker_console_log(`path_filestat_get: no entry for path '${path}'`);
+                worker_console_log(`path_filestat_get: no entry for path '${path}'`);
                 return 1;
             }
             let stat = entry.stat();
@@ -604,7 +604,7 @@ function barebonesWASI() {
             view.setBigUint64(buf + 52, stat.ctim, true);
             return WASI_ESUCCESS;
         } else {
-	    worker_console_log(`path_filestat_get: undefined or not a directory`);
+            worker_console_log(`path_filestat_get: undefined or not a directory`);
             return 1;
         }
     }
@@ -617,15 +617,15 @@ function barebonesWASI() {
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");
-	    command = command.slice(1);
+            command = command.slice(1);
             const buf = new SharedArrayBuffer(4);
             const lck = new Int32Array(buf, 0, 1);
             worker_send(["spawn", command, args, ENV, buf]);
             worker_console_log("sent." + buf);
-	
-	    // wait for child process to finish
-	    Atomics.wait(lck, 0);
-	    
+
+            // wait for child process to finish
+            Atomics.wait(lck, 0);
+
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             let entry = fds[dir_fd].get_entry_for_path(path);
