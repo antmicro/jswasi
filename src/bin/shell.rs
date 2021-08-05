@@ -99,7 +99,10 @@ fn main() {
                         Err(error) => println!("cat: {}: {}", filename, error),
                     }
                 } else {
-                    println!("cat: not yet implemented");
+                    let mut stdin = io::stdin();
+                    let mut stdout = io::stdout();
+
+                    io::copy(&mut stdin, &mut stdout);
                 }
             }
             "touch" => {

@@ -249,6 +249,9 @@ function barebonesWASI() {
 	    // either way we block with Atomics.wait untill buffer is filled
             worker_send(["buffer", buf]);
             Atomics.wait(lck, 0, 0);
+	    if (Atomics.load(lck, 0) === -1) {
+		return [new Uint8Array, -1];
+	    }
             const sbuf = new Uint8Array(buf, 8, request_len[0]);
             BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
             let data = BUFFER.slice(0, len).replace("\r", "\n");

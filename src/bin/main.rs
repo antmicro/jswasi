@@ -1,3 +1,8 @@
+use std::io;
+
 fn main() {
-    loop {}
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    io::copy(&mut stdin, &mut stdout).unwrap();
 }

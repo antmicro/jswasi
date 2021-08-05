@@ -44,12 +44,19 @@ async function init_all() {
                 let code = data.charCodeAt(0);
                 console.log(data, code);
 
+		const worker = workers[current_worker];
 		if (code !== 13 && code < 32) {
 		    // control characters
 		    if (code == 3) {
-			const worker = workers[current_worker];
 			console.log(`got ^C control, killing current worker (${worker.id})`);
 			handle_program_end(worker);
+		    } else if (code == 4) {
+			console.log(`got ^D, releasing buffer read lock (if present) with value -1`); 
+			if (worker.buffer_request_queue.length !== 0) {
+			    const lck = worker.buffer_request_queue[0].lck;
+			    Atomics.store(lck, 0, -1);
+        		    Atomics.notify(lck, 0);
+			}
 		    }
 		} else {
 		    // regular characters
