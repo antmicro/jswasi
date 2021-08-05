@@ -10,7 +10,7 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, cat, touch, write, exit, echo, duk, main, shell, cowsay");
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, cat, touch, write, exit, echo, duk, main, shell, cowsay, rustpython, printenv, uutils");
 
     loop {
         // prompt for input
@@ -126,7 +126,7 @@ fn main() {
             "exit" => exit(0),
             // external commands
             "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython"
-            | "uutils" => {
+            | "uutils" | "printenv" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
                 eprintln!("Shell after spawning program");
