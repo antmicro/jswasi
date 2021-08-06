@@ -7,8 +7,11 @@ Cargo.lock
 pkg/
 wasm-pack.log
 
-*.webm
 node_modules
+package.json
+package-lock.json
+
+*.webm
 ci/images.txt
 ci/images
 

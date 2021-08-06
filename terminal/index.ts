@@ -7,6 +7,7 @@ async function init_all() {
     hterm.defaultStorage = new lib.Storage.Local();
 
     // setup filesystem
+    const root = await navigator.storage.getDirectory();
 
 
     let workers = [];
@@ -66,7 +67,7 @@ async function init_all() {
                     // echo
                     t.io.print(data);
 
-                    // each worker was a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+                    // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
                     while (workers[current_worker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
                         let {lck, len, sbuf} = workers[current_worker].buffer_request_queue.shift();

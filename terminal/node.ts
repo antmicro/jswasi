@@ -1,5 +1,5 @@
 const {
-    Worker, isMainThread, parentPort, workerData
+    isMainThread, parentPort, workerData //,Worker
 } = require('worker_threads');
 
 if (process.argv.length < 3) {
@@ -79,7 +79,7 @@ function heartbeat() {
     }
     if (!debug) {
         while (1) {
-            c = process.stdin.read(1);
+            const c = process.stdin.read(1);
             if (c != null) {
                 buffer = buffer + c;
             } else {

@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "outDir": "output",
+    "watch": false
+  },
+  "include": ["terminal/**/*"]
+}

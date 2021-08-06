@@ -2,14 +2,14 @@
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
-started = false;
-fname = "";
-myself = null;
-fs = null;
+let started = false;
+let fname = "";
+let myself = null;
+let fs = null;
 let ARGS = [];
 let ENV = {};
 
-onmessage = function (e) {
+const onmessage_ = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
             started = true;
@@ -20,6 +20,7 @@ onmessage = function (e) {
         }
     }
 }
+this.onmessage = onmessage_;
 
 function get_parent_port() {
     if (is_node) {
@@ -34,7 +35,7 @@ let is_node = (typeof self === 'undefined');
 if (is_node) {
     get_parent_port().once('message', (message) => {
         let msg = {data: message};
-        onmessage(msg);
+        onmessage_(msg);
     });
     fs = require('fs');
 } else {
@@ -43,10 +44,10 @@ if (is_node) {
 
 function worker_send(msg) {
     if (is_node) {
-        msg_ = {data: [myself, msg[0], msg[1]]};
+        const msg_ = {data: [myself, msg[0], msg[1]]};
         get_parent_port().postMessage(msg_);
     } else {
-        msg_ = [myself, ...msg];
+        const msg_ = [myself, ...msg];
         postMessage(msg_);
     }
 }
@@ -146,10 +147,11 @@ function barebonesWASI() {
 
     class OpenFile {
         file_type = FILETYPE_REGULAR_FILE;
+        file;
+        file_pos = 0;
 
         constructor(file) {
             this.file = file;
-            this.file_pos = 0;
         }
 
         get size() {
@@ -188,6 +190,7 @@ function barebonesWASI() {
 
     class Directory {
         file_type = FILETYPE_DIRECTORY;
+        directory;
 
         constructor(contents) {
             this.directory = contents;
@@ -213,7 +216,7 @@ function barebonesWASI() {
         create_entry_for_path(path) {
             let entry = this;
             let components = path.split("/").filter((component) => component != "/");
-            for (let i in components) {
+            for (let i = 0; i < components.length; i++) {
                 let component = components[i];
                 if (entry.directory[component] != undefined) {
                     entry = entry.directory[component];
@@ -231,6 +234,8 @@ function barebonesWASI() {
     }
 
     class PreopenDirectory extends Directory {
+        prestat_name;
+
         constructor(name, contents) {
             super(contents);
             this.prestat_name = new TextEncoder().encode(name);
@@ -342,7 +347,7 @@ function barebonesWASI() {
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
-        Object.entries(ARGS).forEach(([i, arg]) => {
+        Object.entries(ARGS).forEach((arg, i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
@@ -508,7 +513,7 @@ function barebonesWASI() {
     }
 
     function fd_readdir(fd, buf, buf_len, cookie, bufused) {
-        worker_console_log("fd_readdir(", fd, ", ", buf, ", ", buf_len, ", ", cookie, ", ", bufused, ")");
+        worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         // 8 ,  3408816 ,  128 ,  0n ,  1032332
@@ -524,7 +529,7 @@ function barebonesWASI() {
             for (let name of Object.keys(fds[fd].directory).slice(Number(cookie))) {
                 let entry = fds[fd].directory[name];
                 worker_console_log(name + " " + entry);
-                let encoded_name = new TextEncoder("utf-8").encode(name);
+                let encoded_name = new TextEncoder().encode(name);
 
                 let offset = 24 + encoded_name.length;
 
@@ -596,7 +601,7 @@ function barebonesWASI() {
             let stat = entry.stat();
             view.setBigUint64(buf, stat.dev, true);
             view.setBigUint64(buf + 8, stat.ino, true);
-            view8.setUint8(buf + 16, stat.file_type);
+            view.setUint8(buf + 16, stat.file_type);
             view.setBigUint64(buf + 24, stat.nlink, true);
             view.setBigUint64(buf + 32, stat.size, true);
             view.setBigUint64(buf + 38, stat.atim, true);
@@ -624,27 +629,27 @@ function barebonesWASI() {
             worker_console_log("sent." + buf);
 
             // wait for child process to finish
-            Atomics.wait(lck, 0);
+            Atomics.wait(lck, 0, 0);
 
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             let entry = fds[dir_fd].get_entry_for_path(path);
             if (entry == null) {
-                if (oflags & OFLAGS_CREAT === OFLAGS_CREAT) {
+                if ((oflags & OFLAGS_CREAT) === OFLAGS_CREAT) {
                     entry = fds[dir_fd].create_entry_for_path(path);
                 } else {
                     return WASI_EBADF;
                 }
-            } else if (oflags & OFLAGS_EXCL === OFLAGS_EXCL) {
+            } else if ((oflags & OFLAGS_EXCL) === OFLAGS_EXCL) {
                 // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
                 // worker_console_log("file already exists, return 1");
                 // return WASI_EEXIST;
             }
-            if (oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY) {
+            if ((oflags & OFLAGS_DIRECTORY) === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY) {
                 worker_console_log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
                 return 1;
             }
-            if (oflags & OFLAGS_TRUNC === OFLAGS_TRUNC) {
+            if ((oflags & OFLAGS_TRUNC) === OFLAGS_TRUNC) {
                 worker_console_log("entry.truncate()")
                 entry.truncate();
             }
