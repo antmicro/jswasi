@@ -8,13 +8,15 @@ async function init_all() {
 
     // setup filesystem
     const root = await navigator.storage.getDirectory();
-
+    const home = await root.getDirectoryHandle("home", {create: true});
+    const ant = await home.getDirectoryHandle("ant", {create: true});
+    const history = await ant.getFileHandle(".shell_history", {create: true});
 
     let workers = [];
     workers[0] = {id: 0, worker: new Worker('worker.js'), buffer_request_queue: []};
     let current_worker = 0;
 
-    function send_buffer_to_worker(lck, len, sbuf) {
+    function send_buffer_to_worker(lck: Int32Array, len: Int32Array, sbuf: Uint8Array) {
         console.log("got buffer request of len " + len[0] + ", notifying");
         len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
         console.log("current buffer is '" + buffer + "', copying len " + len[0]);
@@ -26,7 +28,7 @@ async function init_all() {
         Atomics.notify(lck, 0);
     }
 
-    function handle_program_end(worker) {
+    function handle_program_end(worker: Worker) {
         worker.worker.terminate();
         // notify parent that they can resume operation
         Atomics.store(worker.parent_lck, 0, 1);
@@ -91,7 +93,7 @@ async function init_all() {
     await lib.init();
     const terminal = setupHterm();
 
-    const worker_onmessage = (event) => {
+    const worker_onmessage = async (event) => {
         const [worker_id, action, data] = event.data;
         if (action === "buffer") {
             const lck = new Int32Array(data, 0, 1);
@@ -117,15 +119,23 @@ async function init_all() {
             handle_program_end(worker);
             console.log(`WORKER ${worker_id} exited with result code: ${data}`);
         } else if (action === "spawn") {
-            const args = event.data[3];
-            const env = event.data[4];
-            const parent_lck = new Int32Array(event.data[5], 0, 1);
+            const [command, args, env, lck_sbuf] = data;
+            const parent_lck = new Int32Array(lck_sbuf, 0, 1);
             const id = workers.length;
-            workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: [], parent_lck});
-            workers[id].worker.onmessage = worker_onmessage;
-            workers[id].worker.postMessage(["start", `${data}.wasm`, id, args, env]);
-            console.log("WORKER " + worker_id + " spawned: " + data);
-            current_worker = id;
+            if (command === "mount") {
+                // special case for mount command
+                const mount = showDirectoryPicker();
+                Atomics.store(parent_lck, 0, 1);
+                Atomics.notify(parent_lck, 0)
+            } else {
+                workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: [], parent_lck});
+                workers[id].worker.onmessage = worker_onmessage;
+                workers[id].worker.postMessage(["start", `${command}.wasm`, id, args, env]);
+                console.log("WORKER " + worker_id + " spawned: " + command);
+                current_worker = id;
+            }
+        } else if (action === "file-access") {
+
         }
     }
 

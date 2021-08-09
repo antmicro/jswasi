@@ -56,7 +56,7 @@ function worker_console_log(msg) {
     worker_send(["console", msg]);
 }
 
-function do_exit(exit_code) {
+function do_exit(exit_code: number) {
     if (is_node) {
         const buf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(buf, 0, 1);
@@ -625,8 +625,8 @@ function barebonesWASI() {
             command = command.slice(1);
             const buf = new SharedArrayBuffer(4);
             const lck = new Int32Array(buf, 0, 1);
-            worker_send(["spawn", command, args, ENV, buf]);
-            worker_console_log("sent." + buf);
+            worker_send(["spawn", [command, args, ENV, buf]]);
+            worker_console_log("sent.");
 
             // wait for child process to finish
             Atomics.wait(lck, 0, 0);
