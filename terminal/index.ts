@@ -8,9 +8,9 @@ async function init_all() {
 
     // setup filesystem
     const root = await navigator.storage.getDirectory();
-    const home = await root.getDirectoryHandle("home", {create: true});
-    const ant = await home.getDirectoryHandle("ant", {create: true});
-    const history = await ant.getFileHandle(".shell_history", {create: true});
+    // const home = await root.getDirectoryHandle("home", {create: true});
+    // const ant = await home.getDirectoryHandle("ant", {create: true});
+    // const history = await ant.getFileHandle(".shell_history", {create: true});
 
     let workers = [];
     workers[0] = {id: 0, worker: new Worker('worker.js', {type: "module"}), buffer_request_queue: []};
@@ -28,7 +28,7 @@ async function init_all() {
         Atomics.notify(lck, 0);
     }
 
-    function handle_program_end(worker: Worker) {
+    function handle_program_end(worker) {
         worker.worker.terminate();
         // notify parent that they can resume operation
         Atomics.store(worker.parent_lck, 0, 1);
@@ -124,7 +124,7 @@ async function init_all() {
             const id = workers.length;
             if (command === "mount") {
                 // special case for mount command
-                const mount = showDirectoryPicker();
+                const mount = await showDirectoryPicker();
                 Atomics.store(parent_lck, 0, 1);
                 Atomics.notify(parent_lck, 0)
             } else {
