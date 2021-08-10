@@ -13,7 +13,7 @@ async function init_all() {
     const history = await ant.getFileHandle(".shell_history", {create: true});
 
     let workers = [];
-    workers[0] = {id: 0, worker: new Worker('worker.js'), buffer_request_queue: []};
+    workers[0] = {id: 0, worker: new Worker('worker.js', {type: "module"}), buffer_request_queue: []};
     let current_worker = 0;
 
     function send_buffer_to_worker(lck: Int32Array, len: Int32Array, sbuf: Uint8Array) {
@@ -128,7 +128,7 @@ async function init_all() {
                 Atomics.store(parent_lck, 0, 1);
                 Atomics.notify(parent_lck, 0)
             } else {
-                workers.push({id: id, worker: new Worker('worker.js'), buffer_request_queue: [], parent_lck});
+                workers.push({id: id, worker: new Worker("worker.js", {type: "module"}), buffer_request_queue: [], parent_lck});
                 workers[id].worker.onmessage = worker_onmessage;
                 workers[id].worker.postMessage(["start", `${command}.wasm`, id, args, env]);
                 console.log("WORKER " + worker_id + " spawned: " + command);

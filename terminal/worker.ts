@@ -2,6 +2,15 @@
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
+import {
+    WASI_EBADF,
+    WASI_ESUCCESS, WASI_FILETYPE_DIRECTORY,
+    WASI_FILETYPE_REGULAR_FILE, WASI_O_CREAT, WASI_O_DIRECTORY, WASI_O_EXCL, WASI_O_TRUNC,
+    WASI_WHENCE_CUR,
+    WASI_WHENCE_END,
+    WASI_WHENCE_SET
+} from "./constants.js";
+
 let started = false;
 let fname = "";
 let myself = null;
@@ -20,7 +29,7 @@ const onmessage_ = function (e) {
         }
     }
 }
-this.onmessage = onmessage_;
+onmessage = onmessage_;
 
 function get_parent_port() {
     if (is_node) {
@@ -74,31 +83,6 @@ function barebonesWASI() {
     let BUFFER = "";
     let moduleInstanceExports = null;
 
-    const WASI_ESUCCESS = 0;
-    const WASI_EBADF = 8;
-    const WASI_EEXIST = 20;
-    const WASI_EINVAL = 28;
-    const WASI_ENOSYS = 52;
-
-    const WASI_STDIN_FILENO = 0;
-    const WASI_STDOUT_FILENO = 1;
-    const WASI_STDERR_FILENO = 2;
-
-    const FILETYPE_UNKNOWN = 0;
-    const FILETYPE_DIRECTORY = 3;
-    const FILETYPE_REGULAR_FILE = 4;
-
-    const PREOPEN_TYPE_DIR = 0;
-
-    const OFLAGS_CREAT = 0x1;
-    const OFLAGS_DIRECTORY = 0x2;
-    const OFLAGS_EXCL = 0x4;
-    const OFLAGS_TRUNC = 0x8;
-
-    const WHENCE_SET = 0;
-    const WHENCE_CUR = 1;
-    const WHENCE_END = 2;
-
     function setModuleInstance(instance) {
         moduleInstanceExports = instance.exports;
     }
@@ -112,7 +96,7 @@ function barebonesWASI() {
     }
 
     class File {
-        file_type = FILETYPE_REGULAR_FILE;
+        file_type = WASI_FILETYPE_REGULAR_FILE;
         data;
 
         constructor(data) {
@@ -146,7 +130,7 @@ function barebonesWASI() {
     }
 
     class OpenFile {
-        file_type = FILETYPE_REGULAR_FILE;
+        file_type = WASI_FILETYPE_REGULAR_FILE;
         file;
         file_pos = 0;
 
@@ -189,7 +173,7 @@ function barebonesWASI() {
     }
 
     class Directory {
-        file_type = FILETYPE_DIRECTORY;
+        file_type = WASI_FILETYPE_DIRECTORY;
         directory;
 
         constructor(contents) {
@@ -562,15 +546,15 @@ function barebonesWASI() {
         if (fds[fd] !== undefined) {
             let file = fds[fd];
             switch (whence) {
-                case WHENCE_SET: {
+                case WASI_WHENCE_SET: {
                     file.file_pos = offset;
                     break;
                 }
-                case WHENCE_CUR: {
+                case WASI_WHENCE_CUR: {
                     file.file_pos += offset;
                     break;
                 }
-                case WHENCE_END: {
+                case WASI_WHENCE_END: {
                     file.file_pos = file.data.length + offset;
                 }
             }
@@ -635,21 +619,21 @@ function barebonesWASI() {
         } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
             let entry = fds[dir_fd].get_entry_for_path(path);
             if (entry == null) {
-                if ((oflags & OFLAGS_CREAT) === OFLAGS_CREAT) {
+                if ((oflags & WASI_O_CREAT) === WASI_O_CREAT) {
                     entry = fds[dir_fd].create_entry_for_path(path);
                 } else {
                     return WASI_EBADF;
                 }
-            } else if ((oflags & OFLAGS_EXCL) === OFLAGS_EXCL) {
+            } else if ((oflags & WASI_O_EXCL) === WASI_O_EXCL) {
                 // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
                 // worker_console_log("file already exists, return 1");
                 // return WASI_EEXIST;
             }
-            if ((oflags & OFLAGS_DIRECTORY) === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY) {
+            if ((oflags & WASI_O_DIRECTORY) === WASI_O_DIRECTORY && fds[dir_fd].file_type !== WASI_FILETYPE_DIRECTORY) {
                 worker_console_log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
                 return 1;
             }
-            if ((oflags & OFLAGS_TRUNC) === OFLAGS_TRUNC) {
+            if ((oflags & WASI_O_TRUNC) === WASI_O_TRUNC) {
                 worker_console_log("entry.truncate()")
                 entry.truncate();
             }
