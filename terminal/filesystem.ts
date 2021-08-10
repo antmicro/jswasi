@@ -1,3 +1,5 @@
+import {WASI_FILETYPE_REGULAR_FILE} from "./constants";
+
 class OpenDirectory {
     public path: string;
     private handle: FileSystemDirectoryHandle;
@@ -68,14 +70,16 @@ class OpenFile {
     }
 
     // return file size in bytes
-    get size(): number {
-        return this.handle.getFile().size;
+    async size() {
+        let file = await this.handle.getFile();
+        return file.size;
     }
 
-    read(len) {
+    async read(len) {
         // worker_console_log(`${typeof this.file_pos}, ${typeof len}`)
-        if (this.file_pos < this.size) {
-            let slice = this.handle.data.slice(this.file_pos, this.file_pos + len);
+        if (this.file_pos < await this.size()) {
+            let file = await this.handle.getFile();
+            let slice = await file.slice(this.file_pos, this.file_pos + len).arrayBuffer();
             this.file_pos += slice.length;
             return [slice, 0];
         } else {
@@ -83,34 +87,38 @@ class OpenFile {
         }
     }
 
-    write(buffer) {
-        // File.data is and Uint8Array, we need to resize it if necessary
-        if (this.file_pos + buffer.length > this.size) {
-            let old = this.file.data;
-            this.file.data = new Uint8Array(this.file_pos + buffer.length);
-            this.file.data.set(old);
-        }
-        this.file.data.set(
-            new TextEncoder().encode(buffer), this.file_pos
-        );
+    async write(buffer) {
+        const w = await this.handle.createWritable();
+        await w.write({type: "write", position: this.file_pos, data: buffer})
         this.file_pos += buffer.length;
         return 0;
     }
 
-    stat() {
+    async stat() {
         return {
             dev: 0n,
             ino: 0n,
-            file_type: this.file_type,
+            file_type: WASI_FILETYPE_REGULAR_FILE,
             nlink: 0n,
-            size: BigInt(this.size),
+            size: BigInt(await this.size()),
             atim: 0n,
             mtim: 0n,
             ctim: 0n,
         };
     }
 
-    truncate() {
+    async seek(position: number) {
+        const w = await this.handle.createWritable();
+        await w.write({type: "seek", position})
+        this.file_pos = position;
+        return 0;
+    }
+
+    async truncate() {
+        const w = await this.handle.createWritable();
+        await w.write({type: "truncate", size: 0})
+        this.file_pos = 0;
+        return 0;
     }
 }
 
