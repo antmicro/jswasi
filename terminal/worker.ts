@@ -213,9 +213,9 @@ function barebonesWASI() {
 
         const content = String.fromCharCode.apply(null, bufferBytes);
 
-        const buf = new SharedArrayBuffer(4); // lock, len, data
+        const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(buf, 0, 1);
-        worker_send(["fd_write", content]);
+        worker_send(["fd_write", sbuf, content]);
         Atomics.wait(lck, 0, 0);
         // TODO: handle error, also it returns 1 on success at the moment (should be changed)
         const err = Atomics.load(lck, 0);
@@ -499,33 +499,45 @@ function barebonesWASI() {
         return 1;
     }
 
-    function fd_prestat_get(fd, buf_ptr) {
+    function fd_prestat_get(fd: number, buf_ptr) {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         let view = getModuleMemoryDataView();
-        if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            const PREOPEN_TYPE_DIR = 0;
-            view.setUint8(buf_ptr, PREOPEN_TYPE_DIR);
-            view.setUint32(buf_ptr + 4, fds[fd].prestat_name.length);
-            return WASI_ESUCCESS;
-        } else {
-            // FIXME: this fails for created files (when fds[fd] is undefined)
-            //  what should happen when requesting with not used fd?
-            //  for now we get error: 'data provided contains a nul byte' on File::create
-            worker_console_log("fd_prestat_get returning EBADF");
-            return WASI_EBADF;
+	
+	    const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const name_len = new Int32Array(sbuf, 4, 1);
+        const preopen_type = new Uint8Array(sbuf, 8, 1);
+
+        worker_send(["fd_prestat_get", [sbuf, fd]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err === WASI_ESUCCESS) {
+            view.setUint8(buf_ptr, preopen_type[0]);
+            view.setUint32(buf_ptr + 4, name_len);
         }
+        return err;
     }
 
-    function fd_prestat_dir_name(fd, path_ptr, path_len) {
-        worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
-        if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-            let buffer8 = getModuleMemoryUint8Array();
-            buffer8.set(fds[fd].prestat_name, path_ptr);
-            return WASI_ESUCCESS;
-        } else {
-            worker_console_log("fd_prestat_dir_name returning EBADF");
-            return WASI_EBADF; // TODO: what return code?
+    function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
+        worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);       
+        let view8 = getModuleMemoryUint8Array();
+	
+	    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const path = new Uint8Array(sbuf, 4, path_len);
+
+        worker_send(["fd_prestat_dir_name", [sbuf, fd, path_len]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err === WASI_ESUCCESS) {
+            view8.set(path, path_ptr);
         }
+        return err;
+
     }
 
     function fd_datasync() {

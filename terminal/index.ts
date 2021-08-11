@@ -1,4 +1,5 @@
 import {hterm, lib} from "./hterm-all.js";
+import {WASI_ESUCCESS, WASI_EBADF} from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 
 let buffer = "";
@@ -41,8 +42,10 @@ async function init_all() {
                 if (code !== 13 && code < 32) {
                     // control characters
                     if (code == 3) {
+                        console.log(`got ^C control, killing current worker (${id})`);
                         workerTable.terminateWorker(workerTable.currentWorker);
                     } else if (code == 4) {
+                        console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
                         workerTable.releaseWorker(workerTable.currentWorker, -1);
                     }
                 } else {
@@ -54,12 +57,12 @@ async function init_all() {
 
                     // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-                    while (workerTable._workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                    while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
                         let {
                             lck,
                             len,
                             sbuf
-                        } = workerTable._workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                        } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
                         send_buffer_to_worker(lck, len, sbuf);
                     }
                 }
@@ -92,7 +95,7 @@ async function init_all() {
                     send_buffer_to_worker(lck, len, sbuf);
                 } else {
                     // push handle buffer request to queue
-                    workerTable._workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf});
+                    workerTable.workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf});
                 }
                 break;
             }
@@ -125,13 +128,60 @@ async function init_all() {
                 }
                 break;
             }
+            case "fd_prestat_get": {
+                const [sbuf, fd] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const name_len = new Int32Array(sbuf, 4, 1);
+                const preopen_type = new Uint8Array(sbuf, 8, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
+                    const PREOPEN_TYPE_DIR = 0;
+                    preopen_type[0] = PREOPEN_TYPE_DIR;
+                    name_len[0] = fds[fd].prestat_name.length;
+                    err = WASI_ESUCCESS;
+                } else {
+                    // FIXME: this fails for created files (when fds[fd] is undefined)
+                    //  what should happen when requesting with not used fd?
+                    //  for now we get error: 'data provided contains a nul byte' on File::create
+                    console.log("fd_prestat_get returning EBADF");
+                    err = WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+
+                break;
+            }
+            case "fd_prestat_dir_name": {
+                const [sbuf, fd, path_len] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const path = new Uint8Array(sbuf, 4, path_len);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
+                    path.set(fds[fd].prestat_name, 0);
+                    err = WASI_ESUCCESS;
+                } else {
+                    console.log("fd_prestat_dir_name returning EBADF");
+                    err = WASI_EBADF; // TODO: what return code?
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+
+                break;
+            }
             case "fd_write": {
-                let output = data.replaceAll("\n", "\n\r");
+        		const [sbuf, content] = data;
+                let output = content.replaceAll("\n", "\n\r");
                 terminal.io.print(output);
 
-                const lck = new Int32Array(data, 0, 1);
+                const lck = new Int32Array(sbuf, 0, 1);
                 Atomics.store(lck, 0, 1);
-                Atomics.notify(lck, 0)
+                Atomics.notify(lck, 0);
                 break;
             }
         }
