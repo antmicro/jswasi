@@ -55,7 +55,11 @@ async function init_all() {
                     // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
                     while (workerTable._workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-                        let {lck, len, sbuf} = workerTable._workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                        let {
+                            lck,
+                            len,
+                            sbuf
+                        } = workerTable._workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
                         send_buffer_to_worker(lck, len, sbuf);
                     }
                 }
@@ -79,7 +83,7 @@ async function init_all() {
     const on_worker_message = async (event) => {
         const [worker_id, action, data] = event.data;
         switch (action) {
-            case "buffer":
+            case "buffer": {
                 const lck = new Int32Array(data, 0, 1);
                 const len = new Int32Array(data, 4, 1);
                 const sbuf = new Uint8Array(data, 8, len[0]);
@@ -91,22 +95,22 @@ async function init_all() {
                     workerTable._workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf});
                 }
                 break;
-            case "stdout":
-                // let output = new TextDecoder().decode(data).replace("\n", "\n\r");
-                let output = data.replaceAll("\n", "\n\r");
-                terminal.io.print(output);
-                break;
-            case "stderr":
+            }
+
+            case "stderr": {
                 console.log(`STDERR ${worker_id}: ${data}`);
                 break;
-            case "console":
+            }
+            case "console": {
                 console.log("WORKER " + worker_id + ": " + data);
                 break;
-            case "exit":
+            }
+            case "exit": {
                 workerTable.terminateWorker(worker_id);
                 console.log(`WORKER ${worker_id} exited with result code: ${data}`);
                 break;
-            case "spawn":
+            }
+            case "spawn": {
                 const [command, args, env, lck_sbuf] = data;
                 const parent_lck = new Int32Array(lck_sbuf, 0, 1);
                 if (command === "mount") {
@@ -120,8 +124,16 @@ async function init_all() {
                     console.log("WORKER " + worker_id + " spawned: " + command);
                 }
                 break;
-            case "fd_read":
+            }
+            case "fd_write": {
+                let output = data.replaceAll("\n", "\n\r");
+                terminal.io.print(output);
 
+                const lck = new Int32Array(data, 0, 1);
+                Atomics.store(lck, 0, 1);
+                Atomics.notify(lck, 0)
+                break;
+            }
         }
     }
 
