@@ -145,7 +145,7 @@ function barebonesWASI() {
     }
 
     function args_get(argv, argv_buf) {
-        worker_console_log("args_get(" + argv + ", " + argv_buf + ")");
+        worker_console_log("args_get(" + argv + ", 0x" + argv_buf.toString(16) + ")");
 
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
@@ -215,14 +215,14 @@ function barebonesWASI() {
 
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
-        worker_send(["fd_write", [sbuf, content]]);
-        Atomics.wait(lck, 0, 0);
-        // TODO: handle error, also it returns 1 on success at the moment (should be changed)
+        worker_send(["fd_write", [sbuf, fd, content]]);
+        Atomics.wait(lck, 0, -1);
+
         const err = Atomics.load(lck, 0);
-
-        view.setUint32(nwritten_ptr, written, true);
-
-        return WASI_ESUCCESS;
+        if (err === WASI_ESUCCESS) {
+            view.setUint32(nwritten_ptr, written, true);
+        }
+        return err;
     }
 
     function proc_exit(exit_code) {
@@ -303,24 +303,30 @@ function barebonesWASI() {
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
 
-        if (fds[fd] != undefined) {
-            let nread = 0;
-            for (let i = 0; i < iovs_len; i++) {
-                let addr = view.getUint32(iovs_ptr + 8 * i, true);
-                let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
-                let [data, err] = fds[fd].read(len);
-                if (err !== 0) {
-                    return err;
-                }
-                view8.set(data, addr);
-                nread += data.length;
+        let nread = 0;
+        for (let i = 0; i < iovs_len; i++) {
+            let addr = view.getUint32(iovs_ptr + 8 * i, true);
+            let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
+            
+            // TODO: rip for optimisation, addr and len could be put inside a vector and requested all at once
+            const sbuf = new SharedArrayBuffer(4 + 4 + len); // lock, read length, read buffer
+            const lck = new Int32Array(sbuf, 0, 1);
+            const readlen = new Int32Array(sbuf, 4, 1);
+            const readbuf = new Uint8Array(sbuf, 8, len);
+
+            worker_send(["fd_read", [sbuf, fd, len]]);
+            Atomics.wait(lck, 0, -1);
+
+            const err = Atomics.load(lck, 0);
+            if (err !== WASI_ESUCCESS) {
+                return err;
             }
-            view.setUint32(nread_ptr, nread, true);
-            return WASI_ESUCCESS;
-        } else {
-            worker_console_log("fd_read returning 1");
-            return 1;
+
+            view8.set(readbuf, addr);
+            nread += readlen[0];
         }
+        view.setUint32(nread_ptr, nread, true);
+        return WASI_ESUCCESS;
     }
 
     function fd_readdir(fd, buf, buf_len, cookie, bufused) {

@@ -1,15 +1,16 @@
 import {hterm, lib} from "./hterm-all.js";
 import {WASI_ESUCCESS, WASI_EBADF} from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
+import {PreopenDirectory, File, OpenFile} from "./filesystem.js";
 
 let buffer = "";
 
-function send_buffer_to_worker(lck: Int32Array, len: Int32Array, sbuf: Uint8Array) {
+function send_buffer_to_worker(lck: Int32Array, len: Int32Array, buf: Uint8Array) {
     console.log("got buffer request of len " + len[0] + ", notifying");
     len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
     console.log("current buffer is '" + buffer + "', copying len " + len[0]);
     for (let j = 0; j < len[0]; j++) {
-        sbuf[j] = buffer.charCodeAt(j);
+        buf[j] = buffer.charCodeAt(j);
     }
     buffer = buffer.slice(len[0]);
     Atomics.store(lck, 0, 1);
@@ -27,7 +28,7 @@ async function init_all() {
     // const history = await ant.getFileHandle(".shell_history", {create: true});
 
     let workerTable = new WorkerTable;
-    workerTable.spawnWorker(null, null);
+
 
     const setupHterm = () => {
         const t = new hterm.Terminal("profile-id");
@@ -83,27 +84,23 @@ async function init_all() {
     await lib.init();
     const terminal = setupHterm();
 
+    workerTable.spawnWorker(
+        [
+            null, // stdin
+            null, // stdout
+            null, // stderr
+            new PreopenDirectory(".", {
+                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+            }), // 3
+            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+        ],
+        null, // parent_id
+        null // parent_lock
+    );
+
     const on_worker_message = async (event) => {
         const [worker_id, action, data] = event.data;
         switch (action) {
-            case "buffer": {
-                const lck = new Int32Array(data, 0, 1);
-                const len = new Int32Array(data, 4, 1);
-                const sbuf = new Uint8Array(data, 8, len[0]);
-                if (buffer.length !== 0) {
-                    // handle buffer request straight away
-                    send_buffer_to_worker(lck, len, sbuf);
-                } else {
-                    // push handle buffer request to queue
-                    workerTable.workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: len, sbuf: sbuf});
-                }
-                break;
-            }
-
-            case "stderr": {
-                console.log(`STDERR ${worker_id}: ${data}`);
-                break;
-            }
             case "console": {
                 console.log("WORKER " + worker_id + ": " + data);
                 break;
@@ -121,7 +118,11 @@ async function init_all() {
                     const mount = await showDirectoryPicker();
                     workerTable.releaseWorker(worker_id, 1);
                 } else {
-                    const id = workerTable.spawnWorker(worker_id, parent_lck);
+                    const id = workerTable.spawnWorker(
+                        [],
+                        worker_id,
+                        parent_lck
+                    );
                     workerTable.setOnMessage(id, on_worker_message);
                     workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
                     console.log("WORKER " + worker_id + " spawned: " + command);
@@ -175,13 +176,82 @@ async function init_all() {
                 break;
             }
             case "fd_write": {
-        		const [sbuf, content] = data;
-                let output = content.replaceAll("\n", "\n\r");
-                terminal.io.print(output);
-
+        		const [sbuf, fd, content] = data;
                 const lck = new Int32Array(sbuf, 0, 1);
-                Atomics.store(lck, 0, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                switch (fd) {
+                    case 0: {
+                        throw "can't write to stdin!";
+                        break;
+                    }
+                    case 1: {
+                        const output = content.replaceAll("\n", "\n\r");
+                        terminal.io.print(output);
+                        break;
+                    }
+                    case 2: {
+                        const output = buffer.replaceAll("\n", "\n\r");
+                        // TODO: should print in red, use ANSI color codes
+                        terminal.io.print(`STDERR: ${output}`);
+                        break;
+                    }
+                    default: {
+                        if (fds[fd] != undefined) {
+                            fds[fd].write(content);
+                            err = WASI_ESUCCESS;
+                        } else {
+                            console.log("fd_prestat_dir_name returning EBADF");
+                            err = WASI_EBADF; // TODO: what return code?
+                        }
+                        break;
+                    }
+                }
+                Atomics.store(lck, 0, err);
                 Atomics.notify(lck, 0);
+                break;
+            }    
+            case "fd_read": {
+                const [sbuf, fd, len] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const readlen = new Int32Array(sbuf, 4, 1);
+                const readbuf = new Uint8Array(sbuf, 8, len);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                switch (fd) {
+                    case 0: {
+                        if (buffer.length !== 0) {
+                            // handle buffer request straight away
+                            send_buffer_to_worker(lck, readlen, readbuf);
+                        } else {
+                            // push handle buffer request to queue
+                            workerTable.workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: readlen, sbuf: readbuf});
+                        }
+                        break;
+                    }
+                    case 1: {
+                        throw "can't read from stdout!";
+                        break;
+                    }
+                    case 2: {
+                        throw "can't read from stderr!";
+                        break;
+                    }
+                    default: {
+                        if (fds[fd] != undefined) {
+                            fds[fd].write(content);
+                            err = WASI_ESUCCESS;
+                        } else {
+                            console.log("fd_prestat_dir_name returning EBADF");
+                            err = WASI_EBADF; // TODO: what return code?
+                        }
+                        Atomics.store(lck, 0, err);
+                        Atomics.notify(lck, 0);
+                        break;
+                    }
+                }
                 break;
             }
         }
