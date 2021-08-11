@@ -214,8 +214,8 @@ function barebonesWASI() {
         const content = String.fromCharCode.apply(null, bufferBytes);
 
         const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(buf, 0, 1);
-        worker_send(["fd_write", sbuf, content]);
+        const lck = new Int32Array(sbuf, 0, 1);
+        worker_send(["fd_write", [sbuf, content]]);
         Atomics.wait(lck, 0, 0);
         // TODO: handle error, also it returns 1 on success at the moment (should be changed)
         const err = Atomics.load(lck, 0);
