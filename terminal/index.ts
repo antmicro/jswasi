@@ -192,9 +192,9 @@ async function init_all() {
                         break;
                     }
                     case 2: {
-                        const output = buffer.replaceAll("\n", "\n\r");
+                        const output = content.replaceAll("\n", "\n\r");
                         // TODO: should print in red, use ANSI color codes
-                        terminal.io.print(`STDERR: ${output}`);
+                        terminal.io.print(output);
                         break;
                     }
                     default: {
