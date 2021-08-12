@@ -14,7 +14,6 @@ import {
 let started = false;
 let fname = "";
 let myself = null;
-let fs = null;
 let ARGS = [];
 let ENV = {};
 
@@ -34,16 +33,10 @@ function is_node() {
     return (typeof self === 'undefined');
 }
 
-function get_parent_port() {
-    if (is_node()) {
-        const {parentPort} = require('worker_threads');
-        return parentPort;
-    }
-    return null;
-}
+//NODE// import node_helpers from './node_helpers.cjs';
 
 if (is_node()) {
-    get_parent_port().once('message', (message) => {
+        node_helpers.get_parent_port().once('message', (message) => {
         let msg = {data: message};
         onmessage_(msg);
     });
@@ -55,7 +48,7 @@ if (is_node()) {
 function worker_send(msg) {
     if (is_node()) {
         const msg_ = {data: [myself, msg[0], msg[1]]};
-        get_parent_port().postMessage(msg_);
+        node_helpers.get_parent_port().postMessage(msg_);
     } else {
         const msg_ = [myself, ...msg];
         postMessage(msg_);
@@ -719,7 +712,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
                 const response = await fetch(moduleName);
                 buffer = await response.arrayBuffer();
             } else {
-                buffer = fs.readFileSync(moduleName, null);
+                buffer = node_helpers.fs.readFileSync(moduleName, null);
             }
             module = await WebAssembly.compile(buffer);
         }
@@ -749,16 +742,12 @@ function importWasmModule(moduleName, wasiPolyfill) {
     })();
 }
 
-if (is_node()) {
-    fs = require('fs');
-}
-
 function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
         try {
             if (is_node()) { // TODO: add spawn for browser!
-                if (!fs.existsSync(fname)) {
+                if (!node_helpers.fs.existsSync(fname)) {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
                     fname = "";

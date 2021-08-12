@@ -6,10 +6,11 @@ if (process.argv.length < 3) {
 }
 
 let debug = false;
+let WORKER_SCRIPT_NAME = "./worker.mjs";
 
 let workers = [];
-workers[0] = {id: 0, worker: new Worker('./worker.js')};
-if (debug) workers[1] = {id: 1, worker: new Worker('./worker.js')};
+workers[0] = {id: 0, worker: new Worker(WORKER_SCRIPT_NAME)};
+if (debug) workers[1] = {id: 1, worker: new Worker(WORKER_SCRIPT_NAME)};
 let workers_count = 1;
 
 let terminated = false;
@@ -50,7 +51,7 @@ let ev = (event) => {
         if (debug) console.log("WORKER " + event.data[0] + ": " + event.data[2]);
     } else if (action === "spawn") {
         console.log("WORKER " + event.data[0] + " SHOULD SPAWN " + event.data[2]);
-        workers[workers_count] = {id: workers_count, worker: new Worker('./worker.js')};
+        workers[workers_count] = {id: workers_count, worker: new Worker(WORKER_SCRIPT_NAME)};
         workers[workers_count].worker.on('message', ev);
         workers[workers_count].worker.postMessage(["start", event.data[2] + ".wasm", workers_count, [], []]);
         workers_count++;
