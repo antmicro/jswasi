@@ -42,11 +42,11 @@ export class WorkerTable {
         const worker = this.workerInfos[id];
         worker.worker.terminate();
         // notify parent that they can resume operation
-	if (worker.parent_lock !== null) {
+	    if (worker.parent_lock !== null) {
             Atomics.store(worker.parent_lock, 0, 1);
             Atomics.notify(worker.parent_lock, 0);
-            this.currentWorker -= worker.parent_id;
-	}
+            this.currentWorker = worker.parent_id;
+	    }
         // remove worker from workers array
         delete this.workerInfos[id];
         console.log(`Awaiting input from WORKER ${this.currentWorker}`)

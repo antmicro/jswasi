@@ -308,9 +308,10 @@ function barebonesWASI() {
             let addr = view.getUint32(iovs_ptr + 8 * i, true);
             let len = view.getUint32(iovs_ptr + 8 * i + 4, true);
             
-            // TODO: rip for optimisation, addr and len could be put inside a vector and requested all at once
+            // TODO: ripe for optimisation, addr and len could be put inside a vector and requested all at once
             const sbuf = new SharedArrayBuffer(4 + 4 + len); // lock, read length, read buffer
             const lck = new Int32Array(sbuf, 0, 1);
+            lck[0] = -1;
             const readlen = new Int32Array(sbuf, 4, 1);
             const readbuf = new Uint8Array(sbuf, 8, len);
 

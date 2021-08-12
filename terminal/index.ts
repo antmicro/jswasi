@@ -5,15 +5,15 @@ import {PreopenDirectory, File, OpenFile} from "./filesystem.js";
 
 let buffer = "";
 
-function send_buffer_to_worker(lck: Int32Array, len: Int32Array, buf: Uint8Array) {
-    console.log("got buffer request of len " + len[0] + ", notifying");
-    len[0] = (buffer.length > len[0]) ? len[0] : buffer.length;
-    console.log("current buffer is '" + buffer + "', copying len " + len[0]);
-    for (let j = 0; j < len[0]; j++) {
+function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
+    console.log("got buffer request of len " + requested_len + ", notifying");
+    readlen[0] = (buffer.length > requested_len) ? requested_len : buffer.length;
+    console.log("current buffer is '" + buffer + "', copying len " + readlen[0]);
+    for (let j = 0; j < readlen[0]; j++) {
         buf[j] = buffer.charCodeAt(j);
     }
-    buffer = buffer.slice(len[0]);
-    Atomics.store(lck, 0, 1);
+    buffer = buffer.slice(readlen[0]);
+    Atomics.store(lck, 0, WASI_ESUCCESS);
     Atomics.notify(lck, 0);
 }
 
@@ -60,11 +60,12 @@ async function init_all() {
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
                     while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
                         let {
+                            requested_len,
                             lck,
                             len,
                             sbuf
                         } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                        send_buffer_to_worker(lck, len, sbuf);
+                        send_buffer_to_worker(requested_len, lck, len, sbuf);
                     }
                 }
             };
@@ -224,10 +225,10 @@ async function init_all() {
                     case 0: {
                         if (buffer.length !== 0) {
                             // handle buffer request straight away
-                            send_buffer_to_worker(lck, readlen, readbuf);
+                            send_buffer_to_worker(len, lck, readlen, readbuf);
                         } else {
                             // push handle buffer request to queue
-                            workerTable.workerInfos[worker_id].buffer_request_queue.push({lck: lck, len: readlen, sbuf: readbuf});
+                            workerTable.workerInfos[worker_id].buffer_request_queue.push({requested_len: len, lck: lck, len: readlen, sbuf: readbuf});
                         }
                         break;
                     }
@@ -241,7 +242,7 @@ async function init_all() {
                     }
                     default: {
                         if (fds[fd] != undefined) {
-                            fds[fd].write(content);
+                            fds[fd].read(len);
                             err = WASI_ESUCCESS;
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");

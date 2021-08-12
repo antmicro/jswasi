@@ -23,7 +23,7 @@ fn main() {
             io::stdin().read_exact(&mut c).unwrap();
             match c[0] {
                 // enter
-                10 => {
+                13 => {
                     println!();
                     break;
                 }
@@ -102,7 +102,7 @@ fn main() {
                     let mut stdin = io::stdin();
                     let mut stdout = io::stdout();
 
-                    io::copy(&mut stdin, &mut stdout);
+                    io::copy(&mut stdin, &mut stdout).unwrap();
                 }
             }
             "touch" => {
@@ -132,7 +132,6 @@ fn main() {
             | "uutils" | "printenv" | "mount" | "tree" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
-                eprintln!("Shell after spawning program");
             }
             // edge cases
             "" => {}
