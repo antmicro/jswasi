@@ -1,6 +1,4 @@
-const {
-    isMainThread, parentPort, workerData, Worker
-} = require('worker_threads');
+import { isMainThread, parentPort, workerData, Worker } from 'worker_threads';
 
 if (process.argv.length < 3) {
     console.log("Not enough arguments");
