@@ -54,7 +54,7 @@ let ev = (event) => {
         console.log("WORKER " + event.data[0] + " SHOULD SPAWN " + event.data[2]);
         workers[workers_count] = {id: workers_count, worker: new Worker('./worker.js')};
         workers[workers_count].worker.on('message', ev);
-        workers[workers_count].worker.postMessage(["start", event.data[2] + ".wasm", workers_count]);
+        workers[workers_count].worker.postMessage(["start", event.data[2] + ".wasm", workers_count, [], []]);
         workers_count++;
         console.log("SPAWNED, total processes == " + workers_count + "!");
     }
@@ -67,8 +67,8 @@ if (debug) workers[1].worker.on('message', ev);
 //myWorker.onmessage = ev;
 
 if (debug) console.log('sending message!');
-workers[0].worker.postMessage(["start", process.argv[2], 0]);
-if (debug) workers[1].worker.postMessage(["start", process.argv[2], 1]);
+workers[0].worker.postMessage(["start", process.argv[2], 0, [], []]);
+if (debug) workers[1].worker.postMessage(["start", process.argv[2], 1, [], []]);
 if (debug) console.log('message sent!');
 
 function heartbeat() {
