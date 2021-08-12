@@ -3,7 +3,7 @@ class WorkerInfo {
     public worker: Worker;
     public parent_id: number;
     public parent_lock: Int32Array;
-    public buffer_request_queue: { lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
+    public buffer_request_queue: { requested_len: number, lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
     public fds;
 
     constructor(id: number, worker: Worker, fds, parent_id: number, parent_lock: Int32Array) {
@@ -35,7 +35,6 @@ export class WorkerTable {
 
     postMessage(id: number, message) {
         this.workerInfos[id].worker.postMessage(message);
-        console.log(`message posted to worker ${id}`)
     }
 
     terminateWorker(id: number) {
@@ -49,7 +48,6 @@ export class WorkerTable {
 	    }
         // remove worker from workers array
         delete this.workerInfos[id];
-        console.log(`Awaiting input from WORKER ${this.currentWorker}`)
     }
 
     releaseWorker(id: number, lock_value) {

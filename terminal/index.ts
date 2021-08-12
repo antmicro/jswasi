@@ -1,5 +1,5 @@
 import {hterm, lib} from "./hterm-all.js";
-import {WASI_ESUCCESS, WASI_EBADF} from "./constants.js";
+import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 import {PreopenDirectory, File, OpenFile} from "./filesystem.js";
 
@@ -13,7 +13,7 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
         buf[j] = buffer.charCodeAt(j);
     }
     buffer = buffer.slice(readlen[0]);
-    Atomics.store(lck, 0, WASI_ESUCCESS);
+    Atomics.store(lck, 0, constants.WASI_ESUCCESS);
     Atomics.notify(lck, 0);
 }
 
@@ -112,12 +112,12 @@ async function init_all() {
                 break;
             }
             case "spawn": {
-                const [command, args, env, lck_sbuf] = data;
-                const parent_lck = new Int32Array(lck_sbuf, 0, 1);
+                const [command, args, env, sbuf] = data;
+                const parent_lck = new Int32Array(sbuf, 0, 1);
                 if (command === "mount") {
                     // special case for mount command
                     const mount = await showDirectoryPicker();
-                    workerTable.releaseWorker(worker_id, 1);
+                    workerTable.releaseWorker(worker_id, 0);
                 } else {
                     const id = workerTable.spawnWorker(
                         [],
@@ -142,13 +142,13 @@ async function init_all() {
                     const PREOPEN_TYPE_DIR = 0;
                     preopen_type[0] = PREOPEN_TYPE_DIR;
                     name_len[0] = fds[fd].prestat_name.length;
-                    err = WASI_ESUCCESS;
+                    err = constants.WASI_ESUCCESS;
                 } else {
                     // FIXME: this fails for created files (when fds[fd] is undefined)
                     //  what should happen when requesting with not used fd?
                     //  for now we get error: 'data provided contains a nul byte' on File::create
                     console.log("fd_prestat_get returning EBADF");
-                    err = WASI_EBADF;
+                    err = constants.WASI_EBADF;
                 }
 
                 Atomics.store(lck, 0, err);
@@ -165,10 +165,10 @@ async function init_all() {
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
                     path.set(fds[fd].prestat_name, 0);
-                    err = WASI_ESUCCESS;
+                    err = constants.WASI_ESUCCESS;
                 } else {
                     console.log("fd_prestat_dir_name returning EBADF");
-                    err = WASI_EBADF; // TODO: what return code?
+                    err = constants.WASI_EBADF; // TODO: what return code?
                 }
 
                 Atomics.store(lck, 0, err);
@@ -195,16 +195,17 @@ async function init_all() {
                     case 2: {
                         const output = content.replaceAll("\n", "\n\r");
                         // TODO: should print in red, use ANSI color codes
+                        // terminal.io.print(`${'\\033[01;32m'}${output}${'\\033[00m'}`);
                         terminal.io.print(output);
                         break;
                     }
                     default: {
                         if (fds[fd] != undefined) {
                             fds[fd].write(content);
-                            err = WASI_ESUCCESS;
+                            err = constants.WASI_ESUCCESS;
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
-                            err = WASI_EBADF; // TODO: what return code?
+                            err = constants.WASI_EBADF; // TODO: what return code?
                         }
                         break;
                     }
@@ -243,10 +244,10 @@ async function init_all() {
                     default: {
                         if (fds[fd] != undefined) {
                             fds[fd].read(len);
-                            err = WASI_ESUCCESS;
+                            err = constants.WASI_ESUCCESS;
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
-                            err = WASI_EBADF; // TODO: what return code?
+                            err = constants.WASI_EBADF; // TODO: what return code?
                         }
                         Atomics.store(lck, 0, err);
                         Atomics.notify(lck, 0);
@@ -254,6 +255,46 @@ async function init_all() {
                     }
                 }
                 break;
+            }
+            case "path_open": {
+                const [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags] = data;
+                console.log(path);
+                const lck = new Int32Array(sbuf, 0, 1);
+                const opened_fd = new Int32Array(sbuf, 4, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined) {
+                    let entry = fds[dir_fd].get_entry_for_path(path);
+                    if (entry == null) {
+                        if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
+                            entry = fds[dir_fd].create_entry_for_path(path);
+                        } else {
+                            err = constants.WASI_EBADF;
+                        }
+                    } else if ((oflags & constants.WASI_O_EXCL) === constants.WASI_O_EXCL) {
+                        // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
+                        // console.log("file already exists, return 1");
+                        // return constants.WASI_EEXIST;
+                    }
+                    if ((oflags & constants.WASI_O_DIRECTORY) === constants.WASI_O_DIRECTORY && fds[dir_fd].file_type !== constants.WASI_FILETYPE_DIRECTORY) {
+                        console.log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
+                        err = 1;
+                    }
+                    if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
+                        console.log("entry.truncate()")
+                        entry.truncate();
+                    }
+                    fds.push(entry.open(path));
+                    opened_fd[0] = fds.length - 1;
+                    err = constants.WASI_ESUCCESS;
+                } else {
+                    console.log("fd doesn't exist or is a directory");
+                    err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
             }
         }
     }

@@ -298,7 +298,7 @@ function barebonesWASI() {
         }
     }
 
-    function fd_read(fd, iovs_ptr, iovs_len, nread_ptr) {
+    function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
         worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         let view = getModuleMemoryDataView();
         let view8 = getModuleMemoryUint8Array();
@@ -434,50 +434,41 @@ function barebonesWASI() {
 
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
         worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
-        let path = new TextDecoder("utf-8").decode(buffer8.slice(path_ptr, path_ptr + path_len));
+        let view = getModuleMemoryDataView();
+        let view8 = getModuleMemoryUint8Array();
+
+        let path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");
             command = command.slice(1);
-            const buf = new SharedArrayBuffer(4);
-            const lck = new Int32Array(buf, 0, 1);
-            worker_send(["spawn", [command, args, ENV, buf]]);
+            const sbuf = new SharedArrayBuffer(4);
+            const lck = new Int32Array(sbuf, 0, 1);
+            lck[0] = -1;
+            worker_send(["spawn", [command, args, ENV, sbuf]]);
             worker_console_log("sent.");
 
             // wait for child process to finish
-            Atomics.wait(lck, 0, 0);
+            Atomics.wait(lck, 0, -1);
 
             return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
-        } else if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined && path_len != 0) {
-            let entry = fds[dir_fd].get_entry_for_path(path);
-            if (entry == null) {
-                if ((oflags & WASI_O_CREAT) === WASI_O_CREAT) {
-                    entry = fds[dir_fd].create_entry_for_path(path);
-                } else {
-                    return WASI_EBADF;
-                }
-            } else if ((oflags & WASI_O_EXCL) === WASI_O_EXCL) {
-                // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
-                // worker_console_log("file already exists, return 1");
-                // return WASI_EEXIST;
-            }
-            if ((oflags & WASI_O_DIRECTORY) === WASI_O_DIRECTORY && fds[dir_fd].file_type !== WASI_FILETYPE_DIRECTORY) {
-                worker_console_log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
-                return 1;
-            }
-            if ((oflags & WASI_O_TRUNC) === WASI_O_TRUNC) {
-                worker_console_log("entry.truncate()")
-                entry.truncate();
-            }
-            fds.push(entry.open(path));
-            let opened_fd = fds.length - 1;
-            buffer.setUint32(opened_fd_ptr, opened_fd, true);
-            return WASI_ESUCCESS;
         } else {
-            worker_console_log("fd doesn't exist or is a directory");
-            return WASI_EBADF;
+            const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
+            const lck = new Int32Array(sbuf, 0, 1);
+            lck[0] = -1;
+            const opened_fd = new Int32Array(sbuf, 4, 1);
+
+            worker_console_log(path);
+            worker_send(["path_open", [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags]]);
+            Atomics.wait(lck, 0, -1);
+
+            const err = Atomics.load(lck, 0);
+            if (err !== WASI_ESUCCESS) {
+                return err;
+            }
+
+            view.setUint32(opened_fd_ptr, opened_fd, true);
+            return WASI_ESUCCESS;
         }
     }
 
