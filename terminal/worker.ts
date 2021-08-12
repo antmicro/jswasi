@@ -284,21 +284,37 @@ function barebonesWASI() {
 
         let view = getModuleMemoryDataView();
 
-        if (fd > 2 && fds[fd] != undefined) {
-            let stat = fds[fd].stat();
-            view.setBigUint64(buf, stat.dev, true);
-            view.setBigUint64(buf + 8, stat.ino, true);
-            view.setUint8(buf + 16, stat.file_type);
-            view.setBigUint64(buf + 24, stat.nlink, true);
-            view.setBigUint64(buf + 32, stat.size, true);
-            view.setBigUint64(buf + 38, stat.atim, true);
-            view.setBigUint64(buf + 46, stat.mtim, true);
-            view.setBigUint64(buf + 52, stat.ctim, true);
-            return WASI_ESUCCESS;
-        } else {
-            worker_console_log(`fd_filestat_get returning WASI_EBADF`);
-            return WASI_EBADF;
+        const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const statbuf = new DataView(sbuf, 4);
+
+        worker_send(["fd_filestat_get", [sbuf, fd]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err !== WASI_ESUCCESS) {
+            return err;
         }
+        
+        const dev = statbuf.getBigUint64(0, true);
+        const ino = statbuf.getBigUint64(8, true);
+        const file_type = statbuf.getUint8(16);
+        const nlink = statbuf.getBigUint64(24, true);
+        const size = statbuf.getBigUint64(32, true);
+        const atim = statbuf.getBigUint64(38, true);
+        const mtim = statbuf.getBigUint64(46, true);
+        const ctim = statbuf.getBigUint64(52, true);
+
+        view.setBigUint64(buf, dev, true);
+        view.setBigUint64(buf + 8, ino, true);
+        view.setUint8(buf + 16, file_type);
+        view.setBigUint64(buf + 24, nlink, true);
+        view.setBigUint64(buf + 32, size, true);
+        view.setBigUint64(buf + 38, atim, true);
+        view.setBigUint64(buf + 46, mtim, true);
+        view.setBigUint64(buf + 52, ctim, true);
+        return WASI_ESUCCESS;
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
@@ -470,7 +486,7 @@ function barebonesWASI() {
                 return err;
             }
 
-            view.setUint32(opened_fd_ptr, opened_fd, true);
+            view.setUint32(opened_fd_ptr, opened_fd[0], true);
             return WASI_ESUCCESS;
         }
     }
@@ -516,7 +532,7 @@ function barebonesWASI() {
         const err = Atomics.load(lck, 0);
         if (err === WASI_ESUCCESS) {
             view.setUint8(buf_ptr, preopen_type[0]);
-            view.setUint32(buf_ptr + 4, name_len);
+            view.setUint32(buf_ptr + 4, name_len[0]);
         }
         return err;
     }

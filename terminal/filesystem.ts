@@ -47,14 +47,14 @@ export class OpenFile {
         return this.file.size;
     }
 
-    read(len) {
-        worker_console_log(`${typeof this.file_pos}, ${typeof len}`)
+    read(len): [Uint8Array, number] {
         if (this.file_pos < this.file.data.byteLength) {
             let slice = this.file.data.slice(this.file_pos, this.file_pos + len);
             this.file_pos += slice.length;
+            console.log("OpenFile.read() returning: " + new TextDecoder().decode(slice));
             return [slice, 0];
         } else {
-            return [[], 0];
+            return [new Uint8Array, 0];
         }
     }
 
@@ -128,29 +128,6 @@ export class PreopenDirectory extends Directory {
     constructor(name, contents) {
         super(contents);
         this.prestat_name = new TextEncoder().encode(name);
-    }
-}
-
-class Stdin {
-    read(len) {
-        if (len === 0) return [new Uint8Array([]), 0];
-        const buf = new SharedArrayBuffer((len * 2) + 8); // lock, len, data
-        const lck = new Int32Array(buf, 0, 1);
-        const request_len = new Int32Array(buf, 4, 1);
-        request_len[0] = len;
-        // send buffer read request to main thread
-        // it can either be handled straight away or queued for later
-        // either way we block with Atomics.wait until buffer is filled
-        worker_send(["buffer", buf]);
-        Atomics.wait(lck, 0, 0);
-        if (Atomics.load(lck, 0) === -1) {
-            return [new Uint8Array, -1];
-        }
-        const sbuf = new Uint8Array(buf, 8, request_len[0]);
-        BUFFER = BUFFER + String.fromCharCode.apply(null, new Uint8Array(sbuf));
-        let data = BUFFER.slice(0, len).replace("\r", "\n");
-        BUFFER = BUFFER.slice(len, BUFFER.length);
-        return [new TextEncoder().encode(data), 0];
     }
 }
 

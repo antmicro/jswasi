@@ -6,9 +6,9 @@ import {PreopenDirectory, File, OpenFile} from "./filesystem.js";
 let buffer = "";
 
 function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
-    console.log("got buffer request of len " + requested_len + ", notifying");
+    // console.log("got buffer request of len " + requested_len + ", notifying");
     readlen[0] = (buffer.length > requested_len) ? requested_len : buffer.length;
-    console.log("current buffer is '" + buffer + "', copying len " + readlen[0]);
+    // console.log("current buffer is '" + buffer + "', copying len " + readlen[0]);
     for (let j = 0; j < readlen[0]; j++) {
         buf[j] = buffer.charCodeAt(j);
     }
@@ -38,12 +38,12 @@ async function init_all() {
 
             io.onVTKeystroke = io.sendString = (data) => {
                 let code = data.charCodeAt(0);
-                console.log(data, code);
+                // console.log(data, code);
 
                 if (code !== 13 && code < 32) {
                     // control characters
                     if (code == 3) {
-                        console.log(`got ^C control, killing current worker (${id})`);
+                        console.log(`got ^C control, killing current worker (${workerTable.currentWorker})`);
                         workerTable.terminateWorker(workerTable.currentWorker);
                     } else if (code == 4) {
                         console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
@@ -120,7 +120,15 @@ async function init_all() {
                     workerTable.releaseWorker(worker_id, 0);
                 } else {
                     const id = workerTable.spawnWorker(
-                        [],
+                        [
+                            null, // stdin
+                            null, // stdout
+                            null, // stderr
+                            new PreopenDirectory(".", {
+                                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+                            }), // 3
+                            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+                        ],
                         worker_id,
                         parent_lck
                     );
@@ -243,8 +251,15 @@ async function init_all() {
                     }
                     default: {
                         if (fds[fd] != undefined) {
-                            fds[fd].read(len);
-                            err = constants.WASI_ESUCCESS;
+                            console.log(fds);
+                            let data;
+                            [data, err] = fds[fd].read(len);
+                            console.log(`read len=${len} from file: ` + new TextDecoder().decode(data));
+                            if (err === 0) {
+                                readbuf.set(data);
+                                readlen[0] = data.byteLength;
+                                // console.log(`sent to wasm: ` + new TextDecoder().decode(readbuf));
+                            }
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
                             err = constants.WASI_EBADF; // TODO: what return code?
@@ -282,8 +297,8 @@ async function init_all() {
                         err = 1;
                     }
                     if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
-                        console.log("entry.truncate()")
-                        entry.truncate();
+                        // console.log("entry.truncate()")
+                        // entry.truncate();
                     }
                     fds.push(entry.open(path));
                     opened_fd[0] = fds.length - 1;
@@ -307,6 +322,33 @@ async function init_all() {
                     fds[fd] = undefined;
                     err = constants.WASI_ESUCCESS;
                 } else {
+                    err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
+            case "fd_filestat_get" : {
+                const [sbuf, fd] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const buf = new DataView(sbuf, 4);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fd > 2 && fds[fd] != undefined) {
+                    let stat = fds[fd].stat();
+                    buf.setBigUint64(0, stat.dev, true);
+                    buf.setBigUint64(8, stat.ino, true);
+                    buf.setUint8(16, stat.file_type);
+                    buf.setBigUint64(24, stat.nlink, true);
+                    buf.setBigUint64(32, stat.size, true);
+                    buf.setBigUint64(38, stat.atim, true);
+                    buf.setBigUint64(46, stat.mtim, true);
+                    buf.setBigUint64(52, stat.ctim, true);
+                    err = constants.WASI_ESUCCESS;
+                } else {
+                    console.log(`fd_filestat_get returning WASI_EBADF`);
                     err = constants.WASI_EBADF;
                 }
 
