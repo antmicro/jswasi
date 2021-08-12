@@ -1,5 +1,5 @@
 const {
-    isMainThread, parentPort, workerData //,Worker
+    isMainThread, parentPort, workerData, Worker
 } = require('worker_threads');
 
 if (process.argv.length < 3) {
