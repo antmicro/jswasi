@@ -254,11 +254,14 @@ function barebonesWASI() {
 
     function fd_close(fd) {
         worker_console_log(`fd_close(${fd})`);
-        if (fds[fd] !== undefined) {
-            fds[fd] = undefined;
-            return WASI_ESUCCESS;
-        }
-        return WASI_EBADF;
+
+        const sbuf = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sbuf, 0, 1);
+        worker_send(["fd_close", [sbuf, fd]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        return err;
     }
 
     function fd_advice(a, b, c, d) {

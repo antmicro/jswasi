@@ -295,6 +295,24 @@ async function init_all() {
 
                 Atomics.store(lck, 0, err);
                 Atomics.notify(lck, 0);
+                break;
+            }
+            case "fd_close": {
+                const [sbuf, fd] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] !== undefined) {
+                    fds[fd] = undefined;
+                    err = constants.WASI_ESUCCESS;
+                } else {
+                    err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
             }
         }
     }
