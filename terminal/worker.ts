@@ -29,30 +29,31 @@ const onmessage_ = function (e) {
         }
     }
 }
-onmessage = onmessage_;
+
+function is_node() {
+    return (typeof self === 'undefined');
+}
 
 function get_parent_port() {
-    if (is_node) {
+    if (is_node()) {
         const {parentPort} = require('worker_threads');
         return parentPort;
     }
     return null;
 }
 
-let is_node = (typeof self === 'undefined');
-
-if (is_node) {
+if (is_node()) {
     get_parent_port().once('message', (message) => {
         let msg = {data: message};
         onmessage_(msg);
     });
-    fs = require('fs');
 } else {
     worker_console_log("Running in a browser!");
+    onmessage = onmessage_;
 }
 
 function worker_send(msg) {
-    if (is_node) {
+    if (is_node()) {
         const msg_ = {data: [myself, msg[0], msg[1]]};
         get_parent_port().postMessage(msg_);
     } else {
@@ -66,7 +67,7 @@ function worker_console_log(msg) {
 }
 
 function do_exit(exit_code: number) {
-    if (is_node) {
+    if (is_node()) {
         const buf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(buf, 0, 1);
         worker_send(["exit", exit_code]); // never return
@@ -714,7 +715,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
             module = await WebAssembly.compileStreaming(fetch(moduleName));
         } else {
             let buffer = null;
-            if (!is_node) {
+            if (!is_node()) {
                 const response = await fetch(moduleName);
                 buffer = await response.arrayBuffer();
             } else {
@@ -748,11 +749,15 @@ function importWasmModule(moduleName, wasiPolyfill) {
     })();
 }
 
+if (is_node()) {
+    fs = require('fs');
+}
+
 function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
         try {
-            if (is_node) { // TODO: add spawn for browser!
+            if (is_node()) { // TODO: add spawn for browser!
                 if (!fs.existsSync(fname)) {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
