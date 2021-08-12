@@ -774,4 +774,4 @@ function start_wasm() {
     }
 }
 
-setTimeout(await start_wasm, 500);
+setTimeout(start_wasm, 500);
