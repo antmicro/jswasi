@@ -98,11 +98,11 @@ async function init_all() {
             null, // stdin
             null, // stdout
             null, // stderr
-            // new OpenDirectory("/", root),
-            new PreopenDirectory(".", {
-                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
-            }), // 3
-            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+            // new PreopenDirectory(".", {
+            //     "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+            // }), // 3
+            // new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+            new OpenDirectory("/", root),
         ],
         null, // parent_id
         null // parent_lock
@@ -134,11 +134,11 @@ async function init_all() {
                             null, // stdin
                             null, // stdout
                             null, // stderr
-                            //new OpenDirectory("/", root),
-                            new PreopenDirectory(".", {
-                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
-            }), // 3
-            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+                            // new PreopenDirectory(".", {
+                            //     "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+                            // }), // 3
+                            // new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+                            new OpenDirectory("/", root),
                         ],
                         worker_id,
                         parent_lck
@@ -157,10 +157,9 @@ async function init_all() {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-                    const PREOPEN_TYPE_DIR = 0;
-                    preopen_type[0] = PREOPEN_TYPE_DIR;
-                    name_len[0] = fds[fd].prestat_name.length;
+                if (fds[fd] != undefined) { // && fds[fd].prestat_name != undefined) {
+                    preopen_type[0] = constants.WASI_PREOPEN_TYPE_DIR;
+                    name_len[0] = fds[fd].path.length;
                     err = constants.WASI_ESUCCESS;
                 } else {
                     // FIXME: this fails for created files (when fds[fd] is undefined)
@@ -182,8 +181,8 @@ async function init_all() {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[fd] != undefined && fds[fd].prestat_name != undefined) {
-                    path.set(fds[fd].prestat_name, 0);
+                if (fds[fd] != undefined) { // && fds[fd].prestat_name != undefined) {
+                    path.set(fds[fd].path, 0);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     console.log("fd_prestat_dir_name returning EBADF");

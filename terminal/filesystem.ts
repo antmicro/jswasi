@@ -144,14 +144,17 @@ export class OpenDirectory {
 
     // get all entries in a directory, for eg. in fd_readdir call
     entries(): Iterable<FileSystemHandle> {
+        console.log(`OpenDirectory.entries()`);
 
     }
 
     resolve(path: string): FileSystemHandle {
+        console.log(`OpenDirectory.resolve()`);
 
     }
 
     get_entry_for_path(path) {
+        console.log(`OpenDirectory.get_entry_for_path()`);
         let entry = this;
         for (let component of path.split("/")) {
             if (component == "") break;
@@ -165,6 +168,7 @@ export class OpenDirectory {
     }
 
     create_entry_for_path(path) {
+        console.log(`OpenDirectory.create_entry_for_path()`);
         let entry = this;
         let components = path.split("/").filter((component) => component != "/");
         for (let i = 0; i < components.length; i++) {
@@ -209,7 +213,7 @@ export class OpenFile {
     }
 
     async read(len) {
-        // worker_console_log(`${typeof this.file_pos}, ${typeof len}`)
+        console.log(`OpenFile.read(${len})`);
         if (this.file_pos < await this.size()) {
             let file = await this.handle.getFile();
             let slice = await file.slice(this.file_pos, this.file_pos + len).arrayBuffer();
@@ -221,6 +225,7 @@ export class OpenFile {
     }
 
     async write(buffer) {
+        console.log(`OpenFile.write(${buffer})`);
         const w = await this.handle.createWritable();
         await w.write({type: "write", position: this.file_pos, data: buffer})
         this.file_pos += buffer.length;
