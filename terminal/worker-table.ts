@@ -42,7 +42,7 @@ export class WorkerTable {
         worker.worker.terminate();
         // notify parent that they can resume operation
 	    if (worker.parent_lock !== null) {
-            Atomics.store(worker.parent_lock, 0, 1);
+            Atomics.store(worker.parent_lock, 0, 0);
             Atomics.notify(worker.parent_lock, 0);
             this.currentWorker = worker.parent_id;
 	    }

@@ -1,7 +1,7 @@
-import {WASI_ESUCCESS, WASI_FILETYPE_DIRECTORY, WASI_FILETYPE_REGULAR_FILE} from "./constants.js";
+import * as constants from "./constants.js";
 
 export class File {
-    file_type = WASI_FILETYPE_REGULAR_FILE;
+    file_type = constants.WASI_FILETYPE_REGULAR_FILE;
     data;
 
     constructor(data) {
@@ -35,7 +35,7 @@ export class File {
 }
 
 export class PreopenFile {
-    file_type = WASI_FILETYPE_REGULAR_FILE;
+    file_type = constants.WASI_FILETYPE_REGULAR_FILE;
     file;
     file_pos = 0;
 
@@ -78,7 +78,7 @@ export class PreopenFile {
 }
 
 export class Directory {
-    file_type = WASI_FILETYPE_DIRECTORY;
+    file_type = constants.WASI_FILETYPE_DIRECTORY;
     directory;
 
     constructor(contents) {
@@ -131,9 +131,10 @@ export class PreopenDirectory extends Directory {
     }
 }
 
-import {WASI_FILETYPE_REGULAR_FILE} from "./constants";
+import {constants.WASI_FILETYPE_REGULAR_FILE} from "./constants";
 
 export class OpenDirectory {
+    public file_type: number = constants.WASI_PREOPEN_TYPE_DIR;
     public path: string;
     private handle: FileSystemDirectoryHandle;
 
@@ -236,7 +237,7 @@ export class OpenFile {
         return {
             dev: 0n,
             ino: 0n,
-            file_type: WASI_FILETYPE_REGULAR_FILE,
+            file_type: constants.WASI_FILETYPE_REGULAR_FILE,
             nlink: 0n,
             size: BigInt(await this.size()),
             atim: 0n,

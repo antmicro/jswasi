@@ -127,7 +127,10 @@ async function init_all() {
                 if (command === "mount") {
                     // special case for mount command
                     const mount = await showDirectoryPicker();
-                    workerTable.releaseWorker(worker_id, 0);
+                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[0], mount);
+                    // release worker straight away
+                    Atomics.store(parent_lck, 0, 0);
+                    Atomics.notify(parent_lck, 0);
                 } else {
                     const id = workerTable.spawnWorker(
                         [
@@ -158,7 +161,7 @@ async function init_all() {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) { // && fds[fd].prestat_name != undefined) {
-                    preopen_type[0] = constants.WASI_PREOPEN_TYPE_DIR;
+                    preopen_type[0] = fds[fd].file_type;
                     name_len[0] = fds[fd].path.length;
                     err = constants.WASI_ESUCCESS;
                 } else {
@@ -289,8 +292,8 @@ async function init_all() {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[dir_fd] != undefined && fds[dir_fd].directory != undefined) {
-                    let entry = fds[dir_fd].get_entry_for_path(path);
+                if (fds[dir_fd] != undefined) { // && fds[dir_fd].directory != undefined) {
+                    let entry = fds[dir_fd].open_entry(path, create);
                     if (entry == null) {
                         if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
                             entry = fds[dir_fd].create_entry_for_path(path);
