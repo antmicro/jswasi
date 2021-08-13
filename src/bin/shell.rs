@@ -23,8 +23,8 @@ fn main() {
             io::stdin().read_exact(&mut c).unwrap();
             match c[0] {
                 // enter
-                13 => {
-                    println!();
+                10 => {
+                    // println!();
                     break;
                 }
                 // backspace

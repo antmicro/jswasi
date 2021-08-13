@@ -751,7 +751,7 @@ function start_wasm() {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
                     fname = "";
-                    setTimeout(start_wasm, 500);
+                    setTimeout(start_wasm, 0);
                     return;
                 }
             }
@@ -764,8 +764,8 @@ function start_wasm() {
     } else {
         setTimeout(function () {
             start_wasm();
-        }, 500);
+        }, 0);
     }
 }
 
-setTimeout(start_wasm, 500);
+start_wasm();

@@ -38,9 +38,14 @@ async function init_all() {
 
             io.onVTKeystroke = io.sendString = (data) => {
                 let code = data.charCodeAt(0);
-                // console.log(data, code);
+                console.log(data, code);
 
-                if (code !== 13 && code < 32) {
+                if (code === 13) {
+                    code = 10;
+                    data = String.fromCharCode(10);
+                }
+
+                if (code !== 10 && code < 32) {
                     // control characters
                     if (code == 3) {
                         console.log(`got ^C control, killing current worker (${workerTable.currentWorker})`);
@@ -54,7 +59,7 @@ async function init_all() {
                     buffer = buffer + data;
 
                     // echo
-                    t.io.print(data);
+                    t.io.print(code === 10 ? "\r\n" : data);
 
                     // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
@@ -196,12 +201,12 @@ async function init_all() {
                         break;
                     }
                     case 1: {
-                        const output = content.replaceAll("\n", "\n\r");
+                        const output = content.replaceAll("\n", "\r\n");
                         terminal.io.print(output);
                         break;
                     }
                     case 2: {
-                        const output = content.replaceAll("\n", "\n\r");
+                        const output = content.replaceAll("\n", "\r\n");
                         // TODO: should print in red, use ANSI color codes
                         // terminal.io.print(`${'\\033[01;32m'}${output}${'\\033[00m'}`);
                         terminal.io.print(output);
