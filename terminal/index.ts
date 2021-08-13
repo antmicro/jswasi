@@ -1,7 +1,7 @@
 import {hterm, lib} from "./hterm-all.js";
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {PreopenDirectory, File, OpenFile} from "./filesystem.js";
+import {PreopenDirectory, PreopenFile, File, OpenFile, OpenDirectory} from "./filesystem.js";
 
 let buffer = "";
 
@@ -25,7 +25,10 @@ async function init_all() {
     const root = await navigator.storage.getDirectory();
     // const home = await root.getDirectoryHandle("home", {create: true});
     // const ant = await home.getDirectoryHandle("ant", {create: true});
-    // const history = await ant.getFileHandle(".shell_history", {create: true});
+    const shell_history = await root.getFileHandle(".shell_history", {create: true});
+    const w = await shell_history.createWritable();
+    await w.write("abc");
+    await w.close();
 
     let workerTable = new WorkerTable;
 
@@ -95,6 +98,7 @@ async function init_all() {
             null, // stdin
             null, // stdout
             null, // stderr
+            // new OpenDirectory("/", root),
             new PreopenDirectory(".", {
                 "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
             }), // 3
@@ -117,6 +121,7 @@ async function init_all() {
                 break;
             }
             case "spawn": {
+                console.log("got spawn");
                 const [command, args, env, sbuf] = data;
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 if (command === "mount") {
@@ -129,10 +134,11 @@ async function init_all() {
                             null, // stdin
                             null, // stdout
                             null, // stderr
+                            //new OpenDirectory("/", root),
                             new PreopenDirectory(".", {
-                                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
-                            }), // 3
-                            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
+                "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
+            }), // 3
+            new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
                         ],
                         worker_id,
                         parent_lck
@@ -302,8 +308,9 @@ async function init_all() {
                         err = 1;
                     }
                     if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
-                        // console.log("entry.truncate()")
-                        // entry.truncate();
+                        // TODO: seems to trigger on each path_open 
+                        console.log("entry.truncate()");
+                        entry.truncate();
                     }
                     fds.push(entry.open(path));
                     opened_fd[0] = fds.length - 1;
@@ -368,10 +375,8 @@ async function init_all() {
     workerTable.postMessage(0, ["start", "shell.wasm", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
-        X: "3"
+        PWD: "/",
     }]);
-
-    console.log("init_all done")
 }
 
 window.onload = init_all;

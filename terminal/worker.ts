@@ -25,6 +25,7 @@ const onmessage_ = function (e) {
             myself = e.data[2];
             ARGS = e.data[3];
             ENV = e.data[4];
+            worker_console_log(`hello from worker ${myself}`);
         }
     }
 }
