@@ -1,7 +1,7 @@
 import {hterm, lib} from "./hterm-all.js";
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {PreopenDirectory, PreopenFile, File, OpenFile, OpenDirectory} from "./filesystem.js";
+import {OpenFile, OpenDirectory} from "./filesystem.js";
 
 let buffer = "";
 
@@ -23,8 +23,8 @@ async function init_all() {
 
     // setup filesystem
     const root = await navigator.storage.getDirectory();
-    // const home = await root.getDirectoryHandle("home", {create: true});
-    // const ant = await home.getDirectoryHandle("ant", {create: true});
+    const home = await root.getDirectoryHandle("home", {create: true});
+    const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await root.getFileHandle(".shell_history", {create: true});
     const w = await shell_history.createWritable();
     await w.write("abc");
@@ -98,10 +98,6 @@ async function init_all() {
             null, // stdin
             null, // stdout
             null, // stderr
-            // new PreopenDirectory(".", {
-            //     "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
-            // }), // 3
-            // new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
             new OpenDirectory("/", root),
         ],
         null, // parent_id
@@ -127,7 +123,7 @@ async function init_all() {
                 if (command === "mount") {
                     // special case for mount command
                     const mount = await showDirectoryPicker();
-                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[0], mount);
+                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[0], mount));
                     // release worker straight away
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
@@ -137,10 +133,6 @@ async function init_all() {
                             null, // stdin
                             null, // stdout
                             null, // stderr
-                            // new PreopenDirectory(".", {
-                            //     "hello.rs": new File(new TextEncoder().encode(`fn main() { println!("Hello World!"); }`)),
-                            // }), // 3
-                            // new PreopenDirectory("/tmp", {"test.txt": new File(new TextEncoder().encode("test string content"))}), // 4
                             new OpenDirectory("/", root),
                         ],
                         worker_id,
@@ -264,14 +256,12 @@ async function init_all() {
                     }
                     default: {
                         if (fds[fd] != undefined) {
-                            console.log(fds);
                             let data;
-                            [data, err] = fds[fd].read(len);
-                            console.log(`read len=${len} from file: ` + new TextDecoder().decode(data));
+                            [data, err] = await fds[fd].read(len);
                             if (err === 0) {
                                 readbuf.set(data);
                                 readlen[0] = data.byteLength;
-                                // console.log(`sent to wasm: ` + new TextDecoder().decode(readbuf));
+                                console.log(`read len=${data.byteLength} from file: ` + new TextDecoder().decode(data));
                             }
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
@@ -292,11 +282,12 @@ async function init_all() {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[dir_fd] != undefined) { // && fds[dir_fd].directory != undefined) {
-                    let entry = fds[dir_fd].open_entry(path, create);
+                if (fds[dir_fd] != undefined) { // && fds[dir_fd].directory != undefined) { 
+                    const create = (oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT;
+                    let entry = await fds[dir_fd].get_entry_for_path(path);
                     if (entry == null) {
                         if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
-                            entry = fds[dir_fd].create_entry_for_path(path);
+                            entry = await fds[dir_fd].create_entry_for_path(path);
                         } else {
                             err = constants.WASI_EBADF;
                         }
@@ -314,7 +305,7 @@ async function init_all() {
                         console.log("entry.truncate()");
                         entry.truncate();
                     }
-                    fds.push(entry.open(path));
+                    fds.push(entry);
                     opened_fd[0] = fds.length - 1;
                     err = constants.WASI_ESUCCESS;
                 } else {
@@ -351,7 +342,7 @@ async function init_all() {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fd > 2 && fds[fd] != undefined) {
-                    let stat = fds[fd].stat();
+                    let stat = await fds[fd].stat();
                     buf.setBigUint64(0, stat.dev, true);
                     buf.setBigUint64(8, stat.ino, true);
                     buf.setUint8(16, stat.file_type);
