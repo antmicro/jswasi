@@ -41,7 +41,6 @@ if (is_node()) {
         onmessage_(msg);
     });
 } else {
-    worker_console_log("Running in a browser!");
     onmessage = onmessage_;
 }
 
