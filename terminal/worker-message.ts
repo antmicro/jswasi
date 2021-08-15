@@ -98,14 +98,22 @@ export const on_worker_message = async (event) => {
                     }
                     case 1: {
                         const output = content.replaceAll("\n", "\r\n");
-                        terminal.io.print(output);
+                        if (typeof terminal === "undefined") {
+                            console.log(output);
+                        } else {
+                            terminal.io.print(output);
+                        }
                         break;
                     }
                     case 2: {
                         const output = content.replaceAll("\n", "\r\n");
                         // TODO: should print in red, use ANSI color codes
                         // terminal.io.print(`${'\\033[01;32m'}${output}${'\\033[00m'}`);
-                        terminal.io.print(output);
+                        if (typeof terminal === "undefined") {
+                            console.log(output);
+                        } else {
+                            terminal.io.print(output);
+                        }
                         break;
                     }
                     default: {

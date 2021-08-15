@@ -25,7 +25,7 @@ if (process.argv.length < 3) {
     process.exit(1);
 }
 
-global.workerTable = new WorkerTable("./worker.mjs", true, send_buffer_to_worker);
+global.workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, true);
 
 workerTable.spawnWorker([null, null, null, null], 
     null, // parent_id
