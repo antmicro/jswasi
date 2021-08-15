@@ -6,7 +6,7 @@ import {OpenFile, OpenDirectory} from "./filesystem.js";
 import {on_worker_message} from "./worker-message.js";
 
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
-let buffer = "";
+global.buffer = "";
 
 function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
     // console.log("got buffer request of len " + requested_len + ", notifying");
@@ -25,6 +25,20 @@ if (process.argv.length < 3) {
     process.exit(1);
 }
 
+global.workerTable = new WorkerTable("./worker.mjs", true, send_buffer_to_worker);
+
+workerTable.spawnWorker([null, null, null, null], 
+    null, // parent_id
+    null, // parent_lock
+    on_worker_message
+);
+workerTable.postMessage(0, ["start", "shell.wasm", 0, [], {
+            RUST_BACKTRACE: "full",
+            PATH: "/usr/bin:/usr/local/bin",
+            PWD: "/",
+}]);
+
+/*
 let debug = false;
 let WORKER_SCRIPT_NAME = "./worker.mjs";
 
@@ -112,3 +126,45 @@ function heartbeat() {
 }
 
 heartbeat();
+
+*/
+
+
+
+function uart_loop() {
+    let debug = false;
+    let terminated = false;
+    if (debug)
+        console.log("bip");
+    if (terminated) {
+        if (debug)
+            console.log("Thread finished.");
+        return;
+    }
+    if (!debug) {
+        while (1) {
+            const data = process.stdin.read(1);
+            if (data != null) {
+                    // regular characters
+                    buffer = buffer + data;
+                    // echo
+                    //t.io.print(code === 10 ? "\r\n" : data);
+                    // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+                    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
+                    while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                        let { requested_len, lck, len, sbuf } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                        workerTable.send_callback(requested_len, lck, len, sbuf);
+                    }                                
+            }
+            else {
+                setTimeout(uart_loop, 100);
+                return;
+            }
+        }
+    }
+    else {
+        setTimeout(uart_loop, 2000);
+    }
+}
+
+uart_loop();

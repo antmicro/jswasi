@@ -20,22 +20,29 @@ export class WorkerTable {
     private _nextWorkerId = 0;
     public workerInfos: Record<number, WorkerInfo> = {};
     public script_name: string;
+    public isNode: boolean;
+    public send_callback;
 
-    constructor(sname: string) {
+    constructor(sname: string, send_callback, isNode = false) {
         this.script_name = sname;
+        this.isNode = isNode;
+        this.send_callback = send_callback;
     }
 
-    spawnWorker(fds, parent_id: number, parent_lock: Int32Array): number {
+    spawnWorker(fds, parent_id: number, parent_lock: Int32Array, callback): number {
         const id = this._nextWorkerId;
         this.currentWorker = id;
         this._nextWorkerId += 1;
-        let worker = new Worker(this.script_name, {type: "module"});
+        let private_data = {};
+        if (!isNode) private_data = {type: "module"};
+        let worker = new Worker(this.script_name, private_data);
         this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock);
+        if (!isNode) {
+            worker.onmessage = callback;
+        } else {
+            worker.on('message', callback);
+        }
         return id;
-    }
-
-    setOnMessage(id: number, onmessage) {
-        this.workerInfos[id].worker.onmessage = onmessage;
     }
 
     postMessage(id: number, message) {

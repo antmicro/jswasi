@@ -32,7 +32,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    let workerTable = new WorkerTable("worker.js");
+    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker);
 
 
     const setupHterm = () => {
@@ -75,7 +75,7 @@ async function init_all() {
                             len,
                             sbuf
                         } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                        send_buffer_to_worker(requested_len, lck, len, sbuf);
+                        workerTable.send_callback(requested_len, lck, len, sbuf);
                     }
                 }
             };
