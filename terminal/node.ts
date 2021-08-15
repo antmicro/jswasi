@@ -155,7 +155,7 @@ function uart_loop() {
                     //t.io.print(code === 10 ? "\r\n" : data);
                     // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-                    while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                    if (workerTable.currentWorker != null) while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
                         let { requested_len, lck, len, sbuf } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
                         workerTable.send_callback(requested_len, lck, len, sbuf);
                     }                                
