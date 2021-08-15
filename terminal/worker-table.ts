@@ -34,10 +34,10 @@ export class WorkerTable {
         this.currentWorker = id;
         this._nextWorkerId += 1;
         let private_data = {};
-        if (!isNode) private_data = {type: "module"};
+        if (!this.isNode) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
         this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock);
-        if (!isNode) {
+        if (!this.isNode) {
             worker.onmessage = callback;
         } else {
             worker.on('message', callback);

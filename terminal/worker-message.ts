@@ -135,7 +135,7 @@ export const on_worker_message = async (event) => {
                     case 0: {
                         if (buffer.length !== 0) {
                             // handle buffer request straight away
-                            send_buffer_to_worker(len, lck, readlen, readbuf);
+                            workerTable.send_callback(len, lck, readlen, readbuf);
                         } else {
                             // push handle buffer request to queue
                             workerTable.workerInfos[worker_id].buffer_request_queue.push({requested_len: len, lck: lck, len: readlen, sbuf: readbuf});
