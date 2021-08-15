@@ -38,11 +38,7 @@ export class WorkerTable {
     }
 
     _callback(event) {
-        console.log("got event data = ",event.data," this = ",this);
         let id = event.data[0];
-        console.log("id is ",id);
-        console.log("parent is ", this.parent);
-        console.log("workerInfo is ",this.parent.workerInfos[id]);
         this.parent.workerInfos[id].callback(event, this.parent);
     }
 
