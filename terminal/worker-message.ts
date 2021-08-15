@@ -32,9 +32,9 @@ export const on_worker_message = async (event, workerTable) => {
                             new OpenDirectory("/", root),
                         ],
                         worker_id,
-                        parent_lck
+                        parent_lck,
+                        on_worker_message
                     );
-                    workerTable.setOnMessage(id, on_worker_message);
                     workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
                     console.log("WORKER " + worker_id + " spawned: " + command);
                 }
