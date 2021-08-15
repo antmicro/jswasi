@@ -20,7 +20,7 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     Atomics.notify(lck, 0);
 }
 
-function receive_callback(id, c) {
+function receive_callback(id, output) {
     if (terminal != null) {
         terminal.io.print(output);
     }
