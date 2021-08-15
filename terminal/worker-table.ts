@@ -1,6 +1,5 @@
 //NODE// import { Worker } from 'worker_threads';
-
-export let workerTable = null;
+import {OpenDirectory} from "./filesystem.js";
 
 class WorkerInfo {
     public id: number;
@@ -29,12 +28,14 @@ export class WorkerTable {
     public isNode: boolean;
     public send_callback;
     public receive_callback;
+    public root;
 
-    constructor(sname: string, send_callback, receive_callback, isNode = false) {
+    constructor(sname: string, send_callback, receive_callback, root, isNode = false) {
         this.script_name = sname;
         this.isNode = isNode;
         this.send_callback = send_callback;
         this.receive_callback = receive_callback;
+        this.root = root;
     }
 
     _callback(event) {
@@ -42,7 +43,7 @@ export class WorkerTable {
         this.parent.workerInfos[id].callback(event, this.parent);
     }
 
-    spawnWorker(fds, parent_id: number, parent_lock: Int32Array, callback): number {
+    spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
         const id = this._nextWorkerId;
         this.currentWorker = id;
         this._nextWorkerId += 1;
@@ -50,7 +51,7 @@ export class WorkerTable {
         if (!this.isNode) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
         worker.parent = this;
-        this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, new OpenDirectory("/", this.root)], parent_id, parent_lock, callback);
         if (!this.isNode) {
             worker.onmessage = this._callback;
         } else {

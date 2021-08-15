@@ -22,8 +22,8 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     return 1;
 }
 
-function receive_callback(id, c) {
-    console.log("got ",c," from ",id);
+function receive_callback(id, output) {
+    process.stdout.write(output);
 }
 
 if (process.argv.length < 3) {
@@ -31,9 +31,9 @@ if (process.argv.length < 3) {
     process.exit(1);
 }
 
-let workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, receive_callback, true);
+let workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, receive_callback, null, true);
 
-workerTable.spawnWorker([null, null, null, new OpenDirectory("/", null)],
+workerTable.spawnWorker(
     null, // parent_id
     null, // parent_lock
     on_worker_message

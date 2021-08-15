@@ -37,6 +37,7 @@ export class OpenDirectory {
         for (let component of path.split("/")) {
             if (component == "") break;
             let found = false;
+            if (entry == null) return null;
             for await (const [name, handle] of entry.entries()) {
                 console.log({name, handle});
                 if (name === component) {
@@ -57,6 +58,7 @@ export class OpenDirectory {
     async create_entry_for_path(path) {
         console.log(`OpenDirectory.create_entry_for_path()`);
         let entry = this.handle;
+        if (entry == null) return null;
         let components = path.split("/").filter((component) => component != "/");
         for (let i = 0; i < components.length; i++) {
             let component = components[i];

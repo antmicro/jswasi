@@ -41,7 +41,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback);
+    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback, root);
 
 
     const setupHterm = () => {
@@ -105,12 +105,6 @@ async function init_all() {
     terminal = setupHterm();
 
     workerTable.spawnWorker(
-        [
-            null, // stdin
-            null, // stdout
-            null, // stderr
-            new OpenDirectory("/", root),
-        ],
         null, // parent_id
         null, // parent_lock
         on_worker_message

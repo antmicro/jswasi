@@ -26,12 +26,6 @@ export const on_worker_message = async (event, workerTable) => {
                     Atomics.notify(parent_lck, 0);
                 } else {
                     const id = workerTable.spawnWorker(
-                        [
-                            null, // stdin
-                            null, // stdout
-                            null, // stderr
-                            new OpenDirectory("/", /*root*/ null),
-                        ],
                         worker_id,
                         parent_lck,
                         on_worker_message
@@ -197,7 +191,7 @@ export const on_worker_message = async (event, workerTable) => {
                     if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
                         // TODO: seems to trigger on each path_open 
                         console.log("entry.truncate()");
-                        entry.truncate();
+                        if (entry != null) entry.truncate();
                     }
                     fds.push(entry);
                     opened_fd[0] = fds.length - 1;

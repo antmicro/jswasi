@@ -754,6 +754,7 @@ function start_wasm() {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
                     fname = "";
+                    do_exit(255);
                     setTimeout(start_wasm, 0);
                     return;
                 }
