@@ -33,7 +33,7 @@ if (process.argv.length < 3) {
 
 let workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, receive_callback, true);
 
-workerTable.spawnWorker([null, null, null, null], 
+workerTable.spawnWorker([null, null, null, new OpenDirectory("/", null)],
     null, // parent_id
     null, // parent_lock
     on_worker_message
@@ -136,38 +136,25 @@ heartbeat();
 */
 
 function uart_loop() {
-    let debug = false;
-    let terminated = false;
-    if (debug)
-        console.log("bip");
-    if (terminated) {
-        if (debug)
-            console.log("Thread finished.");
-        return;
-    }
-    if (!debug) {
-        while (1) {
-            const data = process.stdin.read(1);
-            if (data != null) {
-                    // regular characters
-                    buffer = buffer + data;
-                    // echo
-                    //t.io.print(code === 10 ? "\r\n" : data);
-                    // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
-                    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-                    if (workerTable.currentWorker != null) while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-                        let { requested_len, lck, len, sbuf } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                        workerTable.send_callback(requested_len, lck, len, sbuf);
-                    }                                
-            }
-            else {
-                setTimeout(uart_loop, 100);
-                return;
-            }
+    if (workerTable.currentWorker == null) return;
+    while (1) {
+        const data = process.stdin.read(1);
+        if (data != null) {
+                // regular characters
+                buffer = buffer + data;
+                // echo
+                //t.io.print(code === 10 ? "\r\n" : data);
+                // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+                // now that buffer was filled, look if there are pending buffer requests from current foreground worker
+                if (workerTable.currentWorker != null) while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                    let { requested_len, lck, len, sbuf } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                    workerTable.send_callback(requested_len, lck, len, sbuf);
+                }
         }
-    }
-    else {
-        setTimeout(uart_loop, 2000);
+        else {
+            setTimeout(uart_loop, 100);
+            return;
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 import * as constants from "./constants.js";
+import { OpenDirectory } from "./filesystem.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
@@ -29,7 +30,7 @@ export const on_worker_message = async (event, workerTable) => {
                             null, // stdin
                             null, // stdout
                             null, // stderr
-                            new OpenDirectory("/", root),
+                            new OpenDirectory("/", /*root*/ null),
                         ],
                         worker_id,
                         parent_lck,

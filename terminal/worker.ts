@@ -1,4 +1,3 @@
-// credits
 // TODO: remove any code taken from here:
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
 
@@ -10,8 +9,8 @@ import * as constants from "./constants.js";
 let started = false;
 let fname = "";
 let myself = null;
-let ARGS = [];
-let ENV = {};
+let args = [];
+let env = {};
 
 const onmessage_ = function (e) {
     if (!started) {
@@ -19,8 +18,8 @@ const onmessage_ = function (e) {
             started = true;
             fname = e.data[1];
             myself = e.data[2];
-            ARGS = e.data[3];
-            ENV = e.data[4];
+            args = e.data[3];
+            env = e.data[4];
         }
     }
 }
@@ -51,6 +50,7 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
+    console.log(msg);
     worker_send(["console", msg]);
 }
 
@@ -89,10 +89,10 @@ function WASI() {
         const view = getModuleMemoryDataView();
 
         let encoder = new TextEncoder();
-        let environ_count = Object.keys(ENV).length;
+        let environ_count = Object.keys(env).length;
         view.setUint32(environ_count_ptr, environ_count, true);
 
-        let environ_size = Object.entries(ENV).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
+        let environ_size = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
         view.setUint32(environ_size_ptr, environ_size, true);
 
 
@@ -108,7 +108,7 @@ function WASI() {
         let encoder = new TextEncoder();
         let environ_buf_offset = environ_buf;
 
-        Object.entries(ENV).forEach(([key, val], i) => {
+        Object.entries(env).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(environ + i * 4, environ_buf_offset, true);
             // write string describing the variable to WASM memory
@@ -126,8 +126,8 @@ function WASI() {
 
         const view = getModuleMemoryDataView();
 
-        view.setUint32(argc, ARGS.length, true);
-        view.setUint32(argvBufSize, new TextEncoder().encode(ARGS.join("")).byteLength + ARGS.length, true);
+        view.setUint32(argc, args.length, true);
+        view.setUint32(argvBufSize, new TextEncoder().encode(args.join("")).byteLength + args.length, true);
 
         return constants.WASI_ESUCCESS;
     }
@@ -141,7 +141,7 @@ function WASI() {
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
-        Object.entries(ARGS).forEach(([_, arg], i) => {
+        Object.entries(args).forEach(([_, arg], i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
@@ -215,14 +215,19 @@ function WASI() {
 
     function proc_exit(exit_code) {
         worker_console_log(`proc_exit(${exit_code})`);
-        close(); // doesn't actually end here
+        do_exit(exit_code);
+        //close(); // doesn't actually end here
     }
 
     function random_get(buf_addr, buf_len) {
         worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
         let view8 = getModuleMemoryUint8Array();
         let numbers = new Uint8Array(buf_len);
-        self.crypto.getRandomValues(numbers);
+        if (is_node) {
+            // TODO
+        } else {
+            self.crypto.getRandomValues(numbers);
+        }
         view8.set(numbers, buf_addr);
         return constants.WASI_ESUCCESS;
     }
@@ -456,7 +461,7 @@ function WASI() {
             const sbuf = new SharedArrayBuffer(4);
             const lck = new Int32Array(sbuf, 0, 1);
             lck[0] = -1;
-            worker_send(["spawn", [command, args, ENV, sbuf]]);
+            worker_send(["spawn", [command, args, env, sbuf]]);
             worker_console_log("sent.");
 
             // wait for child process to finish
