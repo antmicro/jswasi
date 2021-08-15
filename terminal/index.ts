@@ -32,7 +32,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    let workerTable = new WorkerTable;
+    let workerTable = new WorkerTable("worker.js");
 
 
     const setupHterm = () => {

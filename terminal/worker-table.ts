@@ -19,12 +19,17 @@ export class WorkerTable {
     public currentWorker = null;
     private _nextWorkerId = 0;
     public workerInfos: Record<number, WorkerInfo> = {};
+    public script_name: string;
+
+    constructor(sname: string) {
+        this.script_name = sname;
+    }
 
     spawnWorker(fds, parent_id: number, parent_lock: Int32Array): number {
         const id = this._nextWorkerId;
         this.currentWorker = id;
         this._nextWorkerId += 1;
-        let worker = new Worker("worker.js", {type: "module"});
+        let worker = new Worker(this.script_name, {type: "module"});
         this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock);
         return id;
     }
