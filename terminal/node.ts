@@ -6,10 +6,11 @@ import {OpenFile, OpenDirectory} from "./filesystem.js";
 import {on_worker_message} from "./worker-message.js";
 
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
-global.buffer = "";
+let buffer = "";
 
 function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
     // console.log("got buffer request of len " + requested_len + ", notifying");
+    if (buffer.length == 0) return 0;
     readlen[0] = (buffer.length > requested_len) ? requested_len : buffer.length;
     // console.log("current buffer is '" + buffer + "', copying len " + readlen[0]);
     for (let j = 0; j < readlen[0]; j++) {
@@ -18,6 +19,7 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     buffer = buffer.slice(readlen[0]);
     Atomics.store(lck, 0, constants.WASI_ESUCCESS);
     Atomics.notify(lck, 0);
+    return 1;
 }
 
 function receive_callback(id, c) {
