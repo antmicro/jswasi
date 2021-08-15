@@ -19,6 +19,8 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     Atomics.notify(lck, 0);
 }
 
+let workerTable = null;
+
 async function init_all() {
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
@@ -32,7 +34,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker);
+    workerTable = new WorkerTable("worker.js", send_buffer_to_worker);
 
 
     const setupHterm = () => {
