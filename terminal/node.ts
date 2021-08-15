@@ -1,7 +1,7 @@
 import { Worker } from 'worker_threads';
 
 import * as constants from "./constants.js";
-import {WorkerTable} from "./worker-table.js";
+import {WorkerTable} from "./worker-table.mjs";
 import {OpenFile, OpenDirectory} from "./filesystem.js";
 import {on_worker_message} from "./worker-message.js";
 

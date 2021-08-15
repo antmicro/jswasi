@@ -1,3 +1,5 @@
+//NODE// import { Worker } from 'worker_threads';
+
 class WorkerInfo {
     public id: number;
     public worker: Worker;
