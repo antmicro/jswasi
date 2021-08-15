@@ -20,12 +20,16 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     Atomics.notify(lck, 0);
 }
 
+function receive_callback(id, c) {
+    console.log("got ",c," from ",id);
+}
+
 if (process.argv.length < 3) {
     console.log("Not enough arguments");
     process.exit(1);
 }
 
-let workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, true);
+let workerTable = new WorkerTable("./worker.mjs", send_buffer_to_worker, receive_callback, true);
 
 workerTable.spawnWorker([null, null, null, null], 
     null, // parent_id

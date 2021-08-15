@@ -19,6 +19,10 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     Atomics.notify(lck, 0);
 }
 
+function receive_callback(id, c) {
+    console.log("got ",c," from ",id);
+}
+
 let workerTable = null;
 
 async function init_all() {
@@ -34,7 +38,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    workerTable = new WorkerTable("worker.js", send_buffer_to_worker);
+    workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback);
 
 
     const setupHterm = () => {

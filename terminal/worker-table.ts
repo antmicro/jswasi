@@ -28,14 +28,17 @@ export class WorkerTable {
     public script_name: string;
     public isNode: boolean;
     public send_callback;
+    public receive_callback;
 
-    constructor(sname: string, send_callback, isNode = false) {
+    constructor(sname: string, send_callback, receive_callback, isNode = false) {
         this.script_name = sname;
         this.isNode = isNode;
         this.send_callback = send_callback;
+        this.receive_callback = receive_callback;
     }
 
     _callback(event) {
+        console.log("got event ",event," this = ",this);
         let id = event.data[0];
         this.parent.workerInfos[id].callback(event, this.parent);
     }
