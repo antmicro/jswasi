@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 
-export const on_worker_message = async (event) => {
+export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
         switch (action) {
             case "console": {

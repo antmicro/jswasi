@@ -1,5 +1,7 @@
 //NODE// import { Worker } from 'worker_threads';
 
+export let workerTable = null;
+
 class WorkerInfo {
     public id: number;
     public worker: Worker;
@@ -7,13 +9,15 @@ class WorkerInfo {
     public parent_lock: Int32Array;
     public buffer_request_queue: { requested_len: number, lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
     public fds;
+    public callback;
 
-    constructor(id: number, worker: Worker, fds, parent_id: number, parent_lock: Int32Array) {
+    constructor(id: number, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback) {
         this.id = id;
         this.worker = worker;
         this.fds = fds;
         this.parent_id = parent_id;
         this.parent_lock = parent_lock;
+        this.callback = callback;
     }
 }
 
@@ -31,6 +35,11 @@ export class WorkerTable {
         this.send_callback = send_callback;
     }
 
+    _callback(event) {
+        let id = event.data[0];
+        this.parent.workerInfos[id].callback(event, this.parent);
+    }
+
     spawnWorker(fds, parent_id: number, parent_lock: Int32Array, callback): number {
         const id = this._nextWorkerId;
         this.currentWorker = id;
@@ -38,11 +47,12 @@ export class WorkerTable {
         let private_data = {};
         if (!this.isNode) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock);
+        worker.parent = this;
+        this.workerInfos[id] = new WorkerInfo(id, worker, fds, parent_id, parent_lock, callback);
         if (!this.isNode) {
-            worker.onmessage = callback;
+            worker.onmessage = this._callback;
         } else {
-            worker.on('message', callback);
+            worker.on('message', this._callback);
         }
         return id;
     }
