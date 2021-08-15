@@ -16,6 +16,7 @@ let fname = "";
 let myself = null;
 let ARGS = [];
 let ENV = {};
+let fds = null;
 
 const onmessage_ = function (e) {
     if (!started) {
@@ -347,6 +348,7 @@ function barebonesWASI() {
         let buffer = getModuleMemoryDataView();
         let buffer8 = getModuleMemoryUint8Array();
         // 8 ,  3408816 ,  128 ,  0n ,  1032332
+        // TODO: fix fds!!!
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             buffer.setUint32(bufused, 0, true);
 
@@ -756,8 +758,7 @@ function start_wasm() {
             }
         } catch {
         }
-        const wasiPolyfill = barebonesWASI();
-        importWasmModule(fname, wasiPolyfill);
+        importWasmModule(fname, barebonesWASI());
         // FIXME: returns done even if it failed
         worker_console_log("done.");
     } else {
