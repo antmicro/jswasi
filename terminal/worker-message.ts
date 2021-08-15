@@ -99,11 +99,6 @@ export const on_worker_message = async (event, workerTable) => {
                     case 1: {
                         const output = content.replaceAll("\n", "\r\n");
                         workerTable.receive_callback(worker_id, output);
-                        if (typeof terminal === "undefined") {
-                            console.log(output);
-                        } else {
-                            terminal.io.print(output);
-                        }
                         break;
                     }
                     case 2: {
@@ -111,11 +106,6 @@ export const on_worker_message = async (event, workerTable) => {
                         // TODO: should print in red, use ANSI color codes
                         // terminal.io.print(`${'\\033[01;32m'}${output}${'\\033[00m'}`);
                         workerTable.receive_callback(worker_id, output);
-                        if (typeof terminal === "undefined") {
-                            console.log(output);
-                        } else {
-                            terminal.io.print(output);
-                        }
                         break;
                     }
                     default: {

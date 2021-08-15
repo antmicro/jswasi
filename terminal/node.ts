@@ -133,8 +133,6 @@ heartbeat();
 
 */
 
-
-
 function uart_loop() {
     let debug = false;
     let terminated = false;

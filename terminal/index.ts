@@ -6,6 +6,7 @@ import {on_worker_message} from "./worker-message.js";
 
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
 let buffer = "";
+let terminal = null;
 
 function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
     // console.log("got buffer request of len " + requested_len + ", notifying");
@@ -20,10 +21,10 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
 }
 
 function receive_callback(id, c) {
-    console.log("got ",c," from ",id);
+    if (terminal != null) {
+        terminal.io.print(output);
+    }
 }
-
-let workerTable = null;
 
 async function init_all() {
     // If you are a cross-browser web app and want to use window.localStorage.
@@ -38,7 +39,7 @@ async function init_all() {
     await w.write("abc");
     await w.close();
 
-    workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback);
+    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback);
 
 
     const setupHterm = () => {
@@ -99,7 +100,7 @@ async function init_all() {
 
     // This will be whatever normal entry/initialization point your project uses.
     await lib.init();
-    const terminal = setupHterm();
+    terminal = setupHterm();
 
     workerTable.spawnWorker(
         [
