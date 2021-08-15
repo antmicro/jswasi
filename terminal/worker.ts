@@ -1,22 +1,17 @@
 // credits
+// TODO: remove any code taken from here:
 // WebAssembly Tutor (https://www.wasmtutor.com/webassembly-barebones-wasi)
+
+// TODO: remove any code taken from here:
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
-import {
-    WASI_EBADF,
-    WASI_ESUCCESS, WASI_FILETYPE_DIRECTORY,
-    WASI_O_CREAT, WASI_O_DIRECTORY, WASI_O_EXCL, WASI_O_TRUNC,
-    WASI_WHENCE_CUR,
-    WASI_WHENCE_END,
-    WASI_WHENCE_SET
-} from "./constants.js";
+import * as constants from "./constants.js";
 
 let started = false;
 let fname = "";
 let myself = null;
 let ARGS = [];
 let ENV = {};
-let fds = null;
 
 const onmessage_ = function (e) {
     if (!started) {
@@ -72,9 +67,8 @@ function do_exit(exit_code: number) {
     }
 }
 
-function barebonesWASI() {
+function WASI() {
 
-    let BUFFER = "";
     let moduleInstanceExports = null;
 
     function setModuleInstance(instance) {
@@ -102,7 +96,7 @@ function barebonesWASI() {
         view.setUint32(environ_size_ptr, environ_size, true);
 
 
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function environ_get(environ, environ_buf) {
@@ -124,7 +118,7 @@ function barebonesWASI() {
             environ_buf_offset += variable.byteLength;
         })
 
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function args_sizes_get(argc, argvBufSize) {
@@ -135,7 +129,7 @@ function barebonesWASI() {
         view.setUint32(argc, ARGS.length, true);
         view.setUint32(argvBufSize, new TextEncoder().encode(ARGS.join("")).byteLength + ARGS.length, true);
 
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function args_get(argv, argv_buf) {
@@ -157,7 +151,7 @@ function barebonesWASI() {
             argv_buf_offset += variable.byteLength;
         })
 
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_fdstat_get(fd, bufPtr) {
@@ -173,7 +167,7 @@ function barebonesWASI() {
         view.setBigUint64(bufPtr + 8, BigInt(0));
         view.setBigUint64(bufPtr + 16, BigInt(0));
 
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function getiovs(view, iovs, iovsLen) {
@@ -213,10 +207,10 @@ function barebonesWASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        if (err === WASI_ESUCCESS) {
+        if (err === 0) {
             view.setUint32(nwritten_ptr, written, true);
         }
-        return err;
+        return err; // TODO!!!!
     }
 
     function proc_exit(exit_code) {
@@ -230,12 +224,12 @@ function barebonesWASI() {
         let numbers = new Uint8Array(buf_len);
         self.crypto.getRandomValues(numbers);
         view8.set(numbers, buf_addr);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function clock_res_get(a, b) {
         worker_console_log(`clock_res_get(${a},${b})`);
-        return 1;
+        return 1; // TODO!!!!
     }
 
 
@@ -243,7 +237,7 @@ function barebonesWASI() {
         worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
         let buffer = getModuleMemoryDataView()
         buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_close(fd) {
@@ -255,22 +249,22 @@ function barebonesWASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        return err;
+        return err; // TODO!!!!
     }
 
     function fd_advice(a, b, c, d) {
         worker_console_log("fd_advice");
-        return 1;
+        return 1; // TODO!!!!
     }
 
     function fd_allocate(a, b, c) {
         worker_console_log("fd_allocate");
-        return 1;
+        return 1; // TODO!!!!
     }
 
     function fd_fdstat_set_rights(a, b, c) {
         worker_console_log("fd_fdstat_set_rights");
-        return 1;
+        return 1; // TODO!!!!
     }
 
     function fd_filestat_get(fd, buf) {
@@ -287,8 +281,8 @@ function barebonesWASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        if (err !== WASI_ESUCCESS) {
-            return err;
+        if (err !== constants.WASI_ESUCCESS) {
+            return err; // TODO!!!!
         }
         
         const dev = statbuf.getBigUint64(0, true);
@@ -308,7 +302,8 @@ function barebonesWASI() {
         view.setBigUint64(buf + 38, atim, true);
         view.setBigUint64(buf + 46, mtim, true);
         view.setBigUint64(buf + 52, ctim, true);
-        return WASI_ESUCCESS;
+        
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
@@ -332,15 +327,16 @@ function barebonesWASI() {
             Atomics.wait(lck, 0, -1);
 
             const err = Atomics.load(lck, 0);
-            if (err !== WASI_ESUCCESS) {
-                return err;
+            if (err !== constants.WASI_ESUCCESS) {
+                return err; // TODO!!!!
             }
 
             view8.set(readbuf, addr);
             nread += readlen[0];
         }
         view.setUint32(nread_ptr, nread, true);
-        return WASI_ESUCCESS;
+        
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_readdir(fd, buf, buf_len, cookie, bufused) {
@@ -382,9 +378,9 @@ function barebonesWASI() {
                 }
             }
             worker_console_log("used =" + buffer.getUint32(bufused, true));
-            return 0;
+            return 0; // TODO!!!!
         } else {
-            return 1;
+            return 1; // TODO!!!!
         }
     }
 
@@ -394,27 +390,27 @@ function barebonesWASI() {
         if (fds[fd] !== undefined) {
             let file = fds[fd];
             switch (whence) {
-                case WASI_WHENCE_SET: {
+                case constants.WASI_WHENCE_SET: {
                     file.file_pos = offset;
                     break;
                 }
-                case WASI_WHENCE_CUR: {
+                case constants.WASI_WHENCE_CUR: {
                     file.file_pos += offset;
                     break;
                 }
-                case WASI_WHENCE_END: {
+                case constants.WASI_WHENCE_END: {
                     file.file_pos = file.data.length + offset;
                 }
             }
             view.setBigUint64(new_offset, file.file_pos, true);
-            return WASI_ESUCCESS;
+            return constants.WASI_ESUCCESS;
         }
-        return WASI_EBADF;
+        return constants.WASI_EBADF;
     }
 
     function path_create_directory() {
         worker_console_log("path_create_directory");
-        return 1;
+        return 1; // TODO!!!!
     }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
@@ -428,7 +424,7 @@ function barebonesWASI() {
             let entry = fds[fd].get_entry_for_path(path);
             if (entry == null) {
                 worker_console_log(`path_filestat_get: no entry for path '${path}'`);
-                return 1;
+                return 1; // TODO!!!!
             }
             let stat = entry.stat();
             view.setBigUint64(buf, stat.dev, true);
@@ -439,10 +435,11 @@ function barebonesWASI() {
             view.setBigUint64(buf + 38, stat.atim, true);
             view.setBigUint64(buf + 46, stat.mtim, true);
             view.setBigUint64(buf + 52, stat.ctim, true);
-            return WASI_ESUCCESS;
+            
+            return constants.WASI_ESUCCESS;
         } else {
             worker_console_log(`path_filestat_get: undefined or not a directory`);
-            return 1;
+            return 1; // TODO!!!!
         }
     }
 
@@ -465,7 +462,7 @@ function barebonesWASI() {
             // wait for child process to finish
             Atomics.wait(lck, 0, -1);
 
-            return WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
+            return constants.WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else {
             const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
             const lck = new Int32Array(sbuf, 0, 1);
@@ -477,12 +474,12 @@ function barebonesWASI() {
             Atomics.wait(lck, 0, -1);
 
             const err = Atomics.load(lck, 0);
-            if (err !== WASI_ESUCCESS) {
-                return err;
+            if (err !== constants.WASI_ESUCCESS) {
+                return err; // TODO!!!!
             }
 
             view.setUint32(opened_fd_ptr, opened_fd[0], true);
-            return WASI_ESUCCESS;
+            return constants.WASI_ESUCCESS;
         }
     }
 
@@ -515,7 +512,7 @@ function barebonesWASI() {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         let view = getModuleMemoryDataView();
 	
-	    const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
+        const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
         const name_len = new Int32Array(sbuf, 4, 1);
@@ -525,11 +522,11 @@ function barebonesWASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        if (err === WASI_ESUCCESS) {
+        if (err === constants.WASI_ESUCCESS) {
             view.setUint8(buf_ptr, preopen_type[0]);
             view.setUint32(buf_ptr + 4, name_len[0]);
         }
-        return err;
+        return err; // TODO!!!
     }
 
     function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
@@ -545,81 +542,81 @@ function barebonesWASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        if (err === WASI_ESUCCESS) {
+        if (err === constants.WASI_ESUCCESS) {
             view8.set(path, path_ptr);
         }
-        return err;
+        return err; // TODO!!!
 
     }
 
     function fd_datasync() {
         worker_console_log("fd_datasync");
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_filestat_set_size() {
         worker_console_log("fd_filestat_set_size");
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_sync() {
         worker_console_log("fd_sync");
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function path_symlink() {
         worker_console_log("path_symlink");
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_fdstat_set_flags(a, b) {
         worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_pwrite(a, b, c, d, e) {
         worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_renumber(a, b) {
         worker_console_log(`fd_renumber(${a}, ${b})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_tell(a, b) {
         worker_console_log(`fd_tell(${a}, ${b})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function path_filestat_set_times(a, b, c, d, e, f, g) {
         worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function proc_raise(a) {
         worker_console_log(`proc_raise(${a})`);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     }
 
     function sock_recv(a, b, c, d, e, f) {
         worker_console_log("sock_recv");
-        return 1;
+        return 1; // TODO
     }
 
     function sock_send(a, b, c, d, e) {
         worker_console_log("sock_send");
-        return 1;
+        return 1; // TODO
     }
 
     function sock_shutdown(a, b) {
         worker_console_log("sock_shutdown");
-        return 1;
+        return 1; // TODO
     }
 
     let placeholder = function () {
         worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]);
-        return WASI_ESUCCESS;
+        return constants.WASI_ESUCCESS;
     };
 
     function poll_oneoff() {
@@ -693,12 +690,12 @@ function barebonesWASI() {
     }
 }
 
-function importWasmModule(moduleName, wasiPolyfill) {
+function importWasmModule(moduleName, wasiCallbacks) {
 
     const memory = new WebAssembly.Memory({initial: 2, maximum: 10});
     const moduleImports = {
-        wasi_snapshot_preview1: wasiPolyfill,
-        wasi_unstable: wasiPolyfill,
+        wasi_snapshot_preview1: wasiCallbacks,
+        wasi_unstable: wasiCallbacks,
         js: {mem: memory}
     };
 
@@ -728,7 +725,7 @@ function importWasmModule(moduleName, wasiPolyfill) {
         }
 
         if (instance != null) {
-            wasiPolyfill.setModuleInstance(instance);
+            wasiCallbacks.setModuleInstance(instance);
             try {
                 instance.exports._start();
                 do_exit(0);
@@ -758,7 +755,7 @@ function start_wasm() {
             }
         } catch {
         }
-        importWasmModule(fname, barebonesWASI());
+        importWasmModule(fname, WASI());
         // FIXME: returns done even if it failed
         worker_console_log("done.");
     } else {
