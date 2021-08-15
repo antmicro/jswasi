@@ -103,11 +103,11 @@ async function init_all() {
             new OpenDirectory("/", root),
         ],
         null, // parent_id
-        null // parent_lock
+        null, // parent_lock
+        on_worker_message
     );
 
 
-    workerTable.setOnMessage(0, on_worker_message);
     workerTable.postMessage(0, ["start", "shell.wasm", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
