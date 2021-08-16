@@ -75,18 +75,10 @@ function WASI() {
         moduleInstanceExports = instance.exports;
     }
 
-    function getModuleMemoryDataView() {
-        return new DataView(moduleInstanceExports.memory.buffer);
-    }
-
-    function getModuleMemoryUint8Array() {
-        return new Uint8Array(moduleInstanceExports.memory.buffer);
-    }
-
     function environ_sizes_get(environ_count_ptr, environ_size_ptr) {
         worker_console_log(`environ_sizes_get(0x${environ_count_ptr.toString(16)}, 0x${environ_size_ptr.toString(16)})`);
 
-        const view = getModuleMemoryDataView();
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let encoder = new TextEncoder();
         let environ_count = Object.keys(env).length;
@@ -102,8 +94,8 @@ function WASI() {
     function environ_get(environ, environ_buf) {
         worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
 
-        let view = getModuleMemoryDataView();
-        let view8 = getModuleMemoryUint8Array();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let encoder = new TextEncoder();
         let environ_buf_offset = environ_buf;
@@ -124,7 +116,7 @@ function WASI() {
     function args_sizes_get(argc, argvBufSize) {
         worker_console_log(`args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`);
 
-        const view = getModuleMemoryDataView();
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         view.setUint32(argc, args.length, true);
         view.setUint32(argvBufSize, new TextEncoder().encode(args.join("")).byteLength + args.length, true);
@@ -135,8 +127,8 @@ function WASI() {
     function args_get(argv, argv_buf) {
         worker_console_log("args_get(" + argv + ", 0x" + argv_buf.toString(16) + ")");
 
-        let view = getModuleMemoryDataView();
-        let view8 = getModuleMemoryUint8Array();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
@@ -157,7 +149,7 @@ function WASI() {
     function fd_fdstat_get(fd, bufPtr) {
         worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
 
-        const view = getModuleMemoryDataView();
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         // const stats = fds[fd].stats();
 
@@ -183,7 +175,7 @@ function WASI() {
 
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
         worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
-        const view = getModuleMemoryDataView();
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let written = 0;
         const bufferBytes = [];
@@ -222,7 +214,7 @@ function WASI() {
 
     function random_get(buf_addr, buf_len) {
         worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
-        let view8 = getModuleMemoryUint8Array();
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
         let numbers = new Uint8Array(buf_len);
         if (is_node) {
             // TODO
@@ -241,7 +233,7 @@ function WASI() {
 
     function clock_time_get(id, precision, time) {
         worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
-        let buffer = getModuleMemoryDataView()
+        let buffer = new DataView(moduleInstanceExports.memory.buffer)
         buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
         return constants.WASI_ESUCCESS;
     }
@@ -276,7 +268,7 @@ function WASI() {
     function fd_filestat_get(fd, buf) {
         worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
 
-        let view = getModuleMemoryDataView();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -314,8 +306,8 @@ function WASI() {
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
         worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
-        let view = getModuleMemoryDataView();
-        let view8 = getModuleMemoryUint8Array();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let nread = 0;
         for (let i = 0; i < iovs_len; i++) {
@@ -347,8 +339,8 @@ function WASI() {
 
     function fd_readdir(fd, buf, buf_len, cookie, bufused) {
         worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
-        let buffer = getModuleMemoryDataView();
-        let buffer8 = getModuleMemoryUint8Array();
+        let buffer = new DataView(moduleInstanceExports.memory.buffer);
+        let buffer8 = new Uint8Array(moduleInstanceExports.memory.buffer);
         // 8 ,  3408816 ,  128 ,  0n ,  1032332
         // TODO: fix fds!!!
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
@@ -392,7 +384,7 @@ function WASI() {
 
     function fd_seek(fd, offset, whence, new_offset) {
         worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
-        let view = getModuleMemoryDataView();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
         if (fds[fd] !== undefined) {
             let file = fds[fd];
             switch (whence) {
@@ -422,8 +414,8 @@ function WASI() {
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
 
-        const view = getModuleMemoryDataView();
-        const view8 = getModuleMemoryUint8Array();
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         const path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
 
@@ -463,8 +455,8 @@ function WASI() {
 
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
         worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
-        let view = getModuleMemoryDataView();
-        let view8 = getModuleMemoryUint8Array();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
         if (path[0] == '!') {
@@ -487,7 +479,6 @@ function WASI() {
             lck[0] = -1;
             const opened_fd = new Int32Array(sbuf, 4, 1);
 
-            worker_console_log(path);
             worker_send(["path_open", [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags]]);
             Atomics.wait(lck, 0, -1);
 
@@ -528,7 +519,7 @@ function WASI() {
 
     function fd_prestat_get(fd: number, buf_ptr) {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
-        let view = getModuleMemoryDataView();
+        let view = new DataView(moduleInstanceExports.memory.buffer);
 	
         const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
         const lck = new Int32Array(sbuf, 0, 1);
@@ -549,7 +540,7 @@ function WASI() {
 
     function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
         worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);       
-        let view8 = getModuleMemoryUint8Array();
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 	
 	    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
         const lck = new Int32Array(sbuf, 0, 1);

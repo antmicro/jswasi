@@ -10,29 +10,16 @@ export class OpenDirectory {
         this.handle = handle;
     }
 
-//     async open_entry(path: string, create: boolean) {
-//         let handle = this.handle;
-//         // for now we assume the path is valid and doesn't contain special characters
-//         // (".", "..", "~"
-//         for (let component of path.split("/") {
-// 
-//         }
-// 
-//         return
-//     }
-
     async entries(): Promise<Record<string, FileSystemFileHandle | FileSystemDirectoryHandle>>  {
         const o = {};
-        for await (const [name, handle] of this.entries()) {
+        for await (const [name, handle] of this.handle.entries()) {
             o[name] = handle;
         }
         return o;
     }
 
-
-
-    async get_entry_for_path(path): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
-        console.log(`OpenDirectory.get_entry_for_path()`);
+    async get_entry_for_path(path: string): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+        console.log(`OpenDirectory.get_entry_for_path(${path})`);
         let entry = this.handle;
         for (let component of path.split("/")) {
             if (component == "") break;
@@ -59,8 +46,8 @@ export class OpenDirectory {
         return new OpenFile(name, entry);
     }
 
-    async create_entry_for_path(path) {
-        console.log(`OpenDirectory.create_entry_for_path()`);
+    async create_entry_for_path(path: string) {
+        console.log(`OpenDirectory.create_entry_for_path(${path})`);
         let entry = this.handle;
         if (entry == null) return null;
         let components = path.split("/").filter((component) => component != "/");
@@ -87,7 +74,7 @@ export class OpenDirectory {
                 }
             }
         }
-        return new OpenFile(components.splice(-1), entry);
+        return new OpenFile(components[components.length - 1], entry);
     }
 
     delete_entry(path: string) {
@@ -111,7 +98,7 @@ export class OpenFile {
         return file.size;
     }
 
-    async read(len): Promise<[Uint8Array, number]> {
+    async read(len: number): Promise<[Uint8Array, number]> {
         console.log(`OpenFile.read(${len})`);
         if (this.file_pos < await this.size()) {
             let file = await this.handle.getFile();
@@ -124,7 +111,7 @@ export class OpenFile {
         }
     }
 
-    async write(buffer) {
+    async write(buffer: string) {
         console.log(`OpenFile.write(${buffer})`);
         const w = await this.handle.createWritable();
         await w.write({type: "write", position: this.file_pos, data: buffer});
@@ -134,6 +121,7 @@ export class OpenFile {
     }
 
     async stat() {
+        console.log(`OpenFile.stat()`);
         return {
             dev: 0n,
             ino: 0n,
@@ -146,20 +134,30 @@ export class OpenFile {
         };
     }
 
-    async seek(position: number) {
+    async seek(offset: number, whence: number) {
+        console.log(`OpenFile.seek(${offset}, ${whence})`);
         const w = await this.handle.createWritable();
-        await w.write({type: "seek", position})
-        this.file_pos = position;
-        return 0;
+        switch (whence) {
+            case constants.WASI_WHENCE_SET: {
+                this.file_pos = offset;
+                break;
+            }
+            case constants.WASI_WHENCE_CUR: {
+                this.file_pos += offset;
+                break;
+            }
+            case constants.WASI_WHENCE_END: {
+                this.file_pos = await this.size() + offset;
+            }
+        }
+        await w.write({type: "seek", position: offset})
+        this.file_pos = offset;
     }
 
     async truncate() {
+        console.log(`OpenFile.truncate()`);
         const w = await this.handle.createWritable();
         await w.write({type: "truncate", size: 0})
         this.file_pos = 0;
-        return 0;
     }
 }
-
-export type FileDescriptorTable = Record<number, OpenFile | OpenDirectory>;
-

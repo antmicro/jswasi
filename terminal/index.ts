@@ -34,12 +34,12 @@ async function init_all() {
 
     // setup filesystem
     const root = await navigator.storage.getDirectory();
-    const home = await root.getDirectoryHandle("home", {create: true});
-    const ant = await home.getDirectoryHandle("ant", {create: true});
-    const shell_history = await root.getFileHandle(".shell_history", {create: true});
-    const w = await shell_history.createWritable();
-    await w.write("abc");
-    await w.close();
+//     const home = await root.getDirectoryHandle("home", {create: true});
+//     const ant = await home.getDirectoryHandle("ant", {create: true});
+//     const shell_history = await root.getFileHandle(".shell_history", {create: true});
+//     const w = await shell_history.createWritable();
+//     await w.write("abc");
+//     await w.close();
 
     let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback, root);
 
@@ -77,14 +77,16 @@ async function init_all() {
 
                     // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
                     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-                    if (workerTable.currentWorker != null) while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-                        let {
-                            requested_len,
-                            lck,
-                            len,
-                            sbuf
-                        } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                        workerTable.send_callback(requested_len, lck, len, sbuf);
+                    if (workerTable.currentWorker != null) {
+                        while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                            let {
+                                requested_len,
+                                lck,
+                                len,
+                                sbuf
+                            } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                            workerTable.send_callback(requested_len, lck, len, sbuf);
+                        }
                     }
                 }
             };

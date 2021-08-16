@@ -14,7 +14,6 @@ export const on_worker_message = async (event, workerTable) => {
                 break;
             }
             case "spawn": {
-                console.log("got spawn");
                 const [command, args, env, sbuf] = data;
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 if (command === "mount") {
@@ -89,7 +88,6 @@ export const on_worker_message = async (event, workerTable) => {
                 switch (fd) {
                     case 0: {
                         throw "can't write to stdin!";
-                        break;
                     }
                     case 1: {
                         const output = content.replaceAll("\n", "\r\n");
@@ -147,10 +145,8 @@ export const on_worker_message = async (event, workerTable) => {
                             let data;
                             [data, err] = await fds[fd].read(len);
                             if (err === 0) {
-                                console.log(`data = ${data}`)
                                 readbuf.set(data);
                                 readlen[0] = data.byteLength;
-                                console.log(`read len=${data.byteLength} from file: ` + new TextDecoder().decode(new Uint8Array(readbuf)));
                             }
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
@@ -165,7 +161,6 @@ export const on_worker_message = async (event, workerTable) => {
             }
             case "path_open": {
                 const [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags] = data;
-                console.log(path);
                 const lck = new Int32Array(sbuf, 0, 1);
                 const opened_fd = new Int32Array(sbuf, 4, 1);
 
@@ -191,7 +186,6 @@ export const on_worker_message = async (event, workerTable) => {
                     }
                     if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
                         // TODO: seems to trigger on each path_open 
-                        console.log("entry.truncate()");
                         if (entry != null) entry.truncate();
                     }
                     fds.push(entry);
@@ -260,7 +254,6 @@ export const on_worker_message = async (event, workerTable) => {
                 if (fds[fd] != undefined) {
                     let entry = fds[fd].get_entry_for_path(path);
                     if (entry == null) {
-                        worker_console_log(`path_filestat_get: no entry for path '${path}'`);
                         err = constants.WASI_EINVAL;
                     }
                     let stat = entry.stat();
