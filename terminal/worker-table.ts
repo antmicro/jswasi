@@ -55,6 +55,7 @@ export class WorkerTable {
         if (!this.isNode) {
             worker.onmessage = this._callback;
         } else {
+            // @ts-ignore
             worker.on('message', this._callback);
         }
         return id;

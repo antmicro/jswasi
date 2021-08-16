@@ -31,6 +31,7 @@ function is_node() {
 //NODE// import node_helpers from './node_helpers.cjs';
 
 if (is_node()) {
+        // @ts-ignore
         node_helpers.get_parent_port().once('message', (message) => {
         let msg = {data: message};
         onmessage_(msg);
@@ -42,6 +43,7 @@ if (is_node()) {
 function worker_send(msg) {
     if (is_node()) {
         const msg_ = {data: [myself, msg[0], msg[1]]};
+        // @ts-ignore
         node_helpers.get_parent_port().postMessage(msg_);
     } else {
         const msg_ = [myself, ...msg];
@@ -341,8 +343,7 @@ function WASI() {
         worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
         let buffer = new DataView(moduleInstanceExports.memory.buffer);
         let buffer8 = new Uint8Array(moduleInstanceExports.memory.buffer);
-        // 8 ,  3408816 ,  128 ,  0n ,  1032332
-        // TODO: fix fds!!!
+
         if (fds[fd] != undefined && fds[fd].directory != undefined) {
             buffer.setUint32(bufused, 0, true);
 
@@ -719,6 +720,7 @@ function importWasmModule(moduleName, wasiCallbacks) {
                 const response = await fetch(moduleName);
                 buffer = await response.arrayBuffer();
             } else {
+                // @ts-ignore
                 buffer = node_helpers.fs.readFileSync(moduleName, null);
             }
             module = await WebAssembly.compile(buffer);
@@ -754,6 +756,7 @@ function start_wasm() {
         worker_console_log("Loading " + fname);
         try {
             if (is_node()) { // TODO: add spawn for browser!
+                // @ts-ignore
                 if (!node_helpers.fs.existsSync(fname)) {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
