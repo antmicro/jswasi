@@ -261,7 +261,7 @@ export const on_worker_message = async (event, workerTable) => {
                     let entry = fds[fd].get_entry_for_path(path);
                     if (entry == null) {
                         worker_console_log(`path_filestat_get: no entry for path '${path}'`);
-                        err = constants.WASI_EINVAL;
+                        return constants.WASI_EINVAL;
                     }
                     let stat = entry.stat();
                     view.setBigUint64(buf, stat.dev, true);
