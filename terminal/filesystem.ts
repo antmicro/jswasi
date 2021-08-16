@@ -42,7 +42,7 @@ export class OpenDirectory {
             }
         }
 
-        const name = path.split("/").slice(-1);
+        const name = path.split("/").slice(-1)[0];
         return new OpenFile(name, entry);
     }
 

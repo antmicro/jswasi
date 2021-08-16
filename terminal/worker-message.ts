@@ -252,23 +252,23 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    let entry = fds[fd].get_entry_for_path(path);
+                    let entry = await fds[fd].get_entry_for_path(path);
                     if (entry == null) {
                         err = constants.WASI_EINVAL;
+                    } else {
+                        let stat = await entry.stat();
+                        buf.setBigUint64(0, stat.dev, true);
+                        buf.setBigUint64(8, stat.ino, true);
+                        buf.setUint8(16, stat.file_type);
+                        buf.setBigUint64(24, stat.nlink, true);
+                        buf.setBigUint64(32, stat.size, true);
+                        buf.setBigUint64(38, stat.atim, true);
+                        buf.setBigUint64(46, stat.mtim, true);
+                        buf.setBigUint64(52, stat.ctim, true);
+                        err = constants.WASI_ESUCCESS;
                     }
-                    let stat = entry.stat();
-                    view.setBigUint64(buf, stat.dev, true);
-                    view.setBigUint64(buf + 8, stat.ino, true);
-                    view.setUint8(buf + 16, stat.file_type);
-                    view.setBigUint64(buf + 24, stat.nlink, true);
-                    view.setBigUint64(buf + 32, stat.size, true);
-                    view.setBigUint64(buf + 38, stat.atim, true);
-                    view.setBigUint64(buf + 46, stat.mtim, true);
-                    view.setBigUint64(buf + 52, stat.ctim, true);
-                    
-                    return constants.WASI_ESUCCESS;
                 } else {
-                    worker_console_log(`path_filestat_get: undefined or not a directory`);
+                    console.log(`path_filestat_get: undefined`);
                     err = constants.WASI_EINVAL;
                 }
 
