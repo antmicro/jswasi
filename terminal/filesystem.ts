@@ -38,6 +38,10 @@ export class OpenDirectory {
             if (component == "") break;
             let found = false;
             if (entry == null) return null;
+            if (entry instanceof FileSystemFileHandle) {
+                console.log(`component '${component}' is a file not a directory`);
+                return null;
+            }
             for await (const [name, handle] of entry.entries()) {
                 console.log({name, handle});
                 if (name === component) {
@@ -63,6 +67,10 @@ export class OpenDirectory {
         for (let i = 0; i < components.length; i++) {
             let component = components[i];
             let found = false;
+            if (entry instanceof FileSystemFileHandle) {
+                console.log(`component '${component}' is a file not a directory`);
+                return null;
+            }
             for await (const [name, handle] of entry.entries()) {
                 console.log({name, handle});
                 if (name === component) {
@@ -79,7 +87,7 @@ export class OpenDirectory {
                 }
             }
         }
-        return new OpenFile(components.split(-1), entry);
+        return new OpenFile(components.splice(-1), entry);
     }
 
     delete_entry(path: string) {
@@ -98,16 +106,16 @@ export class OpenFile {
     }
 
     // return file size in bytes
-    async size() {
+    async size(): Promise<number> {
         let file = await this.handle.getFile();
         return file.size;
     }
 
-    async read(len) {
+    async read(len): Promise<[Uint8Array, number]> {
         console.log(`OpenFile.read(${len})`);
         if (this.file_pos < await this.size()) {
             let file = await this.handle.getFile();
-            let slice = await file.slice(this.file_pos, this.file_pos + len).arrayBuffer();
+            let slice = new Uint8Array(await file.slice(this.file_pos, this.file_pos + len).arrayBuffer());
             this.file_pos += slice.byteLength;
             console.log(slice);
             return [slice, 0];

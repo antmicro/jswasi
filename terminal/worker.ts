@@ -50,7 +50,7 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
-    console.log(msg);
+    // console.log(msg); // doubles the log, is it something node specific?
     worker_send(["console", msg]);
 }
 
@@ -170,6 +170,7 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
+    // TODO: add types here
     function getiovs(view, iovs, iovsLen) {
         return Array.from({length: iovsLen}, function (_, i) {
             const ptr = iovs + i * 8;
@@ -180,7 +181,7 @@ function WASI() {
         });
     }
 
-    function fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
+    function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
         worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = getModuleMemoryDataView();
 
@@ -190,16 +191,16 @@ function WASI() {
         const buffers = getiovs(view, iovs_ptr, iovs_len);
 
         function writev(iov) {
-            for (var b = 0; b < iov.byteLength; b++) {
+            for (let b = 0; b < iov.byteLength; b++) {
                 bufferBytes.push(iov[b]);
             }
 
-            written += b;
+            written += iov.byteLength;
         }
 
         buffers.forEach(writev);
 
-        const content = String.fromCharCode.apply(null, bufferBytes);
+        const content = String.fromCharCode(...bufferBytes);
 
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
@@ -210,7 +211,7 @@ function WASI() {
         if (err === 0) {
             view.setUint32(nwritten_ptr, written, true);
         }
-        return err; // TODO!!!!
+        return err;
     }
 
     function proc_exit(exit_code) {
@@ -254,7 +255,7 @@ function WASI() {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        return err; // TODO!!!!
+        return err;
     }
 
     function fd_advice(a, b, c, d) {
@@ -287,7 +288,7 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err !== constants.WASI_ESUCCESS) {
-            return err; // TODO!!!!
+            return err;
         }
         
         const dev = statbuf.getBigUint64(0, true);
@@ -333,7 +334,7 @@ function WASI() {
 
             const err = Atomics.load(lck, 0);
             if (err !== constants.WASI_ESUCCESS) {
-                return err; // TODO!!!!
+                return err;
             }
 
             view8.set(readbuf, addr);
@@ -421,31 +422,43 @@ function WASI() {
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
         console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
 
-        let view = getModuleMemoryDataView();
-        let view8 = getModuleMemoryUint8Array();
+        const view = getModuleMemoryDataView();
+        const view8 = getModuleMemoryUint8Array();
 
-        if (fds[fd] != undefined && fds[fd].directory != undefined) {
-            let path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
-            let entry = fds[fd].get_entry_for_path(path);
-            if (entry == null) {
-                worker_console_log(`path_filestat_get: no entry for path '${path}'`);
-                return 1; // TODO!!!!
-            }
-            let stat = entry.stat();
-            view.setBigUint64(buf, stat.dev, true);
-            view.setBigUint64(buf + 8, stat.ino, true);
-            view.setUint8(buf + 16, stat.file_type);
-            view.setBigUint64(buf + 24, stat.nlink, true);
-            view.setBigUint64(buf + 32, stat.size, true);
-            view.setBigUint64(buf + 38, stat.atim, true);
-            view.setBigUint64(buf + 46, stat.mtim, true);
-            view.setBigUint64(buf + 52, stat.ctim, true);
-            
-            return constants.WASI_ESUCCESS;
-        } else {
-            worker_console_log(`path_filestat_get: undefined or not a directory`);
-            return 1; // TODO!!!!
+        const path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
+
+        const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const statbuf = new DataView(sbuf, 4);
+
+        worker_send(["path_filestat_get", [sbuf, fd, path, flags]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+            return err;
         }
+        
+        const dev = statbuf.getBigUint64(0, true);
+        const ino = statbuf.getBigUint64(8, true);
+        const file_type = statbuf.getUint8(16);
+        const nlink = statbuf.getBigUint64(24, true);
+        const size = statbuf.getBigUint64(32, true);
+        const atim = statbuf.getBigUint64(38, true);
+        const mtim = statbuf.getBigUint64(46, true);
+        const ctim = statbuf.getBigUint64(52, true);
+
+        view.setBigUint64(buf, dev, true);
+        view.setBigUint64(buf + 8, ino, true);
+        view.setUint8(buf + 16, file_type);
+        view.setBigUint64(buf + 24, nlink, true);
+        view.setBigUint64(buf + 32, size, true);
+        view.setBigUint64(buf + 38, atim, true);
+        view.setBigUint64(buf + 46, mtim, true);
+        view.setBigUint64(buf + 52, ctim, true);
+        
+        return constants.WASI_ESUCCESS;
     }
 
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
@@ -480,7 +493,7 @@ function WASI() {
 
             const err = Atomics.load(lck, 0);
             if (err !== constants.WASI_ESUCCESS) {
-                return err; // TODO!!!!
+                return err;
             }
 
             view.setUint32(opened_fd_ptr, opened_fd[0], true);
@@ -531,7 +544,7 @@ function WASI() {
             view.setUint8(buf_ptr, preopen_type[0]);
             view.setUint32(buf_ptr + 4, name_len[0]);
         }
-        return err; // TODO!!!
+        return err;
     }
 
     function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
@@ -550,7 +563,7 @@ function WASI() {
         if (err === constants.WASI_ESUCCESS) {
             view8.set(path, path_ptr);
         }
-        return err; // TODO!!!
+        return err;
 
     }
 

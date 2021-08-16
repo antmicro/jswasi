@@ -147,9 +147,10 @@ export const on_worker_message = async (event, workerTable) => {
                             let data;
                             [data, err] = await fds[fd].read(len);
                             if (err === 0) {
+                                console.log(`data = ${data}`)
                                 readbuf.set(data);
                                 readlen[0] = data.byteLength;
-                                console.log(`read len=${data.byteLength} from file: ` + new TextDecoder().decode(data));
+                                console.log(`read len=${data.byteLength} from file: ` + new TextDecoder().decode(new Uint8Array(readbuf)));
                             }
                         } else {
                             console.log("fd_prestat_dir_name returning EBADF");
@@ -243,6 +244,39 @@ export const on_worker_message = async (event, workerTable) => {
                 } else {
                     console.log(`fd_filestat_get returning WASI_EBADF`);
                     err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
+            case "path_filestat_get": {
+                const [sbuf, fd, path, flags] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const buf = new DataView(sbuf, 4);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {
+                    let entry = fds[fd].get_entry_for_path(path);
+                    if (entry == null) {
+                        worker_console_log(`path_filestat_get: no entry for path '${path}'`);
+                        err = constants.WASI_EINVAL;
+                    }
+                    let stat = entry.stat();
+                    view.setBigUint64(buf, stat.dev, true);
+                    view.setBigUint64(buf + 8, stat.ino, true);
+                    view.setUint8(buf + 16, stat.file_type);
+                    view.setBigUint64(buf + 24, stat.nlink, true);
+                    view.setBigUint64(buf + 32, stat.size, true);
+                    view.setBigUint64(buf + 38, stat.atim, true);
+                    view.setBigUint64(buf + 46, stat.mtim, true);
+                    view.setBigUint64(buf + 52, stat.ctim, true);
+                    
+                    return constants.WASI_ESUCCESS;
+                } else {
+                    worker_console_log(`path_filestat_get: undefined or not a directory`);
+                    err = constants.WASI_EINVAL;
                 }
 
                 Atomics.store(lck, 0, err);
