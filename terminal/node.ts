@@ -5,6 +5,12 @@ import {WorkerTable} from "./worker-table.mjs";
 import {OpenFile, OpenDirectory} from "./filesystem.js";
 import {on_worker_message} from "./worker-message.js";
 
+let debug = false;
+
+if (!debug) {
+    console.log = function() {};
+}
+
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
 let buffer = "";
 
