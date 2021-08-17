@@ -129,7 +129,7 @@ fn main() {
             "exit" => exit(0),
             // external commands
             "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython"
-            | "uutils" | "printenv" | "mount" | "tree" => {
+            | "uutils" | "printenv" | "mount" | "tree" | "viu" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
             }
