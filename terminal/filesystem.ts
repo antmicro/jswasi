@@ -104,7 +104,6 @@ export class OpenFile {
             let file = await this.handle.getFile();
             let slice = new Uint8Array(await file.slice(this.file_pos, this.file_pos + len).arrayBuffer());
             this.file_pos += slice.byteLength;
-            console.log(slice);
             return [slice, 0];
         } else {
             return [new Uint8Array, 0];

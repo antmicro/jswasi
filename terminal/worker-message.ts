@@ -19,7 +19,7 @@ export const on_worker_message = async (event, workerTable) => {
                 if (command === "mount") {
                     // special case for mount command
                     const mount = await showDirectoryPicker();
-                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[0], mount));
+                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[1], mount));
                     // release worker straight away
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
@@ -270,6 +270,26 @@ export const on_worker_message = async (event, workerTable) => {
                 } else {
                     console.log(`path_filestat_get: undefined`);
                     err = constants.WASI_EINVAL;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
+            case "fd_seek": {
+                const [sbuf, fd, offset, whence] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const file_pos = new BigUint64Array(sbuf, 8, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {
+                    // we get offset as BigInt, but FSA API requires Number
+                    fds[fd].seek(Number(offset), whence); 
+                    err = constants.WASI_ESUCCESS;
+                } else {
+                    console.log(`fd_seek: bad fd: ${fd}`);
+                    err = constants.WASI_EBADF;
                 }
 
                 Atomics.store(lck, 0, err);

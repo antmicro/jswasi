@@ -383,28 +383,25 @@ function WASI() {
         }
     }
 
-    function fd_seek(fd, offset, whence, new_offset) {
+    function fd_seek(fd: number, offset: BigInt, whence: number, new_offset) {
         worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
         let view = new DataView(moduleInstanceExports.memory.buffer);
-        if (fds[fd] !== undefined) {
-            let file = fds[fd];
-            switch (whence) {
-                case constants.WASI_WHENCE_SET: {
-                    file.file_pos = offset;
-                    break;
-                }
-                case constants.WASI_WHENCE_CUR: {
-                    file.file_pos += offset;
-                    break;
-                }
-                case constants.WASI_WHENCE_END: {
-                    file.file_pos = file.data.length + offset;
-                }
-            }
-            view.setBigUint64(new_offset, file.file_pos, true);
-            return constants.WASI_ESUCCESS;
+
+        const sbuf = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const file_pos = new BigUint64Array(sbuf, 8, 1);
+
+        worker_send(["fd_seek", [sbuf, fd, offset, whence]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+            return err;
         }
-        return constants.WASI_EBADF;
+
+        view.setBigUint64(new_offset, file_pos[0], true);
+        return constants.WASI_ESUCCESS;
     }
 
     function path_create_directory() {
