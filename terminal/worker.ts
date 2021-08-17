@@ -339,48 +339,32 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    function fd_readdir(fd, buf, buf_len, cookie, bufused) {
+    function fd_readdir(fd: number, buf, buf_len: number, cookie: number, bufused) {
         worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
-        let buffer = new DataView(moduleInstanceExports.memory.buffer);
-        let buffer8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        if (fds[fd] != undefined && fds[fd].directory != undefined) {
-            buffer.setUint32(bufused, 0, true);
+        let view = new DataView(moduleInstanceExports.memory.buffer);
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-            worker_console_log(cookie + " " + Object.keys(fds[fd].directory).slice(Number(cookie)));
-            if (cookie >= BigInt(Object.keys(fds[fd].directory).length)) {
-                worker_console_log("end of dir");
-                return 0;
-            }
-            let next_cookie = cookie + 1n;
-            for (let name of Object.keys(fds[fd].directory).slice(Number(cookie))) {
-                let entry = fds[fd].directory[name];
-                worker_console_log(name + " " + entry);
-                let encoded_name = new TextEncoder().encode(name);
+        const sbuf = new SharedArrayBuffer(4 + 4 + buf_len); // lock, buf_used, buf
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const buf_used = new Uint32Array(sbuf, 4, 1);
+        const databuf = new Uint8Array(sbuf, 8);
 
-                let offset = 24 + encoded_name.length;
+        worker_send(["fd_readdir", [sbuf, fd, cookie, buf_len]]);
+        Atomics.wait(lck, 0, -1);
 
-                if ((buf_len - buffer.getUint32(bufused, true)) < offset) {
-                    worker_console_log("too small buf");
-                    break;
-                } else {
-                    worker_console_log("next_cookie = " + next_cookie + " " + buf);
-                    buffer.setBigUint64(buf, next_cookie, true);
-                    next_cookie += 1n;
-                    buffer.setBigUint64(buf + 8, 1n, true); // inode
-                    buffer.setUint32(buf + 16, encoded_name.length, true);
-                    buffer.setUint8(buf + 20, entry.file_type);
-                    buffer8.set(encoded_name, buf + 24);
-                    worker_console_log("buffer = " + buffer8.slice(buf, buf + offset));
-                    buf += offset;
-                    buffer.setUint32(bufused, buffer.getUint32(bufused, true) + offset, true);
-                }
-            }
-            worker_console_log("used =" + buffer.getUint32(bufused, true));
-            return 0; // TODO!!!!
-        } else {
-            return 1; // TODO!!!!
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+            return err;
         }
+
+        view8.set(databuf, buf); // TODO: does this work?
+        worker_console_log(new TextDecoder().decode(view8.slice(buf, buf + buf_used[0])));
+        worker_console_log(`buf used: ${buf_used[0]}`);
+        view.setUint32(bufused, buf_used[0], true);
+
+        return constants.WASI_ESUCCESS;
     }
 
     function fd_seek(fd: number, offset: BigInt, whence: number, new_offset) {
@@ -415,7 +399,7 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        const path = new TextDecoder("utf-8").decode(view8.slice(path_ptr, path_ptr + path_len));
+        const path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -457,6 +441,7 @@ function WASI() {
         let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
+        worker_console_log(`path_open: path = ${path}`);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
             let [command, ...args] = path.split(" ");

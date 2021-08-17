@@ -10,19 +10,24 @@ export class OpenDirectory {
         this.handle = handle;
     }
 
-    async entries(): Promise<Record<string, FileSystemFileHandle | FileSystemDirectoryHandle>>  {
-        const o = {};
-        for await (const [name, handle] of this.handle.entries()) {
-            o[name] = handle;
+    async entries(): Promise<(FileSystemFileHandle | FileSystemDirectoryHandle)[]>  {
+        const a = [];
+        for await (const entry of this.handle.entries()) {
+            a.push(entry);
         }
-        return o;
+        return a;
     }
 
     async get_entry_for_path(path: string): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
         console.log(`OpenDirectory.get_entry_for_path(${path})`);
         let entry = this.handle;
-        for (let component of path.split("/")) {
+        let components = path.split("/");
+        for (let i = 0; i < components.length; i++) {
+            let component = components[i];
             if (component == "") break;
+            // this is a hack for cases when we path_open a directory that is already opened
+            // TODO: implement proper behaviour for "." and ".."
+            if (i == components.length -1 && component === ".") break;
             let found = false;
             if (entry == null) return null;
             if (entry instanceof FileSystemFileHandle) {
@@ -43,7 +48,11 @@ export class OpenDirectory {
         }
 
         const name = path.split("/").slice(-1)[0];
-        return new OpenFile(name, entry);
+        if (entry instanceof FileSystemFileHandle) {
+            return new OpenFile(name, entry);
+        } else {
+            return new OpenDirectory(name, entry);
+        }
     }
 
     async create_entry_for_path(path: string) {
@@ -59,7 +68,7 @@ export class OpenDirectory {
                 return null;
             }
             for await (const [name, handle] of entry.entries()) {
-                console.log({name, handle});
+                console.log("-".repeat(4 * i), {name, handle});
                 if (name === component) {
                     entry = handle;
                     found = true;
@@ -70,7 +79,7 @@ export class OpenDirectory {
                 if (i == components.length - 1) {
                     entry = await entry.getFileHandle(component, {create: true});
                 } else {
-                    entry = await entry.getDirectoryHandle(component, {create: true});
+                    entry = await entry.getDirectoryHandle(component, {create: false});
                 }
             }
         }

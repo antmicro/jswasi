@@ -285,7 +285,7 @@ export const on_worker_message = async (event, workerTable) => {
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
                     // we get offset as BigInt, but FSA API requires Number
-                    fds[fd].seek(Number(offset), whence); 
+                    fds[fd].seek(Number(offset), whence);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     console.log(`fd_seek: bad fd: ${fd}`);
@@ -294,6 +294,63 @@ export const on_worker_message = async (event, workerTable) => {
 
                 Atomics.store(lck, 0, err);
                 Atomics.notify(lck, 0);
+                break;
+            }
+            case "fd_readdir": {
+                const [sbuf, fd, cookie, databuf_len] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const buf_used = new Uint32Array(sbuf, 4, 1);
+                const databuf = new DataView(sbuf, 8, databuf_len);
+                let databuf_ptr = 0;
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {
+                    const entries = await fds[fd].entries();
+                    for (let i = Number(cookie); i < entries.length; i++) {
+                        const [name, handle] = entries[i];
+                        const namebuf = new TextEncoder().encode(name);
+                        if (databuf_ptr + 8 > databuf_len) break;
+
+
+                        databuf.setBigUint64(databuf_ptr, BigInt(i + 1), true);
+                        databuf_ptr += 8;
+                        if (databuf_ptr >= databuf_len) break;
+
+                        // TODO: get file stats ino (dummy 0n for now)
+                        databuf.setBigUint64(databuf_ptr, 0n, true);
+                        databuf_ptr += 8;
+                        // readdir can return more entries that the buffor can store
+                        // in such case we return early
+                        if (databuf_ptr >= databuf_len) break;
+                        
+                        databuf.setUint32(databuf_ptr, namebuf.byteLength, true);
+                        databuf_ptr += 4;
+                        if (databuf_ptr >= databuf_len) break;
+
+                        // TODO: I don't like that FSA API is leaking outside filesystem.ts, create a wrapper class around any directory entry type
+                        const file_type = handle instanceof FileSystemFileHandle ? constants.WASI_FILETYPE_REGULAR_FILE : constants.WASI_FILETYPE_DIRECTORY;
+                        databuf.setUint8(databuf_ptr, file_type);
+                        databuf_ptr += 4; // uint8 + padding
+                        if (databuf_ptr >= databuf_len) break;
+
+                        // check if name will fit
+                        if (databuf_ptr + namebuf.byteLength >= databuf_len) break;
+                        const databuf8 = new Uint8Array(sbuf);
+                        databuf8.set(namebuf, databuf_ptr);
+                        databuf_ptr += namebuf.byteLength;
+                        if (databuf_ptr >= databuf_len) break;
+                    }
+                    buf_used[0] = databuf_ptr > databuf_len ? databuf_len : databuf_ptr;
+                    err = constants.WASI_ESUCCESS;
+                } else {
+                    console.log(`fd_readdir: bad fd: ${fd}`);
+                    err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
                 break;
             }
         }
