@@ -308,8 +308,8 @@ export const on_worker_message = async (event, workerTable) => {
                 if (fds[fd] != undefined) {
                     const entries = await fds[fd].entries();
                     for (let i = Number(cookie); i < entries.length; i++) {
-                        const [name, handle] = entries[i];
-                        const namebuf = new TextEncoder().encode(name);
+                        const entry = entries[i];
+                        const namebuf = new TextEncoder().encode(entry.path);
                         if (databuf_ptr > databuf_len) break;
 
 
@@ -328,8 +328,7 @@ export const on_worker_message = async (event, workerTable) => {
                         databuf_ptr += 4;
                         if (databuf_ptr >= databuf_len) break;
 
-                        // TODO: I don't like that FSA API is leaking outside filesystem.ts, create a wrapper class around any directory entry type
-                        const file_type = handle instanceof FileSystemFileHandle ? constants.WASI_FILETYPE_REGULAR_FILE : constants.WASI_FILETYPE_DIRECTORY;
+                        const file_type = entry.file_type;
                         databuf.setUint8(databuf_ptr, file_type);
                         databuf_ptr += 4; // uint8 + padding
                         if (databuf_ptr >= databuf_len) break;
