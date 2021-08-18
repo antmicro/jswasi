@@ -10,6 +10,8 @@ import * as constants from "./constants.js";
 type ptr = number;
 
 const IS_NODE = typeof self === 'undefined';
+const ENCODER = new TextEncoder();
+const DECODER = new TextDecoder();
 
 let started = false;
 let fname = "";
@@ -81,11 +83,10 @@ function WASI() {
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
-        let encoder = new TextEncoder();
         let environ_count_ = Object.keys(env).length;
         view.setUint32(environ_count, environ_count_, true);
 
-        let environ_size_ = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
+        let environ_size_ = Object.entries(env).reduce((sum, [key, val]) => sum + ENCODER.encode(`${key}=${val}\0`).byteLength, 0);
         view.setUint32(environ_size, environ_size_, true);
 
 
@@ -98,14 +99,13 @@ function WASI() {
         let view = new DataView(moduleInstanceExports.memory.buffer);
         let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        let encoder = new TextEncoder();
         let environ_buf_offset = environ_buf;
 
         Object.entries(env).forEach(([key, val], i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(environ + i * 4, environ_buf_offset, true);
             // write string describing the variable to WASM memory
-            let variable = encoder.encode(`${key}=${val}\0`);
+            let variable = ENCODER.encode(`${key}=${val}\0`);
             view8.set(variable, environ_buf_offset);
             // calculate pointer to next variable
             environ_buf_offset += variable.byteLength;
@@ -120,7 +120,7 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         view.setUint32(argc, args.length, true);
-        view.setUint32(argvBufSize, new TextEncoder().encode(args.join("")).byteLength + args.length, true);
+        view.setUint32(argvBufSize, ENCODER.encode(args.join("")).byteLength + args.length, true);
 
         return constants.WASI_ESUCCESS;
     }
@@ -131,14 +131,13 @@ function WASI() {
         let view = new DataView(moduleInstanceExports.memory.buffer);
         let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        let encoder = new TextEncoder();
         let argv_buf_offset = argv_buf;
 
         Object.entries(args).forEach(([_, arg], i) => {
             // set pointer address to beginning of next key value pair
             view.setUint32(argv + i * 4, argv_buf_offset, true);
             // write string describing the argument to WASM memory
-            let variable = encoder.encode(`${arg}\0`);
+            let variable = ENCODER.encode(`${arg}\0`);
             view8.set(variable, argv_buf_offset);
             // calculate pointer to next variable
             argv_buf_offset += variable.byteLength;
@@ -349,7 +348,7 @@ function WASI() {
         }
 
         view8.set(databuf, buf); // TODO: does this work?
-        worker_console_log(new TextDecoder().decode(view8.slice(buf, buf + buf_used[0])));
+        worker_console_log(DECODER.decode(view8.slice(buf, buf + buf_used[0])));
         worker_console_log(`buf used: ${buf_used[0]}`);
         view.setUint32(bufused, buf_used[0], true);
 
@@ -388,7 +387,7 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        const path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
+        const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -429,7 +428,7 @@ function WASI() {
         let view = new DataView(moduleInstanceExports.memory.buffer);
         let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        let path = new TextDecoder().decode(view8.slice(path_ptr, path_ptr + path_len));
+        let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`path_open: path = ${path}`);
         if (path[0] == '!') {
             worker_console_log("We are going to send a spawn message!");
