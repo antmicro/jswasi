@@ -7,6 +7,8 @@
 import * as constants from "./constants.js";
 //NODE// import node_helpers from './node_helpers.cjs';
 
+type ptr = number;
+
 const IS_NODE = typeof self === 'undefined';
 
 let started = false;
@@ -74,17 +76,17 @@ function WASI() {
         moduleInstanceExports = instance.exports;
     }
 
-    function environ_sizes_get(environ_count_ptr, environ_size_ptr) {
-        worker_console_log(`environ_sizes_get(0x${environ_count_ptr.toString(16)}, 0x${environ_size_ptr.toString(16)})`);
+    function environ_sizes_get(environ_count: ptr, environ_size: ptr) {
+        worker_console_log(`environ_sizes_get(0x${environ_count.toString(16)}, 0x${environ_size.toString(16)})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let encoder = new TextEncoder();
-        let environ_count = Object.keys(env).length;
-        view.setUint32(environ_count_ptr, environ_count, true);
+        let environ_count_ = Object.keys(env).length;
+        view.setUint32(environ_count, environ_count_, true);
 
-        let environ_size = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
-        view.setUint32(environ_size_ptr, environ_size, true);
+        let environ_size_ = Object.entries(env).reduce((sum, [key, val]) => sum + encoder.encode(`${key}=${val}\0`).byteLength, 0);
+        view.setUint32(environ_size, environ_size_, true);
 
 
         return constants.WASI_ESUCCESS;
