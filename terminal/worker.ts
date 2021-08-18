@@ -5,6 +5,9 @@
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
 import * as constants from "./constants.js";
+//NODE// import node_helpers from './node_helpers.cjs';
+
+const IS_NODE = typeof self === 'undefined';
 
 let started = false;
 let fname = "";
@@ -24,15 +27,9 @@ const onmessage_ = function (e) {
     }
 }
 
-function is_node() {
-    return (typeof self === 'undefined');
-}
-
-//NODE// import node_helpers from './node_helpers.cjs';
-
-if (is_node()) {
-        // @ts-ignore
-        node_helpers.get_parent_port().once('message', (message) => {
+if (IS_NODE) {
+    // @ts-ignore
+    node_helpers.get_parent_port().once('message', (message) => {
         let msg = {data: message};
         onmessage_(msg);
     });
@@ -41,7 +38,7 @@ if (is_node()) {
 }
 
 function worker_send(msg) {
-    if (is_node()) {
+    if (IS_NODE) {
         const msg_ = {data: [myself, msg[0], msg[1]]};
         // @ts-ignore
         node_helpers.get_parent_port().postMessage(msg_);
@@ -57,7 +54,7 @@ function worker_console_log(msg) {
 }
 
 function do_exit(exit_code: number) {
-    if (is_node()) {
+    if (IS_NODE) {
         const buf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(buf, 0, 1);
         worker_send(["exit", exit_code]); // never return
@@ -164,17 +161,6 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    // TODO: add types here
-    function getiovs(view, iovs, iovsLen) {
-        return Array.from({length: iovsLen}, function (_, i) {
-            const ptr = iovs + i * 8;
-            const buf = view.getUint32(ptr, true);
-            const bufLen = view.getUint32(ptr + 4, true);
-
-            return new Uint8Array(moduleInstanceExports.memory.buffer, buf, bufLen);
-        });
-    }
-
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
         worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
@@ -182,17 +168,19 @@ function WASI() {
         let written = 0;
         const bufferBytes = [];
 
-        const buffers = getiovs(view, iovs_ptr, iovs_len);
+        const buffers = Array.from({length: iovs_len}, function (_, i) {
+            const ptr = iovs_ptr + i * 8;
+            const buf = view.getUint32(ptr, true);
+            const bufLen = view.getUint32(ptr + 4, true);
 
-        function writev(iov) {
+            return new Uint8Array(moduleInstanceExports.memory.buffer, buf, bufLen);
+        });
+        buffers.forEach((iov: Uint8Array) => {
             for (let b = 0; b < iov.byteLength; b++) {
                 bufferBytes.push(iov[b]);
             }
-
             written += iov.byteLength;
-        }
-
-        buffers.forEach(writev);
+        });
 
         const content = String.fromCharCode(...bufferBytes);
 
@@ -211,14 +199,13 @@ function WASI() {
     function proc_exit(exit_code) {
         worker_console_log(`proc_exit(${exit_code})`);
         do_exit(exit_code);
-        //close(); // doesn't actually end here
     }
 
     function random_get(buf_addr, buf_len) {
         worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
         let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
         let numbers = new Uint8Array(buf_len);
-        if (is_node) {
+        if (IS_NODE) {
             // TODO
         } else {
             self.crypto.getRandomValues(numbers);
@@ -686,7 +673,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
     // make memory shared so that main thread can write to it directly
     const memory = new WebAssembly.Memory({initial: 10, maximum: 10, shared: true});
 
-    const wasiCallbacks = wasiCallbacksConstructor(memory.buffer);
+    const wasiCallbacks = wasiCallbacksConstructor();
     const moduleImports = {
         wasi_snapshot_preview1: wasiCallbacks,
         wasi_unstable: wasiCallbacks,
@@ -699,6 +686,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
 
         wasiCallbacks.setModuleInstance(instance);
         try {
+            // @ts-ignore
             instance.exports._start();
             do_exit(0);
         } catch (e) {
@@ -714,7 +702,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             module = await WebAssembly.compileStreaming(fetch(moduleName));
         } else {
             let buffer = null;
-            if (!is_node()) {
+            if (!IS_NODE) {
                 const response = await fetch(moduleName);
                 buffer = await response;
             } else {
@@ -753,7 +741,7 @@ async function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
         try {
-            if (is_node()) { // TODO: add spawn for browser!
+            if (IS_NODE) {
                 // @ts-ignore
                 if (!node_helpers.fs.existsSync(fname)) {
                     worker_console_log(`File ${fname} not found!`);
