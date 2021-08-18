@@ -682,58 +682,58 @@ function WASI() {
     }
 }
 
-function importWasmModule(moduleName, wasiCallbacks) {
+async function importWasmModule(moduleName, wasiCallbacksConstructor) {
+    // make memory shared so that main thread can write to it directly
+    const memory = new WebAssembly.Memory({initial: 10, maximum: 10, shared: true});
 
-    const memory = new WebAssembly.Memory({initial: 2, maximum: 10});
+    const wasiCallbacks = wasiCallbacksConstructor(memory.buffer);
     const moduleImports = {
         wasi_snapshot_preview1: wasiCallbacks,
         wasi_unstable: wasiCallbacks,
         js: {mem: memory}
     };
 
-    (async () => {
-        let module = null;
+    let module = null;
 
-        if (WebAssembly.compileStreaming) {
-            module = await WebAssembly.compileStreaming(fetch(moduleName));
+    if (WebAssembly.compileStreaming) {
+        module = await WebAssembly.compileStreaming(fetch(moduleName));
+    } else {
+        let buffer = null;
+        if (!is_node()) {
+            const response = await fetch(moduleName);
+            buffer = await response;
         } else {
-            let buffer = null;
-            if (!is_node()) {
-                const response = await fetch(moduleName);
-                buffer = await response.arrayBuffer();
-            } else {
-                // @ts-ignore
-                buffer = node_helpers.fs.readFileSync(moduleName, null);
-            }
-            module = await WebAssembly.compile(buffer);
+            // @ts-ignore
+            buffer = node_helpers.fs.readFileSync(moduleName, null);
         }
+        module = await WebAssembly.compile(buffer);
+    }
 
-        let instance = null;
+    let instance = null;
+    try {
+        instance = await WebAssembly.instantiate(module, moduleImports);
+    } catch (e) {
+        worker_console_log("exception while instantiating wasm");
+        worker_console_log(e.stack);
+        instance = null;
+    }
+
+    if (instance != null) {
+        wasiCallbacks.setModuleInstance(instance);
         try {
-            instance = await WebAssembly.instantiate(module, moduleImports);
+            instance.exports._start();
+            do_exit(0);
         } catch (e) {
-            worker_console_log("exception while instantiating wasm");
+            worker_console_log("exception while running wasm");
             worker_console_log(e.stack);
-            instance = null;
-        }
-
-        if (instance != null) {
-            wasiCallbacks.setModuleInstance(instance);
-            try {
-                instance.exports._start();
-                do_exit(0);
-            } catch (e) {
-                worker_console_log("exception while running wasm");
-                worker_console_log(e.stack);
-                do_exit(255);
-            }
-        } else {
             do_exit(255);
         }
-    })();
+    } else {
+        do_exit(255);
+    }
 }
 
-function start_wasm() {
+async function start_wasm() {
     if (started && fname != "") {
         worker_console_log("Loading " + fname);
         try {
@@ -744,13 +744,12 @@ function start_wasm() {
                     started = false;
                     fname = "";
                     do_exit(255);
-                    setTimeout(start_wasm, 0);
                     return;
                 }
             }
         } catch {
         }
-        importWasmModule(fname, WASI());
+        await importWasmModule(fname, WASI);
         // FIXME: returns done even if it failed
         worker_console_log("done.");
     } else {
@@ -760,4 +759,4 @@ function start_wasm() {
     }
 }
 
-start_wasm();
+await start_wasm();
