@@ -310,7 +310,7 @@ export const on_worker_message = async (event, workerTable) => {
                     for (let i = Number(cookie); i < entries.length; i++) {
                         const [name, handle] = entries[i];
                         const namebuf = new TextEncoder().encode(name);
-                        if (databuf_ptr + 8 > databuf_len) break;
+                        if (databuf_ptr > databuf_len) break;
 
 
                         databuf.setBigUint64(databuf_ptr, BigInt(i + 1), true);
@@ -320,8 +320,8 @@ export const on_worker_message = async (event, workerTable) => {
                         // TODO: get file stats ino (dummy 0n for now)
                         databuf.setBigUint64(databuf_ptr, 0n, true);
                         databuf_ptr += 8;
-                        // readdir can return more entries that the buffor can store
-                        // in such case we return early
+                        // directory can have more entries that the buffor can store
+                        // in such case we return only partial results 
                         if (databuf_ptr >= databuf_len) break;
                         
                         databuf.setUint32(databuf_ptr, namebuf.byteLength, true);
@@ -350,7 +350,6 @@ export const on_worker_message = async (event, workerTable) => {
 
                 Atomics.store(lck, 0, err);
                 Atomics.notify(lck, 0);
-                break;
                 break;
             }
         }

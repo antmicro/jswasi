@@ -38,11 +38,6 @@ export class WorkerTable {
         this.root = root;
     }
 
-    _callback(event) {
-        let id = event.data[0];
-        this.parent.workerInfos[id].callback(event, this.parent);
-    }
-
     spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
         const id = this._nextWorkerId;
         this.currentWorker = id;
@@ -50,13 +45,12 @@ export class WorkerTable {
         let private_data = {};
         if (!this.isNode) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
-        worker.parent = this;
         this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, new OpenDirectory("/", this.root)], parent_id, parent_lock, callback);
         if (!this.isNode) {
-            worker.onmessage = this._callback;
+            worker.onmessage = (event) => callback(event, this);
         } else {
             // @ts-ignore
-            worker.on('message', this._callback);
+            worker.on('message', (event) => callback(event, this));
         }
         return id;
     }
