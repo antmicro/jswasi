@@ -28,7 +28,7 @@ function receive_callback(id, output) {
     }
 }
 
-async function init_all() {
+export async function init_all(terminal_query_selector: string) {
     // If you are a cross-browser web app and want to use window.localStorage.
     hterm.defaultStorage = new lib.Storage.Local();
 
@@ -42,7 +42,6 @@ async function init_all() {
 //     await w.close();
 
     let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback, root);
-
 
     const setupHterm = () => {
         const t = new hterm.Terminal("profile-id");
@@ -96,7 +95,7 @@ async function init_all() {
 
         };
 
-        t.decorate(document.querySelector('#terminal'));
+        t.decorate(document.querySelector(terminal_query_selector));
         t.installKeyboard();
 
         return t;
@@ -120,4 +119,3 @@ async function init_all() {
     }]);
 }
 
-window.onload = init_all;

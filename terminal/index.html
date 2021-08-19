@@ -5,7 +5,10 @@
     <title>Antmicro's WASM shell</title>
 </head>
 <body>
-<script src="index.js" type="module"></script>
+<script type="module">
+    import { init_all } from "./rust-shell.js";
+    window.onload = await init_all("#terminal");
+</script>
 <div id="terminal"></div>
 </body>
 </html>
