@@ -181,16 +181,15 @@ export const on_worker_message = async (event, workerTable) => {
                         console.log("file already exists, return 1");
                         // return constants.WASI_EEXIST;
                     }
-                    if ((oflags & constants.WASI_O_DIRECTORY) === constants.WASI_O_DIRECTORY && fds[dir_fd].file_type !== constants.WASI_FILETYPE_DIRECTORY) {
-                        console.log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
-                        err = 1;
-                    }
-                    if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
-                        // TODO: seems to trigger on each path_open 
-                        if (entry != null) entry.truncate();
-                    }
-
                     if (entry != null) {
+                        if ((oflags & constants.WASI_O_DIRECTORY) === constants.WASI_O_DIRECTORY && fds[dir_fd].file_type !== constants.WASI_FILETYPE_DIRECTORY) {
+                            console.log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
+                            err = 1;
+                        }
+                        if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
+                            entry.truncate();
+                        }
+
                         fds.push(entry);
                         opened_fd[0] = fds.length - 1;
                         err = constants.WASI_ESUCCESS;
