@@ -65,7 +65,9 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    path.set(new TextEncoder().encode(fds[fd].path), 0);
+                    // FIXME: this shouldn't work, but it fixes the 'uutils cat', find out why and document it
+                    // path.set(new TextEncoder().encode(fds[fd].path), 0);
+                    path.set(fds[fd].path, 0);
                     console.log(`path: ${fds[fd].path}`);
                     err = constants.WASI_ESUCCESS;
                 } else {
