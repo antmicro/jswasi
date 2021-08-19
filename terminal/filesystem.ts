@@ -100,6 +100,7 @@ export class OpenDirectory {
                     entry = await entry.getFileHandle(component, {create: true});
                 } else {
                     console.log(`component '${component} missing`);
+                    return null;
                 }
             }
         }

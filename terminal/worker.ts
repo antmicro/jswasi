@@ -503,6 +503,7 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === constants.WASI_ESUCCESS) {
+            worker_console_log(`filte_type: ${preopen_type[0]}, name_len: ${name_len[0]}`);
             view.setUint8(buf_ptr, preopen_type[0]);
             view.setUint32(buf_ptr + 4, name_len[0]);
         }

@@ -42,14 +42,12 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[fd] != undefined) { // && fds[fd].prestat_name != undefined) {
+                if (fds[fd] != undefined) {
                     preopen_type[0] = fds[fd].file_type;
                     name_len[0] = fds[fd].path.length;
+                    console.log(`filte_type: ${preopen_type[0]}, name_len: ${name_len[0]}`);
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    // FIXME: this fails for created files (when fds[fd] is undefined)
-                    //  what should happen when requesting with not used fd?
-                    //  for now we get error: 'data provided contains a nul byte' on File::create
                     console.log("fd_prestat_get returning EBADF");
                     err = constants.WASI_EBADF;
                 }
@@ -66,8 +64,9 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[fd] != undefined) { // && fds[fd].prestat_name != undefined) {
-                    path.set(fds[fd].path, 0);
+                if (fds[fd] != undefined) {
+                    path.set(new TextEncoder().encode(fds[fd].path), 0);
+                    console.log(`path: ${fds[fd].path}`);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     console.log("fd_prestat_dir_name returning EBADF");
@@ -172,12 +171,14 @@ export const on_worker_message = async (event, workerTable) => {
                     if (entry == null) {
                         if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
                             entry = await fds[dir_fd].create_entry_for_path(path);
+                            if (entry == null) {
+                                err = constants.WASI_ENOENT;
+                            }
                         } else {
                             err = constants.WASI_EBADF;
                         }
                     } else if ((oflags & constants.WASI_O_EXCL) === constants.WASI_O_EXCL) {
-                        // FIXME: this flag is set on fs::write and it fails, but doesnt on linux
-                        // console.log("file already exists, return 1");
+                        console.log("file already exists, return 1");
                         // return constants.WASI_EEXIST;
                     }
                     if ((oflags & constants.WASI_O_DIRECTORY) === constants.WASI_O_DIRECTORY && fds[dir_fd].file_type !== constants.WASI_FILETYPE_DIRECTORY) {
@@ -188,9 +189,12 @@ export const on_worker_message = async (event, workerTable) => {
                         // TODO: seems to trigger on each path_open 
                         if (entry != null) entry.truncate();
                     }
-                    fds.push(entry);
-                    opened_fd[0] = fds.length - 1;
-                    err = constants.WASI_ESUCCESS;
+
+                    if (entry != null) {
+                        fds.push(entry);
+                        opened_fd[0] = fds.length - 1;
+                        err = constants.WASI_ESUCCESS;
+                    }
                 } else {
                     console.log("fd doesn't exist or is a directory");
                     err = constants.WASI_EBADF;
