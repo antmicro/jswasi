@@ -67,11 +67,10 @@ export class OpenDirectory {
             }
         }
 
-        const name = path.split("/").slice(-1)[0];
         if (entry instanceof FileSystemFileHandle) {
-            return new OpenFile(name, entry);
+            return new OpenFile(path, entry);
         } else {
-            return new OpenDirectory(name, entry);
+            return new OpenDirectory(path, entry);
         }
     }
 
@@ -99,12 +98,12 @@ export class OpenDirectory {
                 if (i == components.length - 1) {
                     entry = await entry.getFileHandle(component, {create: true});
                 } else {
-                    console.log(`component '${component} missing`);
+                    console.log(`component '${component}' missing`);
                     return null;
                 }
             }
         }
-        return new OpenFile(components[components.length - 1], entry);
+        return new OpenFile(path, entry);
     }
 
     delete_entry(path: string) {

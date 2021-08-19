@@ -175,7 +175,7 @@ export const on_worker_message = async (event, workerTable) => {
                                 err = constants.WASI_ENOENT;
                             }
                         } else {
-                            err = constants.WASI_EBADF;
+                            err = constants.WASI_ENOENT;
                         }
                     } else if ((oflags & constants.WASI_O_EXCL) === constants.WASI_O_EXCL) {
                         console.log("file already exists, return 1");
