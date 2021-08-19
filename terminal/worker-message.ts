@@ -339,7 +339,7 @@ export const on_worker_message = async (event, workerTable) => {
 
                         // check if name will fit
                         if (databuf_ptr + namebuf.byteLength >= databuf_len) break;
-                        const databuf8 = new Uint8Array(sbuf);
+                        const databuf8 = new Uint8Array(sbuf, 8);
                         databuf8.set(namebuf, databuf_ptr);
                         databuf_ptr += namebuf.byteLength;
                         if (databuf_ptr >= databuf_len) break;

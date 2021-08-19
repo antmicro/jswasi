@@ -347,9 +347,7 @@ function WASI() {
             return err;
         }
 
-        view8.set(databuf, buf); // TODO: does this work?
-        worker_console_log(DECODER.decode(view8.slice(buf, buf + buf_used[0])));
-        worker_console_log(`buf used: ${buf_used[0]}`);
+        view8.set(databuf, buf);
         view.setUint32(bufused, buf_used[0], true);
 
         return constants.WASI_ESUCCESS;
