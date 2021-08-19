@@ -190,7 +190,7 @@ export const on_worker_message = async (event, workerTable) => {
                             entry.truncate();
                         }
 
-                        fds.push(entry);
+                        fds.push(entry.open());
                         opened_fd[0] = fds.length - 1;
                         err = constants.WASI_ESUCCESS;
                     }

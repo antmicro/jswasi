@@ -1,17 +1,29 @@
 use std::{env, fs, io};
 
+use std::fs::DirEntry;
+use std::path::Path;
+
+fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, cb)?;
+            } else {
+                cb(&entry);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() -> io::Result<()> {
-    let mut entries = fs::read_dir(env::args().skip(1).next().unwrap())?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, io::Error>>()?;
+    let dir = env::args().skip(1).next().unwrap();
 
-    // The order in which `read_dir` returns entries is not guaranteed. If reproducible
-    // ordering is required the entries should be explicitly sorted.
-
-    entries.sort();
-    println!("{:?}", entries);
-
-    // The entries have now been sorted by their path.
+    visit_dirs(Path::new(&dir), &|entry: &DirEntry| {
+        println!("{}", entry.path().to_str().unwrap());
+    })?;
 
     Ok(())
 }

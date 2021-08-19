@@ -9,6 +9,25 @@ export class Directory {
         this.path = path;
         this._handle = handle;
     }
+
+    // TODO: fill dummy values with something meaningful
+    async stat() {
+        console.log(`Directory.stat()`);
+        return {
+            dev: 0n,
+            ino: 0n,
+            file_type: self.file_type,
+            nlink: 0n,
+            size: BigInt(4096),
+            atim: 0n,
+            mtim: 0n,
+            ctim: 0n,
+        };
+    }
+
+    open() {
+        return new OpenDirectory(this.path, this._handle);
+    }
 }
 
 export class OpenDirectory {
@@ -68,9 +87,9 @@ export class OpenDirectory {
         }
 
         if (entry instanceof FileSystemFileHandle) {
-            return new OpenFile(path, entry);
+            return new File(path, entry);
         } else {
-            return new OpenDirectory(path, entry);
+            return new Directory(path, entry);
         }
     }
 
@@ -103,7 +122,7 @@ export class OpenDirectory {
                 }
             }
         }
-        return new OpenFile(path, entry);
+        return new File(path, entry);
     }
 
     delete_entry(path: string) {
@@ -120,6 +139,26 @@ export class File {
         this.path = path;
         this._handle = handle;
 
+    }
+
+    // TODO: fill dummy values with something meaningful
+    async stat() {
+        console.log(`File.stat()`);
+        let file = await this._handle.getFile();
+        return {
+            dev: 0n,
+            ino: 0n,
+            file_type: constants.WASI_FILETYPE_REGULAR_FILE,
+            nlink: 0n,
+            size: BigInt(file.size),
+            atim: 0n,
+            mtim: 0n,
+            ctim: 0n,
+        };
+    }
+
+    async open() {
+        return new OpenFile(this.path, this._handle);
     }
 }
 
