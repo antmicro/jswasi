@@ -186,11 +186,14 @@ export const on_worker_message = async (event, workerTable) => {
                             console.log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
                             err = 1;
                         }
+
+                        const entry_opened = await entry.open();
+                        fds.push(entry_opened);
+
                         if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
-                            entry.truncate();
+                            entry_opened.truncate();
                         }
 
-                        fds.push(entry.open());
                         opened_fd[0] = fds.length - 1;
                         err = constants.WASI_ESUCCESS;
                     }

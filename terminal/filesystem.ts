@@ -16,7 +16,7 @@ export class Directory {
         return {
             dev: 0n,
             ino: 0n,
-            file_type: self.file_type,
+            file_type: this.file_type,
             nlink: 0n,
             size: BigInt(4096),
             atim: 0n,
@@ -40,7 +40,7 @@ export class OpenDirectory {
         this._handle = handle;
     }
 
-    async entries(): Promise<(FileSystemFileHandle | FileSystemDirectoryHandle)[]>  {
+    async entries(): Promise<(File | Directory)[]>  {
         const a = [];
         for await (const [name, handle] of this._handle.entries()) {
             switch(handle.kind) {

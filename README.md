@@ -15,7 +15,7 @@ and go to http://localhost:8000.
 
 If you only want to embed rust-shell run
 ```
-make # builds wasm binary and copies necesssary files to `output` directory
+make embedded # builds wasm binary and copies necesssary files to `output` directory
 
 wget -P output https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm
 wget -P output https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm
