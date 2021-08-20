@@ -1,4 +1,4 @@
-import {hterm, lib} from "./hterm-all.js";
+import {hterm, lib} from "./hterm_all.js";
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 import {OpenFile, OpenDirectory} from "./filesystem.js";
