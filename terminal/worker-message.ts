@@ -96,9 +96,8 @@ export const on_worker_message = async (event, workerTable) => {
                         break;
                     }
                     case 2: {
+                        // TODO: should print in red, use ANSI color codes around output
                         const output = content.replaceAll("\n", "\r\n");
-                        // TODO: should print in red, use ANSI color codes
-                        // terminal.io.print(`${'\\033[01;32m'}${output}${'\\033[00m'}`);
                         workerTable.receive_callback(worker_id, output);
                         break;
                     }

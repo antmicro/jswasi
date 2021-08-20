@@ -7,7 +7,15 @@
 <body>
 <script type="module">
     import { init_all } from "./rust-shell.js";
-    window.onload = await init_all("#terminal");
+
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "./hterm_all.js";
+    script.onload = async () => {
+      await lib.init();
+      await init_all(document.querySelector("#terminal"));
+    };
+document.body.appendChild(script);
 </script>
 <div id="terminal"></div>
 </body>
