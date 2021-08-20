@@ -21,14 +21,6 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     return 1;
 }
 
-function receive_callback_maker(terminal) {
-    return (id, output) => {
-        if (terminal != null) {
-         terminal.io.print(output);
-        }
-    }
-}
-
 export async function init_all(anchor: HTMLElement) {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
@@ -40,7 +32,13 @@ export async function init_all(anchor: HTMLElement) {
     // attempt to pass Terminal to init_all as a parameter would fail
     const t = new hterm.Terminal();
 
-    const workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback_maker(t), root);
+    const workerTable = new WorkerTable(
+        "worker.js",
+        send_buffer_to_worker,
+        // receive_callback
+        (id, output) => t.io.print(output),
+        root
+    );
 
     t.decorate(anchor);
     t.installKeyboard();
