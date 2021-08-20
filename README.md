@@ -21,5 +21,5 @@ wget -P output https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.w
 wget -P output https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm
 wget -P output https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm
 wget -P output https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm
-wget -P output https://registry-cdn.wapm.io/contents/_/coreutils/0.0.1/target/wasm32-wasi/release/uutils.wasm
+wget -P output https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm -O uutils.wasm
 ```
