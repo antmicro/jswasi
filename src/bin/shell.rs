@@ -106,11 +106,13 @@ fn main() {
                 }
             }
             "touch" => {
-                if let Some(&filename) = args.get(0) {
-                    match File::create(filename) {
-                        Ok(_) => {}
-                        // TODO: match on error and provide better messages
-                        Err(error) => println!("touch: failed creating file: {}", error),
+                if !args.is_empty() {
+                    for filename in args {
+                        match File::create(filename) {
+                            Ok(_) => {}
+                            // TODO: match on error and provide better messages
+                            Err(error) => println!("touch: failed creating file: {}", error),
+                        }
                     }
                 } else {
                     println!("touch: missing file operand");
