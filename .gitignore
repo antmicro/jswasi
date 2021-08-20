@@ -8,12 +8,12 @@ pkg/
 wasm-pack.log
 
 node_modules
-package.json
 package-lock.json
 
 *.webm
 ci/images.txt
 ci/images
+ci/package-lock.json
 
 output
 

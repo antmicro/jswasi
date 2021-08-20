@@ -318,34 +318,30 @@ export const on_worker_message = async (event, workerTable) => {
                     for (let i = Number(cookie); i < entries.length; i++) {
                         const entry = entries[i];
                         const namebuf = new TextEncoder().encode(entry.path);
-                        if (databuf_ptr + 8 > databuf_len) break;
 
+                        if (databuf_ptr + 8 > databuf_len) break;
                         databuf.setBigUint64(databuf_ptr, BigInt(i + 1), true);
                         databuf_ptr += 8;
-                        if (databuf_ptr >= databuf_len) break;
-
+                        
+                        if (databuf_ptr + 8 >= databuf_len) break;
                         // TODO: get file stats ino (dummy 0n for now)
                         databuf.setBigUint64(databuf_ptr, 0n, true);
                         databuf_ptr += 8;
-                        // directory can have more entries that the buffor can store
-                        // in such case we return only partial results 
-                        if (databuf_ptr >= databuf_len) break;
                         
+                        if (databuf_ptr + 4 >= databuf_len) break;
                         databuf.setUint32(databuf_ptr, namebuf.byteLength, true);
                         databuf_ptr += 4;
-                        if (databuf_ptr >= databuf_len) break;
-
+                        
+                        if (databuf_ptr + 4 >= databuf_len) break;
                         const file_type = entry.file_type;
                         databuf.setUint8(databuf_ptr, file_type);
                         databuf_ptr += 4; // uint8 + padding
-                        if (databuf_ptr >= databuf_len) break;
 
                         // check if name will fit
                         if (databuf_ptr + namebuf.byteLength >= databuf_len) break;
                         const databuf8 = new Uint8Array(sbuf, 8);
                         databuf8.set(namebuf, databuf_ptr);
                         databuf_ptr += namebuf.byteLength;
-                        if (databuf_ptr >= databuf_len) break;
                     }
                     buf_used[0] = databuf_ptr > databuf_len ? databuf_len : databuf_ptr;
                     err = constants.WASI_ESUCCESS;
