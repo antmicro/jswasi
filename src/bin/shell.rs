@@ -75,6 +75,7 @@ fn main() {
                         );
                     } else {
                         pwd = new_path;
+                        // TODO: set PWD env var
                     }
                 }
             }
@@ -91,33 +92,6 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "cat" => {
-                if let Some(&filename) = args.get(0) {
-                    match fs::read_to_string(filename) {
-                        Ok(content) => println!("{}", content),
-                        // TODO: match on error and provide better messages
-                        Err(error) => println!("cat: {}: {}", filename, error),
-                    }
-                } else {
-                    let mut stdin = io::stdin();
-                    let mut stdout = io::stdout();
-
-                    io::copy(&mut stdin, &mut stdout).unwrap();
-                }
-            }
-            "touch" => {
-                if !args.is_empty() {
-                    for filename in args {
-                        match File::create(filename) {
-                            Ok(_) => {}
-                            // TODO: match on error and provide better messages
-                            Err(error) => println!("touch: failed creating file: {}", error),
-                        }
-                    }
-                } else {
-                    println!("touch: missing file operand");
-                }
-            }
             "write" => {
                 if args.len() < 2 {
                     println!("write: help: write <filename> <contents>");
@@ -130,8 +104,8 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "echo" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython"
-            | "uutils" | "printenv" | "mount" | "tree" | "viu" | "ls" => {
+            "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython" | "uutils"
+            | "printenv" | "mount" | "tree" | "viu" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
             }

@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "dependencies": {
     "typescript": "^4.3.5"
   },
