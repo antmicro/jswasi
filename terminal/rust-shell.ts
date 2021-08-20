@@ -1,4 +1,3 @@
-import {hterm, lib} from "./hterm-all.js";
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 import {OpenFile, OpenDirectory} from "./filesystem.js";
@@ -22,85 +21,73 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     return 1;
 }
 
-function receive_callback(id, output) {
-    if (terminal != null) {
-        terminal.io.print(output);
-    }
-}
-
-export async function init_all(terminal_query_selector: string) {
-    // If you are a cross-browser web app and want to use window.localStorage.
-    hterm.defaultStorage = new lib.Storage.Local();
-
+export async function init_all(anchor: HTMLElement) {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const home = await root.getDirectoryHandle("home", {create: true});
     const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await ant.getFileHandle(".shell_history", {create: true});
 
-    let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback, root);
+    // FIXME: for now we assume hterm is in scope
+    // attempt to pass Terminal to init_all as a parameter would fail
+    const t = new hterm.Terminal();
 
-    const setupHterm = () => {
-        const t = new hterm.Terminal("profile-id");
+    const workerTable = new WorkerTable(
+        "worker.js",
+        send_buffer_to_worker,
+        // receive_callback
+        (id, output) => t.io.print(output),
+        root
+    );
 
-        t.onTerminalReady = function () {
-            const io = t.io.push();
+    t.decorate(anchor);
+    t.installKeyboard();
 
-            io.onVTKeystroke = io.sendString = (data) => {
-                let code = data.charCodeAt(0);
-                console.log(data, code);
+    const io = t.io.push();
 
-                if (code === 13) {
-                    code = 10;
-                    data = String.fromCharCode(10);
+    io.onVTKeystroke = io.sendString = (data) => {
+        let code = data.charCodeAt(0);
+        console.log(data, code);
+
+        if (code === 13) {
+            code = 10;
+            data = String.fromCharCode(10);
+        }
+
+        if (code !== 10 && code < 32) {
+            // control characters
+            if (code == 3) {
+                console.log(`got ^C control, killing current worker (${workerTable.currentWorker})`);
+                workerTable.terminateWorker(workerTable.currentWorker);
+            } else if (code == 4) {
+                console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
+                workerTable.releaseWorker(workerTable.currentWorker, -1);
+            }
+        } else {
+            // regular characters
+            buffer = buffer + data;
+
+            // echo
+            t.io.print(code === 10 ? "\r\n" : data);
+
+            // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+            // now that buffer was filled, look if there are pending buffer requests from current foreground worker
+            if (workerTable.currentWorker != null) {
+                while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
+                    let {
+                        requested_len,
+                        lck,
+                        len,
+                        sbuf
+                    } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
+                    workerTable.send_callback(requested_len, lck, len, sbuf);
                 }
+            }
+        }
+    };
 
-                if (code !== 10 && code < 32) {
-                    // control characters
-                    if (code == 3) {
-                        console.log(`got ^C control, killing current worker (${workerTable.currentWorker})`);
-                        workerTable.terminateWorker(workerTable.currentWorker);
-                    } else if (code == 4) {
-                        console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
-                        workerTable.releaseWorker(workerTable.currentWorker, -1);
-                    }
-                } else {
-                    // regular characters
-                    buffer = buffer + data;
-
-                    // echo
-                    t.io.print(code === 10 ? "\r\n" : data);
-
-                    // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
-                    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-                    if (workerTable.currentWorker != null) {
-                        while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-                            let {
-                                requested_len,
-                                lck,
-                                len,
-                                sbuf
-                            } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                            workerTable.send_callback(requested_len, lck, len, sbuf);
-                        }
-                    }
-                }
-            };
-
-            io.onTerminalResize = (columns, rows) => {
-            };
-
-        };
-
-        t.decorate(document.querySelector(terminal_query_selector));
-        t.installKeyboard();
-
-        return t;
-    }
-
-    // This will be whatever normal entry/initialization point your project uses.
-    await lib.init();
-    terminal = setupHterm();
+    io.onTerminalResize = (columns, rows) => {
+    };
 
     workerTable.spawnWorker(
         null, // parent_id

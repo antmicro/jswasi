@@ -23354,4 +23354,3 @@ lib.resource.add('hterm/git/HEAD', 'text/plain',
 '7b6d46accc057e06d087f15732870b331850058b'
 );
 
-export { hterm, lib };
