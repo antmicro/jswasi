@@ -34,12 +34,9 @@ export async function init_all(terminal_query_selector: string) {
 
     // setup filesystem
     const root = await navigator.storage.getDirectory();
-//     const home = await root.getDirectoryHandle("home", {create: true});
-//     const ant = await home.getDirectoryHandle("ant", {create: true});
-//     const shell_history = await root.getFileHandle(".shell_history", {create: true});
-//     const w = await shell_history.createWritable();
-//     await w.write("abc");
-//     await w.close();
+    const home = await root.getDirectoryHandle("home", {create: true});
+    const ant = await home.getDirectoryHandle("ant", {create: true});
+    const shell_history = await root.getFileHandle(".shell_history", {create: true});
 
     let workerTable = new WorkerTable("worker.js", send_buffer_to_worker, receive_callback, root);
 
