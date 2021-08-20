@@ -10,7 +10,7 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, uutils (ls, cat, echo, env, basename, dirname, sum, printf, wc)");
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc)");
 
     loop {
         // prompt for input
@@ -95,6 +95,11 @@ fn main() {
             "touch" => {
                 if !args.is_empty() {
                     for filename in args {
+                        let filename = if filename.starts_with("/") {
+                            filename.to_owned()
+                        } else {
+                            pwd.join(filename).into_os_string().into_string().unwrap()
+                        };
                         match File::create(filename) {
                             Ok(_) => {}
                             // TODO: match on error and provide better messages
