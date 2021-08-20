@@ -765,4 +765,4 @@ async function start_wasm() {
     }
 }
 
-await start_wasm();
+(async () => await start_wasm())();
