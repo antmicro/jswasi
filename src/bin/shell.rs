@@ -10,7 +10,7 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, cat, touch, write, exit, echo, duk, main, shell, cowsay, rustpython, printenv, uutils");
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, uutils (ls, cat, echo, env, basename, dirname, sum, printf, wc)");
 
     loop {
         // prompt for input
@@ -92,6 +92,19 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
+            "touch" => {
+                if !args.is_empty() {
+                    for filename in args {
+                        match File::create(filename) {
+                            Ok(_) => {}
+                            // TODO: match on error and provide better messages
+                            Err(error) => println!("touch: failed creating file: {}", error),
+                        }
+                    }
+                } else {
+                    println!("touch: missing file operand");
+                }
+            }
             "write" => {
                 if args.len() < 2 {
                     println!("write: help: write <filename> <contents>");
@@ -104,8 +117,8 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython" | "uutils"
-            | "printenv" | "mount" | "tree" | "viu" => {
+            "touch" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython"
+            | "uutils" | "printenv" | "mount" | "tree" | "viu" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
             }
