@@ -318,8 +318,7 @@ export const on_worker_message = async (event, workerTable) => {
                     for (let i = Number(cookie); i < entries.length; i++) {
                         const entry = entries[i];
                         const namebuf = new TextEncoder().encode(entry.path);
-                        if (databuf_ptr > databuf_len) break;
-
+                        if (databuf_ptr + 8 > databuf_len) break;
 
                         databuf.setBigUint64(databuf_ptr, BigInt(i + 1), true);
                         databuf_ptr += 8;
