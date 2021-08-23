@@ -45,7 +45,6 @@ export const on_worker_message = async (event, workerTable) => {
                 if (fds[fd] != undefined) {
                     preopen_type[0] = fds[fd].file_type;
                     name_len[0] = fds[fd].path.length;
-                    console.log(`filte_type: ${preopen_type[0]}, name_len: ${name_len[0]}`);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     console.log("fd_prestat_get returning EBADF");
@@ -168,10 +167,10 @@ export const on_worker_message = async (event, workerTable) => {
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[dir_fd] != undefined) { // && fds[dir_fd].directory != undefined) { 
                     const create = (oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT;
-                    let entry = await fds[dir_fd].get_entry_for_path(path);
+                    let entry = await fds[dir_fd].get_entry(path);
                     if (entry == null) {
                         if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
-                            entry = await fds[dir_fd].create_entry_for_path(path);
+                            entry = await fds[dir_fd].create_entry(path);
                             if (entry == null) {
                                 err = constants.WASI_ENOENT;
                             }
@@ -259,7 +258,7 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    let entry = await fds[fd].get_entry_for_path(path);
+                    let entry = await fds[fd].get_entry(path);
                     if (entry == null) {
                         err = constants.WASI_EINVAL;
                     } else {
@@ -347,6 +346,22 @@ export const on_worker_message = async (event, workerTable) => {
                 } else {
                     console.log(`fd_readdir: bad fd: ${fd}`);
                     err = constants.WASI_EBADF;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
+            case "path_unlink_file": {
+                const [sbuf, fd, path] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {              
+                    // TODO: handle errors
+                    fds[fd].delete_entry(path);
+                    err = constants.WASI_ESUCCESS;
                 }
 
                 Atomics.store(lck, 0, err);

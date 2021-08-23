@@ -57,7 +57,7 @@ export class OpenDirectory {
         return a;
     }
 
-    async get_entry_for_path(path: string): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+    async get_entry(path: string): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
         console.log(`OpenDirectory.get_entry_for_path(${path})`);
         let entry = this._handle;
         let components = path.split("/");
@@ -93,7 +93,7 @@ export class OpenDirectory {
         }
     }
 
-    async create_entry_for_path(path: string) {
+    async create_entry(path: string) {
         console.log(`OpenDirectory.create_entry_for_path(${path})`);
         let entry = this._handle;
         if (entry == null) return null;
@@ -126,7 +126,8 @@ export class OpenDirectory {
     }
 
     delete_entry(path: string) {
-
+        this._handle.removeEntry(path);
+        return constants.WASI_ESUCCESS;
     }
 }
 

@@ -476,9 +476,22 @@ function WASI() {
         return 1;
     }
 
-    function path_unlink_file() {
-        worker_console_log("path_unlink_file");
-        return 1;
+    function path_unlink_file(fd: number, path_ptr: ptr, path_len: number) {
+        worker_console_log(`path_unlink_file(${fd}, ${path_ptr}, ${path_len})`);
+        
+        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+
+        const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+	
+        const sbuf = new SharedArrayBuffer(4); // lock
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+
+        worker_send(["path_unlink_file", [sbuf, fd, path]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        return err;
     }
 
     function sched_yield() {
@@ -501,7 +514,6 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === constants.WASI_ESUCCESS) {
-            worker_console_log(`filte_type: ${preopen_type[0]}, name_len: ${name_len[0]}`);
             view.setUint8(buf_ptr, preopen_type[0]);
             view.setUint32(buf_ptr + 4, name_len[0]);
         }
