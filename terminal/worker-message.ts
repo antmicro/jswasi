@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { OpenDirectory } from "./filesystem.js";
+import { OpenDirectory } from "./browser-fs.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
@@ -163,47 +163,20 @@ export const on_worker_message = async (event, workerTable) => {
                 const lck = new Int32Array(sbuf, 0, 1);
                 const opened_fd = new Int32Array(sbuf, 4, 1);
 
-                let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[dir_fd] != undefined) { // && fds[dir_fd].directory != undefined) { 
-                    const create = (oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT;
-                    let entry = await fds[dir_fd].get_entry(path);
-                    if (entry == null) {
-                        if ((oflags & constants.WASI_O_CREAT) === constants.WASI_O_CREAT) {
-                            entry = await fds[dir_fd].create_entry(path);
-                            if (entry == null) {
-                                err = constants.WASI_ENOENT;
-                            }
-                        } else {
-                            err = constants.WASI_ENOENT;
-                        }
-                    } else if ((oflags & constants.WASI_O_EXCL) === constants.WASI_O_EXCL) {
-                        console.log("file already exists, return 1");
-                        // return constants.WASI_EEXIST;
-                    }
-                    if (entry != null) {
-                        if ((oflags & constants.WASI_O_DIRECTORY) === constants.WASI_O_DIRECTORY && fds[dir_fd].file_type !== constants.WASI_FILETYPE_DIRECTORY) {
-                            console.log("oflags & OFLAGS_DIRECTORY === OFLAGS_DIRECTORY && fds[dir_fd].file_type !== FILETYPE_DIRECTORY")
-                            err = 1;
-                        }
-
-                        const entry_opened = await entry.open();
-                        fds.push(entry_opened);
-
-                        if ((oflags & constants.WASI_O_TRUNC) === constants.WASI_O_TRUNC) {
-                            entry_opened.truncate();
-                        }
-
-                        opened_fd[0] = fds.length - 1;
-                        err = constants.WASI_ESUCCESS;
-                    }
+                if (fds[dir_fd] != undefined) {
+                    let {err, entry} = await fds[dir_fd].get_entry(path, oflags);
+                    fds.push(await entry.open());
+                    opened_fd[0] = fds.length - 1;
+                    Atomics.store(lck, 0, err);
+                    Atomics.notify(lck, 0);
                 } else {
-                    console.log("fd doesn't exist or is a directory");
-                    err = constants.WASI_EBADF;
+                    console.log("fd doesn't exist");
+                    const err = constants.WASI_EBADF;
+                    Atomics.store(lck, 0, err);
+                    Atomics.notify(lck, 0);
                 }
 
-                Atomics.store(lck, 0, err);
-                Atomics.notify(lck, 0);
                 break;
             }
             case "fd_close": {
@@ -258,10 +231,8 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    let entry = await fds[fd].get_entry(path);
-                    if (entry == null) {
-                        err = constants.WASI_EINVAL;
-                    } else {
+                    const {err, entry} = await fds[fd].get_entry(path);
+                    if (err == constants.WASI_ESUCCESS) {
                         let stat = await entry.stat();
                         buf.setBigUint64(0, stat.dev, true);
                         buf.setBigUint64(8, stat.ino, true);
@@ -271,7 +242,6 @@ export const on_worker_message = async (event, workerTable) => {
                         buf.setBigUint64(38, stat.atim, true);
                         buf.setBigUint64(46, stat.mtim, true);
                         buf.setBigUint64(52, stat.ctim, true);
-                        err = constants.WASI_ESUCCESS;
                     }
                 } else {
                     console.log(`path_filestat_get: undefined`);

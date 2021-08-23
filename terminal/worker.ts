@@ -380,12 +380,14 @@ function WASI() {
     }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
-        console.log("path_filestat_get(", fd, ", ", flags, ", ", path_ptr, ", ", path_len, ", ", buf, ")");
-
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+
+        console.log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
+
+
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);

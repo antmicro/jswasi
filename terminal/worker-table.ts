@@ -1,5 +1,4 @@
 //NODE// import { Worker } from 'worker_threads';
-import {OpenDirectory} from "./filesystem.js";
 
 class WorkerInfo {
     public id: number;
@@ -45,7 +44,7 @@ export class WorkerTable {
         let private_data = {};
         if (!this.isNode) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, new OpenDirectory("/", this.root)], parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, this.root], parent_id, parent_lock, callback);
         if (!this.isNode) {
             worker.onmessage = (event) => callback(event, this);
         } else {

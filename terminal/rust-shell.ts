@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {OpenFile, OpenDirectory} from "./filesystem.js";
+import {OpenFile, OpenDirectory} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
@@ -37,7 +37,7 @@ export async function init_all(anchor: HTMLElement) {
         send_buffer_to_worker,
         // receive_callback
         (id, output) => t.io.print(output),
-        root
+        new OpenDirectory("/", root)
     );
 
     t.decorate(anchor);
