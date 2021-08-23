@@ -360,8 +360,22 @@ export const on_worker_message = async (event, workerTable) => {
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {              
                     // TODO: handle errors
-                    fds[fd].delete_entry(path);
+                    await fds[fd].delete_entry(path);
                     err = constants.WASI_ESUCCESS;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
+            case "path_remove_directory": {
+                const [sbuf, fd, path] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {              
+                    ({err} = fds[fd].delete_entry(path, {recursive: true}));
                 }
 
                 Atomics.store(lck, 0, err);

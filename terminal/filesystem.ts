@@ -40,6 +40,31 @@ export class OpenDirectory {
         this._handle = handle;
     }
 
+    private async _resolve(path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+        const parts = [];
+
+        for(const component of path.split("/")) {
+            if (component == "..") {
+                if (parts.length == 0) {
+                    return {err: constants.WASI_ENOTCAPABLE, name: null, dir_handle: null};
+                } else {
+                    parts.pop()
+                }
+            } else if (component !== ".") {
+                parts.push(component);
+            }
+        }
+
+        const name = parts.pop();
+        let dir_handle = this._handle;
+        for (const part of parts) {
+            dir_handle = await dir_handle.getDirectoryHandle(part);
+        }
+
+        return {err: constants.WASI_ESUCCESS, name, dir_handle};
+    }
+
+
     async entries(): Promise<(File | Directory)[]>  {
         const a = [];
         for await (const [name, handle] of this._handle.entries()) {
@@ -57,7 +82,7 @@ export class OpenDirectory {
         return a;
     }
 
-    async get_entry(path: string): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+    async get_entry(path: string): Promise<File | Directory> {
         console.log(`OpenDirectory.get_entry_for_path(${path})`);
         let entry = this._handle;
         let components = path.split("/");
@@ -106,7 +131,6 @@ export class OpenDirectory {
                 return null;
             }
             for await (const [name, handle] of entry.entries()) {
-                console.log("-".repeat(4 * i), {name, handle});
                 if (name === component) {
                     entry = handle;
                     found = true;
@@ -125,9 +149,10 @@ export class OpenDirectory {
         return new File(path, entry);
     }
 
-    delete_entry(path: string) {
-        this._handle.removeEntry(path);
-        return constants.WASI_ESUCCESS;
+    async delete_entry(path: string, options): Promise<{err: number}> {
+        const {err, name, dir_handle} = await this._resolve(path);
+        await dir_handle.removeEntry(name, options);
+        return {err: constants.WASI_ESUCCESS};
     }
 }
 
