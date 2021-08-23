@@ -1,4 +1,5 @@
 import * as constants from "./constants.js";
+import { FileOrDir } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
 
 export const on_worker_message = async (event, workerTable) => {
@@ -165,7 +166,7 @@ export const on_worker_message = async (event, workerTable) => {
 
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[dir_fd] != undefined) {
-                    let {err, entry} = await fds[dir_fd].get_entry(path, oflags);
+                    let {err, entry} = await fds[dir_fd].get_entry(path, FileOrDir.Any, oflags);
                     fds.push(await entry.open());
                     opened_fd[0] = fds.length - 1;
                     Atomics.store(lck, 0, err);
@@ -231,7 +232,7 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    const {err, entry} = await fds[fd].get_entry(path);
+                    const {err, entry} = await fds[fd].get_entry(path, FileOrDir.Any);
                     if (err == constants.WASI_ESUCCESS) {
                         let stat = await entry.stat();
                         buf.setBigUint64(0, stat.dev, true);

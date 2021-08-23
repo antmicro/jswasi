@@ -97,8 +97,13 @@ export class OpenDirectory {
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, ${oflags})`);
-        
-        if (path === ".") {
+    
+        let {err, name, dir_handle} = await this._resolve(path);
+        if (err !== constants.WASI_ESUCCESS) {
+            return {err, entry: null};
+        }    
+
+        if (name === undefined) {
             if (oflags & (OpenFlags.Create | OpenFlags.Exclusive)) {
                 return {err: constants.WASI_EEXIST, entry: null};
             }
@@ -108,19 +113,15 @@ export class OpenDirectory {
             return {err: constants.WASI_ESUCCESS, entry: new Directory(this.path, this._handle)};
         }
 
-        const {err, name, dir_handle} = await this._resolve(path);
-        if (err !== constants.WASI_ESUCCESS) {
-            return {err, entry: null};
-        }
         
         if (oflags & OpenFlags.Directory) {
             mode = FileOrDir.Directory;
         }
 
-        const openWithCreate = async (create: boolean): Promise<{err: number, entry: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
+        const openWithCreate = async (create: boolean): Promise<{err: number, handle: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
             if (mode & FileOrDir.File) {
                 try {
-                    return {err: constants.WASI_ESUCCESS, entry: await dir_handle.getFileHandle(name, {create})};
+                    return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getFileHandle(name, {create})};
                 } catch (err) {
                     if (err.name === 'TypeMismatchError') {
                         if (!(mode & FileOrDir.Directory)) {
@@ -132,7 +133,7 @@ export class OpenDirectory {
                 }
             }
             try {
-                return await dir_handle.getDirectoryHandle(name, {create});
+                return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create}});
             } catch (err) {
                 if (err.name === 'TypeMismatchError') {
                     return {err: constants.WASI_ENOTDIR, entry: null};
@@ -149,9 +150,13 @@ export class OpenDirectory {
                     return {err: constants.WASI_EEXIST, entry: null};
                 }
             }
-            handle = await openWithCreate(true);
+            ({err, handle} = await openWithCreate(true));
         } else {
-            handle = await openWithCreate(false);
+            ({err, handle} = await openWithCreate(false));
+        }
+
+        if (err !== constants.WASI_ESUCCESS) {
+            return {err, entry: null};
         }
                 
         if (oflags & OpenFlags.Truncate) {
