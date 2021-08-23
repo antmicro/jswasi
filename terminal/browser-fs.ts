@@ -4,7 +4,7 @@ import {FileOrDir, OpenFlags} from "./filesystem.js";
 export class Directory {
     public readonly file_type: number = constants.WASI_FILETYPE_DIRECTORY;
     public readonly path: string;
-    private readonly _handle: FileSystemDirectoryHandle;
+    protected readonly _handle: FileSystemDirectoryHandle;
 
     constructor(path: string, handle: FileSystemDirectoryHandle) {
         this.path = path;
@@ -31,26 +31,15 @@ export class Directory {
     }
 }
 
-export class OpenDirectory {
+export class OpenDirectory extends Directory {
     public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
-    public readonly path: string;
-    private readonly _handle: FileSystemDirectoryHandle;
-
-    constructor(path: string, handle: FileSystemDirectoryHandle) {
-        this.path = path;
-        this._handle = handle;
-    }
 
     private async _resolve(path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
         const parts = [];
 
         for(const component of path.split("/")) {
             if (component == "..") {
-                if (parts.length == 0) {
-                    return {err: constants.WASI_ENOTCAPABLE, name: null, dir_handle: null};
-                } else {
-                    parts.pop()
-                }
+                parts.pop()
             } else if (component !== ".") {
                 parts.push(component);
             }
@@ -125,18 +114,20 @@ export class OpenDirectory {
                 } catch (err) {
                     if (err.name === 'TypeMismatchError') {
                         if (!(mode & FileOrDir.Directory)) {
-                            return {err: constants.WASI_EISDIR, entry: null};
+                            return {err: constants.WASI_EISDIR, handle: null};
                         }
+                    } else if (err.name === 'NotFoundError') {
+                        return {err: constants.WASI_ENOENT, handle: null};
                     } else {
                         throw err;
                     }
                 }
             }
             try {
-                return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create}});
+                return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create})};
             } catch (err) {
                 if (err.name === 'TypeMismatchError') {
-                    return {err: constants.WASI_ENOTDIR, entry: null};
+                    return {err: constants.WASI_ENOTDIR, handle: null};
                 } else {
                     throw err;
                 }

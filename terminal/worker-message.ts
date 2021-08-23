@@ -164,20 +164,21 @@ export const on_worker_message = async (event, workerTable) => {
                 const lck = new Int32Array(sbuf, 0, 1);
                 const opened_fd = new Int32Array(sbuf, 4, 1);
 
+                let err, entry;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[dir_fd] != undefined) {
-                    let {err, entry} = await fds[dir_fd].get_entry(path, FileOrDir.Any, oflags);
-                    fds.push(await entry.open());
-                    opened_fd[0] = fds.length - 1;
-                    Atomics.store(lck, 0, err);
-                    Atomics.notify(lck, 0);
+                    ({err, entry} = await fds[dir_fd].get_entry(path, FileOrDir.Any, oflags));
+                    if (err === constants.WASI_ESUCCESS) {
+                        fds.push(await entry.open());
+                        opened_fd[0] = fds.length - 1;
+                    }
                 } else {
                     console.log("fd doesn't exist");
-                    const err = constants.WASI_EBADF;
-                    Atomics.store(lck, 0, err);
-                    Atomics.notify(lck, 0);
+                    err = constants.WASI_EBADF;
                 }
 
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
                 break;
             }
             case "fd_close": {
@@ -229,11 +230,11 @@ export const on_worker_message = async (event, workerTable) => {
                 const lck = new Int32Array(sbuf, 0, 1);
                 const buf = new DataView(sbuf, 4);
 
-                let err;
+                let err, entry;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    const {err, entry} = await fds[fd].get_entry(path, FileOrDir.Any);
-                    if (err == constants.WASI_ESUCCESS) {
+                    ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
+                    if (err === constants.WASI_ESUCCESS) {
                         let stat = await entry.stat();
                         buf.setBigUint64(0, stat.dev, true);
                         buf.setBigUint64(8, stat.ino, true);
