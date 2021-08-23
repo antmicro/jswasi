@@ -122,8 +122,8 @@ fn main() {
             }
             "exit" => exit(0),
             // external commands
-            "touch" | "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython"
-            | "uutils" | "printenv" | "mount" | "tree" | "viu" => {
+            "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython" | "uutils"
+            | "printenv" | "mount" | "tree" | "viu" => {
                 #[allow(unused_must_use)]
                 File::open(format!("!{} {}", command, input));
             }
