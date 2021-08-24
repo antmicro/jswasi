@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { FileOrDir } from "./filesystem.js";
+import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
 
 export const on_worker_message = async (event, workerTable) => {
@@ -348,6 +348,23 @@ export const on_worker_message = async (event, workerTable) => {
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {              
                     ({err} = fds[fd].delete_entry(path, {recursive: true}));
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }   
+            case "path_create_directory": {
+                const [sbuf, fd, path] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {              
+                    // TODO: handle errors
+                    err = await fds[fd].get_entry(path, FileOrDir.Directory, OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive);
+                } else {
+                    err = constants.WASI_EBADF;
                 }
 
                 Atomics.store(lck, 0, err);

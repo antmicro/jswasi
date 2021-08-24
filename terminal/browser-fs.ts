@@ -127,7 +127,8 @@ export class OpenDirectory extends Directory {
                 return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create})};
             } catch (err) {
                 if (err.name === 'TypeMismatchError') {
-                    return {err: constants.WASI_ENOTDIR, handle: null};
+                    return {err: constants.WASI_ENOTDIR, handle: null};                              } else if (err.name === 'NotFoundError') {
+                    return {err: constants.WASI_ENOENT, handle: null};
                 } else {
                     throw err;
                 }

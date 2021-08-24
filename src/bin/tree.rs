@@ -9,6 +9,7 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
+                cb(&entry);
                 visit_dirs(&path, cb)?;
             } else {
                 cb(&entry);

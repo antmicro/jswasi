@@ -10,7 +10,7 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc)");
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv)");
 
     loop {
         // prompt for input

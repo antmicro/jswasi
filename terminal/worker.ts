@@ -375,9 +375,23 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    function path_create_directory() {
-        worker_console_log("path_create_directory");
-        return 1; // TODO!!!!
+    function path_create_directory(fd: number, path_ptr: ptr, path_len: number) {
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+
+        const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+
+        console.log(`path_create_directory(${fd}, ${path_ptr}, ${path_len}) [path=${path}]`);
+
+        const sbuf = new SharedArrayBuffer(4); // lock
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+
+        worker_send(["path_create_directory", [sbuf, fd, path]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        return err;
     }
 
     function path_filestat_get(fd, flags, path_ptr, path_len, buf) {
