@@ -1,5 +1,3 @@
-import * as constants from "./constants.js";
-
 export const enum FileOrDir {
     File = 1,
     Directory = 2,

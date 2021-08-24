@@ -21,12 +21,44 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     return 1;
 }
 
-export async function init_all(anchor: HTMLElement) {
+const BINARIES = {
+    "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+    "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
+    "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
+    "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+};
+
+export async function init_fs(): Promise<OpenDirectory> {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const home = await root.getDirectoryHandle("home", {create: true});
     const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await ant.getFileHandle(".shell_history", {create: true});
+
+    const usr = await root.getDirectoryHandle("usr", {create: true});
+    const bin = await usr.getDirectoryHandle("bin", {create: true});
+
+    for (const [filename, address] of Object.entries(BINARIES)) {
+        const handle = await bin.getFileHandle(filename, {create: true});
+        const file = await handle.getFile();
+        // only fetch binary if not yet present
+        if (file.size === 0) {
+            const response = await fetch(address);
+            if (response.status === 200) {
+                const writable = await handle.createWritable();
+                await response.body.pipeTo(writable);
+            } else {
+                console.log(`Failed downloading ${filename} from ${address}`);
+            }
+        }
+    }
+
+    return new OpenDirectory("/", root);
+}
+
+export async function init_all(anchor: HTMLElement) {
+    const openRoot = await init_fs();
 
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
@@ -38,7 +70,7 @@ export async function init_all(anchor: HTMLElement) {
         send_buffer_to_worker,
         // receive_callback
         (id, output) => t.io.print(output),
-        new OpenDirectory("/", root)
+        openRoot
     );
 
     t.decorate(anchor);
