@@ -792,9 +792,8 @@ async function start_wasm() {
                     do_exit(255);
                     return;
                 }
-            } else {
-                await importWasmModule(fname, WASI);
             }
+            await importWasmModule(fname, WASI);
         } catch {
             worker_console_log("Failed instantiating WASM module");
             do_exit(255);
