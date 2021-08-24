@@ -3,6 +3,7 @@
     "target": "esnext",
     "module": "esnext",
     "outDir": "output",
+    "removeComments": false,
     "watch": false
   },
   "include": ["terminal/**/*"]

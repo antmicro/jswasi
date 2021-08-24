@@ -30,6 +30,7 @@ export async function init_all(anchor: HTMLElement) {
 
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
+    // @ts-ignore
     const t = new hterm.Terminal();
 
     const workerTable = new WorkerTable(

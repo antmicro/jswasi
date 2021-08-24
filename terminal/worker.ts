@@ -4,8 +4,9 @@
 // TODO: remove any code taken from here:
 // bjorn3 (https://github.com/bjorn3/rust/blob/compile_rustc_wasm4/rustc.html)
 
+//NODE// import * as fs from "fs";
+//NODE// import { parentPort } from "worker_threads";
 import * as constants from "./constants.js";
-//NODE// import node_helpers from './node_helpers.cjs';
 
 type ptr = number;
 
@@ -33,7 +34,7 @@ const onmessage_ = function (e) {
 
 if (IS_NODE) {
     // @ts-ignore
-    node_helpers.get_parent_port().once('message', (message) => {
+    parentPort.once('message', (message) => {
         let msg = {data: message};
         onmessage_(msg);
     });
@@ -45,7 +46,7 @@ function worker_send(msg) {
     if (IS_NODE) {
         const msg_ = {data: [myself, msg[0], msg[1]]};
         // @ts-ignore
-        node_helpers.get_parent_port().postMessage(msg_);
+        parentPort.postMessage(msg_);
     } else {
         const msg_ = [myself, ...msg];
         postMessage(msg_);
@@ -729,12 +730,12 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             module = await WebAssembly.compileStreaming(fetch(moduleName));
         } else {
             let buffer = null;
-            if (!IS_NODE) {
+            if (IS_NODE) {
+                // @ts-ignore
+                buffer = fs.readFileSync(moduleName, null);
+            } else {
                 const response = await fetch(moduleName);
                 buffer = await response;
-            } else {
-                // @ts-ignore
-                buffer = node_helpers.fs.readFileSync(moduleName, null);
             }
             module = await WebAssembly.compile(buffer);
         }

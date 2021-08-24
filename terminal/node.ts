@@ -3,7 +3,7 @@ import { Worker } from 'worker_threads';
 import * as constants from "./constants.js";
 // @ts-ignore
 import {WorkerTable} from "./worker-table.mjs";
-import {OpenFile, OpenDirectory} from "./filesystem.js";
+import {OpenFile, OpenDirectory} from "./node-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 let debug = false;
