@@ -771,7 +771,7 @@ async function start_wasm() {
         try {
             if (IS_NODE) {
                 // @ts-ignore
-                if (!node_helpers.fs.existsSync(fname)) {
+                if (!fs.existsSync(fname)) {
                     worker_console_log(`File ${fname} not found!`);
                     started = false;
                     fname = "";
