@@ -3,6 +3,8 @@ import {WorkerTable} from "./worker-table.js";
 import {OpenFile, OpenDirectory} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
+const PROXY_SERVER = "http://localhost:8001";
+
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
 let buffer = "";
 let terminal = null;
@@ -44,7 +46,7 @@ export async function init_fs(): Promise<OpenDirectory> {
         const file = await handle.getFile();
         // only fetch binary if not yet present
         if (file.size === 0) {
-            const response = await fetch(address, {"mode": "no-cors"});
+            const response = await fetch(`${PROXY_SERVER}/${address}`);
             if (response.status === 200) {
                 const writable = await handle.createWritable();
                 await response.body.pipeTo(writable);
