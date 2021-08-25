@@ -44,7 +44,7 @@ export async function init_fs(): Promise<OpenDirectory> {
         const file = await handle.getFile();
         // only fetch binary if not yet present
         if (file.size === 0) {
-            const response = await fetch(address);
+            const response = await fetch(address, {"mode": "no-cors"});
             if (response.status === 200) {
                 const writable = await handle.createWritable();
                 await response.body.pipeTo(writable);
