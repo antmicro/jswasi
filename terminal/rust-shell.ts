@@ -24,6 +24,8 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
 }
 
 const BINARIES = {
+    "shell.wasm": "http://localhost:8000/shell.wasm",
+    "tree.wasm": "http://localhost:8000/tree.wasm",
     "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
     "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
     "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
@@ -46,7 +48,14 @@ export async function init_fs(): Promise<OpenDirectory> {
         const file = await handle.getFile();
         // only fetch binary if not yet present
         if (file.size === 0) {
-            const response = await fetch(`${PROXY_SERVER}/${address}`);
+            let response;
+            if (address.startsWith("http://localhost")) {
+                // files served from same origin
+                response = await fetch(address);
+            } else {
+                // files requested from cross-orign that require proxy server
+                response = await fetch(`${PROXY_SERVER}/${address}`);
+            }
             if (response.status === 200) {
                 const writable = await handle.createWritable();
                 await response.body.pipeTo(writable);

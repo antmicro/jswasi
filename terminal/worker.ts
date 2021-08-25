@@ -722,9 +722,16 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         js: {mem: memory}
     };
 
+    const root = await navigator.storage.getDirectory();
+    const usr = await root.getDirectoryHandle("usr");
+    const bin = await usr.getDirectoryHandle("bin");
+    const binary = await bin.getFileHandle(moduleName);
+    const file = await binary.getFile();
+    const response = new Response(file);
+
     if (WebAssembly.instantiateStreaming) {
         worker_console_log(`WebAssembly.instantiateStreaming`);
-        const {module, instance} = await WebAssembly.instantiateStreaming(fetch(moduleName), moduleImports);
+        const {module, instance} = await WebAssembly.instantiateStreaming(response, moduleImports);
 
         wasiCallbacks.setModuleInstance(instance);
         try {
@@ -741,15 +748,14 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         let module = null;
 
         if (WebAssembly.compileStreaming) {
-            module = await WebAssembly.compileStreaming(fetch(moduleName));
+            module = await WebAssembly.compileStreaming(response);
         } else {
             let buffer = null;
             if (IS_NODE) {
                 // @ts-ignore
                 buffer = fs.readFileSync(moduleName, null);
             } else {
-                const response = await fetch(moduleName);
-                buffer = await response;
+                buffer = await (await response);
             }
             module = await WebAssembly.compile(buffer);
         }
@@ -794,8 +800,8 @@ async function start_wasm() {
                 }
             }
             await importWasmModule(fname, WASI);
-        } catch {
-            worker_console_log("Failed instantiating WASM module");
+        } catch(err) {
+            worker_console_log(`Failed instantiating WASM module: ${err}`);
             do_exit(255);
         }
         worker_console_log("done.");
