@@ -1,29 +1,53 @@
 import * as constants from "./constants.js";
 import {FileOrDir, OpenFlags} from "./filesystem.js";
 
-export class Directory {
-    public readonly file_type: number = constants.WASI_FILETYPE_DIRECTORY;
+abstract class Entry {
+    public readonly file_type: number;
     public readonly path: string;
-    protected readonly _handle: FileSystemDirectoryHandle;
+    protected readonly _handle: FileSystemDirectoryHandle | FileSystemFileHandle;
 
-    constructor(path: string, handle: FileSystemDirectoryHandle) {
+    constructor(path: string, handle: FileSystemDirectoryHandle | FileSystemFileHandle) {
         this.path = path;
         this._handle = handle;
     }
 
+    abstract size(): Promise<number>;
+
+    abstract lastModified(): Promise<number>;
+
     // TODO: fill dummy values with something meaningful
     async stat() {
-        console.log(`Directory.stat()`);
+        console.log(`Entry.stat()`);
+        const time = BigInt(await this.lastModified()) * 1_000_000n;
         return {
             dev: 0n,
             ino: 0n,
             file_type: this.file_type,
             nlink: 0n,
-            size: BigInt(4096),
-            atim: 0n,
-            mtim: 0n,
-            ctim: 0n,
+            size: BigInt(await this.size()),
+            atim: time,
+            mtim: time, 
+            ctim: time,
         };
+    }
+}
+
+export class Directory extends Entry {
+    public readonly file_type: number = constants.WASI_FILETYPE_DIRECTORY;
+    declare _handle: FileSystemDirectoryHandle;
+
+    constructor(path: string, handle: FileSystemDirectoryHandle) {
+        super(path, handle);
+    }
+
+    async size(): Promise<number> {
+        return 0;
+    }
+    
+    async lastModified(): Promise<number> {
+        // TODO: this could recursively call all entries lastModified() and pick latest
+        //       but it wouldn't be too optimal and there is no way to store that information for now
+        return 0;
     }
 
     open() {
@@ -127,7 +151,8 @@ export class OpenDirectory extends Directory {
                 return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create})};
             } catch (err) {
                 if (err.name === 'TypeMismatchError') {
-                    return {err: constants.WASI_ENOTDIR, handle: null};                              } else if (err.name === 'NotFoundError') {
+                    return {err: constants.WASI_ENOTDIR, handle: null};                              
+                } else if (err.name === 'NotFoundError') {
                     return {err: constants.WASI_ENOENT, handle: null};
                 } else {
                     throw err;
@@ -177,31 +202,23 @@ export class OpenDirectory extends Directory {
     }
 }
 
-export class File {
+export class File extends Entry {
     public readonly file_type: number = constants.WASI_FILETYPE_REGULAR_FILE;
-    public readonly path: string;
-    private readonly _handle: FileSystemFileHandle;
+    declare protected readonly _handle: FileSystemFileHandle;
 
     constructor(path: string, handle: FileSystemFileHandle) {
-        this.path = path;
-        this._handle = handle;
-
+        super(path, handle);
     }
 
-    // TODO: fill dummy values with something meaningful
-    async stat() {
-        console.log(`File.stat()`);
+    async size(): Promise<number> {
         let file = await this._handle.getFile();
-        return {
-            dev: 0n,
-            ino: 0n,
-            file_type: constants.WASI_FILETYPE_REGULAR_FILE,
-            nlink: 0n,
-            size: BigInt(file.size),
-            atim: 0n,
-            mtim: 0n,
-            ctim: 0n,
-        };
+        return file.size;
+    }
+    
+    async lastModified(): Promise<number> {
+        let file = await this._handle.getFile();
+        console.log(`file.lastModified = ${file.lastModified}`);
+        return file.lastModified;
     }
 
     async open() {
@@ -211,22 +228,9 @@ export class File {
 
 // Represents File opened for reading and writing
 // it is backed by File System Access API through a FileSystemFileHandle handle
-export class OpenFile {
+export class OpenFile extends File {
     public readonly file_type: number = constants.WASI_FILETYPE_REGULAR_FILE;
-    public readonly path: string;
-    private readonly _handle: FileSystemFileHandle;
     private _file_pos: number = 0;
-
-    constructor(path: string, handle: FileSystemFileHandle) {
-        this.path = path;
-        this._handle = handle;
-    }
-
-    // return file size in bytes
-    async size(): Promise<number> {
-        let file = await this._handle.getFile();
-        return file.size;
-    }
 
     async read(len: number): Promise<[Uint8Array, number]> {
         console.log(`OpenFile.read(${len})`);
@@ -248,21 +252,6 @@ export class OpenFile {
         await w.close();
         this._file_pos += buffer.length;
         return 0;
-    }
-
-    // TODO: fill dummy values with something meaningful
-    async stat() {
-        console.log(`OpenFile.stat()`);
-        return {
-            dev: 0n,
-            ino: 0n,
-            file_type: constants.WASI_FILETYPE_REGULAR_FILE,
-            nlink: 0n,
-            size: BigInt(await this.size()),
-            atim: 0n,
-            mtim: 0n,
-            ctim: 0n,
-        };
     }
 
     async seek(offset: number, whence: number) {
