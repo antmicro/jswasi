@@ -36,8 +36,8 @@ const OPTIONAL_BINARIES = {
     "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
 };
 
-async function fetch_binary(bin_handle: FileSystemDirectoryHandle, filename: string, address: string) {
-    const handle = await bin_handle.getFileHandle(filename, {create: true});
+async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
+    const handle = await dir_handle.getFileHandle(filename, {create: true});
     const file = await handle.getFile();
     // only fetch binary if not yet present
     if (file.size === 0) {
@@ -69,8 +69,12 @@ export async function init_fs(): Promise<OpenDirectory> {
     const usr = await root.getDirectoryHandle("usr", {create: true});
     const bin = await usr.getDirectoryHandle("bin", {create: true});
 
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_binary(bin, filename, address));
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_binary(bin, filename, address));
+    // create dummy files for browser executed commands
+    await bin.getFileHandle("mount.wasm", {create: true});
+    await bin.getFileHandle("wget.wasm", {create: true});
+
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
     
     // don't await this on purpose
     // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
@@ -158,5 +162,21 @@ export async function init_all(anchor: HTMLElement) {
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
     }]);
+}
+
+export async function mount(worker_id, args, env) {
+    const mount = await showDirectoryPicker();
+    // TODO: implement
+    // workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[1], mount));
+}
+
+export async function wget(worker_id, args, env) {
+    if (args.length != 3) {
+        console.log("write: help: write <address> <filename>")
+        return;
+    }
+    // TODO: fetch to CWD
+    const root = await navigator.storage.getDirectory();
+    fetch_file(root, args[2], args[1]); 
 }
 

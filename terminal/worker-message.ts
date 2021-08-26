@@ -1,6 +1,7 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
+import { mount, wget } from "./rust-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
@@ -17,21 +18,28 @@ export const on_worker_message = async (event, workerTable) => {
             case "spawn": {
                 const [command, args, env, sbuf] = data;
                 const parent_lck = new Int32Array(sbuf, 0, 1);
-                if (command === "mount") {
-                    // special case for mount command
-                    const mount = await showDirectoryPicker();
-                    workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[1], mount));
-                    // release worker straight away
-                    Atomics.store(parent_lck, 0, 0);
-                    Atomics.notify(parent_lck, 0);
-                } else {
-                    const id = workerTable.spawnWorker(
-                        worker_id,
-                        parent_lck,
-                        on_worker_message
-                    );
-                    workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
-                    console.log("WORKER " + worker_id + " spawned: " + command);
+                switch(command) {
+                    case "mount": {
+                        await mount(worker_id, args, env);
+                        Atomics.store(parent_lck, 0, 0);
+                        Atomics.notify(parent_lck, 0);
+                        break;
+                    } 
+                    case "wget": {
+                        await wget(worker_id, args, env);
+                        Atomics.store(parent_lck, 0, 0);
+                        Atomics.notify(parent_lck, 0);
+                        break;
+                    }
+                    default: {
+                        const id = workerTable.spawnWorker(
+                            worker_id,
+                            parent_lck,
+                            on_worker_message
+                        );
+                        workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
+                        console.log("WORKER " + worker_id + " spawned: " + command);
+                    }
                 }
                 break;
             }
