@@ -249,9 +249,9 @@ export const on_worker_message = async (event, workerTable) => {
                         buf.setUint8(16, stat.file_type);
                         buf.setBigUint64(24, stat.nlink, true);
                         buf.setBigUint64(32, stat.size, true);
-                        buf.setBigUint64(38, stat.atim, true);
-                        buf.setBigUint64(46, stat.mtim, true);
-                        buf.setBigUint64(52, stat.ctim, true);
+                        buf.setBigUint64(40, stat.atim, true);
+                        buf.setBigUint64(48, stat.mtim, true);
+                        buf.setBigUint64(56, stat.ctim, true);
                     }
                 } else {
                     console.log(`path_filestat_get: undefined`);

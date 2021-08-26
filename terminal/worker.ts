@@ -49,6 +49,7 @@ function worker_send(msg) {
         parentPort.postMessage(msg_);
     } else {
         const msg_ = [myself, ...msg];
+        // @ts-ignore
         postMessage(msg_);
     }
 }
@@ -97,8 +98,8 @@ function WASI() {
     function environ_get(environ, environ_buf) {
         worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
 
-        let view = new DataView(moduleInstanceExports.memory.buffer);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let environ_buf_offset = environ_buf;
 
@@ -129,8 +130,8 @@ function WASI() {
     function args_get(argv, argv_buf) {
         worker_console_log("args_get(" + argv + ", 0x" + argv_buf.toString(16) + ")");
 
-        let view = new DataView(moduleInstanceExports.memory.buffer);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let argv_buf_offset = argv_buf;
 
@@ -148,18 +149,41 @@ function WASI() {
     }
 
     function fd_fdstat_get(fd, bufPtr) {
-        worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
-
-        const view = new DataView(moduleInstanceExports.memory.buffer);
-
-        // const stats = fds[fd].stats();
-
-        if (fd <= 2) {
-            view.setBigUint64(bufPtr, BigInt(2)); // chardev
-        }
-        view.setBigUint64(bufPtr + 8, BigInt(0));
-        view.setBigUint64(bufPtr + 16, BigInt(0));
-
+//        worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
+//
+//        const view = new DataView(moduleInstanceExports.memory.buffer);
+//
+//        const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
+//        const lck = new Int32Array(sbuf, 0, 1);
+//        lck[0] = -1;
+//        const statbuf = new DataView(sbuf, 4);
+//
+//        worker_send(["fd_filestat_get", [sbuf, fd]]);
+//        Atomics.wait(lck, 0, -1);
+//
+//        const err = Atomics.load(lck, 0);
+//        if (err !== constants.WASI_ESUCCESS) {
+//            return err;
+//        }
+//        
+//        const dev = statbuf.getBigUint64(0, true);
+//        const ino = statbuf.getBigUint64(8, true);
+//        const file_type = statbuf.getUint8(16);
+//        const nlink = statbuf.getBigUint64(24, true);
+//        const size = statbuf.getBigUint64(32, true);
+//        const atim = statbuf.getBigUint64(38, true);
+//        const mtim = statbuf.getBigUint64(46, true);
+//        const ctim = statbuf.getBigUint64(52, true);
+//
+//        view.setBigUint64(buf, dev, true);
+//        view.setBigUint64(buf + 8, ino, true);
+//        view.setUint8(buf + 16, file_type);
+//        view.setBigUint64(buf + 24, nlink, true);
+//        view.setBigUint64(buf + 32, size, true);
+//        view.setBigUint64(buf + 38, atim, true);
+//        view.setBigUint64(buf + 46, mtim, true);
+//        view.setBigUint64(buf + 52, ctim, true);
+        
         return constants.WASI_ESUCCESS;
     }
 
@@ -205,7 +229,7 @@ function WASI() {
 
     function random_get(buf_addr, buf_len) {
         worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
         let numbers = new Uint8Array(buf_len);
         if (IS_NODE) {
             // TODO
@@ -259,7 +283,7 @@ function WASI() {
     function fd_filestat_get(fd, buf) {
         worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
 
-        let view = new DataView(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -297,8 +321,8 @@ function WASI() {
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
         worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
-        let view = new DataView(moduleInstanceExports.memory.buffer);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let nread = 0;
         for (let i = 0; i < iovs_len; i++) {
@@ -331,8 +355,8 @@ function WASI() {
     function fd_readdir(fd: number, buf, buf_len: number, cookie: number, bufused) {
         worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
 
-        let view = new DataView(moduleInstanceExports.memory.buffer);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         const sbuf = new SharedArrayBuffer(4 + 4 + buf_len); // lock, buf_used, buf
         const lck = new Int32Array(sbuf, 0, 1);
@@ -356,7 +380,7 @@ function WASI() {
 
     function fd_seek(fd: number, offset: BigInt, whence: number, new_offset) {
         worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
-        let view = new DataView(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 
         const sbuf = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
         const lck = new Int32Array(sbuf, 0, 1);
@@ -402,8 +426,6 @@ function WASI() {
 
         console.log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
 
-
-
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
@@ -422,26 +444,27 @@ function WASI() {
         const file_type = statbuf.getUint8(16);
         const nlink = statbuf.getBigUint64(24, true);
         const size = statbuf.getBigUint64(32, true);
-        const atim = statbuf.getBigUint64(38, true);
-        const mtim = statbuf.getBigUint64(46, true);
-        const ctim = statbuf.getBigUint64(52, true);
+        worker_console_log(`size: ${size}`);
+        const atim = statbuf.getBigUint64(40, true);
+        const mtim = statbuf.getBigUint64(48, true);
+        const ctim = statbuf.getBigUint64(56, true);
 
         view.setBigUint64(buf, dev, true);
         view.setBigUint64(buf + 8, ino, true);
         view.setUint8(buf + 16, file_type);
         view.setBigUint64(buf + 24, nlink, true);
         view.setBigUint64(buf + 32, size, true);
-        view.setBigUint64(buf + 38, atim, true);
-        view.setBigUint64(buf + 46, mtim, true);
-        view.setBigUint64(buf + 52, ctim, true);
+        view.setBigUint64(buf + 40, atim, true);
+        view.setBigUint64(buf + 48, mtim, true);
+        view.setBigUint64(buf + 56, ctim, true);
         
         return constants.WASI_ESUCCESS;
     }
 
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
         worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
-        let view = new DataView(moduleInstanceExports.memory.buffer);
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`path_open: path = ${path}`);
@@ -486,7 +509,7 @@ function WASI() {
     function path_remove_directory(fd: number, path_ptr: ptr, path_len: number) {
         worker_console_log(`path_remove_directory(${fd}, ${path_ptr}, ${path_len})`);
         
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 	
@@ -509,7 +532,7 @@ function WASI() {
     function path_unlink_file(fd: number, path_ptr: ptr, path_len: number) {
         worker_console_log(`path_unlink_file(${fd}, ${path_ptr}, ${path_len})`);
         
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 	
@@ -531,7 +554,7 @@ function WASI() {
 
     function fd_prestat_get(fd: number, buf_ptr) {
         worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
-        let view = new DataView(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
 	
         const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
         const lck = new Int32Array(sbuf, 0, 1);
@@ -552,7 +575,7 @@ function WASI() {
 
     function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
         worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);       
-        let view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 	
 	    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
         const lck = new Int32Array(sbuf, 0, 1);
