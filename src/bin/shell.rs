@@ -10,7 +10,7 @@ fn main() {
     let mut pwd = PathBuf::from("/");
     let mut input = String::new();
 
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, touch, write, exit, duk, shell, cowsay, rustpython, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv)");
+    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, write, exit, duk, shell, cowsay, rustpython, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv, touch, cp, mkdir, rmdir)");
 
     loop {
         // prompt for input
@@ -121,15 +121,20 @@ fn main() {
                 }
             }
             "exit" => exit(0),
-            // external commands
-            "duk" | "main" | "shell" | "cowsay" | "qjs" | "python" | "rustpython" | "uutils"
-            | "printenv" | "mount" | "tree" | "viu" => {
-                #[allow(unused_must_use)]
-                File::open(format!("!{} {}", command, input));
-            }
-            // edge cases
+            // no input
             "" => {}
-            _ => println!("command not found: {}", command),
+            // external commands or command not found
+            _ => {
+                let bin_dir = PathBuf::from("/usr/bin");
+                if bin_dir.join(format!("{}.wasm", command)).is_file() {
+                    match File::open(format!("!{} {}", command, input)) {
+                        Ok(_) => {}  // doesn't happen for now
+                        Err(_) => {} // we return error even on successful spawn
+                    }
+                } else {
+                    println!("command not found: {}", command);
+                }
+            }
         }
         input.clear();
     }

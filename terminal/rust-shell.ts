@@ -23,15 +23,41 @@ function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: 
     return 1;
 }
 
-const BINARIES = {
+const NECESSARY_BINARIES = {
     "shell.wasm": "http://localhost:8000/shell.wasm",
-    "tree.wasm": "http://localhost:8000/tree.wasm",
     "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+};
+
+const OPTIONAL_BINARIES = {
+    "tree.wasm": "http://localhost:8000/tree.wasm",
     "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
     "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
     "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
     "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
 };
+
+async function fetch_binary(bin_handle: FileSystemDirectoryHandle, filename: string, address: string) {
+    const handle = await bin_handle.getFileHandle(filename, {create: true});
+    const file = await handle.getFile();
+    // only fetch binary if not yet present
+    if (file.size === 0) {
+        let response;
+        if (address.startsWith("http://localhost")) {
+            // files served from same origin
+            response = await fetch(address);
+        } else {
+            // files requested from cross-orign that require proxy server
+            response = await fetch(`${PROXY_SERVER}/${address}`);
+        }
+        if (response.status === 200) {
+            const writable = await handle.createWritable();
+            await response.body.pipeTo(writable);
+        } else {
+            console.log(`Failed downloading ${filename} from ${address}`);
+        }
+    }
+}
+
 
 export async function init_fs(): Promise<OpenDirectory> {
     // setup filesystem
@@ -43,27 +69,14 @@ export async function init_fs(): Promise<OpenDirectory> {
     const usr = await root.getDirectoryHandle("usr", {create: true});
     const bin = await usr.getDirectoryHandle("bin", {create: true});
 
-    for (const [filename, address] of Object.entries(BINARIES)) {
-        const handle = await bin.getFileHandle(filename, {create: true});
-        const file = await handle.getFile();
-        // only fetch binary if not yet present
-        if (file.size === 0) {
-            let response;
-            if (address.startsWith("http://localhost")) {
-                // files served from same origin
-                response = await fetch(address);
-            } else {
-                // files requested from cross-orign that require proxy server
-                response = await fetch(`${PROXY_SERVER}/${address}`);
-            }
-            if (response.status === 200) {
-                const writable = await handle.createWritable();
-                await response.body.pipeTo(writable);
-            } else {
-                console.log(`Failed downloading ${filename} from ${address}`);
-            }
-        }
-    }
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_binary(bin, filename, address));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_binary(bin, filename, address));
+    
+    // don't await this on purpose
+    // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
+    //       it can say that command is not found or just fail at instantiation
+    Promise.all(optional_promises);
+    await Promise.all(necessary_promises);
 
     return new OpenDirectory("/", root);
 }
