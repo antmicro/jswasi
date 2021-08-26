@@ -93,24 +93,6 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "touch" => {
-                if !args.is_empty() {
-                    for filename in args {
-                        let filename = if filename.starts_with("/") {
-                            filename.to_owned()
-                        } else {
-                            pwd.join(filename).into_os_string().into_string().unwrap()
-                        };
-                        match File::create(filename) {
-                            Ok(_) => {}
-                            // TODO: match on error and provide better messages
-                            Err(error) => println!("touch: failed creating file: {}", error),
-                        }
-                    }
-                } else {
-                    println!("touch: missing file operand");
-                }
-            }
             "write" => {
                 if args.len() < 2 {
                     println!("write: help: write <filename> <contents>");
