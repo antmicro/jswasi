@@ -91,20 +91,20 @@ export async function init_all(anchor: HTMLElement) {
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
     // @ts-ignore
-    const t = new hterm.Terminal();
+    terminal = new hterm.Terminal();
 
     const workerTable = new WorkerTable(
         "worker.js",
         send_buffer_to_worker,
         // receive_callback
-        (id, output) => t.io.print(output),
+        (id, output) => terminal.io.print(output),
         openRoot
     );
 
-    t.decorate(anchor);
-    t.installKeyboard();
+    terminal.decorate(anchor);
+    terminal.installKeyboard();
 
-    const io = t.io.push();
+    const io = terminal.io.push();
 
     io.onVTKeystroke = io.sendString = (data) => {
         let code = data.charCodeAt(0);
@@ -129,7 +129,7 @@ export async function init_all(anchor: HTMLElement) {
             buffer = buffer + data;
 
             // echo
-            t.io.print(code === 10 ? "\r\n" : data);
+            terminal.io.print(code === 10 ? "\r\n" : data);
 
             // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
             // now that buffer was filled, look if there are pending buffer requests from current foreground worker
@@ -171,12 +171,20 @@ export async function mount(worker_id, args, env) {
 }
 
 export async function wget(worker_id, args, env) {
-    if (args.length != 3) {
-        console.log("write: help: write <address> <filename>")
+    let filename: string;
+    let address: string;
+    if (args.length == 2) {
+        address = args[1];
+        filename = address.split("/").slice(-1)[0];
+    } else if (args.length == 3) {
+        address = args[1];
+        filename = args[2];
+    } else {
+        terminal.io.println("write: help: write <address> <filename>");
         return;
     }
     // TODO: fetch to CWD
     const root = await navigator.storage.getDirectory();
-    fetch_file(root, args[2], args[1]); 
+    fetch_file(root, filename, address); 
 }
 
