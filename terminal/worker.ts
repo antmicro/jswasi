@@ -722,15 +722,17 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         js: {mem: memory}
     };
 
-    const root = await navigator.storage.getDirectory();
-    const usr = await root.getDirectoryHandle("usr");
-    const bin = await usr.getDirectoryHandle("bin");
-    const binary = await bin.getFileHandle(moduleName);
-    const file = await binary.getFile();
-    const response = new Response(file);
 
     if (WebAssembly.instantiateStreaming) {
         worker_console_log(`WebAssembly.instantiateStreaming`);
+
+        const root = await navigator.storage.getDirectory();
+        const usr = await root.getDirectoryHandle("usr");
+        const bin = await usr.getDirectoryHandle("bin");
+        const binary = await bin.getFileHandle(moduleName);
+        const file = await binary.getFile();
+        const response = new Response(file);
+
         const {module, instance} = await WebAssembly.instantiateStreaming(response, moduleImports);
 
         wasiCallbacks.setModuleInstance(instance);
@@ -743,22 +745,10 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             worker_console_log(e.stack);
             do_exit(255);
         }
-    } else {
-        // legacy and node version, could be refactored
-        let module = null;
-
-        if (WebAssembly.compileStreaming) {
-            module = await WebAssembly.compileStreaming(response);
-        } else {
-            let buffer = null;
-            if (IS_NODE) {
-                // @ts-ignore
-                buffer = fs.readFileSync(moduleName, null);
-            } else {
-                buffer = await (await response);
-            }
-            module = await WebAssembly.compile(buffer);
-        }
+    } else if (IS_NODE) {
+        // @ts-ignore
+        let buffer = fs.readFileSync(moduleName, null);
+        let module = await WebAssembly.compile(buffer);
 
         let instance = null;
         try {
@@ -766,22 +756,20 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         } catch (e) {
             worker_console_log("exception while instantiating wasm");
             worker_console_log(e.stack);
-            instance = null;
-        }
-
-        if (instance != null) {
-            wasiCallbacks.setModuleInstance(instance);
-            try {
-                instance.exports._start();
-                do_exit(0);
-            } catch (e) {
-                worker_console_log("exception while running wasm");
-                worker_console_log(e.stack);
-                do_exit(255);
-            }
-        } else {
             do_exit(255);
         }
+
+        wasiCallbacks.setModuleInstance(instance);
+        try {
+            instance.exports._start();
+            do_exit(0);
+        } catch (e) {
+            worker_console_log("exception while running wasm");
+            worker_console_log(e.stack);
+            do_exit(255);
+        }
+    } else {
+        worker_console_log(`WebAssembly.instantiateStreaming is not supported`);
     }
 }
 

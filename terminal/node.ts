@@ -6,7 +6,7 @@ import {WorkerTable} from "./worker-table.mjs";
 import {OpenFile, OpenDirectory} from "./node-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
-let debug = false;
+let debug = true;
 
 if (!debug) {
     console.log = function() {};
