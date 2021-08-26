@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
@@ -125,13 +126,20 @@ fn main() {
             "" => {}
             // external commands or command not found
             _ => {
-                let bin_dir = PathBuf::from("/usr/bin");
-                if bin_dir.join(format!("{}.wasm", command)).is_file() {
-                    match File::open(format!("!{} {}", command, input)) {
-                        Ok(_) => {}  // doesn't happen for now
-                        Err(_) => {} // we return error even on successful spawn
+                let mut found = false;
+                // get PATH env varaible, split it and look for binaries in each directory
+                for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
+                    let bin_dir = PathBuf::from(bin_dir);
+                    if bin_dir.join(format!("{}.wasm", command)).is_file() {
+                        match File::open(format!("!{} {}", command, input)) {
+                            Ok(_) => {}  // doesn't happen for now
+                            Err(_) => {} // we return error even on successful spawn
+                        }
+                        found = true;
+                        break;
                     }
-                } else {
+                }
+                if !found {
                     println!("command not found: {}", command);
                 }
             }
