@@ -110,20 +110,6 @@ export async function init_all(anchor: HTMLElement) {
 
             // echo
             terminal.io.print(code === 10 ? "\r\n" : data);
-
-            // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
-            // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-            if (workerTable.currentWorker != null) {
-                while (workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.length !== 0 && buffer.length !== 0) {
-                    let {
-                        requested_len,
-                        lck,
-                        len,
-                        sbuf
-                    } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                    workerTable.send_buffer_to_worker(requested_len, lck, len, sbuf);
-                }
-            }
         }
     };
 
@@ -160,6 +146,7 @@ export async function wget(worker_id, args, env) {
         address = args[1];
         filename = args[2];
     } else {
+        // TODO: pass terminal to function 
         // terminal.io.println("write: help: write <address> <filename>");
         return;
     }
