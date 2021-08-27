@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
-import { mount, wget } from "./rust-shell.js";
+import { mount, wget } from "./browser-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
