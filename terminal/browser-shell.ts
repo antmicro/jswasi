@@ -16,6 +16,7 @@ const OPTIONAL_BINARIES = {
     "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
     "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
     "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+    "python.wasm": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
@@ -98,11 +99,9 @@ export async function init_all(anchor: HTMLElement) {
         if (code !== 10 && code < 32) {
             // control characters
             if (code == 3) {
-                console.log(`got ^C control, killing current worker (${workerTable.currentWorker})`);
-                workerTable.terminateWorker(workerTable.currentWorker);
+                workerTable.sendSigInt(workerTable.currentWorker);
             } else if (code == 4) {
-                console.log(`got ^D, releasing buffer read lock (if present) with value -1`);
-                workerTable.releaseWorker(workerTable.currentWorker, -1);
+                workerTable.sendEndOfFile(workerTable.currentWorker, -1);
             }
         } else {
             // regular characters

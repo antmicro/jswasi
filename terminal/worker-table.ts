@@ -59,22 +59,22 @@ export class WorkerTable {
         this.workerInfos[id].worker.postMessage(message);
     }
 
-    terminateWorker(id: number) {
+    sendSigInt(id: number) {
         const worker = this.workerInfos[id];
-        worker.worker.terminate();
-        // notify parent that they can resume operation
-	    if (worker.parent_lock !== null) {
+        if (this.currentWorker === 0) {
+            console.log(`Ctrl-C sent to WORKER 0`);
+        } else {
+            worker.worker.terminate();
+            // notify parent that they can resume operation
             Atomics.store(worker.parent_lock, 0, 0);
             Atomics.notify(worker.parent_lock, 0);
             this.currentWorker = worker.parent_id;
-	    } else {
-            this.currentWorker = null;
+            // remove worker from workers array
+            delete this.workerInfos[id];
         }
-        // remove worker from workers array
-        delete this.workerInfos[id];
     }
 
-    releaseWorker(id: number, lock_value) {
+    sendEndOfFile(id: number, lock_value) {
         const worker = this.workerInfos[id];
         if (worker.buffer_request_queue.length !== 0) {
             const lck = worker.buffer_request_queue[0].lck;
