@@ -92,7 +92,6 @@ export async function init_all(anchor: HTMLElement) {
 
     io.onVTKeystroke = io.sendString = (data) => {
         let code = data.charCodeAt(0);
-        console.log(data, code);
 
         if (code === 13) {
             code = 10;

@@ -39,7 +39,6 @@ export const on_worker_message = async (event, workerTable) => {
                             on_worker_message
                         );
                         workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
-                        console.log("WORKER " + worker_id + " spawned: " + command);
                     }
                 }
                 break;
@@ -56,7 +55,6 @@ export const on_worker_message = async (event, workerTable) => {
                     name_len[0] = fds[fd].path.length;
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    console.log("fd_prestat_get returning EBADF");
                     err = constants.WASI_EBADF;
                 }
 
@@ -75,11 +73,9 @@ export const on_worker_message = async (event, workerTable) => {
                     // FIXME: this shouldn't work, but it fixes the 'uutils cat', find out why and document it
                     // path.set(new TextEncoder().encode(fds[fd].path), 0);
                     path.set(fds[fd].path, 0);
-                    console.log(`path: ${fds[fd].path}`);
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    console.log("fd_prestat_dir_name returning EBADF");
-                    err = constants.WASI_EBADF; // TODO: what return code?
+                    err = constants.WASI_EBADF;
                 }
 
                 Atomics.store(lck, 0, err);
@@ -112,8 +108,7 @@ export const on_worker_message = async (event, workerTable) => {
                             fds[fd].write(content);
                             err = constants.WASI_ESUCCESS;
                         } else {
-                            console.log("fd_prestat_dir_name returning EBADF");
-                            err = constants.WASI_EBADF; // TODO: what return code?
+                            err = constants.WASI_EBADF;
                         }
                         break;
                     }
@@ -151,8 +146,7 @@ export const on_worker_message = async (event, workerTable) => {
                                 readlen[0] = data.byteLength;
                             }
                         } else {
-                            console.log("fd_prestat_dir_name returning EBADF");
-                            err = constants.WASI_EBADF; // TODO: what return code?
+                            err = constants.WASI_EBADF;
                         }
                         Atomics.store(lck, 0, err);
                         Atomics.notify(lck, 0);
@@ -174,7 +168,6 @@ export const on_worker_message = async (event, workerTable) => {
                         opened_fd[0] = fds.length - 1;
                     }
                 } else {
-                    console.log("fd doesn't exist");
                     err = constants.WASI_EBADF;
                 }
 
@@ -188,7 +181,8 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 if (fds[fd] !== undefined) {
-                    fds[fd] = undefined;
+                    // TODO: actually close file
+                    fds[fd] == undefined;
                     err = constants.WASI_ESUCCESS;
                 } else {
                     err = constants.WASI_EBADF;
@@ -205,7 +199,7 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
-                if (fd > 2 && fds[fd] != undefined) {
+                if (fds[fd] != undefined) {
                     let stat = await fds[fd].stat();
                     buf.setBigUint64(0, stat.dev, true);
                     buf.setBigUint64(8, stat.ino, true);
@@ -217,7 +211,6 @@ export const on_worker_message = async (event, workerTable) => {
                     buf.setBigUint64(52, stat.ctim, true);
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    console.log(`fd_filestat_get returning WASI_EBADF`);
                     err = constants.WASI_EBADF;
                 }
 
@@ -246,8 +239,7 @@ export const on_worker_message = async (event, workerTable) => {
                         buf.setBigUint64(56, stat.ctim, true);
                     }
                 } else {
-                    console.log(`path_filestat_get: undefined`);
-                    err = constants.WASI_EINVAL;
+                    err = constants.WASI_EBADF;
                 }
 
                 Atomics.store(lck, 0, err);
@@ -262,11 +254,9 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
-                    // we get offset as BigInt, but FSA API requires Number
                     fds[fd].seek(Number(offset), whence);
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    console.log(`fd_seek: bad fd: ${fd}`);
                     err = constants.WASI_EBADF;
                 }
 
@@ -316,7 +306,6 @@ export const on_worker_message = async (event, workerTable) => {
                     buf_used[0] = databuf_ptr > databuf_len ? databuf_len : databuf_ptr;
                     err = constants.WASI_ESUCCESS;
                 } else {
-                    console.log(`fd_readdir: bad fd: ${fd}`);
                     err = constants.WASI_EBADF;
                 }
 
@@ -331,9 +320,7 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {              
-                    // TODO: handle errors
-                    await fds[fd].delete_entry(path);
-                    err = constants.WASI_ESUCCESS;
+                    ({err} = fds[fd].delete_entry(path));
                 }
 
                 Atomics.store(lck, 0, err);
@@ -361,7 +348,6 @@ export const on_worker_message = async (event, workerTable) => {
                 let err;
                 const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {              
-                    // TODO: handle errors
                     err = await fds[fd].get_entry(path, FileOrDir.Directory, OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive);
                 } else {
                     err = constants.WASI_EBADF;
@@ -379,7 +365,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
                     file_type[0] = fds[fd].file_type;
                     rights_base[0] = -1n;

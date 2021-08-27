@@ -75,7 +75,6 @@ export class OpenDirectory extends Directory {
             try {
                 dir_handle = await dir_handle.getDirectoryHandle(part);
             } catch (err) {
-                console.log(err);
                 if (err.name === "NotFoundError") {
                     return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
                 } else if (err.name === "TypeMismatchError") {
@@ -217,7 +216,6 @@ export class File extends Entry {
     
     async lastModified(): Promise<number> {
         let file = await this._handle.getFile();
-        console.log(`file.lastModified = ${file.lastModified}`);
         return file.lastModified;
     }
 
