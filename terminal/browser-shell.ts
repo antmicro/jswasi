@@ -5,9 +5,6 @@ import {on_worker_message} from "./worker-message.js";
 
 const PROXY_SERVER = "http://localhost:8001";
 
-// TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
-let buffer = "";
-let terminal = null;
 const NECESSARY_BINARIES = {
     "shell.wasm": "http://localhost:8000/shell.wasm",
     "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
@@ -76,7 +73,7 @@ export async function init_all(anchor: HTMLElement) {
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
     // @ts-ignore
-    terminal = new hterm.Terminal();
+    const terminal = new hterm.Terminal();
 
     const workerTable = new WorkerTable(
         "worker.js",
@@ -163,7 +160,7 @@ export async function wget(worker_id, args, env) {
         address = args[1];
         filename = args[2];
     } else {
-        terminal.io.println("write: help: write <address> <filename>");
+        // terminal.io.println("write: help: write <address> <filename>");
         return;
     }
     // TODO: fetch to CWD
