@@ -1,5 +1,7 @@
 //NODE// import { Worker } from 'worker_threads';
 
+const IS_NODE = typeof self === 'undefined';
+
 class WorkerInfo {
     public id: number;
     public worker: Worker;
@@ -24,14 +26,12 @@ export class WorkerTable {
     private _nextWorkerId = 0;
     public workerInfos: Record<number, WorkerInfo> = {};
     public script_name: string;
-    public isNode: boolean;
     public send_callback;
     public receive_callback;
     public root;
 
-    constructor(sname: string, send_callback, receive_callback, root, isNode = false) {
+    constructor(sname: string, send_callback, receive_callback, root) {
         this.script_name = sname;
-        this.isNode = isNode;
         this.send_callback = send_callback;
         this.receive_callback = receive_callback;
         this.root = root;
@@ -42,10 +42,10 @@ export class WorkerTable {
         this.currentWorker = id;
         this._nextWorkerId += 1;
         let private_data = {};
-        if (!this.isNode) private_data = {type: "module"};
+        if (!IS_NODE) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
         this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, this.root], parent_id, parent_lock, callback);
-        if (!this.isNode) {
+        if (!IS_NODE) {
             worker.onmessage = (event) => callback(event, this);
         } else {
             // @ts-ignore

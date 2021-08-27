@@ -379,6 +379,27 @@ export const on_worker_message = async (event, workerTable) => {
                 Atomics.notify(lck, 0);
                 break;
             }
+            case "fd_fdstat_get": {
+                const [sbuf, fd] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const file_type = new Uint8Array(sbuf, 4, 1);
+                const rights_base = new BigUint64Array(sbuf, 8, 1);
+                const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
+
+                let err;
+                const fds = workerTable.workerInfos[worker_id].fds;
+                if (fds[fd] != undefined) {
+                    file_type[0] = fds[fd].file_type;
+                    rights_base[0] = -1n;
+                    rights_inheriting[0] = ~(1n << 24n);
+
+                    err = constants.WASI_ESUCCESS;
+                }
+
+                Atomics.store(lck, 0, err);
+                Atomics.notify(lck, 0);
+                break;
+            }
         }
 }
 

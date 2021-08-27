@@ -148,41 +148,30 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    function fd_fdstat_get(fd, bufPtr) {
-//        worker_console_log(`fd_fdstat_get(${fd}, 0x${bufPtr.toString(16)})`);
-//
-//        const view = new DataView(moduleInstanceExports.memory.buffer);
-//
-//        const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
-//        const lck = new Int32Array(sbuf, 0, 1);
-//        lck[0] = -1;
-//        const statbuf = new DataView(sbuf, 4);
-//
-//        worker_send(["fd_filestat_get", [sbuf, fd]]);
-//        Atomics.wait(lck, 0, -1);
-//
-//        const err = Atomics.load(lck, 0);
-//        if (err !== constants.WASI_ESUCCESS) {
-//            return err;
-//        }
-//        
-//        const dev = statbuf.getBigUint64(0, true);
-//        const ino = statbuf.getBigUint64(8, true);
-//        const file_type = statbuf.getUint8(16);
-//        const nlink = statbuf.getBigUint64(24, true);
-//        const size = statbuf.getBigUint64(32, true);
-//        const atim = statbuf.getBigUint64(38, true);
-//        const mtim = statbuf.getBigUint64(46, true);
-//        const ctim = statbuf.getBigUint64(52, true);
-//
-//        view.setBigUint64(buf, dev, true);
-//        view.setBigUint64(buf + 8, ino, true);
-//        view.setUint8(buf + 16, file_type);
-//        view.setBigUint64(buf + 24, nlink, true);
-//        view.setBigUint64(buf + 32, size, true);
-//        view.setBigUint64(buf + 38, atim, true);
-//        view.setBigUint64(buf + 46, mtim, true);
-//        view.setBigUint64(buf + 52, ctim, true);
+    function fd_fdstat_get(fd: number, buf: ptr) {
+        worker_console_log(`fd_fdstat_get(${fd}, 0x${buf.toString(16)})`);
+
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+
+        const sbuf = new SharedArrayBuffer(4 + 20); // lock, filetype, rights base, rights inheriting 
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const file_type = new Uint8Array(sbuf, 4, 1);
+        const rights_base = new BigUint64Array(sbuf, 8, 1);
+        const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
+
+        worker_send(["fd_fdstat_get", [sbuf, fd]]);
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+            return err;
+        }
+
+        view.setUint8(buf, file_type[0]);
+        view.setUint32(buf + 2, 0, true); // file descriptor flags
+        view.setBigUint64(buf + 8, rights_base[0], true);
+        view.setBigUint64(buf + 16, rights_inheriting[0], true);
         
         return constants.WASI_ESUCCESS;
     }
