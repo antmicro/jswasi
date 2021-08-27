@@ -8,21 +8,6 @@ const PROXY_SERVER = "http://localhost:8001";
 // TODO: move *all* buffer stuff to worker-message, preferably to WorkerTable class
 let buffer = "";
 let terminal = null;
-
-function send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
-    // console.log("got buffer request of len " + requested_len + ", notifying");
-    if (buffer.length == 0) return 0;
-    readlen[0] = (buffer.length > requested_len) ? requested_len : buffer.length;
-    // console.log("current buffer is '" + buffer + "', copying len " + readlen[0]);
-    for (let j = 0; j < readlen[0]; j++) {
-        buf[j] = buffer.charCodeAt(j);
-    }
-    buffer = buffer.slice(readlen[0]);
-    Atomics.store(lck, 0, constants.WASI_ESUCCESS);
-    Atomics.notify(lck, 0);
-    return 1;
-}
-
 const NECESSARY_BINARIES = {
     "shell.wasm": "http://localhost:8000/shell.wasm",
     "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
@@ -95,7 +80,6 @@ export async function init_all(anchor: HTMLElement) {
 
     const workerTable = new WorkerTable(
         "worker.js",
-        send_buffer_to_worker,
         // receive_callback
         (id, output) => terminal.io.print(output),
         openRoot
@@ -126,7 +110,7 @@ export async function init_all(anchor: HTMLElement) {
             }
         } else {
             // regular characters
-            buffer = buffer + data;
+            workerTable.push_to_buffer(data);
 
             // echo
             terminal.io.print(code === 10 ? "\r\n" : data);
@@ -141,7 +125,7 @@ export async function init_all(anchor: HTMLElement) {
                         len,
                         sbuf
                     } = workerTable.workerInfos[workerTable.currentWorker].buffer_request_queue.shift();
-                    workerTable.send_callback(requested_len, lck, len, sbuf);
+                    workerTable.send_buffer_to_worker(requested_len, lck, len, sbuf);
                 }
             }
         }

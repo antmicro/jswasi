@@ -1,4 +1,5 @@
 //NODE// import { Worker } from 'worker_threads';
+import * as constants from "./constants.js";
 
 const IS_NODE = typeof self === 'undefined';
 
@@ -21,18 +22,18 @@ class WorkerInfo {
     }
 }
 
+
 export class WorkerTable {
+    public buffer = "";
     public currentWorker = null;
     private _nextWorkerId = 0;
     public workerInfos: Record<number, WorkerInfo> = {};
     public script_name: string;
-    public send_callback;
     public receive_callback;
     public root;
 
-    constructor(sname: string, send_callback, receive_callback, root) {
+    constructor(sname: string, receive_callback, root) {
         this.script_name = sname;
-        this.send_callback = send_callback;
         this.receive_callback = receive_callback;
         this.root = root;
     }
@@ -80,5 +81,40 @@ export class WorkerTable {
             Atomics.store(lck, 0, lock_value);
             Atomics.notify(lck, 0);
         }
+    }
+
+    push_to_buffer(data: string) {
+        this.buffer += data;
+
+        // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+        // now that buffer was filled, look if there are pending buffer requests from current foreground worker
+        if (this.currentWorker != null) {
+            while (this.workerInfos[this.currentWorker].buffer_request_queue.length !== 0 && this.buffer.length !== 0) {
+                let {
+                    requested_len,
+                    lck,
+                    len,
+                    sbuf
+                } = this.workerInfos[this.currentWorker].buffer_request_queue.shift();
+                this.send_buffer_to_worker(requested_len, lck, len, sbuf);
+            }
+        }
+    }
+
+    send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
+        // if the request can't be processed straight away, push it to queue for later
+        if (this.buffer.length == 0) {
+            this.workerInfos[this.currentWorker].buffer_request_queue.push({requested_len, lck, len: readlen, sbuf: buf});
+            return;
+        }
+
+        readlen[0] = (this.buffer.length > requested_len) ? requested_len : this.buffer.length;
+        for (let j = 0; j < readlen[0]; j++) {
+            buf[j] = this.buffer.charCodeAt(j);
+        }
+        this.buffer = this.buffer.slice(readlen[0]);
+        Atomics.store(lck, 0, constants.WASI_ESUCCESS);
+        Atomics.notify(lck, 0);
+        return 1;
     }
 }
