@@ -5,6 +5,7 @@ import { mount, wget } from "./rust-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
+        const fds = workerTable.workerInfos[worker_id].fds;
         switch (action) {
             case "console": {
                 console.log("WORKER " + worker_id + ": " + data);
@@ -50,7 +51,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const preopen_type = new Uint8Array(sbuf, 8, 1);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
                     preopen_type[0] = fds[fd].file_type;
                     name_len[0] = fds[fd].path.length;
@@ -71,7 +71,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const path = new Uint8Array(sbuf, 4, path_len);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] != undefined) {
                     // FIXME: this shouldn't work, but it fixes the 'uutils cat', find out why and document it
                     // path.set(new TextEncoder().encode(fds[fd].path), 0);
@@ -93,7 +92,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const lck = new Int32Array(sbuf, 0, 1);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 switch (fd) {
                     case 0: {
                         throw "can't write to stdin!";
@@ -131,7 +129,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const readbuf = new Uint8Array(sbuf, 8, len);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 switch (fd) {
                     case 0: {
                         workerTable.send_buffer_to_worker(len, lck, readlen, readbuf);
@@ -170,7 +167,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const opened_fd = new Int32Array(sbuf, 4, 1);
 
                 let err, entry;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[dir_fd] != undefined) {
                     ({err, entry} = await fds[dir_fd].get_entry(path, FileOrDir.Any, oflags));
                     if (err === constants.WASI_ESUCCESS) {
@@ -191,7 +187,6 @@ export const on_worker_message = async (event, workerTable) => {
                 const lck = new Int32Array(sbuf, 0, 1);
 
                 let err;
-                const fds = workerTable.workerInfos[worker_id].fds;
                 if (fds[fd] !== undefined) {
                     fds[fd] = undefined;
                     err = constants.WASI_ESUCCESS;
