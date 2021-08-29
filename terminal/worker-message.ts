@@ -12,7 +12,7 @@ export const on_worker_message = async (event, workerTable) => {
                 break;
             }
             case "exit": {
-                workerTable.terminateWorker(worker_id);
+                workerTable.sendSigInt(worker_id);
                 console.log(`WORKER ${worker_id} exited with result code: ${data}`);
                 break;
             }
