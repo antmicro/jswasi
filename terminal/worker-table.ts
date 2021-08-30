@@ -63,8 +63,10 @@ export class WorkerTable {
         const worker = this.workerInfos[id];
         worker.worker.terminate();
         // notify parent that they can resume operation
-        Atomics.store(worker.parent_lock, 0, 0);
-        Atomics.notify(worker.parent_lock, 0);
+        if (id != 0) {
+            Atomics.store(worker.parent_lock, 0, 0);
+            Atomics.notify(worker.parent_lock, 0);
+        }
         this.currentWorker = worker.parent_id;
         // remove worker from workers array
         delete this.workerInfos[id];
