@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {OpenFile, OpenDirectory} from "./browser-fs.js";
+import {BrowserFilesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
@@ -40,8 +40,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     }
 }
 
-
-export async function init_fs(): Promise<FileSystemDirectoryHandle> {
+export async function init_fs() {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const home = await root.getDirectoryHandle("home", {create: true});
@@ -63,23 +62,25 @@ export async function init_fs(): Promise<FileSystemDirectoryHandle> {
     //       it can say that command is not found or just fail at instantiation
     Promise.all(optional_promises);
     await Promise.all(necessary_promises);
-
-    return root;
 }
 
+// things that are global and should be shared between all tab instances
+const filesystem = new BrowserFilesystem();
+
 export async function init_all(anchor: HTMLElement) {
-    const root = await init_fs();
+    await init_fs();
 
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
     // @ts-ignore
     const terminal = new hterm.Terminal();
 
+    const root_dir = await filesystem.getRootDirectory();
     const workerTable = new WorkerTable(
         "worker.js",
         // receive_callback
         (output) => terminal.io.print(output),
-        [null, null, null, new OpenDirectory("/", root)]
+        [null, null, null, await root_dir.open()]
     );
 
     terminal.decorate(anchor);
@@ -128,13 +129,13 @@ export async function init_all(anchor: HTMLElement) {
 }
 
 export async function mount(workerTable, worker_id, args, env) {
-    const mount = await showDirectoryPicker();
-    if (!mount) {
+    const mount_point = await showDirectoryPicker();
+    if (!mount_point) {
         console.log('user cancelled or failed to open a diretory');
         return;
     }
     // add preopened diretory to file descriptors of any new program
-    workerTable.fds.push(new OpenDirectory(args[1], mount));
+    await filesystem.addMount(args[1], mount_point);
 }
 
 export async function wget(workerTable, worker_id, args, env) {
