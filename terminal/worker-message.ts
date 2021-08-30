@@ -70,9 +70,7 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 if (fds[fd] != undefined) {
-                    // FIXME: this shouldn't work, but it fixes the 'uutils cat', find out why and document it
-                    // path.set(new TextEncoder().encode(fds[fd].path), 0);
-                    path.set(fds[fd].path, 0);
+                    path.set(new TextEncoder().encode(fds[fd].path), 0);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     err = constants.WASI_EBADF;

@@ -540,7 +540,7 @@ function WASI() {
         return 1;
     }
 
-    function fd_prestat_get(fd: number, buf_ptr) {
+    function fd_prestat_get(fd: number, buf: ptr) {
         // worker_console_log(`fd_prestat_get(${fd}, 0x${buf_ptr.toString(16)})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 	
@@ -555,8 +555,8 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === constants.WASI_ESUCCESS) {
-            view.setUint8(buf_ptr, preopen_type[0]);
-            view.setUint32(buf_ptr + 4, name_len[0]);
+            view.setUint8(buf, preopen_type[0]);
+            view.setUint32(buf + 4, name_len[0]);
         }
         return err;
     }
