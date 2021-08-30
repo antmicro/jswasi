@@ -21,13 +21,13 @@ export const on_worker_message = async (event, workerTable) => {
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 switch(command) {
                     case "mount": {
-                        await mount(worker_id, args, env);
+                        await mount(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
                         break;
                     } 
                     case "wget": {
-                        await wget(worker_id, args, env);
+                        await wget(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
                         break;

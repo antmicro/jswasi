@@ -41,7 +41,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
 }
 
 
-export async function init_fs(): Promise<OpenDirectory> {
+export async function init_fs(): Promise<FileSystemDirectoryHandle> {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const home = await root.getDirectoryHandle("home", {create: true});
@@ -64,11 +64,11 @@ export async function init_fs(): Promise<OpenDirectory> {
     Promise.all(optional_promises);
     await Promise.all(necessary_promises);
 
-    return new OpenDirectory("/", root);
+    return root;
 }
 
 export async function init_all(anchor: HTMLElement) {
-    const openRoot = await init_fs();
+    const root = await init_fs();
 
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
@@ -79,7 +79,7 @@ export async function init_all(anchor: HTMLElement) {
         "worker.js",
         // receive_callback
         (id, output) => terminal.io.print(output),
-        openRoot
+        [null, null, null, new OpenDirectory("/", root)]
     );
 
     terminal.decorate(anchor);
@@ -120,7 +120,6 @@ export async function init_all(anchor: HTMLElement) {
         on_worker_message
     );
 
-
     workerTable.postMessage(0, ["start", "shell.wasm", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
@@ -128,13 +127,17 @@ export async function init_all(anchor: HTMLElement) {
     }]);
 }
 
-export async function mount(worker_id, args, env) {
+export async function mount(workerTable, worker_id, args, env) {
     const mount = await showDirectoryPicker();
-    // TODO: implement
-    // workerTable.workerInfos[worker_id].fds.push(new OpenDirectory(args[1], mount));
+    if (!mount) {
+        console.log('user cancelled or failed to open a diretory');
+        return;
+    }
+    // add preopened diretory to file descriptors of any new program
+    workerTable.fds.push(new OpenDirectory(args[1], mount));
 }
 
-export async function wget(worker_id, args, env) {
+export async function wget(workerTable, worker_id, args, env) {
     let filename: string;
     let address: string;
     if (args.length == 2) {

@@ -30,12 +30,12 @@ export class WorkerTable {
     public workerInfos: Record<number, WorkerInfo> = {};
     public script_name: string;
     public receive_callback;
-    public root;
+    public fds;
 
-    constructor(sname: string, receive_callback, root) {
+    constructor(sname: string, receive_callback, fds) {
         this.script_name = sname;
         this.receive_callback = receive_callback;
-        this.root = root;
+        this.fds = fds;
     }
 
     spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
@@ -45,7 +45,7 @@ export class WorkerTable {
         let private_data = {};
         if (!IS_NODE) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, worker, [null, null, null, this.root], parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, worker, this.fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
             worker.onmessage = (event) => callback(event, this);
         } else {
