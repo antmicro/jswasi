@@ -94,13 +94,13 @@ export const on_worker_message = async (event, workerTable) => {
                     }
                     case 1: {
                         const output = content.replaceAll("\n", "\r\n");
-                        workerTable.receive_callback(worker_id, output);
+                        workerTable.receive_callback(output);
                         break;
                     }
                     case 2: {
                         // TODO: should print in red, use ANSI color codes around output
                         const output = content.replaceAll("\n", "\r\n");
-                        workerTable.receive_callback(worker_id, output);
+                        workerTable.receive_callback(output);
                         break;
                     }
                     default: {

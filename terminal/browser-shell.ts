@@ -78,7 +78,7 @@ export async function init_all(anchor: HTMLElement) {
     const workerTable = new WorkerTable(
         "worker.js",
         // receive_callback
-        (id, output) => terminal.io.print(output),
+        (output) => terminal.io.print(output),
         [null, null, null, new OpenDirectory("/", root)]
     );
 
