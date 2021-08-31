@@ -3,15 +3,15 @@ import {WorkerTable} from "./worker-table.js";
 import {OpenFile, OpenDirectory} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
-const PROXY_SERVER = "http://localhost:8001";
+const PROXY_SERVER = location.origin + "/proxy";
 
 const NECESSARY_BINARIES = {
-    "shell.wasm": "http://localhost:8000/shell.wasm",
+    "shell.wasm": location.origin + "/shell.wasm",
     "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
 };
 
 const OPTIONAL_BINARIES = {
-    "tree.wasm": "http://localhost:8000/tree.wasm",
+    "tree.wasm": location.origin + "/tree.wasm",
     "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
     "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
     "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
@@ -25,12 +25,13 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     // only fetch binary if not yet present
     if (file.size === 0) {
         let response;
-        if (address.startsWith("http://localhost")) {
+        if (address.startsWith(location.origin)) {
             // files served from same origin
             response = await fetch(address);
         } else {
             // files requested from cross-orign that require proxy server
-            response = await fetch(`${PROXY_SERVER}/${address}`);
+            let address_base64 = btoa(unescape(encodeURIComponent(address)));
+            response = await fetch(`${PROXY_SERVER}/${address_base64}`);
         }
         if (response.status === 200) {
             const writable = await handle.createWritable();
