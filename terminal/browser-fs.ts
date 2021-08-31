@@ -1,7 +1,8 @@
 import * as constants from "./constants.js";
+import {arraysEqual} from "./utils.js";
 import {FileOrDir, OpenFlags} from "./filesystem.js";
 
-export async function resolve(dir_handle: FilesystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+function parsePath(path: string): {parts: string[], name: string} {
     const parts = [];
 
     for(const component of path.split("/")) {
@@ -13,33 +14,107 @@ export async function resolve(dir_handle: FilesystemDirectoryHandle, path: strin
     }
 
     const name = parts.pop();
-    for (const part of parts) {
-        try {
-            dir_handle = await dir_handle.getDirectoryHandle(part);
-        } catch (err) {
-            if (err.name === "NotFoundError") {
-                return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
-            } else if (err.name === "TypeMismatchError") {
-                return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-            } else {
-                throw err;
-            }
-        }
-    }
-
-    return {err: constants.WASI_ESUCCESS, name, dir_handle};
+    return {parts, name};
 }
 
 export class BrowserFilesystem {
-    mounts: [string, FileSystemDirectoryHandle][];
+    mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle}[] = [];
 
     async getRootDirectory(): Promise<Directory> {
         const root = await navigator.storage.getDirectory();
         return new Directory("/", root, this);
     }
 
-    async addMount(path: string, mount_directory: FileSystemDirectoryHandle) {
-        this.mounts.push([path, mount_directory]);
+    async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
+        // TODO: for now path must be absolute
+        const {parts, name} = parsePath(absolute_path);
+        this.mounts.push({parts, name, handle: mount_directory});
+    }
+
+
+    async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+        const {parts, name} = parsePath(path);
+    
+        for (const part of parts) {
+            try {
+                dir_handle = await this.getDirectoryHandle(dir_handle, part);
+            } catch (err) {
+                if (err.name === "NotFoundError") {
+                    return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
+                } else if (err.name === "TypeMismatchError") {
+                    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+                } else {
+                    throw err;
+                }
+            }
+        }
+    
+        return {err: constants.WASI_ESUCCESS, name, dir_handle};
+    }
+
+    async getDirectoryHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemDirectoryHandle> {
+        const root = await navigator.storage.getDirectory();
+        const components = await root.resolve(handle);
+
+        // if there are many mounts for the same path, we want to return the latest
+        const reversed_mounts = [].concat(this.mounts).reverse();
+        for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
+            if (arraysEqual(parts, components) && child_name === name) {
+                return handle;
+            }
+        }
+        return await handle.getDirectoryHandle(name, options);
+    }
+    
+    async getFileHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemFileHandle> {
+        const root = await navigator.storage.getDirectory();
+        const components = await root.resolve(handle);
+
+        // if there are many mounts for the same path, we want to return the latest
+        const reversed_mounts = [].concat(this.mounts).reverse();
+        for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
+            if (arraysEqual(parts, components) && child_name === name) {
+                throw TypeError;
+            }
+        }
+        return await handle.getFileHandle(name, options);
+    }
+
+    async entries(dir_handle: FileSystemDirectoryHandle): Promise<(File | Directory)[]>  {
+        const root = await navigator.storage.getDirectory();
+        const components = await root.resolve(dir_handle);
+
+        const a = [];
+
+        const reversed_mounts = [].concat(this.mounts).reverse();
+        for (const {parts,  name, handle} of reversed_mounts) {
+            if (arraysEqual(parts, components)) {
+                switch(handle.kind) {
+                    case "file": {
+                        a.push(new File(name, handle, this));
+                        break;
+                    }
+                    case "directory": {
+                        a.push(new Directory(name, handle, this));
+                        break;
+                    }
+                }
+            }
+        }
+
+        for await (const [name, handle] of dir_handle.entries()) {
+            switch(handle.kind) {
+                case "file": {
+                    a.push(new File(name, handle, this));
+                    break;
+                }
+                case "directory": {
+                    a.push(new Directory(name, handle, this));
+                    break;
+                }
+            }
+        }
+        return a;
     }
 }
 
@@ -98,30 +173,16 @@ export class Directory extends Entry {
 export class OpenDirectory extends Directory {
     public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
-
-
     async entries(): Promise<(File | Directory)[]>  {
-        const a = [];
-        for await (const [name, handle] of this._handle.entries()) {
-            switch(handle.kind) {
-                case "file": {
-                    a.push(new File(name, handle, this._filesystem));
-                    break;
-                }
-                case "directory": {
-                    a.push(new Directory(name, handle, this._filesystem));
-                    break;
-                }
-            }
-        }
-        return a;
+        console.log('OpenDirectory.entries()');
+        return await this._filesystem.entries(this._handle);
     }
 
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, ${oflags})`);
     
-        let {err, name, dir_handle} = await resolve(this._handle, path);
+        let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
         if (err !== constants.WASI_ESUCCESS) {
             return {err, entry: null};
         }    
@@ -144,9 +205,9 @@ export class OpenDirectory extends Directory {
         const openWithCreate = async (create: boolean): Promise<{err: number, handle: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
             if (mode & FileOrDir.File) {
                 try {
-                    return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getFileHandle(name, {create})};
+                    return {err: constants.WASI_ESUCCESS, handle: await this._filesystem.getFileHandle(dir_handle, name, {create})};
                 } catch (err) {
-                    if (err.name === 'TypeMismatchError') {
+                    if (err.name === 'TypeMismatchError' || err.name == 'TypeError') {
                         if (!(mode & FileOrDir.Directory)) {
                             return {err: constants.WASI_EISDIR, handle: null};
                         }
@@ -158,7 +219,7 @@ export class OpenDirectory extends Directory {
                 }
             }
             try {
-                return {err: constants.WASI_ESUCCESS, handle: await dir_handle.getDirectoryHandle(name, {create})};
+                return {err: constants.WASI_ESUCCESS, handle: await this._filesystem.getDirectoryHandle(dir_handle, name, {create})};
             } catch (err) {
                 if (err.name === 'TypeMismatchError') {
                     return {err: constants.WASI_ENOTDIR, handle: null};                              
@@ -206,7 +267,7 @@ export class OpenDirectory extends Directory {
     }
 
     async delete_entry(path: string, options): Promise<{err: number}> {
-        const {err, name, dir_handle} = await resolve(this._handle, path);
+        const {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
         await dir_handle.removeEntry(name, options);
         return {err: constants.WASI_ESUCCESS};
     }
