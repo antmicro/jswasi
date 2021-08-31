@@ -17,7 +17,8 @@ export const on_worker_message = async (event, workerTable) => {
                 break;
             }
             case "spawn": {
-                const [command, args, env, sbuf] = data;
+                const [fullpath, args, env, sbuf] = data;
+                const command = fullpath.split("/").slice(-1);
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 switch(command) {
                     case "mount": {
@@ -38,7 +39,7 @@ export const on_worker_message = async (event, workerTable) => {
                             parent_lck,
                             on_worker_message
                         );
-                        workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
+                        workerTable.postMessage(id, ["start", fullpath, id, args, env]);
                     }
                 }
                 break;

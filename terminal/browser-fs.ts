@@ -1,21 +1,6 @@
 import * as constants from "./constants.js";
 import {arraysEqual} from "./utils.js";
-import {FileOrDir, OpenFlags} from "./filesystem.js";
-
-function parsePath(path: string): {parts: string[], name: string} {
-    const parts = [];
-
-    for(const component of path.split("/")) {
-        if (component == "..") {
-            parts.pop()
-        } else if (component !== ".") {
-            parts.push(component);
-        }
-    }
-
-    const name = parts.pop();
-    return {parts, name};
-}
+import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
 
 export class BrowserFilesystem {
     mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle}[] = [];

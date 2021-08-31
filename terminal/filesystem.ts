@@ -10,3 +10,18 @@ export const enum OpenFlags {
     Exclusive = 4, // constants.WASI_O_EXCL,
     Truncate = 8, // constants.WASI_O_TRUNC,
 }
+
+export function parsePath(path: string): {parts: string[], name: string} {
+    const parts = [];
+
+    for(const component of path.split("/")) {
+        if (component == "..") {
+            parts.pop()
+        } else if (component !== ".") {
+            parts.push(component);
+        }
+    }
+
+    const name = parts.pop();
+    return {parts, name};
+}

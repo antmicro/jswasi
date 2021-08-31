@@ -113,8 +113,9 @@ fn main() {
                 // get PATH env varaible, split it and look for binaries in each directory
                 for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
                     let bin_dir = PathBuf::from(bin_dir);
-                    if bin_dir.join(format!("{}.wasm", command)).is_file() {
-                        match File::open(format!("!{} {}", command, input)) {
+                    let fullpath = bin_dir.join(format!("{}.wasm", command));
+                    if fullpath.is_file() {
+                        match File::open(format!("!{} {}", fullpath.display(), input)) {
                             Ok(_) => {}  // doesn't happen for now
                             Err(_) => {} // we return error even on successful spawn
                         }
