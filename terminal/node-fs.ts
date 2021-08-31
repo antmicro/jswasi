@@ -46,7 +46,10 @@ export class OpenDirectory extends Directory {
         }
 
         const name = parts.pop();
-        let dir_handle = this._handle;
+	let dir_handle = this._handle;
+        if (dir_handle == null) {
+            return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
+        }
         for (const part of parts) {
             try {
                 dir_handle = await dir_handle.getDirectoryHandle(part);

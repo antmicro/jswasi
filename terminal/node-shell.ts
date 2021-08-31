@@ -21,7 +21,7 @@ if (process.argv.length < 3) {
     process.exit(1);
 }
 
-let workerTable = new WorkerTable("./worker.mjs", receive_callback, null, true);
+let workerTable = new WorkerTable("./worker.mjs", receive_callback, new OpenDirectory("/", null), true);
 
 workerTable.spawnWorker(
     null, // parent_id
