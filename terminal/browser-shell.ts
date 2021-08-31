@@ -125,7 +125,7 @@ export async function init_all(anchor: HTMLElement) {
         on_worker_message
     );
 
-    workerTable.postMessage(0, ["start", "shell.wasm", 0, [], {
+    workerTable.postMessage(0, ["start", "/usr/bin/shell.wasm", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
