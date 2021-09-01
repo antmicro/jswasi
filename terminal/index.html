@@ -7,7 +7,16 @@
 <body>
 <script type="module">
     import { init_all } from "./browser-shell.js";
-
+    window.buffer = "";
+    window.alive = true;
+    window.stdout_read_data = function() {
+       if (window.stdout_attached != undefined) if (window.stdout_attached && buffer.length > 0) {
+           let tmp = window.buffer;
+	   window.buffer = "";
+	   return tmp;
+       }
+       return null;
+    }
     const script = document.createElement("script");
     script.type = "text/javascript";
     script.src = "./hterm_all.js";

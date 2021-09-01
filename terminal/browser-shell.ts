@@ -78,8 +78,8 @@ export async function init_all(anchor: HTMLElement) {
     const workerTable = new WorkerTable(
         "worker.js",
         // receive_callback
-        (id, output) => terminal.io.print(output),
-        openRoot
+        (id, output) => { terminal.io.print(output); if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + output; },
+	openRoot
     );
 
     terminal.decorate(anchor);

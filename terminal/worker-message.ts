@@ -14,7 +14,8 @@ export const on_worker_message = async (event, workerTable) => {
             case "exit": {
                 workerTable.terminateWorker(worker_id);
                 console.log(`WORKER ${worker_id} exited with result code: ${data}`);
-                break;
+                if (worker_id == 0) window.alive = false;
+		break;
             }
             case "spawn": {
                 const [command, args, env, sbuf] = data;
