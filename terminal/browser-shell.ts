@@ -52,6 +52,7 @@ export async function init_fs() {
 
     // create dummy files for browser executed commands
     await bin.getFileHandle("mount.wasm", {create: true});
+    await bin.getFileHandle("umount.wasm", {create: true});
     await bin.getFileHandle("wget.wasm", {create: true});
 
     const local = await usr.getDirectoryHandle("local", {create: true});
@@ -146,6 +147,10 @@ export async function mount(workerTable, worker_id, args, env) {
     }
     // this will be included in all program
     await filesystem.addMount(args[1], mount_point);
+}
+
+export function umount(workerTable, worker_id, args, env) {
+    filesystem.removeMount(args[1]);
 }
 
 export async function wget(workerTable, worker_id, args, env) {

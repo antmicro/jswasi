@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
-import { mount, wget } from "./browser-shell.js";
+import { mount, umount, wget } from "./browser-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
@@ -26,6 +26,12 @@ export const on_worker_message = async (event, workerTable) => {
                         Atomics.notify(parent_lck, 0);
                         break;
                     } 
+                    case "/usr/bin/umount.wasm": {
+                        await umount(workerTable, worker_id, args, env);
+                        Atomics.store(parent_lck, 0, 0);
+                        Atomics.notify(parent_lck, 0);
+                        break;
+                    }
                     case "/usr/bin/wget.wasm": {
                         await wget(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);

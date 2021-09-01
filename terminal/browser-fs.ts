@@ -16,6 +16,17 @@ export class BrowserFilesystem {
         this.mounts.push({parts, name, handle: mount_directory});
     }
 
+    removeMount(absolute_path: string) {
+        // TODO: for now path must be absolute
+        const {parts: del_parts, name: del_name} = parsePath(absolute_path);
+        for (let i = 0; i < this.mounts.length; i++) {
+            const {parts, name} = this.mounts[i];
+            if (arraysEqual(parts, del_parts) && name === del_name) {
+                this.mounts.splice(i, 1);
+                return;
+            }
+        }
+    }
 
     async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
         const {parts, name} = parsePath(path);
@@ -88,6 +99,18 @@ export class BrowserFilesystem {
         }
 
         for await (const [name, handle] of dir_handle.entries()) {
+            // mounted direcotries hide directories they are mounted to
+            let already_exists = false;
+            for (const entry of a) {
+                if (entry.path === name) {
+                    already_exists = true;
+                    break;
+                }
+            }
+            if (already_exists) {
+                continue;
+            }
+
             switch(handle.kind) {
                 case "file": {
                     a.push(new File(name, handle, this));
