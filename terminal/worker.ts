@@ -21,6 +21,7 @@ let args = [];
 let env = {};
 
 const onmessage_ = function (e) {
+  worker_console_log("got a message!");
     if (!started) {
         if (e.data[0] === "start") {
             started = true;
@@ -410,7 +411,7 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+        const path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
 
         worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
 
@@ -448,17 +449,34 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
+
+    function fix_path(path: string) {
+      let pwd = env['PWD'];
+      if (pwd != "/") pwd = pwd + "/";
+      worker_console_log(`trying to fix path ${path}`);
+      if (path.length == 0) return path;
+      if (path[0] == '!') return path;
+      if (path[0] == '/') return path;
+      if (path[0] != '.') return "/" + path;
+      if (path.substr(0,2) == "./") return pwd + path.substr(2);
+      return pwd + path;
+    }
+
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
         worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+        let path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
         worker_console_log(`path_open: path = ${path}`);
         if (path[0] == '!') {
-            worker_console_log("We are going to send a spawn message!");
             let [fullpath, ...args] = path.split(" ");
             fullpath = fullpath.slice(1);
+            if (fullpath == "set_env") {
+               env[args[0]] = args[1];
+               return constants.WASI_EBADF;
+            }
+            worker_console_log("We are going to send a spawn message!");
             const sbuf = new SharedArrayBuffer(4);
             const lck = new Int32Array(sbuf, 0, 1);
             lck[0] = -1;

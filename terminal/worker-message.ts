@@ -5,7 +5,8 @@ import { mount, umount, wget } from "./browser-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
-        const fds = workerTable.workerInfos[worker_id].fds;
+	let fds = null;
+        if (workerTable.workerInfos[worker_id] != undefined) fds = workerTable.workerInfos[worker_id].fds;
         switch (action) {
             case "console": {
                 console.log("WORKER " + worker_id + ": " + data);
@@ -21,14 +22,8 @@ export const on_worker_message = async (event, workerTable) => {
             }
             case "spawn": {
                 const [fullpath, args, env, sbuf] = data;
-                const parent_lck = new Int32Array(sbuf, 0, 1);
+		const parent_lck = new Int32Array(sbuf, 0, 1);
 		switch(fullpath) {
-		    case "set_env": {
-                        console.log("TODO: set_env ",args[0], args[1]);
-                        Atomics.store(parent_lck, 0, 0);
-                        Atomics.notify(parent_lck, 0);
-			break;
-                    }
                     case "/usr/bin/mount.wasm": {
                         await mount(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);

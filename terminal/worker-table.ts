@@ -58,7 +58,7 @@ export class WorkerTable {
     }
 
     postMessage(id: number, message) {
-        this.workerInfos[id].worker.postMessage(message);
+	this.workerInfos[id].worker.postMessage(message);
     }
 
     terminateWorker(id: number) {
