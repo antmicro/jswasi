@@ -17,7 +17,7 @@ export function parsePath(path: string): {parts: string[], name: string} {
     for(const component of path.split("/")) {
         if (component == "..") {
             parts.pop()
-        } else if (component !== ".") {
+        } else if (component !== "." && component !== "") {
             parts.push(component);
         }
     }

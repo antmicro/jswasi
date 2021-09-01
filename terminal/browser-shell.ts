@@ -58,7 +58,7 @@ export async function init_fs() {
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
     const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
-    // TODO: save optional binaries in /usr/local/bin once module instantiation is reworked
+    // TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
     const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
     
     // don't await this on purpose
@@ -133,12 +133,16 @@ export async function init_all(anchor: HTMLElement) {
 }
 
 export async function mount(workerTable, worker_id, args, env) {
-    const mount_point = await showDirectoryPicker();
-    if (!mount_point) {
-        console.log('user cancelled or failed to open a diretory');
+    console.log(`mount(${worker_id}, ${args}`);
+    let mount_point;
+    try {
+        mount_point = await showDirectoryPicker();
+    } catch(e) {
+        // TODO: write this to terminal
+        // terminal.io.println("mount: failed to open local directory");
         return;
     }
-    // add preopened diretory to file descriptors of any new program
+    // this will be included in all program
     await filesystem.addMount(args[1], mount_point);
 }
 
