@@ -12,7 +12,7 @@ if (!debug) {
     console.log = function() {};
 }
 
-function receive_callback(id, output) {
+function receive_callback(output) {
     process.stdout.write(output);
 }
 

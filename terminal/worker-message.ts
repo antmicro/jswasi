@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenDirectory } from "./browser-fs.js";
-import { mount, wget } from "./browser-shell.js";
+import { mount, umount, wget } from "./browser-shell.js";
 
 export const on_worker_message = async (event, workerTable) => {
         const [worker_id, action, data] = event.data;
@@ -18,17 +18,23 @@ export const on_worker_message = async (event, workerTable) => {
 		break;
             }
             case "spawn": {
-                const [command, args, env, sbuf] = data;
+                const [fullpath, args, env, sbuf] = data;
                 const parent_lck = new Int32Array(sbuf, 0, 1);
-                switch(command) {
-                    case "mount": {
-                        await mount(worker_id, args, env);
+                switch(fullpath) {
+                    case "/usr/bin/mount.wasm": {
+                        await mount(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
                         break;
                     } 
-                    case "wget": {
-                        await wget(worker_id, args, env);
+                    case "/usr/bin/umount.wasm": {
+                        await umount(workerTable, worker_id, args, env);
+                        Atomics.store(parent_lck, 0, 0);
+                        Atomics.notify(parent_lck, 0);
+                        break;
+                    }
+                    case "/usr/bin/wget.wasm": {
+                        await wget(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
                         break;
@@ -39,7 +45,7 @@ export const on_worker_message = async (event, workerTable) => {
                             parent_lck,
                             on_worker_message
                         );
-                        workerTable.postMessage(id, ["start", `${command}.wasm`, id, args, env]);
+                        workerTable.postMessage(id, ["start", fullpath, id, args, env]);
                     }
                 }
                 break;
@@ -71,9 +77,8 @@ export const on_worker_message = async (event, workerTable) => {
 
                 let err;
                 if (fds[fd] != undefined) {
-                    // FIXME: this shouldn't work, but it fixes the 'uutils cat', find out why and document it
-                    // path.set(new TextEncoder().encode(fds[fd].path), 0);
-                    path.set(fds[fd].path, 0);
+                    // FIXME: this broke relative paths, if we would never set path they would work
+                    path.set(new TextEncoder().encode(fds[fd].path), 0);
                     err = constants.WASI_ESUCCESS;
                 } else {
                     err = constants.WASI_EBADF;
@@ -95,13 +100,15 @@ export const on_worker_message = async (event, workerTable) => {
                     }
                     case 1: {
                         const output = content.replaceAll("\n", "\r\n");
-                        workerTable.receive_callback(worker_id, output);
+                        workerTable.receive_callback(output);
                         break;
                     }
                     case 2: {
                         // TODO: should print in red, use ANSI color codes around output
                         const output = content.replaceAll("\n", "\r\n");
-                        workerTable.receive_callback(worker_id, output);
+                        const RED_ANSI = '\u001b[31m';
+                        const RESET = '\u001b[0m';
+                        workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
                         break;
                     }
                     default: {
