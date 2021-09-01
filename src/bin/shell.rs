@@ -76,8 +76,12 @@ fn main() {
                             new_path.to_str().unwrap()
                         );
                     } else {
+                        env::set_var("OLDPWD", pwd.to_str().unwrap()); // TODO: WASI does not support this
+                        match File::open(format!("!set_env {} {}", "OLDPWD", pwd.to_str().unwrap())) {
+                            Ok(_) => {}
+                            Err(_) => {}
+                        }
                         pwd = new_path;
-                        println!("We've set path in env to {}", pwd.to_str().unwrap());
                         env::set_var("PWD", pwd.to_str().unwrap()); // TODO: WASI does not support this
                         match File::open(format!("!set_env {} {}", "PWD", pwd.to_str().unwrap())) {
                             Ok(_) => {}
