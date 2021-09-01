@@ -45,7 +45,7 @@ export class BrowserFilesystem {
         const reversed_mounts = [].concat(this.mounts).reverse();
         for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
             if (arraysEqual(parts, components) && child_name === name) {
-                return handle;
+                return child_handle;
             }
         }
         return await handle.getDirectoryHandle(name, options);
@@ -165,7 +165,7 @@ export class OpenDirectory extends Directory {
 
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-        console.log(`OpenDirectory.get_entry(${path}, ${oflags})`);
+        console.log(`OpenDirectory.get_entry(${path}, ${mode}, ${oflags})`);
     
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
         if (err !== constants.WASI_ESUCCESS) {
