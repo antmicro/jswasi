@@ -11,9 +11,11 @@ export const on_worker_message = async (event, workerTable) => {
                 console.log("WORKER " + worker_id + ": " + data);
                 break;
             }
-            case "exit": {
+	    case "exit": {
+		let worker_name = workerTable.workerInfos[worker_id].cmd;
+                worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
                 workerTable.terminateWorker(worker_id);
-                console.log(`WORKER ${worker_id} exited with result code: ${data}`);
+		console.log(`WORKER ${worker_id} (${worker_name}) exited with result code: ${data}`);
                 if (worker_id == 0) window.alive = false;
 		break;
             }
@@ -44,7 +46,8 @@ export const on_worker_message = async (event, workerTable) => {
                             worker_id,
                             parent_lck,
                             on_worker_message
-                        );
+			);
+                        workerTable.workerInfos[id].cmd = fullpath;
                         workerTable.postMessage(id, ["start", fullpath, id, args, env]);
                     }
                 }

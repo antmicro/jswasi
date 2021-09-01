@@ -127,6 +127,7 @@ export async function init_all(anchor: HTMLElement) {
         null, // parent_lock
         on_worker_message
     );
+    workerTable.workerInfos[0].cmd = "/usr/bin/shell.wasm";
 
     workerTable.postMessage(0, ["start", "/usr/bin/shell.wasm", 0, [], {
         RUST_BACKTRACE: "full",

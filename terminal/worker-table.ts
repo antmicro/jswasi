@@ -5,6 +5,7 @@ const IS_NODE = typeof self === 'undefined';
 
 class WorkerInfo {
     public id: number;
+    public cmd: string;
     public worker: Worker;
     public parent_id: number;
     public parent_lock: Int32Array;
@@ -12,8 +13,9 @@ class WorkerInfo {
     public fds;
     public callback;
 
-    constructor(id: number, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback) {
-        this.id = id;
+    constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback) {
+	this.id = id;
+        this.cmd = cmd;
         this.worker = worker;
         this.fds = fds;
         this.parent_id = parent_id;
@@ -45,7 +47,7 @@ export class WorkerTable {
         let private_data = {};
         if (!IS_NODE) private_data = {type: "module"};
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, worker, this.fds, parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, "(unknown)", worker, this.fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
             worker.onmessage = (event) => callback(event, this);
         } else {
