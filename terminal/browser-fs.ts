@@ -7,7 +7,7 @@ export class BrowserFilesystem {
 
     async getRootDirectory(): Promise<Directory> {
         const root = await navigator.storage.getDirectory();
-        return new Directory("/", root, this);
+        return new Directory("", root, this);
     }
 
     async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
