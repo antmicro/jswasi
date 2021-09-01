@@ -432,7 +432,6 @@ function WASI() {
         const file_type = statbuf.getUint8(16);
         const nlink = statbuf.getBigUint64(24, true);
         const size = statbuf.getBigUint64(32, true);
-        worker_console_log(`size: ${size}`);
         const atim = statbuf.getBigUint64(40, true);
         const mtim = statbuf.getBigUint64(48, true);
         const ctim = statbuf.getBigUint64(56, true);
