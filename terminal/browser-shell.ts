@@ -72,7 +72,9 @@ export async function init_fs() {
 const filesystem = new BrowserFilesystem();
 
 export async function init_all(anchor: HTMLElement) {
+    anchor.innerHTML = 'Fetching binaries, this should only happen once.';
     await init_fs();
+    anchor.innerHTML = '';
 
     // FIXME: for now we assume hterm is in scope
     // attempt to pass Terminal to init_all as a parameter would fail
