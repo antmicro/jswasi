@@ -18,16 +18,15 @@ export const on_worker_message = async (event, workerTable) => {
             }
             case "spawn": {
                 const [fullpath, args, env, sbuf] = data;
-                const command = fullpath.split("/").slice(-1);
                 const parent_lck = new Int32Array(sbuf, 0, 1);
-                switch(command) {
-                    case "mount": {
+                switch(fullpath) {
+                    case "/usr/bin/mount.wasm": {
                         await mount(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
                         break;
                     } 
-                    case "wget": {
+                    case "/usr/bin/wget.wasm": {
                         await wget(workerTable, worker_id, args, env);
                         Atomics.store(parent_lck, 0, 0);
                         Atomics.notify(parent_lck, 0);
