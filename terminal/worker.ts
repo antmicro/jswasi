@@ -517,26 +517,21 @@ function WASI() {
 
         let path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
         worker_console_log(`path_open: path = ${path}`);
-        if (path[0] == '!') {
-            special_parse(path.slice(1));
-            return constants.WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
-        } else {
-            const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
-            const lck = new Int32Array(sbuf, 0, 1);
-            lck[0] = -1;
-            const opened_fd = new Int32Array(sbuf, 4, 1);
+        const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const opened_fd = new Int32Array(sbuf, 4, 1);
 
-            worker_send(["path_open", [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags]]);
-            Atomics.wait(lck, 0, -1);
+        worker_send(["path_open", [sbuf, dir_fd, path, dirflags, oflags, fs_rights_base, fs_rights_inheriting, fdflags]]);
+        Atomics.wait(lck, 0, -1);
 
-            const err = Atomics.load(lck, 0);
-            if (err !== constants.WASI_ESUCCESS) {
-                return err;
-            }
-
-            view.setUint32(opened_fd_ptr, opened_fd[0], true);
-            return constants.WASI_ESUCCESS;
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+            return err;
         }
+
+        view.setUint32(opened_fd_ptr, opened_fd[0], true);
+        return constants.WASI_ESUCCESS;
     }
 
     let used_once = false;
@@ -548,10 +543,15 @@ function WASI() {
         const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`path is ${path}, buffer_len = ${buffer_len}, fd = ${fd}`);
         if (path[0] == '!') {
+            if (buffer_len < 1024) {
+              // we need enough buffer to execute the function only once
+              view.setUint32(buffer_used_ptr, buffer_len, true);
+              return constants.WASI_ESUCCESS;
+            }
             let result_s = special_parse(path.slice(1));
             let result = ENCODER.encode(`${result_s}\0`);
             let count = result.byteLength;
-            if (count > buffer_len) count = buffer_len;
+            if (count > 1024) count = 1024;
             view8.set(result.slice(0, count), buffer_ptr);
             view.setUint32(buffer_used_ptr, count, true);
             worker_console_log(`wrote ${count} bytes for now, full result is '${result_s}'`);
