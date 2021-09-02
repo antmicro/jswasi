@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::{fs, thread};
 
 fn main() {
-    let mut pwd = PathBuf::from("/");
+    let mut pwd = PathBuf::from(env::var("PWD").unwrap());
     let mut input = String::new();
 
     // TODO: fetch program list from PATH bin directories
@@ -77,16 +77,11 @@ fn main() {
                         );
                     } else {
                         env::set_var("OLDPWD", pwd.to_str().unwrap()); // TODO: WASI does not support this
-                        match File::open(format!("!set_env {} {}", "OLDPWD", pwd.to_str().unwrap())) {
-                            Ok(_) => {}
-                            Err(_) => {}
-                        }
-                        pwd = new_path;
-                        env::set_var("PWD", pwd.to_str().unwrap()); // TODO: WASI does not support this
-                        match File::open(format!("!set_env {} {}", "PWD", pwd.to_str().unwrap())) {
-                            Ok(_) => {}
-                            Err(_) => {}
-                        }
+                        let sth2 = fs::read_link(format!("!set_env OLDPWD {}", pwd.to_str().unwrap())).unwrap();
+                        let pwd_path = PathBuf::from(fs::read_link(format!("!set_env PWD {}", new_path.to_str().unwrap())).unwrap().to_str().unwrap().trim_matches(char::from(0)));
+                        pwd = pwd_path;
+                        env::set_var("PWD", pwd.to_str().unwrap());
+                        //println!("PWD is now {}", env::var("PWD").unwrap());
                     }
                 }
             }
@@ -123,8 +118,9 @@ fn main() {
                 for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
                     let bin_dir = PathBuf::from(bin_dir);
                     let fullpath = bin_dir.join(format!("{}.wasm", command));
+                    println!("trying file '{0}'", fullpath.display());
                     if fullpath.is_file() {
-                        match File::open(format!("!{} {}", fullpath.display(), input)) {
+                        match File::open(format!("!spawn {} {}", fullpath.display(), input)) {
                             Ok(_) => {}  // doesn't happen for now
                             Err(_) => {} // we return error even on successful spawn
                         }

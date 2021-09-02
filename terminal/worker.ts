@@ -462,6 +462,54 @@ function WASI() {
       return pwd + path;
     }
 
+    function realpath(path) {
+        let result = [];
+        let result_path = "";
+        let tmp_path = path;
+        let part = "";
+        let level = 0;
+        let root_path = (path[0] == '/');
+        while (tmp_path != "") {
+            if (tmp_path.indexOf("/") != -1) {
+                part = tmp_path.substr(0, tmp_path.indexOf("/"));
+             } else part = tmp_path;
+             tmp_path = tmp_path.substr(part.length+1);
+             if (part == "..") {
+                 if (level > 0) level -= 1;
+             } else {
+                 result[level] = part;
+                 level++;
+             }
+        }
+        result_path = result.slice(0, level).join("/");
+        if (root_path) if (result_path == "") return "/";
+        return result_path;
+    }
+
+    function special_parse(fullcmd: string) {
+            let [cmd, ...args] = fullcmd.split(" ");
+            if (cmd == "spawn") {
+                worker_console_log("We are going to send a spawn message!");
+                const sbuf = new SharedArrayBuffer(4);
+                const lck = new Int32Array(sbuf, 0, 1);
+                lck[0] = -1;
+                worker_send(["spawn", [args[0], args.slice(1), env, sbuf]]);
+                worker_console_log("sent.");
+                // wait for child process to finish
+                Atomics.wait(lck, 0, -1);
+                return "";
+            }
+            if (cmd == "set_env") {
+               env[args[0]] = args[1];
+               if (args[0] == "PWD") env[args[0]] = realpath(args[1]);
+               worker_console_log("set " +args[0]+ " to " + env[args[0]]);
+               return env[args[0]];
+            }
+                
+            worker_console_log(`Special command ${cmd} not found.`);
+            return "";
+    }
+
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
         worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
@@ -470,22 +518,7 @@ function WASI() {
         let path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
         worker_console_log(`path_open: path = ${path}`);
         if (path[0] == '!') {
-            let [fullpath, ...args] = path.split(" ");
-            fullpath = fullpath.slice(1);
-            if (fullpath == "set_env") {
-               env[args[0]] = args[1];
-               return constants.WASI_EBADF;
-            }
-            worker_console_log("We are going to send a spawn message!");
-            const sbuf = new SharedArrayBuffer(4);
-            const lck = new Int32Array(sbuf, 0, 1);
-            lck[0] = -1;
-            worker_send(["spawn", [fullpath, args, env, sbuf]]);
-            worker_console_log("sent.");
-
-            // wait for child process to finish
-            Atomics.wait(lck, 0, -1);
-
+            special_parse(path.slice(1));
             return constants.WASI_EBADF; // TODO, WASI_ESUCCESS throws runtime error in WASM so this is a bit better for now
         } else {
             const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
@@ -506,9 +539,25 @@ function WASI() {
         }
     }
 
-    function path_readlink() {
-        worker_console_log("path_readlink");
-        return 1;
+    let used_once = false;
+
+    function path_readlink(fd: number, path_ptr: ptr, path_len: number, buffer_ptr: ptr, buffer_len: number, buffer_used_ptr: ptr) {
+        worker_console_log(`path_readlink(${fd}, ${path_ptr}, ${path_len}, ${buffer_ptr}, ${buffer_len}, ${buffer_used_ptr})`);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+        worker_console_log(`path is ${path}, buffer_len = ${buffer_len}, fd = ${fd}`);
+        if (path[0] == '!') {
+            let result_s = special_parse(path.slice(1));
+            let result = ENCODER.encode(`${result_s}\0`);
+            let count = result.byteLength;
+            if (count > buffer_len) count = buffer_len;
+            view8.set(result.slice(0, count), buffer_ptr);
+            view.setUint32(buffer_used_ptr, count, true);
+            worker_console_log(`wrote ${count} bytes for now, full result is '${result_s}'`);
+            return constants.WASI_ESUCCESS;
+        }
+        return constants.WASI_EBADF;
     }
 
     function path_remove_directory(fd: number, path_ptr: ptr, path_len: number) {

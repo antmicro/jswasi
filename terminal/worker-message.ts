@@ -236,22 +236,35 @@ export const on_worker_message = async (event, workerTable) => {
                 const buf = new DataView(sbuf, 4);
 
                 let err, entry;
-                const fds = workerTable.workerInfos[worker_id].fds;
-                if (fds[fd] != undefined) {
-                    ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
-                    if (err === constants.WASI_ESUCCESS) {
-                        let stat = await entry.stat();
-                        buf.setBigUint64(0, stat.dev, true);
-                        buf.setBigUint64(8, stat.ino, true);
-                        buf.setUint8(16, stat.file_type);
-                        buf.setBigUint64(24, stat.nlink, true);
-                        buf.setBigUint64(32, stat.size, true);
-                        buf.setBigUint64(40, stat.atim, true);
-                        buf.setBigUint64(48, stat.mtim, true);
-                        buf.setBigUint64(56, stat.ctim, true);
+
+                if (path[0] != '!') {
+                    const fds = workerTable.workerInfos[worker_id].fds;
+                    if (fds[fd] != undefined) {
+                        ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
+                        if (err === constants.WASI_ESUCCESS) {
+                            let stat = await entry.stat();
+                            buf.setBigUint64(0, stat.dev, true);
+                           buf.setBigUint64(8, stat.ino, true);
+                            buf.setUint8(16, stat.file_type);
+                            buf.setBigUint64(24, stat.nlink, true);
+                            buf.setBigUint64(32, stat.size, true);
+                            buf.setBigUint64(40, stat.atim, true);
+                            buf.setBigUint64(48, stat.mtim, true);
+                            buf.setBigUint64(56, stat.ctim, true);
+                        }
+                    } else {
+                       err = constants.WASI_EBADF;
                     }
                 } else {
-                    err = constants.WASI_EBADF;
+                            buf.setBigUint64(0, BigInt(0), true);
+                            buf.setBigUint64(8, BigInt(0), true);
+                            buf.setUint8(16, 0);
+                            buf.setBigUint64(24, BigInt(0), true);
+                            buf.setBigUint64(32, BigInt(4096), true);
+                            buf.setBigUint64(40, BigInt(0), true);
+                            buf.setBigUint64(48, BigInt(0), true);
+                            buf.setBigUint64(56, BigInt(0), true);
+                            err = constants.WASI_ESUCCESS;
                 }
 
                 Atomics.store(lck, 0, err);
