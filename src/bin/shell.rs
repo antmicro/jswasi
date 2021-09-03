@@ -10,6 +10,7 @@ use std::{fs, thread};
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
 use conch_parser::ast;
+use msh::execute;
 
 fn main() {
     let mut pwd = PathBuf::from("/");
@@ -59,7 +60,10 @@ fn main() {
         let lex = Lexer::new(input.chars());
         let parser = DefaultParser::new(lex);
         for cmd in parser {
-
+            match cmd {
+                Ok(cmd) => execute(cmd),
+                Err(e) => println!("{:?}", e)
+            }
         }
 
         let mut words = input.split_whitespace();

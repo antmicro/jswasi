@@ -81,7 +81,6 @@ export const on_worker_message = async (event, workerTable) => {
             let err;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
-                // FIXME: this broke relative paths, if we would never set path they would work
                 path.set(new TextEncoder().encode(fds[fd].path), 0);
                 err = constants.WASI_ESUCCESS;
             } else {
@@ -108,7 +107,6 @@ export const on_worker_message = async (event, workerTable) => {
                     break;
                 }
                 case 2: {
-                    // TODO: should print in red, use ANSI color codes around output
                     const output = content.replaceAll("\n", "\r\n");
                     const RED_ANSI = '\u001b[31m';
                     const RESET = '\u001b[0m';
