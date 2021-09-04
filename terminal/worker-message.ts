@@ -6,7 +6,7 @@ export const on_worker_message = async (event, workerTable) => {
     const [worker_id, action, data] = event.data;
     switch (action) {
         case "console": {
-            console.log("WORKER " + worker_id + ": " + data);
+            //console.log("WORKER " + worker_id + ": " + data);
             break;
         }
 	    case "exit": {

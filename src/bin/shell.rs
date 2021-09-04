@@ -85,11 +85,7 @@ fn main() {
                         fs::read_link(format!("/!set_env OLDPWD {}", env::current_dir().unwrap().to_str().unwrap()));
                         let pwd_path = PathBuf::from(fs::read_link(format!("/!set_env PWD {}", new_path.to_str().unwrap())).unwrap().to_str().unwrap().trim_matches(char::from(0)));
                         env::set_var("PWD", pwd_path.to_str().unwrap());
-                        println!("Setting current dir!");
                         env::set_current_dir(&pwd_path);
-                        println!("ok, now we will read again!");
-                        println!("curr is now {}", env::current_dir().unwrap().display());
-                        //println!("PWD is now {}", env::var("PWD").unwrap());
                     }
                 }
             }
@@ -104,6 +100,13 @@ fn main() {
                     }
                 } else {
                     println!("sleep: missing operand");
+                }
+            }
+            "ls" | "date" | "printf" | "env" => {
+                if args.len() == 0 {
+                    fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {}", command));
+                } else {
+                    fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {} {}", command, args.join(" ")));
                 }
             }
             "write" => {
