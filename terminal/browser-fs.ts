@@ -29,9 +29,9 @@ export class BrowserFilesystem {
     }
 
     async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
-        const {parts, name} = parsePath(path);
-    
-        for (const part of parts) {
+	if (path.includes("\\")) return { err: constants.WASI_EEXIST, name: null, dir_handle: null };
+	const {parts, name} = parsePath(path);
+	for (const part of parts) {
             try {
                 dir_handle = await this.getDirectoryHandle(dir_handle, part);
             } catch (err) {
@@ -39,12 +39,13 @@ export class BrowserFilesystem {
                     return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
                 } else if (err.name === "TypeMismatchError") {
                     return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-                } else {
+                } else if (err.name === "TypeError") {
+		    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+		} else {
                     throw err;
                 }
             }
         }
-    
         return {err: constants.WASI_ESUCCESS, name, dir_handle};
     }
 
