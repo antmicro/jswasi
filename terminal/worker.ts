@@ -10,7 +10,7 @@ import * as constants from "./constants.js";
 
 type ptr = number;
 
-const DEBUG = false;
+const DEBUG = true;
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -412,9 +412,13 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        const path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
+        let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len))
 
         if (DEBUG) worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
+	if (path != fix_path(path)) {
+		path = fix_path(path);
+		worker_console_log(`Fixing path to ${path}`);
+	}
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -452,6 +456,8 @@ function WASI() {
 
 
     function fix_path(path: string) {
+	   // if (path[0] == ".") if (env['PWD'] != "/") return path.replace(".", env['PWD']);
+	    return path;
       let pwd = env['PWD'];
       if (pwd != "/") pwd = pwd + "/";
       if (DEBUG) worker_console_log(`trying to fix path ${path}`);
@@ -502,7 +508,14 @@ function WASI() {
             }
             if (cmd == "set_env") {
                env[args[0]] = args[1];
-               if (args[0] == "PWD") env[args[0]] = realpath(args[1]);
+               if (args[0] == "PWD") {
+		       env[args[0]] = realpath(args[1]);
+                       const sbuf = new SharedArrayBuffer(4);
+                       const lck = new Int32Array(sbuf, 0, 1);
+                       lck[0] = -1;
+	               worker_send(["chdir", [realpath(args[1]), sbuf]]);
+                       Atomics.wait(lck, 0, -1);
+	       }
                worker_console_log("set " +args[0]+ " to " + env[args[0]]);
                return env[args[0]];
             }
@@ -516,8 +529,12 @@ function WASI() {
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-        let path = fix_path(DECODER.decode(view8.slice(path_ptr, path_ptr + path_len)));
+        let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         if (DEBUG) worker_console_log(`path_open: path = ${path}`);
+	if (path != fix_path(path)) {
+		path = fix_path(path);
+		worker_console_log(`fixing path to ${path}`);
+	}
         const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
@@ -622,8 +639,9 @@ function WASI() {
         const err = Atomics.load(lck, 0);
         if (err === constants.WASI_ESUCCESS) {
             view.setUint8(buf, preopen_type[0]);
-            view.setUint32(buf + 4, name_len[0]);
+            view.setUint32(buf + 4, name_len[0], true);
         }
+	worker_console_log(`fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`);
         return err;
     }
 
@@ -631,7 +649,7 @@ function WASI() {
         if (DEBUG) worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);       
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 	
-	    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
+	const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
         const path = new Uint8Array(sbuf, 4, path_len);
@@ -643,6 +661,7 @@ function WASI() {
         if (err === constants.WASI_ESUCCESS) {
             view8.set(path, path_ptr);
         }
+	worker_console_log(`prestat returned ${path} of size ${path_len}`);
         return err;
 
     }

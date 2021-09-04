@@ -8,7 +8,9 @@ use std::time::Duration;
 use std::{fs, thread};
 
 fn main() {
-    let mut pwd = PathBuf::from(env::var("PWD").unwrap());
+    // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24 
+    env::set_current_dir(env::var("PWD").unwrap());
+
     let mut input = String::new();
 
     // TODO: fetch program list from PATH bin directories
@@ -16,7 +18,7 @@ fn main() {
 
     loop {
         // prompt for input
-        print!("{}$ ", pwd.to_str().unwrap());
+        print!("{}$ ", env::current_dir().unwrap().display());
         io::stdout().flush().unwrap();
 
         let mut c = [0];
@@ -59,13 +61,15 @@ fn main() {
             // built in commands
             "cd" => {
                 if args.is_empty() {
-                    pwd = PathBuf::from("/");
+                    // TODO: cd should be equal to cd ~ not cd /
+                    env::set_current_dir(PathBuf::from("/"));
                 } else {
                     let path = args[0];
 
                     let new_path = if path.starts_with("/") {
                         PathBuf::from(path)
                     } else {
+                        let pwd = env::current_dir().unwrap();
                         pwd.join(path)
                     };
 
@@ -76,16 +80,20 @@ fn main() {
                             new_path.to_str().unwrap()
                         );
                     } else {
-                        env::set_var("OLDPWD", pwd.to_str().unwrap()); // TODO: WASI does not support this
-                        fs::read_link(format!("!set_env OLDPWD {}", pwd.to_str().unwrap())).unwrap();
-                        let pwd_path = PathBuf::from(fs::read_link(format!("!set_env PWD {}", new_path.to_str().unwrap())).unwrap().to_str().unwrap().trim_matches(char::from(0)));
-                        pwd = pwd_path;
-                        env::set_var("PWD", pwd.to_str().unwrap());
+                        let oldpwd = env::current_dir().unwrap();
+                        env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap()); // TODO: WASI does not support this
+                        fs::read_link(format!("/!set_env OLDPWD {}", env::current_dir().unwrap().to_str().unwrap()));
+                        let pwd_path = PathBuf::from(fs::read_link(format!("/!set_env PWD {}", new_path.to_str().unwrap())).unwrap().to_str().unwrap().trim_matches(char::from(0)));
+                        env::set_var("PWD", pwd_path.to_str().unwrap());
+                        println!("Setting current dir!");
+                        env::set_current_dir(&pwd_path);
+                        println!("ok, now we will read again!");
+                        println!("curr is now {}", env::current_dir().unwrap().display());
                         //println!("PWD is now {}", env::var("PWD").unwrap());
                     }
                 }
             }
-            "pwd" => println!("{}", pwd.display()),
+            "pwd" => println!("{}", env::current_dir().unwrap().display()),
             "sleep" => {
                 // TODO: requires poll_oneoff implementation
                 if let Some(&sec_str) = args.get(0) {
@@ -120,7 +128,7 @@ fn main() {
                     let fullpath = bin_dir.join(format!("{}.wasm", command));
                     println!("trying file '{0}'", fullpath.display());
                     if fullpath.is_file() {
-                        let _result = fs::read_link(format!("!spawn {} {}", fullpath.display(), input)).unwrap().to_str().unwrap().trim_matches(char::from(0));
+                        let _result = fs::read_link(format!("/!spawn {} {}", fullpath.display(), input)).unwrap().to_str().unwrap().trim_matches(char::from(0));
                         found = true;
                         break;
                     }

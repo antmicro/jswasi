@@ -88,7 +88,7 @@ export async function init_all(anchor: HTMLElement) {
         // receive_callback
         // @ts-ignore
         (output) => { terminal.io.print(output); if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + output; },
-        [null, null, null, await root_dir.open()]
+        [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()]
     );
 
     terminal.decorate(anchor);

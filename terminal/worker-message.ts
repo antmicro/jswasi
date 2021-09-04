@@ -18,6 +18,21 @@ export const on_worker_message = async (event, workerTable) => {
             if (worker_id == 0) window.alive = false;
 		    break;
         }
+	case "chdir": {
+	        const [pwd, sbuf] = data;
+                const parent_lck = new Int32Array(sbuf, 0, 1);
+                const { fds } = workerTable.workerInfos[worker_id];
+		if (fds[3] != undefined) {
+		    console.log("We are checkin the dir!",pwd.substr(1));
+		    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
+		    console.log("We got err = ", err, " entry = ", entry);
+  		    fds[4] = await entry.open();
+		    fds[4].path = ".";
+		}
+                Atomics.store(parent_lck, 0, 0);
+                Atomics.notify(parent_lck, 0);
+	        break;
+	}
         case "spawn": {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
@@ -62,7 +77,9 @@ export const on_worker_message = async (event, workerTable) => {
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
                 preopen_type[0] = fds[fd].file_type;
-                name_len[0] = fds[fd].path.length;
+                if (fds[fd].path == "") if (fd == 3) fds[fd].path = "/";
+                if (fds[fd].path == "") if (fd == 4) fds[fd].path = ".";
+		name_len[0] = fds[fd].path.length;
                 err = constants.WASI_ESUCCESS;
             } else {
                 err = constants.WASI_EBADF;
@@ -82,7 +99,8 @@ export const on_worker_message = async (event, workerTable) => {
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
                 // FIXME: this broke relative paths, if we would never set path they would work
-                path.set(new TextEncoder().encode(fds[fd].path), 0);
+                console.log(`path is ${fds[fd].path}`);
+		path.set(new TextEncoder().encode(fds[fd].path), 0);
                 err = constants.WASI_ESUCCESS;
             } else {
                 err = constants.WASI_EBADF;

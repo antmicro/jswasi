@@ -1,13 +1,16 @@
 import * as constants from "./constants.js";
-import {arraysEqual} from "./utils.js";
+import {realpath, arraysEqual} from "./utils.js";
 import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
 
 export class BrowserFilesystem {
     mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle}[] = [];
 
+    rootDir: Directory;
+
     async getRootDirectory(): Promise<Directory> {
         const root = await navigator.storage.getDirectory();
-        return new Directory("", root, this);
+	this.rootDir = new Directory("", root, this);
+        return this.rootDir;
     }
 
     async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
@@ -28,8 +31,40 @@ export class BrowserFilesystem {
         }
     }
 
+    async resolveAbsolute(path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+	path = realpath(path);
+	console.log(`Resolving absolute path '${path}'`);
+	if ((path == "/") || (path == "/.")) return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: await navigator.storage.getDirectory()};
+        const {parts, name} = parsePath(path);
+	let dir_handle = await navigator.storage.getDirectory();
+
+	try {
+            for (const part of parts) {
+                    dir_handle = await dir_handle.getDirectoryHandle(part);
+            }
+	    console.log(`getting ${name}`);
+  	    //dir_handle = await dir_handle.getDirectoryHandle(name);
+	    return {err: constants.WASI_ESUCCESS, name, dir_handle};
+	} catch (err) {
+	    console.log("There was an error, err.name = ", err.name);
+	    return {err: constants.WASI_EEXIST, name: null, dir_hadnle: null};
+	}
+    }
+
     async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
 	if (path.includes("\\")) return { err: constants.WASI_EEXIST, name: null, dir_handle: null };
+
+
+
+/////////////////
+            const root = await navigator.storage.getDirectory();
+	    let mypath = await root.resolve(dir_handle);
+	    let pth = "/" + mypath.join("/") + "/" + path;
+	    pth = pth.replace("//", "/");
+	    console.log(`PROPOSAL: resolved path would be '${pth}'`);
+	    return this.resolveAbsolute(pth);
+//////////////
+
 	const {parts, name} = parsePath(path);
 	for (const part of parts) {
             try {
@@ -50,16 +85,21 @@ export class BrowserFilesystem {
     }
 
     async getDirectoryHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemDirectoryHandle> {
-        const root = await navigator.storage.getDirectory();
+        console.log("we are in getDirectoryHandle, name = ", name);
+	const root = await navigator.storage.getDirectory();
+	console.log("this is going to be root resolve!");
         const components = await root.resolve(handle);
+	console.log("root resolve finished.");
 
         // if there are many mounts for the same path, we want to return the latest
         const reversed_mounts = [].concat(this.mounts).reverse();
         for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
             if (arraysEqual(parts, components) && child_name === name) {
+		    console.log("We found something!");
                 return child_handle;
             }
         }
+	console.log("We are going to return another async delve inside the handle...",handle, "options = ",options);
         return await handle.getDirectoryHandle(name, options);
     }
     
@@ -192,30 +232,44 @@ export class OpenDirectory extends Directory {
         console.log(`OpenDirectory.get_entry(${path}, ${mode}, ${oflags})`);
     
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
+
         if (err !== constants.WASI_ESUCCESS) {
+		console.log("there was an error",err);
             return {err, entry: null};
         }    
 
+	console.log("get_entry initially resolved to name=",name," dir_handle.name=",dir_handle.name, "dir_handle.fullPath=",dir_handle.fullPath);
+
+	if (name == ".") {
+            let entry = new Directory(dir_handle.name, dir_handle, this._filesystem);
+            return {err: constants.WASI_ESUCCESS, entry};
+	}
+
         if (name === undefined) {
+		console.log("name was undefined!");
             if (oflags & (OpenFlags.Create | OpenFlags.Exclusive)) {
                 return {err: constants.WASI_EEXIST, entry: null};
             }
             if (oflags & OpenFlags.Truncate) {
+		    console.log("ther was truncate!");
                 return {err: constants.WASI_EISDIR, entry: null};
             }
+	    console.log("going to return success!, path = ", this.path, "handle = ", this._handle);
             return {err: constants.WASI_ESUCCESS, entry: new Directory(this.path, this._handle, this._filesystem)};
         }
 
-        
+        console.log("we are further inside!");
         if (oflags & OpenFlags.Directory) {
             mode = FileOrDir.Directory;
         }
 
         const openWithCreate = async (create: boolean): Promise<{err: number, handle: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
+		console.log(`We are in openWithcreate (create = ${create}, mode = ${mode}, name = ${name}`);
             if (mode & FileOrDir.File) {
                 try {
                     return {err: constants.WASI_ESUCCESS, handle: await this._filesystem.getFileHandle(dir_handle, name, {create})};
                 } catch (err) {
+			console.log("There was an error in openWithCreate");
                     if (err.name === 'TypeMismatchError' || err.name == 'TypeError') {
                         if (!(mode & FileOrDir.Directory)) {
                             return {err: constants.WASI_EISDIR, handle: null};
@@ -227,18 +281,23 @@ export class OpenDirectory extends Directory {
                     }
                 }
             }
+	    console.log("We are now here! dir_handle = ", dir_handle, "name = ", name, " create  = ", create, " dir_handle.name = ", dir_handle.name);
             try {
                 return {err: constants.WASI_ESUCCESS, handle: await this._filesystem.getDirectoryHandle(dir_handle, name, {create})};
             } catch (err) {
+		    console.log(`we got an error! (${err.name})`);
                 if (err.name === 'TypeMismatchError') {
                     return {err: constants.WASI_ENOTDIR, handle: null};                              
                 } else if (err.name === 'NotFoundError') {
                     return {err: constants.WASI_ENOENT, handle: null};
+                } else if (err.name === "TypeError") {
+		    return {err: constants.WASI_EEXIST, handle: null};
                 } else {
                     throw err;
                 }
             }
         }
+	console.log("We are here 666 oflags=", oflags);
 
         let handle;
         if (oflags & OpenFlags.Create) {
@@ -269,6 +328,7 @@ export class OpenDirectory extends Directory {
         if (handle.kind == "file") {
             entry = new File(name, handle, this._filesystem);
         } else {
+	    console.log("Creating new handle for this dirpath! name= ", name," handle = " , handle);
             entry = new Directory(name, handle, this._filesystem);
         }
 

@@ -13,7 +13,11 @@ export const enum OpenFlags {
 
 export function parsePath(path: string): {parts: string[], name: string} {
     const parts = [];
-
+    if (path == "..") {
+	    parts.push("..");
+	    const name = parts.pop();
+	    return {parts, name};
+    }
     for(const component of path.split("/")) {
         if (component == "..") {
             parts.pop()
