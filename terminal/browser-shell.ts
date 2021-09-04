@@ -169,8 +169,7 @@ export async function wget(workerTable, worker_id, args, env) {
         // terminal.io.println("write: help: write <address> <filename>");
         return;
     }
-    // TODO: fetch to CWD
-    const root = await navigator.storage.getDirectory();
-    fetch_file(root, filename, address); 
+    const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
+    fetch_file(dir_handle, filename, address); 
 }
 
