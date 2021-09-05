@@ -1,22 +1,26 @@
 use std::env;
-use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time::Duration;
-use std::{fs, thread};
+use std::fs;
+use std::thread;
+use substring::Substring;
 
 fn main() {
     // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24 
     env::set_current_dir(env::var("PWD").unwrap());
 
-    let mut input = String::new();
+//  let mut input = String::new();
+    let mut history: Vec<String> = Vec::new();
 
     // TODO: fetch program list from PATH bin directories
     println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, write, exit, duk, shell, cowsay, python, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv, touch, cp, mkdir, rmdir)");
 
     loop {
+        let mut input = String::new();
+
         // prompt for input
         print!("{}$ ", env::current_dir().unwrap().display());
         io::stdout().flush().unwrap();
@@ -52,13 +56,42 @@ fn main() {
             io::stdout().flush().unwrap();
         }
 
+        // handle '!' history
+        if input.starts_with("!") {
+            // TODO: we should handle more than numbers
+            let history_entry_id: usize = input.split_whitespace().next().unwrap().substring(1,64).parse().unwrap();
+            if history.len() < history_entry_id {
+                println!("!{}: event not found", history_entry_id);
+                input.clear();
+                continue;
+            } else {
+                let mut iter = history[history_entry_id-1].clone();
+                let prefix = format!("!{}", history_entry_id);
+                iter.push_str(input.strip_prefix(&prefix).unwrap());
+                input.clear();
+                input.push_str(&iter);
+            }
+        }
+
         // handle line
         let mut words = input.split_whitespace();
-        let command = words.next().unwrap_or_default();
+        let command = words.next().unwrap();
         let mut args: Vec<_> = words.collect();
+        
+        if input.substring(0,1) != "!" && input.replace(" ", "").len() != 0 {
+            let entry = format!("{}", input);
+            history.push(entry);
+        }
 
         match command {
             // built in commands
+            "history" => {
+                let mut i = 0;
+                for history_entry in &history {
+                    i += 1;
+                    println!("{}: {}", i, history_entry);
+                }
+            }
             "cd" => {
                 if args.is_empty() {
                     // TODO: cd should be equal to cd ~ not cd /
@@ -102,7 +135,7 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "ls" | "date" | "printf" | "env" => {
+            "ls" | "date" | "printf" | "env" | "cat" => {
                 if args.len() == 0 {
                     fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {}", command));
                 } else {

@@ -177,7 +177,8 @@ abstract class Entry {
 
     // TODO: fill dummy values with something meaningful
     async stat() {
-        console.log(`Entry.stat()`);
+        console.log(`Entry.stat() -- Entry -- mostly dummy. path = ${this.path} file_type = ${this.file_type}`);
+    const root = await navigator.storage.getDirectory();
         const time = BigInt(await this.lastModified()) * 1_000_000n;
         return {
             dev: 0n,

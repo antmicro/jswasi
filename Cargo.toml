@@ -13,3 +13,4 @@ opt-level = "s"
 
 [dependencies]
 rand = "0.8.4"
+substring = "1.4.5"

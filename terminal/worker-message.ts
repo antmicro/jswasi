@@ -6,7 +6,7 @@ export const on_worker_message = async (event, workerTable) => {
     const [worker_id, action, data] = event.data;
     switch (action) {
         case "console": {
-            //console.log("WORKER " + worker_id + ": " + data);
+            console.log("WORKER " + worker_id + ": " + data);
             break;
         }
 	    case "exit": {
@@ -23,9 +23,8 @@ export const on_worker_message = async (event, workerTable) => {
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 const { fds } = workerTable.workerInfos[worker_id];
 		if (fds[3] != undefined) {
-		    console.log("We are checkin the dir!",pwd.substr(1));
+		    // fds[3] should be root, so we can store '.' in fds[4]
 		    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
-		    console.log("We got err = ", err, " entry = ", entry);
   		    fds[4] = await entry.open();
 		    fds[4].path = ".";
 		}

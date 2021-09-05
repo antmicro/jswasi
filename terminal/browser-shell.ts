@@ -43,6 +43,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
 export async function init_fs() {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
+    const tmp = await root.getDirectoryHandle("tmp", {create: true});
     const home = await root.getDirectoryHandle("home", {create: true});
     const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await ant.getFileHandle(".shell_history", {create: true});
@@ -134,6 +135,7 @@ export async function init_all(anchor: HTMLElement) {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
+	TMPDIR: "/tmp",
     }]);
 }
 
