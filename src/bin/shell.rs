@@ -56,6 +56,10 @@ fn main() {
             io::stdout().flush().unwrap();
         }
 
+        if input == "" {
+            continue;
+        }
+
         // handle '!' history
         if input.starts_with("!") {
             // TODO: we should handle more than numbers
@@ -76,6 +80,9 @@ fn main() {
         // handle line
         let mut words = input.split_whitespace();
         let command = words.next().unwrap();
+        if command == "" {
+            continue;
+        }
         let mut args: Vec<_> = words.collect();
         
         if input.substring(0,1) != "!" && input.replace(" ", "").len() != 0 {
