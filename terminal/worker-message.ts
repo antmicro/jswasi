@@ -2,21 +2,26 @@ import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { mount, umount, wget } from "./browser-shell.js";
 
-export const on_worker_message = async (event, workerTable) => {
+export const on_worker_message = async function (event, workerTable) {
     const [worker_id, action, data] = event.data;
     switch (action) {
         case "console": {
-            console.log("WORKER " + worker_id + ": " + data);
+	    let worker_name = "unknown";
+	    try {
+                worker_name = workerTable.workerInfos[worker_id].cmd;
+	    } catch {}
+	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+            console.log(`[dbg (${worker_name}:${worker_id})] ${data}`);
             break;
         }
-	    case "exit": {
-		    let worker_name = workerTable.workerInfos[worker_id].cmd;
-            worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+	case "exit": {
+	    let worker_name = workerTable.workerInfos[worker_id].cmd;
+	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
             workerTable.terminateWorker(worker_id);
-		    console.log(`WORKER ${worker_id} (${worker_name}) exited with result code: ${data}`);
-		    // @ts-ignore
+	    console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
+	    // @ts-ignore
             if (worker_id == 0) window.alive = false;
-		    break;
+            break;
         }
 	case "chdir": {
 	        const [pwd, sbuf] = data;
@@ -135,7 +140,9 @@ export const on_worker_message = async (event, workerTable) => {
                 default: {
                     const { fds } = workerTable.workerInfos[worker_id];
                     if (fds[fd] != undefined) {
-                        fds[fd].write(content);
+			console.log("Starting the write!");
+                        await fds[fd].write(content);
+			console.log("Ending the write!");
                         err = constants.WASI_ESUCCESS;
                     } else {
                         err = constants.WASI_EBADF;

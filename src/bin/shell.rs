@@ -152,12 +152,11 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "ls" | "date" | "printf" | "env" | "cat" => {
-                if args.len() == 0 {
-                    fs::read_link(format!("/!spawn /usr/bin/uutils {}", command));
-                } else {
-                    fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ")));
-                }
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date" | "printf" | "env" | "cat" => {
+                fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ").trim()));
+            }
+            "ln" | "printenv" => {
+                fs::read_link(format!("/!spawn /usr/bin/coreutils {} {}", command, args.join(" ").trim()));
             }
             "write" => {
                 if args.len() < 2 {
@@ -167,6 +166,14 @@ fn main() {
                         Ok(_) => {}
                         Err(error) => println!("write: failed to write to file: {}", error),
                     }
+                }
+            }
+            "hexdump" => {
+                if args.len() < 1 {
+                    println!("hexdump: help: hexump <filename>");
+                } else {
+                    // TODO
+                    println!("NOT IMPLEMENTED YET!");
                 }
             }
             "exit" => exit(0),

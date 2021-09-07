@@ -22,7 +22,7 @@ let args = [];
 let env = {};
 
 const onmessage_ = function (e) {
-    if (DEBUG) worker_console_log("got a message!");
+    //if (DEBUG) worker_console_log("got a message!");
     if (!started) {
         if (e.data[0] === "start") {
             started = true;
@@ -198,10 +198,12 @@ function WASI() {
             written += iov.byteLength;
         });
 
+	// TODO: this might potentially cause stack overflow is bufferBytes is large, we should definitely write in chunks
         const content = String.fromCharCode(...bufferBytes);
 
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
+	lck[0] = -1;
         worker_send(["fd_write", [sbuf, fd, content]]);
         Atomics.wait(lck, 0, -1);
 
@@ -689,8 +691,15 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    function path_symlink() {
-        if (DEBUG) worker_console_log("path_symlink");
+    function path_symlink(path_ptr, path_len, fd, newpath_ptr, newpath_len) {
+        if (DEBUG) worker_console_log(`path_symlink(0x${path_ptr.toString(16)}, ${path_len}, ${fd}, 0x${newpath_ptr.toString(16)}, ${newpath_len})`);
+        const view = new DataView(moduleInstanceExports.memory.buffer);
+        const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+
+        let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+        let newpath = DECODER.decode(view8.slice(newpath_ptr, newpath_ptr + newpath_len));
+        if (DEBUG) worker_console_log(`path_symlink: ${newpath} --> ${path}`);
+	// TODO: actually create the symlink!
         return constants.WASI_ESUCCESS;
     }
 
