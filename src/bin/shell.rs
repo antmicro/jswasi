@@ -32,7 +32,7 @@ fn main() {
             match c[0] {
                 // enter
                 10 => {
-                    // println!();
+                    input = input.trim().to_string();
                     break;
                 }
                 // backspace
@@ -60,11 +60,12 @@ fn main() {
             continue;
         }
 
+
         // handle '!' history
         if input.starts_with("!") {
             // TODO: we should handle more than numbers
             let history_entry_id: usize = input.split_whitespace().next().unwrap().substring(1,64).parse().unwrap();
-            if history.len() < history_entry_id {
+            if history_entry_id == 0 || history.len() < history_entry_id {
                 println!("!{}: event not found", history_entry_id);
                 input.clear();
                 continue;
