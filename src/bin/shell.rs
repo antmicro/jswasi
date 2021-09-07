@@ -20,11 +20,19 @@ fn main() {
 
     loop {
         let mut input = String::new();
+        let mut display_path = String::new();
+
 
         // prompt for input
-        print!("{}$ ", env::current_dir().unwrap().display());
+        let pwd = env::current_dir().unwrap().display().to_string();
+        if (pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap()) {
+            display_path.push_str("~");
+            display_path.push_str(pwd.substring(env::var("HOME").unwrap().len(), 4096));
+        } else {
+            display_path.push_str(&pwd);
+        }
+        print!("{}[1;34mant@webshell {}[1;33m{}$ {}[0m", char::from_u32(27).unwrap(), char::from_u32(27).unwrap(), display_path, char::from_u32(27).unwrap());
         io::stdout().flush().unwrap();
-
         let mut c = [0];
         // read line
         loop {
@@ -143,7 +151,7 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "ls" | "date" | "printf" | "env" | "cat" => {
+            "mkdir" | "ls" | "date" | "printf" | "env" | "cat" => {
                 if args.len() == 0 {
                     fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {}", command));
                 } else {

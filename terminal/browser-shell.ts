@@ -136,6 +136,8 @@ export async function init_all(anchor: HTMLElement) {
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
 	TMPDIR: "/tmp",
+	TERM: "xterm-256color",
+	HOME: "/home/ant",
     }]);
 }
 
