@@ -36,19 +36,19 @@ export const on_worker_message = async (event, workerTable) => {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
             switch(fullpath) {
-                case "/usr/bin/mount.wasm": {
+                case "/usr/bin/mount": {
                     await mount(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
                     break;
                 }
-                case "/usr/bin/umount.wasm": {
+                case "/usr/bin/umount": {
                     await umount(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
                     break;
                 }
-                case "/usr/bin/wget.wasm": {
+                case "/usr/bin/wget": {
                     await wget(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);

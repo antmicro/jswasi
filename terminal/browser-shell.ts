@@ -4,17 +4,18 @@ import {BrowserFilesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
-    "shell.wasm": "shell.wasm",
-    "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+    "shell": "shell.wasm",
+    "uutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
 };
 
 const OPTIONAL_BINARIES = {
-    "tree.wasm": "tree.wasm",
-    "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
-    "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
-    "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
-    "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
-    "python.wasm": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "tree": "tree.wasm",
+    "duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
+    "cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    "qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
+    "viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+    "python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
@@ -52,9 +53,9 @@ export async function init_fs() {
     const bin = await usr.getDirectoryHandle("bin", {create: true});
 
     // create dummy files for browser executed commands
-    await bin.getFileHandle("mount.wasm", {create: true});
-    await bin.getFileHandle("umount.wasm", {create: true});
-    await bin.getFileHandle("wget.wasm", {create: true});
+    await bin.getFileHandle("mount", {create: true});
+    await bin.getFileHandle("umount", {create: true});
+    await bin.getFileHandle("wget", {create: true});
 
     const local = await usr.getDirectoryHandle("local", {create: true});
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
@@ -115,6 +116,7 @@ export async function init_all(anchor: HTMLElement) {
         } else {
             // regular characters
             workerTable.push_to_buffer(data);
+	    if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + data;
 
             // echo
             terminal.io.print(code === 10 ? "\r\n" : data);
@@ -129,9 +131,9 @@ export async function init_all(anchor: HTMLElement) {
         null, // parent_lock
         on_worker_message
     );
-    workerTable.workerInfos[0].cmd = "/usr/bin/shell.wasm";
+    workerTable.workerInfos[0].cmd = "/usr/bin/shell";
 
-    workerTable.postMessage(0, ["start", "/usr/bin/shell.wasm", 0, [], {
+    workerTable.postMessage(0, ["start", "/usr/bin/shell", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",

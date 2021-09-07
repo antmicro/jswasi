@@ -36,7 +36,7 @@ fn main() {
         let mut c = [0];
         // read line
         loop {
-            io::stdin().read_exact(&mut c).unwrap();
+            io::stdin().read_exact(&mut c);
             match c[0] {
                 // enter
                 10 => {
@@ -72,7 +72,8 @@ fn main() {
         // handle '!' history
         if input.starts_with("!") {
             // TODO: we should handle more than numbers
-            let history_entry_id: usize = input.split_whitespace().next().unwrap().substring(1,64).parse().unwrap();
+            let sbstr = input.split_whitespace().next().unwrap().substring(1,64);
+            let history_entry_id: usize = sbstr.parse().unwrap();
             if history_entry_id == 0 || history.len() < history_entry_id {
                 println!("!{}: event not found", history_entry_id);
                 input.clear();
@@ -151,11 +152,11 @@ fn main() {
                     println!("sleep: missing operand");
                 }
             }
-            "mkdir" | "ls" | "date" | "printf" | "env" | "cat" => {
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "ls" | "date" | "printf" | "env" | "cat" => {
                 if args.len() == 0 {
-                    fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {}", command));
+                    fs::read_link(format!("/!spawn /usr/bin/uutils {}", command));
                 } else {
-                    fs::read_link(format!("/!spawn /usr/bin/uutils.wasm {} {}", command, args.join(" ")));
+                    fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ")));
                 }
             }
             "write" => {
@@ -177,7 +178,7 @@ fn main() {
                 // get PATH env varaible, split it and look for binaries in each directory
                 for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
                     let bin_dir = PathBuf::from(bin_dir);
-                    let fullpath = bin_dir.join(format!("{}.wasm", command));
+                    let fullpath = bin_dir.join(format!("{}", command));
                     println!("trying file '{0}'", fullpath.display());
                     if fullpath.is_file() {
                         let _result = fs::read_link(format!("/!spawn {} {}", fullpath.display(), input)).unwrap().to_str().unwrap().trim_matches(char::from(0));

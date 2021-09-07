@@ -178,7 +178,7 @@ function WASI() {
     }
 
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
-        if (DEBUG) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
+        //if (DEBUG) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let written = 0;
@@ -310,7 +310,7 @@ function WASI() {
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
-        if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
+        //if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -839,8 +839,11 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         const binary = await bin.getFileHandle(moduleName.split("/").slice(-1));
         const file = await binary.getFile();
         const response = new Response(file);
+	let buffer = null;
+	await response.arrayBuffer().then(buf => { buffer = buf });
 
-        const {module, instance} = await WebAssembly.instantiateStreaming(response, moduleImports);
+        const {module, instance} = await WebAssembly.instantiate(buffer, moduleImports);
+//        const {module, instance} = await WebAssembly.instantiateStreaming(response, moduleImports);
 
         wasiCallbacks.setModuleInstance(instance);
         try {
