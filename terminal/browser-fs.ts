@@ -2,7 +2,8 @@ import * as constants from "./constants.js";
 import {arraysEqual} from "./utils.js";
 import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
 
-export class BrowserFilesystem {
+
+export class Filesystem {
     mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle}[] = [];
 
     async getRootDirectory(): Promise<Directory> {
@@ -127,13 +128,17 @@ export class BrowserFilesystem {
     }
 }
 
+export class Stdin {
+
+}
+
 abstract class Entry {
     public readonly file_type: number;
     public readonly path: string;
     protected readonly _handle: FileSystemDirectoryHandle | FileSystemFileHandle;
-    protected readonly _filesystem: BrowserFilesystem;
+    protected readonly _filesystem: Filesystem;
 
-    constructor(path: string, handle: FileSystemDirectoryHandle | FileSystemFileHandle, filesystem: BrowserFilesystem) {
+    constructor(path: string, handle: FileSystemDirectoryHandle | FileSystemFileHandle, filesystem: Filesystem) {
         this.path = path;
         this._handle = handle;
         this._filesystem = filesystem;
@@ -168,10 +173,15 @@ export class Directory extends Entry {
         return 0;
     }
     
+    async entries(): Promise<(File | Directory)[]>  {
+        console.log('OpenDirectory.entries()');
+        return await this._filesystem.entries(this._handle);
+    }
+
     async lastModified(): Promise<number> {
-        // TODO: this could recursively call all entries lastModified() and pick latest
-        //       but it wouldn't be too optimal and there is no way to store that information for now
-        return 0;
+        const entries = await this.entries();
+        const dates = await Promise.all(entries.map(entry => entry.lastModified()));
+        return Math.max(...dates);
     }
 
     open() {
@@ -181,11 +191,6 @@ export class Directory extends Entry {
 
 export class OpenDirectory extends Directory {
     public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
-
-    async entries(): Promise<(File | Directory)[]>  {
-        console.log('OpenDirectory.entries()');
-        return await this._filesystem.entries(this._handle);
-    }
 
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
