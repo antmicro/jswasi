@@ -153,10 +153,10 @@ fn main() {
                 }
             }
             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date" | "printf" | "env" | "cat" => {
-                fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ").trim()));
+                fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ")).trim());
             }
             "ln" | "printenv" => {
-                fs::read_link(format!("/!spawn /usr/bin/coreutils {} {}", command, args.join(" ").trim()));
+                fs::read_link(format!("/!spawn /usr/bin/coreutils {} {}", command, args.join(" ")).trim());
             }
             "write" => {
                 if args.len() < 2 {
@@ -168,12 +168,50 @@ fn main() {
                     }
                 }
             }
+            "clear" => {
+                print!(""); // TODO: send clear escape codes
+            }
             "hexdump" => {
                 if args.len() < 1 {
                     println!("hexdump: help: hexump <filename>");
                 } else {
-                    // TODO
-                    println!("NOT IMPLEMENTED YET!");
+                    let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
+                        println!("hexdump: error: file not found.");
+                        return vec!();
+                    });
+                    let len = contents.len();
+                    let mut j = 0;
+                    let mut v = ['.'; 16];
+                    for j in 0..len {
+                        let c = contents[j] as char;
+                        v[j % 16] = c;
+                        if (j % 16) == 0 { print!("{:08x} ", j); }
+                        if (j % 8) == 0 { print!(" "); }
+                        print!("{:02x} ", c as u8);
+                        if (j + 1) == len || (j % 16) == 15 {
+                            let mut count = 16;
+                            if (j + 1) == len {
+                                count = len % 16;
+                                for _ in 0..(16-(len % 16)) {
+                                    print!("   ");
+                                }
+                                if (count < 8) {
+                                    print!(" ");
+                                }
+                            }
+                            print!(" |");
+                            for k in 0..count {
+                                if (0x20..0x7e).contains(&(v[k] as u8)) {
+                                    print!("{}", v[k] as char);
+                                    v[k] = '.';
+                                } else {
+                                    print!(".");
+                                }
+                            }
+                            println!("|");
+                            
+                        }
+                    }
                 }
             }
             "exit" => exit(0),
@@ -188,7 +226,7 @@ fn main() {
                     let fullpath = bin_dir.join(format!("{}", command));
                     println!("trying file '{0}'", fullpath.display());
                     if fullpath.is_file() {
-                        let _result = fs::read_link(format!("/!spawn {} {}", fullpath.display(), input)).unwrap().to_str().unwrap().trim_matches(char::from(0));
+                        let _result = fs::read_link(format!("/!spawn {} {}", fullpath.display(), input).trim()).unwrap().to_str().unwrap().trim_matches(char::from(0));
                         found = true;
                         break;
                     }

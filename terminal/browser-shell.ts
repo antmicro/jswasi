@@ -4,23 +4,40 @@ import {BrowserFilesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
-    "shell": "shell.wasm",
-    "uutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+    "/etc/motd" : "motd.txt",
+    "/usr/bin/shell": "shell.wasm",
+    "/usr/bin/uutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
 };
 
 const OPTIONAL_BINARIES = {
-    "tree": "tree.wasm",
-    "duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
-    "cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
-    "qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
-    "viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
-    "python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
-    "coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
+    "/usr/bin/tree": "tree.wasm",
+    "/usr/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
+    "/usr/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    "/usr/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
+    "/usr/bin/viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+    "/usr/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "/usr/bin/coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
-    const handle = await dir_handle.getFileHandle(filename, {create: true});
+    console.log("fetch file: ",filename, " address: ",address);
+    let new_dir_handle = dir_handle;
+    let new_filename = filename;
+    if (filename[0] == '/') {
+	// got an absolute path
+        const { err: err, name: nfilename, dir_handle: dir_handl } = await filesystem.resolveAbsolute(filename);
+	new_filename = nfilename;
+        console.log("dir_handl = ",dir_handl, "err = ",err, " name = ", nfilename);
+	new_dir_handle = dir_handl;
+    } else if (filename.lastIndexOf("/") != -1) {
+	console.log("Error: unsupported path!");
+	// TODO: unsupported situation where its a relative path but not direct
+    }
+    console.log(new_dir_handle);
+    console.log(new_dir_handle.type);
+    const handle = await new_dir_handle.getFileHandle(new_filename, {create: true});
     const file = await handle.getFile();
+    console.log("file = ",file.name);
     // only fetch binary if not yet present
     if (file.size === 0) {
         let response;
@@ -48,6 +65,7 @@ export async function init_fs() {
     const home = await root.getDirectoryHandle("home", {create: true});
     const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await ant.getFileHandle(".shell_history", {create: true});
+    const etc = await root.getDirectoryHandle("etc", {create: true});
 
     const usr = await root.getDirectoryHandle("usr", {create: true});
     const bin = await usr.getDirectoryHandle("bin", {create: true});
@@ -60,9 +78,9 @@ export async function init_fs() {
     const local = await usr.getDirectoryHandle("local", {create: true});
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     // TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     
     // don't await this on purpose
     // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
