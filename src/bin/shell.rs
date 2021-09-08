@@ -192,7 +192,7 @@ fn main() {
         if input.starts_with("!") {
             let sbstr = input.split_whitespace().next().unwrap().substring(1,64).split_whitespace().next().unwrap();
             let history_entry_id: usize = sbstr.parse().unwrap_or_else(|_| {
-                if (sbstr == "") {
+                if sbstr == "" {
                     return 0;
                 }
                 let mut j = 0;
@@ -207,7 +207,7 @@ fn main() {
                 return found;
             });
             if history_entry_id == 0 || history.len() < history_entry_id {
-                if (sbstr != "") {
+                if sbstr != "" {
                     println!("!{}: event not found", sbstr);
                 }
                 input.clear();
@@ -232,6 +232,25 @@ fn main() {
         if input.substring(0,1) != "!" && input.replace(" ", "").len() != 0 {
             let entry = format!("{}", input);
             history.push(entry);
+        }
+
+        if input.contains("=") {
+            let mut iter = input.split("=");
+            let var_name = iter.next().unwrap();
+            if var_name.contains(" ") {
+                continue;
+            }
+            let mut var_contents = iter.next().unwrap();
+            if (var_contents.substring(0,1) == "\"") {
+                let mut iter2 = var_contents.split("\"");
+                iter2.next();
+                var_contents = iter2.next().unwrap();
+            }
+            println!("TODO: should set variable {} to {}", var_name, var_contents);
+            env::set_var(var_name, var_contents);
+            fs::read_link(format!("/!set_env {} {}", var_name, var_contents));
+            input.clear();
+            continue;
         }
 
         match command {
@@ -288,7 +307,7 @@ fn main() {
             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date" | "printf" | "env" | "cat" => {
                 fs::read_link(format!("/!spawn /usr/bin/uutils {} {}", command, args.join(" ")).trim());
             }
-            "ln" | "printenv" => {
+            "ln" | "printenv" | "md5sum" => {
                 fs::read_link(format!("/!spawn /usr/bin/coreutils {} {}", command, args.join(" ")).trim());
             }
             "write" => {
@@ -356,7 +375,6 @@ fn main() {
                 for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
                     let bin_dir = PathBuf::from(bin_dir);
                     let fullpath = bin_dir.join(format!("{}", command));
-                    println!("trying file '{0}'", fullpath.display());
                     if fullpath.is_file() {
                         let _result = fs::read_link(format!("/!spawn {} {}", fullpath.display(), input).trim()).unwrap().to_str().unwrap().trim_matches(char::from(0));
                         found = true;
