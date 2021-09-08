@@ -20,14 +20,12 @@ const OPTIONAL_BINARIES = {
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
-    console.log("fetch file: ",filename, " address: ",address);
     let new_dir_handle = dir_handle;
     let new_filename = filename;
     if (filename[0] == '/') {
 	// got an absolute path
         const { err: err, name: nfilename, dir_handle: dir_handl } = await filesystem.resolveAbsolute(filename);
 	new_filename = nfilename;
-        console.log("dir_handl = ",dir_handl, "err = ",err, " name = ", nfilename);
 	new_dir_handle = dir_handl;
     } else if (filename.lastIndexOf("/") != -1) {
 	console.log("Error: unsupported path!");
@@ -124,7 +122,8 @@ export async function init_all(anchor: HTMLElement) {
             data = String.fromCharCode(10);
         }
 
-        if (code !== 10 && code < 32) {
+        //if (code !== 10 && code < 32) {
+	if (code == 3 || code == 4) {
             // control characters
             if (code == 3) {
                 workerTable.sendSigInt(workerTable.currentWorker);
@@ -136,8 +135,10 @@ export async function init_all(anchor: HTMLElement) {
             workerTable.push_to_buffer(data);
 	    if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + data;
 
-            // echo
-            terminal.io.print(code === 10 ? "\r\n" : data);
+	    if ((code === 10) || code >= 32) {
+                // echo
+                terminal.io.print(code === 10 ? "\r\n" : data);
+	    }
         }
     };
 

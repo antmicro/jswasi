@@ -64,8 +64,9 @@ function do_exit(exit_code: number) {
     if (IS_NODE) {
         const buf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(buf, 0, 1);
+	lck[0] = -1;
         worker_send(["exit", exit_code]); // never return
-        Atomics.wait(lck, 0, 0);
+        Atomics.wait(lck, 0, -1);
     } else {
         if (DEBUG) worker_console_log("calling close()");
         worker_send(["exit", exit_code]);
@@ -199,8 +200,10 @@ function WASI() {
         });
 
 	// TODO: this might potentially cause stack overflow is bufferBytes is large, we should definitely write in chunks
-        const content = String.fromCharCode(...bufferBytes);
-
+        // const content = String.fromCharCode(...bufferBytes);
+        const content = new SharedArrayBuffer(written);
+	const content_view = new Uint8Array(content);
+	for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
 	lck[0] = -1;
@@ -209,8 +212,11 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === 0) {
+	    worker_console_log(`fd_write written ${written} bytes.`);
             view.setUint32(nwritten_ptr, written, true);
-        }
+        } else {
+	    worker_console_log(`fd_write ERROR!.`);
+	}
         return err;
     }
 
@@ -250,6 +256,7 @@ function WASI() {
 
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
+	lck[0] = -1;
         worker_send(["fd_close", [sbuf, fd]]);
         Atomics.wait(lck, 0, -1);
 
@@ -312,7 +319,7 @@ function WASI() {
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
-        //if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
+        if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -339,6 +346,7 @@ function WASI() {
             view8.set(readbuf, addr);
             nread += readlen[0];
         }
+	worker_console_log("fd_read read " + nread+ " bytes.");
         view.setUint32(nread_ptr, nread, true);
         
         return constants.WASI_ESUCCESS;

@@ -352,30 +352,28 @@ export class OpenFile extends File {
         console.log(`OpenFile.read(${this.path} ${len})`);
 	let size = await this.size();
         if (this._file_pos < size) {
-            console.log(`inside if, pos = ${this._file_pos} / ${size}`);
             let file = await this._handle.getFile();
             let data = await file.slice(this._file_pos, this._file_pos + len).arrayBuffer();
-	    data = data.slice(0);
+	    data = await data.slice(0);
             let slice = new Uint8Array(data);
             this._file_pos += slice.byteLength;
             return [slice, 0];
         } else {
-		console.log("returning 0");
             return [new Uint8Array(0), 0];
         }
     }
 
     // TODO: each write creates new writable, store it on creation
-    async write(buffer: string) {
-	console.log(`OpenFile.write(${this.path} len=${buffer.length}, position ${this._file_pos})`);
+    async write(buffer: Uint8Array): Promise<number> {
+	console.log(`OpenFile.write(${this.path} len=${buffer.byteLength}, position ${this._file_pos})`);
 	try {
             const w = await this._handle.createWritable({ keepExistingData: true });
             await w.write({type: "write", position: this._file_pos, data: buffer});
-            await w.close();
-            this._file_pos += buffer.length;
-	    console.log(`written ${buffer.length} bytes, position is now ${this._file_pos}.`);
+	    await w.close();
+            this._file_pos += buffer.byteLength;
 	} catch {
             console.log("There was an error during writing!");
+            return 1;
 	}
         return 0;
     }

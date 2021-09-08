@@ -67,6 +67,9 @@ export const on_worker_message = async function (event, workerTable) {
                     );
                     workerTable.workerInfos[id].cmd = fullpath;
                     workerTable.postMessage(id, ["start", fullpath, id, args, env]);
+                    //Atomics.store(parent_lck, 0, 0);
+                    //Atomics.notify(parent_lck, 0);
+                    break;
                 }
             }
             break;
@@ -103,7 +106,7 @@ export const on_worker_message = async function (event, workerTable) {
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
                 // FIXME: this broke relative paths, if we would never set path they would work
-                console.log(`path is ${fds[fd].path}`);
+                //console.log(`path is ${fds[fd].path}`);
 		path.set(new TextEncoder().encode(fds[fd].path), 0);
                 err = constants.WASI_ESUCCESS;
             } else {
@@ -116,8 +119,9 @@ export const on_worker_message = async function (event, workerTable) {
             break;
         }
         case "fd_write": {
-            const [sbuf, fd, content] = data;
+            const [sbuf, fd, content_] = data;
             const lck = new Int32Array(sbuf, 0, 1);
+            const content = new Uint8Array(content_);
 
             let err;
             switch (fd) {
@@ -125,13 +129,16 @@ export const on_worker_message = async function (event, workerTable) {
                     throw "can't write to stdin!";
                 }
                 case 1: {
-                    const output = content.replaceAll("\n", "\r\n");
-                    workerTable.receive_callback(output);
+	            let output = "";
+                    for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
+                    workerTable.receive_callback(output.replaceAll("\n", "\r\n")); // TODO
                     break;
                 }
                 case 2: {
                     // TODO: should print in red, use ANSI color codes around output
-                    const output = content.replaceAll("\n", "\r\n");
+                    let output = "";
+                    for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
+		    output = output.replaceAll("\n", "\r\n");
                     const RED_ANSI = '\u001b[31m';
                     const RESET = '\u001b[0m';
                     workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
@@ -140,9 +147,10 @@ export const on_worker_message = async function (event, workerTable) {
                 default: {
                     const { fds } = workerTable.workerInfos[worker_id];
                     if (fds[fd] != undefined) {
-			console.log("Starting the write!");
-                        await fds[fd].write(content);
-			console.log("Ending the write!");
+			let local_content = new Uint8Array(content.byteLength);
+			local_content.set(content);
+			// for some reason writable cannot use shared arrays?
+                        await fds[fd].write(local_content);
                         err = constants.WASI_ESUCCESS;
                     } else {
                         err = constants.WASI_EBADF;

@@ -32,12 +32,92 @@ fn main() {
             display_path.push_str(&pwd);
         }
         print!("{}[1;34mant@webshell {}[1;33m{}$ {}[0m", char::from_u32(27).unwrap(), char::from_u32(27).unwrap(), display_path, char::from_u32(27).unwrap());
-        io::stdout().flush().unwrap();
+        io::stdout().flush();
         let mut c = [0];
+        let mut escaped = false;
         // read line
         loop {
             io::stdin().read_exact(&mut c);
-            match c[0] {
+            if (escaped) {
+               match c[0] {
+                   0x5b => {           
+                        io::stdout().flush();
+                        let mut c2 = [0];
+                        io::stdin().read_exact(&mut c2);
+                        match c2[0] {
+                            0x32 | 0x33 | 0x35 | 0x36 => {
+                                io::stdout().flush().unwrap();
+                                let mut c3 = [0];
+                                io::stdin().read_exact(&mut c3);
+                                match [c2[0], c3[0]] {
+                                    [0x35, 0x7e] => {
+                                        println!("TODO: PAGE UP");
+                                        escaped = false;
+                                    }
+                                    [0x36, 0x7e] => {
+                                        println!("TODO: PAGE DOWN");
+                                        escaped = false;
+                                    }
+                                    [0x32, 0x7e] => {
+                                        println!("TODO: INSERT");
+                                        escaped = false;
+                                    }
+                                    [0x33, 0x7e] => {
+                                        println!("TODO: DELETE");
+                                        escaped = false;
+                                    }
+                                    [0x33, 0x3b] => {
+                                        println!("TODO: SHIFT + DELETE");
+                                        io::stdout().flush().unwrap();
+                                        let mut c4 = [0];
+                                        // TWO MORE! TODO: improve!
+                                        io::stdin().read_exact(&mut c4);
+                                        io::stdin().read_exact(&mut c4);
+                                        escaped = false;
+                                    }
+                                    _ => {
+                                        println!("TODO: [ + 0x{:02x} + 0x{:02x}", c2[0] as u8, c3[0] as u8);
+                                        escaped = false;
+                                    }
+                                }
+                            }
+                            0x41 => {
+                                println!("TODO: UP");
+                                escaped = false;
+                            }
+                            0x42 => {
+                                println!("TODO: DOWN");
+                                escaped = false;
+                            }
+                            0x43 => {
+                                println!("TODO: RIGHT");
+                                escaped = false;
+                            }
+                            0x44 => {
+                                println!("TODO: LEFT");
+                                escaped = false;
+                            }
+                            0x46 => {
+                                println!("TODO: END");
+                                escaped = false;
+                            }
+                            0x48 => {
+                                println!("TODO: HOME");
+                                escaped = false;
+                            }
+                            _ => {
+                                println!("WE HAVE UKNOWN CONTROL CODE '[' + {}", c2[0] as u8);
+                                escaped = false;
+                            }
+                        }
+                   }
+                   _ => {
+                       //println!("WE HAVE UNKNOWN CONTROL CODE {}", c[0] as u8);
+                       escaped = false;
+                   }
+               }
+            } else {
+               match c[0] {
                 // enter
                 10 => {
                     input = input.trim().to_string();
@@ -52,7 +132,10 @@ fn main() {
                 }
                 // control codes
                 code if code < 32 => {
-                    // ignore for now
+                    if (code == 0x1b) {
+                        escaped = true;
+                    }
+                    // ignore rest for now
                 }
                 // regular characters
                 _ => {
@@ -60,6 +143,7 @@ fn main() {
                     // echo
                     // print!("{}", c[0] as char);
                 }
+              }
             }
             io::stdout().flush().unwrap();
         }
