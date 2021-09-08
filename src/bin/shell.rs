@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use std::env;
 use std::io;
 use std::io::{Read, Write};
@@ -20,12 +21,13 @@ fn main() {
 
     loop {
         let mut input = String::new();
+        let mut input_stash = String::new();
         let mut display_path = String::new();
 
 
         // prompt for input
         let pwd = env::current_dir().unwrap().display().to_string();
-        if (pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap()) {
+        if pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap() {
             display_path.push_str("~");
             display_path.push_str(pwd.substring(env::var("HOME").unwrap().len(), 4096));
         } else {
@@ -35,10 +37,11 @@ fn main() {
         io::stdout().flush();
         let mut c = [0];
         let mut escaped = false;
+        let mut history_entry_to_display: i32 = -1;
         // read line
         loop {
             io::stdin().read_exact(&mut c);
-            if (escaped) {
+            if escaped {
                match c[0] {
                    0x5b => {           
                         io::stdout().flush();
@@ -82,11 +85,40 @@ fn main() {
                                 }
                             }
                             0x41 => {
-                                println!("TODO: UP");
+                                if history.len() != 0 {
+                                    if history_entry_to_display == -1 {
+                                        history_entry_to_display = (history.len()-1) as i32;
+                                        input_stash.clear();
+                                        input_stash.push_str(&input);
+                                    } else if history_entry_to_display > 0 {
+                                        history_entry_to_display = history_entry_to_display - 1;
+                                    }
+                                    let to_delete = input.len();
+                                    for _ in 0..to_delete {
+                                        print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
+                                    }
+                                    input.clear();
+                                    input.push_str(&history[history_entry_to_display as usize]);
+                                    print!("{}", input);
+                                }
                                 escaped = false;
                             }
                             0x42 => {
-                                println!("TODO: DOWN");
+                                if history_entry_to_display != -1 {
+                                    let to_delete = input.len();
+                                    for _ in 0..to_delete {
+                                        print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
+                                    }
+                                    input.clear();
+                                    if history.len()-1 > (history_entry_to_display as usize) {
+                                        history_entry_to_display = history_entry_to_display + 1;
+                                        input.push_str(&history[history_entry_to_display as usize]);
+                                    } else {
+                                        input.push_str(&input_stash);
+                                        history_entry_to_display = -1;
+                                    }
+                                    print!("{}", input);
+                                }
                                 escaped = false;
                             }
                             0x43 => {
@@ -117,6 +149,9 @@ fn main() {
                    }
                }
             } else {
+               if c[0] != 0x1b {
+                   history_entry_to_display = -1;
+               }
                match c[0] {
                 // enter
                 10 => {
@@ -132,7 +167,7 @@ fn main() {
                 }
                 // control codes
                 code if code < 32 => {
-                    if (code == 0x1b) {
+                    if code == 0x1b {
                         escaped = true;
                     }
                     // ignore rest for now
@@ -155,16 +190,31 @@ fn main() {
 
         // handle '!' history
         if input.starts_with("!") {
-            // TODO: we should handle more than numbers
-            let sbstr = input.split_whitespace().next().unwrap().substring(1,64);
-            let history_entry_id: usize = sbstr.parse().unwrap();
+            let sbstr = input.split_whitespace().next().unwrap().substring(1,64).split_whitespace().next().unwrap();
+            let history_entry_id: usize = sbstr.parse().unwrap_or_else(|_| {
+                if (sbstr == "") {
+                    return 0;
+                }
+                let mut j = 0;
+                let mut found = 0;
+                for entry in &history {
+                    j = j + 1;
+                    if entry.substring(0, sbstr.len()) == sbstr {
+                        found = j;
+                        break;
+                    }
+                }
+                return found;
+            });
             if history_entry_id == 0 || history.len() < history_entry_id {
-                println!("!{}: event not found", history_entry_id);
+                if (sbstr != "") {
+                    println!("!{}: event not found", sbstr);
+                }
                 input.clear();
                 continue;
             } else {
                 let mut iter = history[history_entry_id-1].clone();
-                let prefix = format!("!{}", history_entry_id);
+                let prefix = format!("!{}", sbstr);
                 iter.push_str(input.strip_prefix(&prefix).unwrap());
                 input.clear();
                 input.push_str(&iter);
@@ -214,7 +264,6 @@ fn main() {
                             new_path.to_str().unwrap()
                         );
                     } else {
-                        let oldpwd = env::current_dir().unwrap();
                         env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap()); // TODO: WASI does not support this
                         fs::read_link(format!("/!set_env OLDPWD {}", env::current_dir().unwrap().to_str().unwrap()));
                         let pwd_path = PathBuf::from(fs::read_link(format!("/!set_env PWD {}", new_path.to_str().unwrap())).unwrap().to_str().unwrap().trim_matches(char::from(0)));
@@ -264,7 +313,6 @@ fn main() {
                         return vec!();
                     });
                     let len = contents.len();
-                    let mut j = 0;
                     let mut v = ['.'; 16];
                     for j in 0..len {
                         let c = contents[j] as char;
@@ -279,7 +327,7 @@ fn main() {
                                 for _ in 0..(16-(len % 16)) {
                                     print!("   ");
                                 }
-                                if (count < 8) {
+                                if count < 8 {
                                     print!(" ");
                                 }
                             }
@@ -300,7 +348,7 @@ fn main() {
             }
             "exit" => exit(0),
             // no input
-            "" => {}
+            "" => {},
             // external commands or command not found
             _ => {
                 let mut found = false;

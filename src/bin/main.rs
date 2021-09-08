@@ -1,12 +1,7 @@
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::time::Duration;
-use std::{fs, thread};
+use std::{fs};
 
 fn main() {
     let filename = "a.txt";
