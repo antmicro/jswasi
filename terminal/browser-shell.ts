@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {BrowserFilesystem} from "./browser-fs.js";
+import {Filesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
@@ -91,7 +91,7 @@ export async function init_fs(anchor: HTMLElement) {
 }
 
 // things that are global and should be shared between all tab instances
-const filesystem = new BrowserFilesystem();
+const filesystem = new Filesystem();
 
 export async function init_all(anchor: HTMLElement) {
     anchor.innerHTML = 'Fetching binaries, this should only happen once.';
