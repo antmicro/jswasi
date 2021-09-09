@@ -41,6 +41,23 @@ export const on_worker_message = async function (event, workerTable) {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
             switch(fullpath) {
+		case "/usr/bin/ps": {
+	            let ps_data = "  PID TTY          TIME CMD\n";
+		    for (let id = 0; id < workerTable.nextWorkerId; id++) {
+			    if (workerTable.alive[id]) {
+		               let now = new Date();
+                               let time = Math.floor(now.getTime()/1000) - workerTable.workerInfos[id].timestamp;
+                               let seconds = time % 60;
+                               let minutes = ((time - seconds) / 60) % 60;
+                               let hours = (time - seconds - minutes * 60) / 60 / 60;
+                               ps_data +=    ("     " + id).slice(-5) + " pts/0    "+("00" + hours).slice(-2)+":"+("00" + minutes).slice(-2)+":"+("00" + seconds).slice(-2) +" " + workerTable.workerInfos[id].cmd.split("/").slice(-1)[0]+ "\n";
+			    }
+	            }
+                    workerTable.receive_callback(ps_data); // TODO
+		    Atomics.store(parent_lck, 0, 0);
+		    Atomics.notify(parent_lck, 0);
+		    break;
+		}
                 case "/usr/bin/mount": {
                     await mount(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
