@@ -525,7 +525,7 @@ function WASI() {
                 return "";
             }
             if (cmd == "set_env") {
-               env[args[0]] = args[1];
+               env[args[0]] = args.slice(1).join(" ");
                if (args[0] == "PWD") {
 		       env[args[0]] = realpath(args[1]);
                        const sbuf = new SharedArrayBuffer(4);

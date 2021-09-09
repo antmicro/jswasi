@@ -24,7 +24,6 @@ fn main() {
         let mut input_stash = String::new();
         let mut display_path = String::new();
 
-
         // prompt for input
         let pwd = env::current_dir().unwrap().display().to_string();
         if pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap() {
@@ -246,7 +245,6 @@ fn main() {
                 iter2.next();
                 var_contents = iter2.next().unwrap();
             }
-            println!("TODO: should set variable {} to {}", var_name, var_contents);
             env::set_var(var_name, var_contents);
             fs::read_link(format!("/!set_env {} {}", var_name, var_contents));
             input.clear();
