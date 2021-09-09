@@ -57,6 +57,10 @@ export class BrowserFilesystem {
 /////////////////
             const root = await navigator.storage.getDirectory();
 	    let mypath = await root.resolve(dir_handle);
+	    if (mypath == null) {
+		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
+                    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+	    }
 	    let pth = "/" + mypath.join("/") + "/" + path;
 	    pth = pth.replace("//", "/");
 	    return this.resolveAbsolute(pth);

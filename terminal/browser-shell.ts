@@ -56,7 +56,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     }
 }
 
-export async function init_fs() {
+export async function init_fs(anchor: HTMLElement) {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const tmp = await root.getDirectoryHandle("tmp", {create: true});
@@ -83,8 +83,11 @@ export async function init_fs() {
     // don't await this on purpose
     // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
     //       it can say that command is not found or just fail at instantiation
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of optional";
     Promise.all(optional_promises);
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of mandatory";
     await Promise.all(necessary_promises);
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Mandatory finished.";
 }
 
 // things that are global and should be shared between all tab instances
@@ -92,7 +95,7 @@ const filesystem = new BrowserFilesystem();
 
 export async function init_all(anchor: HTMLElement) {
     anchor.innerHTML = 'Fetching binaries, this should only happen once.';
-    await init_fs();
+    await init_fs(anchor);
     anchor.innerHTML = '';
 
     // FIXME: for now we assume hterm is in scope
