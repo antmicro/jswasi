@@ -179,7 +179,7 @@ function WASI() {
     }
 
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
-        //if (DEBUG) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
+        if (fd > 2) if (DEBUG) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let written = 0;
@@ -212,7 +212,7 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === 0) {
-	    worker_console_log(`fd_write written ${written} bytes.`);
+	    if (fd > 2) if (DEBUG) worker_console_log(`fd_write written ${written} bytes.`);
             view.setUint32(nwritten_ptr, written, true);
         } else {
 	    worker_console_log(`fd_write ERROR!.`);
@@ -319,7 +319,7 @@ function WASI() {
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
-        if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
+        if (fd > 2) if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -346,7 +346,7 @@ function WASI() {
             view8.set(readbuf, addr);
             nread += readlen[0];
         }
-	worker_console_log("fd_read read " + nread+ " bytes.");
+	if (fd > 2) if (DEBUG) worker_console_log("fd_read read " + nread+ " bytes.");
         view.setUint32(nread_ptr, nread, true);
         
         return constants.WASI_ESUCCESS;
@@ -707,8 +707,18 @@ function WASI() {
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         let newpath = DECODER.decode(view8.slice(newpath_ptr, newpath_ptr + newpath_len));
         if (DEBUG) worker_console_log(`path_symlink: ${newpath} --> ${path}`);
-	// TODO: actually create the symlink!
-        return constants.WASI_ESUCCESS;
+
+        const sbuf = new SharedArrayBuffer(4); // lock
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+
+        worker_send(["path_symlink", [sbuf, path, fd, newpath]]);
+
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+
+        return err;
     }
 
     function fd_fdstat_set_flags(a, b) {

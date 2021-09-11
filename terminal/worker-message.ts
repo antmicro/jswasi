@@ -114,6 +114,35 @@ export const on_worker_message = async function (event, workerTable) {
 
             break;
         }
+
+        case "path_symlink": {
+            const [sbuf, path, fd, newpath] = data;
+            const lck = new Int32Array(sbuf, 0, 1);
+
+            let err, entry;
+            const { fds } = workerTable.workerInfos[worker_id];
+            if (fds[fd] != undefined) {
+		let linkpath = newpath + ".link";
+	        console.log(`We should symlink ${newpath} --> ${path} [dir fd=${fd}]`);
+		({err, entry} = await fds[fd].get_entry(linkpath, FileOrDir.File, 1 | 4));
+		if (err == constants.WASI_ESUCCESS) {
+                    let file = await entry.open();
+		//    let databuf = new ArrayBuffer(path.length);
+		    let data = new Uint8Array(path.length);
+		    data.set(new TextEncoder().encode(path), 0);
+		    await file.write(data);
+		}
+            } else {
+                err = constants.WASI_EBADF;
+            }
+
+
+            Atomics.store(lck, 0, err);
+            Atomics.notify(lck, 0);
+
+	    break;
+	}
+
         case "fd_prestat_dir_name": {
             const [sbuf, fd, path_len] = data;
             const lck = new Int32Array(sbuf, 0, 1);
