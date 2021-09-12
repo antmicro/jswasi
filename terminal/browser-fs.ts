@@ -17,6 +17,8 @@ export class Filesystem {
     async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
         // TODO: for now path must be absolute
         const {parts, name} = parsePath(absolute_path);
+	console.log(`Adding path ${absolute_path} --> parsed to ${name}`);
+	console.log("Parts: ", parts.join("/"));
         this.mounts.push({parts, name, handle: mount_directory});
     }
 
@@ -60,8 +62,30 @@ export class Filesystem {
 	    let mypath = await root.resolve(dir_handle);
 	    if (mypath == null) {
 		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
+		    console.log("dirhandle.name = ",dir_handle.name);
+		    for (const a of this.mounts) {
+			    console.log("Mount: ");
+			    let realpath = "/" + a.parts.join("/");
+			    console.log(a.name);
+			    console.log("a.handle.name = ",a.handle.name);
+			    if (a.handle == dir_handle) {
+				    // TODO
+				    console.log("THIS IS THE SAME HANDLE");
+				   return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: dir_handle};
+			    }
+
+			    let dr = await a.handle.resolve(dir_handle);
+			    console.log("found (parent) dr.name = ",dr.name);
+			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: a.name, dir_handle: dr};
+		    }
                     return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
 	    }
+
+		    for (const a of this.mounts) {
+			    console.log(a.parts.join("/"));
+			    console.log(a.name);
+		    }
+
 	    let pth = "/" + mypath.join("/") + "/" + path;
 	    pth = pth.replace("//", "/");
 	    return this.resolveAbsolute(pth);
@@ -87,16 +111,28 @@ export class Filesystem {
     }
 
     async getDirectoryHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemDirectoryHandle> {
+	    console.log("We are in getDirectoryHandle! handle.name=", handle.name, " name = ",name);
 	const root = await navigator.storage.getDirectory();
-        const components = await root.resolve(handle);
+	    console.log("got root!", root);
+	let components = null;
+	try {
+            components = await root.resolve(handle);
+	} catch {
+	    console.log("There was an error in root.resolve...");
+	}
+	console.log("got components! components = ", components);
 
         // if there are many mounts for the same path, we want to return the latest
         const reversed_mounts = [].concat(this.mounts).reverse();
+	console.log("mounts count = ", reversed_mounts.length);
         for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
+	    console.log("We are in itaration!");
             if (arraysEqual(parts, components) && child_name === name) {
+		console.log("Returning a mount handle ",child_handle);
                 return child_handle;
             }
         }
+	console.log("going to return handle.getDirectoryHandle...");
         return await handle.getDirectoryHandle(name, options);
     }
     
@@ -233,9 +269,11 @@ export class OpenDirectory extends Directory {
 
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-        console.log(`OpenDirectory.get_entry(${path}, ${mode}, ${oflags})`);
+        console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
     
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
+
+	console.log("Got an entry with name '",name,"'");
 
         if (err !== constants.WASI_ESUCCESS) {
             return {err, entry: null};
@@ -259,6 +297,8 @@ export class OpenDirectory extends Directory {
         if (oflags & OpenFlags.Directory) {
             mode = FileOrDir.Directory;
         }
+
+	console.log("We are here now");
 
         const openWithCreate = async (create: boolean): Promise<{err: number, handle: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
             if (mode & FileOrDir.File) {
