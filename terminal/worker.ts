@@ -522,6 +522,10 @@ function WASI() {
                 worker_console_log("sent.");
                 // wait for child process to finish
                 Atomics.wait(lck, 0, -1);
+                const err = Atomics.load(lck, 0);
+		if (err != constants.WASI_ESUCCESS) {
+			worker_console_log(`error: spawned process returned ${err}`);
+		}
                 return "";
             }
             if (cmd == "set_env") {

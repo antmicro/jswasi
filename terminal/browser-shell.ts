@@ -167,17 +167,18 @@ export async function init_all(anchor: HTMLElement) {
 }
 
 export async function mount(workerTable, worker_id, args, env) {
-    console.log(`mount(${worker_id}, ${args}`);
+    console.log(`mount(${worker_id}, ${args})`);
     let mount_point;
     try {
         mount_point = await showDirectoryPicker();
     } catch(e) {
         // TODO: write this to terminal
         // terminal.io.println("mount: failed to open local directory");
-        return;
+        return null;
     }
     // this will be included in all program
     await filesystem.addMount(args[1], mount_point);
+    return mount_point;
 }
 
 export function umount(workerTable, worker_id, args, env) {

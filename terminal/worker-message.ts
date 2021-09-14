@@ -17,7 +17,7 @@ export const on_worker_message = async function (event, workerTable) {
 	case "exit": {
 	    let worker_name = workerTable.workerInfos[worker_id].cmd;
 	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
-            workerTable.terminateWorker(worker_id);
+            workerTable.terminateWorker(worker_id, data);
 	    console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
 	    // @ts-ignore
             if (worker_id == 0) window.alive = false;
@@ -42,7 +42,7 @@ export const on_worker_message = async function (event, workerTable) {
             const parent_lck = new Int32Array(sbuf, 0, 1);
             switch(fullpath) {
 		case "/usr/bin/ps": {
-	            let ps_data = "  PID TTY          TIME CMD\n";
+	            let ps_data = "  PID TTY          TIME CMD\n\r";
 		    for (let id = 0; id < workerTable.nextWorkerId; id++) {
 			    if (workerTable.alive[id]) {
 		               let now = new Date();
@@ -50,7 +50,7 @@ export const on_worker_message = async function (event, workerTable) {
                                let seconds = time % 60;
                                let minutes = ((time - seconds) / 60) % 60;
                                let hours = (time - seconds - minutes * 60) / 60 / 60;
-                               ps_data +=    ("     " + id).slice(-5) + " pts/0    "+("00" + hours).slice(-2)+":"+("00" + minutes).slice(-2)+":"+("00" + seconds).slice(-2) +" " + workerTable.workerInfos[id].cmd.split("/").slice(-1)[0]+ "\n";
+                               ps_data +=    ("     " + id).slice(-5) + " pts/0    "+("00" + hours).slice(-2)+":"+("00" + minutes).slice(-2)+":"+("00" + seconds).slice(-2) +" " + workerTable.workerInfos[id].cmd.split("/").slice(-1)[0]+ "\n\r";
 			    }
 	            }
                     workerTable.receive_callback(ps_data); // TODO
@@ -59,8 +59,10 @@ export const on_worker_message = async function (event, workerTable) {
 		    break;
 		}
                 case "/usr/bin/mount": {
-                    await mount(workerTable, worker_id, args, env);
-                    Atomics.store(parent_lck, 0, 0);
+                    let result = await mount(workerTable, worker_id, args, env);
+		    let err = constants.WASI_ESUCCESS;
+		    if (result == null) err = constants.WASI_EBADF;
+                    Atomics.store(parent_lck, 0, err);
                     Atomics.notify(parent_lck, 0);
                     break;
                 }

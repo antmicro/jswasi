@@ -67,12 +67,12 @@ export class WorkerTable {
 	this.workerInfos[id].worker.postMessage(message);
     }
 
-    terminateWorker(id: number) {
+    terminateWorker(id: number, exit_no: number = 0) {
         const worker = this.workerInfos[id];
         worker.worker.terminate();
         // notify parent that they can resume operation
         if (id != 0) {
-            Atomics.store(worker.parent_lock, 0, 0);
+            Atomics.store(worker.parent_lock, 0, exit_no);
             Atomics.notify(worker.parent_lock, 0);
         }
 	this.alive[id] = false;
