@@ -6,11 +6,11 @@ import {on_worker_message} from "./worker-message.js";
 const NECESSARY_BINARIES = {
     "/etc/motd" : "motd.txt",
     "/usr/bin/shell": "shell.wasm",
-    "/usr/bin/uutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+    "/usr/bin/uutils": "uutils.async.wasm",
+    "/usr/bin/tree": "tree.wasm",
 };
 
 const OPTIONAL_BINARIES = {
-    "/usr/bin/tree": "tree.wasm",
     "/usr/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
     "/usr/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
     "/usr/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
