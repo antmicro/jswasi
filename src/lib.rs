@@ -1,53 +1,54 @@
 use conch_parser::ast;
+use conch_parser::ast::{PipeableCommand, TopLevelWord, Redirect, CompoundCommand, CompoundCommandKind, AndOrList, SimpleCommand, Command, TopLevelCommand, ListableCommand, RedirectOrCmdWord};
+use std::rc::Rc;
 
-pub fn execute(cmd: ast::TopLevelCommand<String>) {
-    let result = count_echo_top_level(&cmd);
+#[derive(Debug)]
+pub enum Action {
+    Command {name: String, args: Vec<String>, background: bool},
+    SetEnv {key: String, value: String},
 }
 
-fn count_echo_top_level(cmd: &ast::TopLevelCommand<String>) -> usize {
+pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Action {
+    let mut action: Action;
     match &cmd.0 {
-        ast::Command::Job(list) | ast::Command::List(list) => std::iter::once(&list.first)
-            .chain(list.rest.iter().map(|and_or| match and_or {
-                ast::AndOr::And(cmd) | ast::AndOr::Or(cmd) => cmd,
-            }))
-            .map(|cmd| count_echo_listable(&cmd))
-            .sum(),
-    }
-}
+        Command::Job(list) | Command::List(list) => {
+            match &list.first {
+                ast::ListableCommand::Single(cmd) => {
+                    match cmd {
+                        ast::PipeableCommand::Simple(cmd) => {
+                            let mut words = cmd.redirects_or_cmd_words.iter().filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
+                                RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
+                                RedirectOrCmdWord::CmdWord(cmd_word) => {
+                                    match &cmd_word.0 {
+                                        ast::ComplexWord::Single(word) => {
+                                            match &word {
+                                                ast::Word::SingleQuoted(w) => Some(w.clone()),
+                                                ast::Word::Simple(w) => get_simple_word_as_string(w),
+                                                ast::Word::DoubleQuoted(words) =>
+                                                    Some(words
+                                                        .iter()
+                                                        .filter_map(|w| get_simple_word_as_string(w))
+                                                        .collect::<Vec<_>>()
+                                                        .join(" "))
+                                            }
+                                        },
+                                        ast::ComplexWord::Concat(_) => None, // TODO: handle concat (just join together?)
+                                    }
+                                }
+                            }).collect::<Vec<String>>();
+                            action = Action::Command {name: words.remove(0), args: words, background: false }
+                        }
+                        _ => unimplemented!(),
+                    };
+                },
+                ast::ListableCommand::Pipe(_, cmds) => unimplemented!(),
+            }
 
-fn count_echo_listable(cmd: &ast::DefaultListableCommand) -> usize {
-    match cmd {
-        ast::ListableCommand::Single(cmd) => count_echo_pipeable(cmd),
-        ast::ListableCommand::Pipe(_, cmds) => cmds.into_iter().map(count_echo_pipeable).sum(),
+            // TODO: handle list.rest
+        }
     }
-}
 
-fn count_echo_pipeable(cmd: &ast::DefaultPipeableCommand) -> usize {
-    match cmd {
-        ast::PipeableCommand::Simple(cmd) => count_echo_simple(cmd),
-        _ => 0
-    }
-}
-
-fn count_echo_simple(cmd: &ast::DefaultSimpleCommand) -> usize {
-    cmd.redirects_or_cmd_words
-        .iter()
-        .filter_map(|redirect_or_word| match redirect_or_word {
-            ast::RedirectOrCmdWord::CmdWord(w) => Some(&w.0),
-            ast::RedirectOrCmdWord::Redirect(_) => None,
-        })
-        .filter_map(|word| match word {
-            ast::ComplexWord::Single(w) => Some(w),
-            // We're going to ignore concatenated words for simplicity here
-            ast::ComplexWord::Concat(_) => None,
-        })
-        .filter_map(|word| match word {
-            ast::Word::SingleQuoted(w) => Some(w.clone()),
-            ast::Word::Simple(w) => get_simple_word_as_string(w),
-            ast::Word::DoubleQuoted(words) => Some(words.iter().filter_map(|w| get_simple_word_as_string(w)).collect::<Vec<_>>().join(" ")), // Ignore all multi-word double quoted strings
-        })
-    .filter(|w| *w == "echo")
-        .count()
+    action
 }
 
 fn get_simple_word_as_string(word: &ast::DefaultSimpleWord) -> Option<String> {
