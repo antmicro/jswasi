@@ -4,7 +4,7 @@ import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
 
 
 export class Filesystem {
-    mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle}[] = [];
+    mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle, parent: Directory}[] = [];
 
     rootDir: Directory;
 
@@ -56,12 +56,15 @@ export class Filesystem {
         return await handle.getFileHandle(name, options);
     }
 
-    async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
+    async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle) {
         // TODO: for now path must be absolute
         const {parts, name} = parsePath(absolute_path);
 	    console.log(`Adding path ${absolute_path} --> parsed to ${name}`);
 	    console.log("Parts: ", parts.join("/"));
-        this.mounts.push({parts, name, handle: mount_directory});
+        // TODO: refactor this when adding relative paths support for mount
+        const rootDir = await this.getRootDirectory();
+        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Any, 0);
+        this.mounts.push({parts, name, handle: mounted_directory, parent: padre.entry});
     }
 
     removeMount(absolute_path: string) {
@@ -109,23 +112,27 @@ export class Filesystem {
 	    if (mypath == null) {
 		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
 		    console.log("dirhandle.name = ",dir_handle.name);
-		    for (const a of this.mounts) {
+		    for (const mount of this.mounts) {
 			    console.log("Mount: ");
-			    let realpath = "/" + a.parts.join("/");
-			    console.log(a.name);
-			    console.log("a.handle.name = ",a.handle.name);
-			    if (a.handle == dir_handle) {
+			    let realpath = "/" + mount.parts.join("/");
+			    console.log(mount.name);
+			    console.log("mount.handle.name = ",mount.handle.name);
+			    if (mount.handle == dir_handle) {
 				    // TODO
 				    console.log("THIS IS THE SAME HANDLE");
-				   return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: dir_handle};
+                    mypath = await root.resolve(mount.parent._handle)
+                    mypath.push(mount.name); // TODO: which name to use mount point or local?
+                    break;
 			    }
 
                 // FIXME: something's not right here
                 console.log("!!! check Filesystem.resolve");
-			    let dr = await a.handle.resolve(dir_handle);
-			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: a.name, dir_handle: dr};
+			    let dr = await mount.handle.resolve(dir_handle);
+			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: mount.name, dir_handle: dr};
 		    }
-            return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+            if (mypath == null) {
+                return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+            }
 	    }
 
 	    let pth = "/" + mypath.join("/") + "/" + path;
@@ -246,27 +253,22 @@ export class Directory extends Entry {
     open() {
         return new OpenDirectory(this.path, this._handle, this._filesystem);
     }
-}
-
-export class OpenDirectory extends Directory {
-    public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
     // basically copied form RReverser's wasi-fs-access
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
     
+        debugger;
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
-
-	console.log("Got an entry with name '",name,"'");
 
         if (err !== constants.WASI_ESUCCESS) {
             return {err, entry: null};
         }    
 
-	if (name == ".") {
+	    if (name == ".") {
             let entry = new Directory(dir_handle.name, dir_handle, this._filesystem);
             return {err: constants.WASI_ESUCCESS, entry};
-	}
+	    }
 
         if (name === undefined) {
             if (oflags & (OpenFlags.Create | OpenFlags.Exclusive)) {
@@ -281,8 +283,6 @@ export class OpenDirectory extends Directory {
         if (oflags & OpenFlags.Directory) {
             mode = FileOrDir.Directory;
         }
-
-	console.log("We are here now");
 
         const openWithCreate = async (create: boolean): Promise<{err: number, handle: FileSystemFileHandle | FileSystemDirectoryHandle}> => {
             if (mode & FileOrDir.File) {
@@ -350,6 +350,11 @@ export class OpenDirectory extends Directory {
 
         return {err: constants.WASI_ESUCCESS, entry};
     }
+
+}
+
+export class OpenDirectory extends Directory {
+    public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
     async delete_entry(path: string, options): Promise<{err: number}> {
         const {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
