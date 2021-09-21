@@ -110,16 +110,10 @@ export class Filesystem {
         const root = await navigator.storage.getDirectory();
 	    let mypath = await root.resolve(dir_handle);
 	    if (mypath == null) {
-		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
-		    console.log("dirhandle.name = ",dir_handle.name);
 		    for (const mount of this.mounts) {
-			    console.log("Mount: ");
 			    let realpath = "/" + mount.parts.join("/");
-			    console.log(mount.name);
-			    console.log("mount.handle.name = ",mount.handle.name);
 			    if (mount.handle == dir_handle) {
 				    // TODO
-				    console.log("THIS IS THE SAME HANDLE");
                     mypath = await root.resolve(mount.parent._handle)
                     mypath.push(mount.name); // TODO: which name to use mount point or local?
                     break;
@@ -258,7 +252,6 @@ export class Directory extends Entry {
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
     
-        debugger;
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
 
         if (err !== constants.WASI_ESUCCESS) {
