@@ -10,6 +10,7 @@ const NECESSARY_BINARIES = {
     "/usr/bin/tree": "tree.wasm",
 };
 
+// TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
 const OPTIONAL_BINARIES = {
     "/usr/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
     "/usr/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
@@ -23,19 +24,16 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     let new_dir_handle = dir_handle;
     let new_filename = filename;
     if (filename[0] == '/') {
-	// got an absolute path
+	    // got an absolute path
         const { err: err, name: nfilename, dir_handle: dir_handl } = await filesystem.resolveAbsolute(filename);
-	new_filename = nfilename;
-	new_dir_handle = dir_handl;
+	    new_filename = nfilename;
+	    new_dir_handle = dir_handl;
     } else if (filename.lastIndexOf("/") != -1) {
-	console.log("Error: unsupported path!");
-	// TODO: unsupported situation where its a relative path but not direct
+	    console.log("Error: unsupported path!");
+	    // TODO: unsupported situation where its a relative path but not direct
     }
-    console.log(new_dir_handle);
-    console.log(new_dir_handle.type);
     const handle = await new_dir_handle.getFileHandle(new_filename, {create: true});
     const file = await handle.getFile();
-    console.log("file = ",file.name);
     // only fetch binary if not yet present
     if (file.size === 0) {
         let response;
@@ -78,7 +76,6 @@ export async function init_fs(anchor: HTMLElement) {
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
     const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
-    // TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
     const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     
     // don't await this on purpose
@@ -109,7 +106,12 @@ export async function init_all(anchor: HTMLElement) {
         "worker.js",
         // receive_callback
         // @ts-ignore
-        (output) => { terminal.io.print(output); if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + output; },
+        (output) => {
+            terminal.io.print(output);
+            if (window.stdout_attached != undefined && window.stdout_attached) {
+                window.buffer = window.buffer + output;
+            }
+        },
         [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()]
     );
 
@@ -126,8 +128,7 @@ export async function init_all(anchor: HTMLElement) {
             data = String.fromCharCode(10);
         }
 
-        //if (code !== 10 && code < 32) {
-	if (code == 3 || code == 4) {
+	    if (code == 3 || code == 4) {
             // control characters
             if (code == 3) {
                 workerTable.sendSigInt(workerTable.currentWorker);
@@ -137,13 +138,15 @@ export async function init_all(anchor: HTMLElement) {
         } else {
             // regular characters
             workerTable.push_to_buffer(data);
-	    if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + data;
+	        if (window.stdout_attached != undefined && window.stdout_attached) {
+                window.buffer = window.buffer + data;
+            }
+        }
 
 	    if ((code === 10) || code >= 32) {
-                // echo
-                terminal.io.print(code === 10 ? "\r\n" : data);
+            // echo
+            terminal.io.print(code === 10 ? "\r\n" : data);
 	    }
-        }
     };
 
     io.onTerminalResize = (columns, rows) => {
@@ -160,9 +163,9 @@ export async function init_all(anchor: HTMLElement) {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
-	TMPDIR: "/tmp",
-	TERM: "xterm-256color",
-	HOME: "/home/ant",
+	    TMPDIR: "/tmp",
+	    TERM: "xterm-256color",
+	    HOME: "/home/ant",
     }]);
 }
 
@@ -202,4 +205,3 @@ export async function wget(workerTable, worker_id, args, env) {
     const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
     fetch_file(dir_handle, filename, address); 
 }
-

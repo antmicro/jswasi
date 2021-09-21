@@ -7,6 +7,7 @@
 //NODE// import * as fs from "fs";
 //NODE// import { parentPort } from "worker_threads";
 import * as constants from "./constants.js";
+import {fix_path, realpath} from "./utils";
 
 type ptr = number;
 
@@ -22,7 +23,7 @@ let args = [];
 let env = {};
 
 const onmessage_ = function (e) {
-    //if (DEBUG) worker_console_log("got a message!");
+    worker_console_log("got a message!");
     if (!started) {
         if (e.data[0] === "start") {
             started = true;
@@ -57,18 +58,20 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
-    worker_send(["console", msg]);
+    if (DEBUG) {
+        worker_send(["console", msg]);
+    }
 }
 
 function do_exit(exit_code: number) {
     if (IS_NODE) {
         const buf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(buf, 0, 1);
-	lck[0] = -1;
+	    lck[0] = -1;
         worker_send(["exit", exit_code]); // never return
         Atomics.wait(lck, 0, -1);
     } else {
-        if (DEBUG) worker_console_log("calling close()");
+        worker_console_log("calling close()");
         worker_send(["exit", exit_code]);
         close();
     }
@@ -83,7 +86,7 @@ function WASI() {
     }
 
     function environ_sizes_get(environ_count: ptr, environ_size: ptr) {
-        if (DEBUG) worker_console_log(`environ_sizes_get(0x${environ_count.toString(16)}, 0x${environ_size.toString(16)})`);
+        worker_console_log(`environ_sizes_get(0x${environ_count.toString(16)}, 0x${environ_size.toString(16)})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
@@ -98,7 +101,7 @@ function WASI() {
     }
 
     function environ_get(environ, environ_buf) {
-        if (DEBUG) worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
+        worker_console_log(`environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
@@ -119,7 +122,7 @@ function WASI() {
     }
 
     function args_sizes_get(argc, argvBufSize) {
-        if (DEBUG) worker_console_log(`args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`);
+        worker_console_log(`args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
@@ -130,7 +133,7 @@ function WASI() {
     }
 
     function args_get(argv, argv_buf) {
-        if (DEBUG) worker_console_log("args_get(" + argv + ", 0x" + argv_buf.toString(16) + ")");
+        worker_console_log("args_get(" + argv + ", 0x" + argv_buf.toString(16) + ")");
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
@@ -151,7 +154,7 @@ function WASI() {
     }
 
     function fd_fdstat_get(fd: number, buf: ptr) {
-        if (DEBUG) worker_console_log(`fd_fdstat_get(${fd}, 0x${buf.toString(16)})`);
+        worker_console_log(`fd_fdstat_get(${fd}, 0x${buf.toString(16)})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
@@ -179,7 +182,7 @@ function WASI() {
     }
 
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
-        if (fd > 2) if (DEBUG) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
+        if (fd > 2) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let written = 0;
@@ -199,34 +202,36 @@ function WASI() {
             written += iov.byteLength;
         });
 
-	// TODO: this might potentially cause stack overflow is bufferBytes is large, we should definitely write in chunks
+	    // TODO: this might potentially cause stack overflow is bufferBytes is large, we should definitely write in chunks
         // const content = String.fromCharCode(...bufferBytes);
         const content = new SharedArrayBuffer(written);
-	const content_view = new Uint8Array(content);
-	for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
+	    const content_view = new Uint8Array(content);
+	    for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
-	lck[0] = -1;
+	    lck[0] = -1;
         worker_send(["fd_write", [sbuf, fd, content]]);
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
         if (err === 0) {
-	    if (fd > 2) if (DEBUG) worker_console_log(`fd_write written ${written} bytes.`);
-            view.setUint32(nwritten_ptr, written, true);
+	        if (fd > 2) {
+                worker_console_log(`fd_write written ${written} bytes.`);
+                view.setUint32(nwritten_ptr, written, true);
+            }
         } else {
-	    worker_console_log(`fd_write ERROR!.`);
-	}
+	        worker_console_log(`fd_write ERROR!.`);
+	    }
         return err;
     }
 
     function proc_exit(exit_code) {
-        if (DEBUG) worker_console_log(`proc_exit(${exit_code})`);
+        worker_console_log(`proc_exit(${exit_code})`);
         do_exit(exit_code);
     }
 
     function random_get(buf_addr, buf_len) {
-        if (DEBUG) worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
+        worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
         let numbers = new Uint8Array(buf_len);
         if (IS_NODE) {
@@ -239,48 +244,46 @@ function WASI() {
     }
 
     function clock_res_get(a, b) {
-        if (DEBUG) worker_console_log(`clock_res_get(${a},${b})`);
+        worker_console_log(`clock_res_get(${a},${b})`);
         return 1; // TODO!!!!
     }
 
-
     function clock_time_get(id, precision, time) {
-        if (DEBUG) worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
+        worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
         let buffer = new DataView(moduleInstanceExports.memory.buffer)
         buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
         return constants.WASI_ESUCCESS;
     }
 
     function fd_close(fd) {
-        if (DEBUG) worker_console_log(`fd_close(${fd})`);
+        worker_console_log(`fd_close(${fd})`);
 
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
-	lck[0] = -1;
+	    lck[0] = -1;
         worker_send(["fd_close", [sbuf, fd]]);
         Atomics.wait(lck, 0, -1);
 
-        const err = Atomics.load(lck, 0);
-        return err;
+        return Atomics.load(lck, 0);
     }
 
     function fd_advice(a, b, c, d) {
-        if (DEBUG) worker_console_log("fd_advice");
+        worker_console_log("fd_advice");
         return 1; // TODO!!!!
     }
 
     function fd_allocate(a, b, c) {
-        if (DEBUG) worker_console_log("fd_allocate");
+        worker_console_log("fd_allocate");
         return 1; // TODO!!!!
     }
 
     function fd_fdstat_set_rights(a, b, c) {
-        if (DEBUG) worker_console_log("fd_fdstat_set_rights");
+        worker_console_log("fd_fdstat_set_rights");
         return 1; // TODO!!!!
     }
 
     function fd_filestat_get(fd, buf) {
-        if (DEBUG) worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
+        worker_console_log("fd_filestat_get(" + fd + ", " + buf + ")");
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
@@ -319,7 +322,7 @@ function WASI() {
     }
 
     function fd_read(fd: number, iovs_ptr, iovs_len, nread_ptr) {
-        if (fd > 2) if (DEBUG) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
+        if (fd > 2) worker_console_log("fd_read(" + fd + ", " + iovs_ptr + ", " + iovs_len + ", " + nread_ptr + ")");
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -346,14 +349,14 @@ function WASI() {
             view8.set(readbuf, addr);
             nread += readlen[0];
         }
-	if (fd > 2) if (DEBUG) worker_console_log("fd_read read " + nread+ " bytes.");
+	if (fd > 2) worker_console_log("fd_read read " + nread+ " bytes.");
         view.setUint32(nread_ptr, nread, true);
         
         return constants.WASI_ESUCCESS;
     }
 
     function fd_readdir(fd: number, buf, buf_len: number, cookie: number, bufused) {
-        if (DEBUG) worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
+        worker_console_log(`fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`);
 
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
@@ -379,7 +382,7 @@ function WASI() {
     }
 
     function fd_seek(fd: number, offset: BigInt, whence: number, new_offset) {
-        if (DEBUG) worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
+        worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         const sbuf = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
@@ -405,7 +408,7 @@ function WASI() {
 
         const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
-        if (DEBUG) worker_console_log(`path_create_directory(${fd}, ${path_ptr}, ${path_len}) [path=${path}]`);
+        worker_console_log(`path_create_directory(${fd}, ${path_ptr}, ${path_len}) [path=${path}]`);
 
         const sbuf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(sbuf, 0, 1);
@@ -424,11 +427,11 @@ function WASI() {
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len))
 
-        if (DEBUG) worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
-	if (path != fix_path(path)) {
-		path = fix_path(path);
-		worker_console_log(`Fixing path to ${path}`);
-	}
+        worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
+	    if (path != fix_path(path, env)) {
+	    	path = fix_path(path, env);
+	    	worker_console_log(`Fixing path to ${path}`);
+	    }
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -464,99 +467,17 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-
-    function fix_path(path: string) {
-      // TODO: home handling should be moved to shell in the end
-      if (path == "~") return env['HOME'];
-      if (path == "/~") return env['HOME'];
-      if (path.substr(0,2) == "~/") return env['HOME'] + path.substr(2,4096);
-	   // if (path[0] == ".") if (env['PWD'] != "/") return path.replace(".", env['PWD']);
-	    return path;
-      let pwd = env['PWD'];
-      if (pwd != "/") pwd = pwd + "/";
-      if (DEBUG) worker_console_log(`trying to fix path ${path}`);
-      if (path.length == 0) return path;
-      if (path[0] == '!') return path;
-      if (path[0] == '/') return path;
-      if (path[0] != '.') return "/" + path;
-      if (path.substr(0,2) == "./") return pwd + path.substr(2);
-      return pwd + path;
-    }
-
-    function realpath(path) {
-        let result = [];
-        let result_path = "";
-        let tmp_path = path;
-        let part = "";
-        let level = 0;
-        let root_path = (path[0] == '/');
-        while (tmp_path != "") {
-            if (tmp_path.indexOf("/") != -1) {
-                part = tmp_path.substr(0, tmp_path.indexOf("/"));
-             } else part = tmp_path;
-             tmp_path = tmp_path.substr(part.length+1);
-             if (part == "..") {
-                 if (level > 0) level -= 1;
-             } else if (part == "~") {
-		 // TODO: shell should always parse this in the end and provide "normal" paths
-		 result[level] = env["HOME"];
-		 level++;
-             } else {
-                 result[level] = part;
-                 level++;
-             }
-        }
-        result_path = result.slice(0, level).join("/");
-        if (root_path) if (result_path == "") return "/";
-        return result_path;
-    }
-
-    function special_parse(fullcmd: string) {
-            let [cmd, ...args] = fullcmd.split(" ");
-            if (cmd == "spawn") {
-                worker_console_log("We are going to send a spawn message!");
-                const sbuf = new SharedArrayBuffer(4);
-                const lck = new Int32Array(sbuf, 0, 1);
-                lck[0] = -1;
-                worker_send(["spawn", [args[0], args.slice(1), env, sbuf]]);
-                worker_console_log("sent.");
-                // wait for child process to finish
-                Atomics.wait(lck, 0, -1);
-                const err = Atomics.load(lck, 0);
-		if (err != constants.WASI_ESUCCESS) {
-			worker_console_log(`error: spawned process returned ${err}`);
-		}
-                return "";
-            }
-            if (cmd == "set_env") {
-               env[args[0]] = args.slice(1).join(" ");
-               if (args[0] == "PWD") {
-		       env[args[0]] = realpath(args[1]);
-                       const sbuf = new SharedArrayBuffer(4);
-                       const lck = new Int32Array(sbuf, 0, 1);
-                       lck[0] = -1;
-	               worker_send(["chdir", [realpath(args[1]), sbuf]]);
-                       Atomics.wait(lck, 0, -1);
-	       }
-               worker_console_log("set " +args[0]+ " to " + env[args[0]]);
-               return env[args[0]];
-            }
-                
-            worker_console_log(`Special command ${cmd} not found.`);
-            return "";
-    }
-
     function path_open(dir_fd, dirflags, path_ptr, path_len, oflags, fs_rights_base, fs_rights_inheriting, fdflags, opened_fd_ptr) {
-        if (DEBUG) worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
+        worker_console_log(`path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(16)}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(16)})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
-        if (DEBUG) worker_console_log(`path_open: path = ${path}`);
-	if (path != fix_path(path)) {
-		path = fix_path(path);
-		worker_console_log(`fixing path to ${path}`);
-	}
+        worker_console_log(`path_open: path = ${path}`);
+	    if (path != fix_path(path, env)) {
+	    	path = fix_path(path, env);
+	    	worker_console_log(`fixing path to ${path}`);
+	    }
         const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
@@ -573,7 +494,41 @@ function WASI() {
         return constants.WASI_ESUCCESS;
     }
 
-    let used_once = false;
+    // used solely in path_readlink
+    function special_parse(fullcmd: string) {
+        let [cmd, ...args] = fullcmd.split(" ");
+        if (cmd == "spawn") {
+            worker_console_log("We are going to send a spawn message!");
+            const sbuf = new SharedArrayBuffer(4);
+            const lck = new Int32Array(sbuf, 0, 1);
+            lck[0] = -1;
+            worker_send(["spawn", [args[0], args.slice(1), env, sbuf]]);
+            worker_console_log("sent.");
+            // wait for child process to finish
+            Atomics.wait(lck, 0, -1);
+            const err = Atomics.load(lck, 0);
+            if (err != constants.WASI_ESUCCESS) {
+                worker_console_log(`error: spawned process returned ${err}`);
+            }
+            return "";
+        }
+        if (cmd == "set_env") {
+            env[args[0]] = args.slice(1).join(" ");
+            if (args[0] == "PWD") {
+                env[args[0]] = realpath(args[1], env);
+                const sbuf = new SharedArrayBuffer(4);
+                const lck = new Int32Array(sbuf, 0, 1);
+                lck[0] = -1;
+                worker_send(["chdir", [realpath(args[1], env), sbuf]]);
+                Atomics.wait(lck, 0, -1);
+            }
+            worker_console_log("set " +args[0]+ " to " + env[args[0]]);
+            return env[args[0]];
+        }
+
+        worker_console_log(`Special command ${cmd} not found.`);
+        return "";
+    }
 
     function path_readlink(fd: number, path_ptr: ptr, path_len: number, buffer_ptr: ptr, buffer_len: number, buffer_used_ptr: ptr) {
         worker_console_log(`path_readlink(${fd}, ${path_ptr}, ${path_len}, ${buffer_ptr}, ${buffer_len}, ${buffer_used_ptr})`);
@@ -600,7 +555,7 @@ function WASI() {
     }
 
     function path_remove_directory(fd: number, path_ptr: ptr, path_len: number) {
-        if (DEBUG) worker_console_log(`path_remove_directory(${fd}, ${path_ptr}, ${path_len})`);
+        worker_console_log(`path_remove_directory(${fd}, ${path_ptr}, ${path_len})`);
         
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -618,12 +573,12 @@ function WASI() {
     }
 
     function path_rename() {
-        if (DEBUG) worker_console_log("path_rename");
+        worker_console_log("path_rename");
         return 1;
     }
 
     function path_unlink_file(fd: number, path_ptr: ptr, path_len: number) {
-        if (DEBUG) worker_console_log(`path_unlink_file(${fd}, ${path_ptr}, ${path_len})`);
+        worker_console_log(`path_unlink_file(${fd}, ${path_ptr}, ${path_len})`);
         
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
@@ -641,12 +596,12 @@ function WASI() {
     }
 
     function sched_yield() {
-        if (DEBUG) worker_console_log("sched_yield");
+        worker_console_log("sched_yield");
         return 1;
     }
 
     function fd_prestat_get(fd: number, buf: ptr) {
-        if (DEBUG) worker_console_log(`fd_prestat_get(${fd}, 0x${buf.toString(16)})`);
+        worker_console_log(`fd_prestat_get(${fd}, 0x${buf.toString(16)})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 	
         const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
@@ -663,15 +618,15 @@ function WASI() {
             view.setUint8(buf, preopen_type[0]);
             view.setUint32(buf + 4, name_len[0], true);
         }
-	worker_console_log(`fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`);
+	    worker_console_log(`fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`);
         return err;
     }
 
     function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
-        if (DEBUG) worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);       
+        worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 	
-	const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path 
+	    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
         const path = new Uint8Array(sbuf, 4, path_len);
@@ -683,34 +638,33 @@ function WASI() {
         if (err === constants.WASI_ESUCCESS) {
             view8.set(path, path_ptr);
         }
-	worker_console_log(`prestat returned ${path} of size ${path_len}`);
+	    worker_console_log(`prestat returned ${path} of size ${path_len}`);
         return err;
 
     }
 
     function fd_datasync() {
-        if (DEBUG) worker_console_log("fd_datasync");
+        worker_console_log("fd_datasync");
         return constants.WASI_ESUCCESS;
     }
 
     function fd_filestat_set_size() {
-        if (DEBUG) worker_console_log("fd_filestat_set_size");
+        worker_console_log("fd_filestat_set_size");
         return constants.WASI_ESUCCESS;
     }
 
     function fd_sync() {
-        if (DEBUG) worker_console_log("fd_sync");
+        worker_console_log("fd_sync");
         return constants.WASI_ESUCCESS;
     }
 
     function path_symlink(path_ptr, path_len, fd, newpath_ptr, newpath_len) {
-        if (DEBUG) worker_console_log(`path_symlink(0x${path_ptr.toString(16)}, ${path_len}, ${fd}, 0x${newpath_ptr.toString(16)}, ${newpath_len})`);
-        const view = new DataView(moduleInstanceExports.memory.buffer);
+        worker_console_log(`path_symlink(0x${path_ptr.toString(16)}, ${path_len}, ${fd}, 0x${newpath_ptr.toString(16)}, ${newpath_len})`);
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         let newpath = DECODER.decode(view8.slice(newpath_ptr, newpath_ptr + newpath_len));
-        if (DEBUG) worker_console_log(`path_symlink: ${newpath} --> ${path}`);
+        worker_console_log(`path_symlink: ${newpath} --> ${path}`);
 
         const sbuf = new SharedArrayBuffer(4); // lock
         const lck = new Int32Array(sbuf, 0, 1);
@@ -726,52 +680,52 @@ function WASI() {
     }
 
     function fd_fdstat_set_flags(a, b) {
-        if (DEBUG) worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
+        worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
         return constants.WASI_ESUCCESS;
     }
 
     function fd_pwrite(a, b, c, d, e) {
-        if (DEBUG) worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
+        worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
         return constants.WASI_ESUCCESS;
     }
 
     function fd_renumber(a, b) {
-        if (DEBUG) worker_console_log(`fd_renumber(${a}, ${b})`);
+        worker_console_log(`fd_renumber(${a}, ${b})`);
         return constants.WASI_ESUCCESS;
     }
 
     function fd_tell(a, b) {
-        if (DEBUG) worker_console_log(`fd_tell(${a}, ${b})`);
+        worker_console_log(`fd_tell(${a}, ${b})`);
         return constants.WASI_ESUCCESS;
     }
 
     function path_filestat_set_times(a, b, c, d, e, f, g) {
-        if (DEBUG) worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g})`);
+        worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g})`);
         return constants.WASI_ESUCCESS;
     }
 
     function proc_raise(a) {
-        if (DEBUG) worker_console_log(`proc_raise(${a})`);
+        worker_console_log(`proc_raise(${a})`);
         return constants.WASI_ESUCCESS;
     }
 
     function sock_recv(a, b, c, d, e, f) {
-        if (DEBUG) worker_console_log("sock_recv");
+        worker_console_log("sock_recv");
         return 1; // TODO
     }
 
     function sock_send(a, b, c, d, e) {
-        if (DEBUG) worker_console_log("sock_send");
+        worker_console_log("sock_send");
         return 1; // TODO
     }
 
     function sock_shutdown(a, b) {
-        if (DEBUG) worker_console_log("sock_shutdown");
+        worker_console_log("sock_shutdown");
         return 1; // TODO
     }
 
     let placeholder = function () {
-        if (DEBUG) worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]);
+        worker_console_log("> Entering stub " + (new Error()).stack.split("\n")[2].trim().split(" ")[1]);
         return constants.WASI_ESUCCESS;
     };
 
@@ -859,7 +813,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
 
 
     if (WebAssembly.instantiateStreaming) {
-        if (DEBUG) worker_console_log(`WebAssembly.instantiateStreaming`);
+        worker_console_log(`WebAssembly.instantiateStreaming`);
 
         // TODO: rework this, so that other PATH directories work as well
         // maybe compile module in main thread and pass it on postMessage
@@ -870,11 +824,10 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         const binary = await bin.getFileHandle(moduleName.split("/").slice(-1));
         const file = await binary.getFile();
         const response = new Response(file);
-	let buffer = null;
-	await response.arrayBuffer().then(buf => { buffer = buf });
+	    let buffer = null;
+	    await response.arrayBuffer().then(buf => { buffer = buf });
 
         const {module, instance} = await WebAssembly.instantiate(buffer, moduleImports);
-//        const {module, instance} = await WebAssembly.instantiateStreaming(response, moduleImports);
 
         wasiCallbacks.setModuleInstance(instance);
         try {
@@ -882,8 +835,8 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             instance.exports._start();
             do_exit(0);
         } catch (e) {
-            if (DEBUG) worker_console_log("exception while running wasm");
-            if (DEBUG) worker_console_log(e.stack);
+            worker_console_log("exception while running wasm");
+            worker_console_log(e.stack);
             do_exit(255);
         }
     } else if (IS_NODE) {
@@ -895,9 +848,10 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
         try {
             instance = await WebAssembly.instantiate(module, moduleImports);
         } catch (e) {
-            if (DEBUG) worker_console_log("exception while instantiating wasm");
-            if (DEBUG) worker_console_log(e.stack);
+            worker_console_log("exception while instantiating wasm");
+            worker_console_log(e.stack);
             do_exit(255);
+            return;
         }
 
         wasiCallbacks.setModuleInstance(instance);
@@ -905,23 +859,23 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             instance.exports._start();
             do_exit(0);
         } catch (e) {
-            if (DEBUG) worker_console_log("exception while running wasm");
-            if (DEBUG) worker_console_log(e.stack);
+            worker_console_log("exception while running wasm");
+            worker_console_log(e.stack);
             do_exit(255);
         }
     } else {
-        if (DEBUG) worker_console_log(`WebAssembly.instantiateStreaming is not supported`);
+        worker_console_log(`WebAssembly.instantiateStreaming is not supported`);
     }
 }
 
 async function start_wasm() {
     if (started && fname != "") {
-        if (DEBUG) worker_console_log("Loading " + fname);
+        worker_console_log("Loading " + fname);
         try {
             if (IS_NODE) {
                 // @ts-ignore
                 if (!fs.existsSync(fname)) {
-                    if (DEBUG) worker_console_log(`File ${fname} not found!`);
+                    worker_console_log(`File ${fname} not found!`);
                     started = false;
                     fname = "";
                     do_exit(255);
@@ -930,10 +884,10 @@ async function start_wasm() {
             }
             await importWasmModule(fname, WASI);
         } catch(err) {
-            if (DEBUG) worker_console_log(`Failed instantiating WASM module: ${err}`);
+            worker_console_log(`Failed instantiating WASM module: ${err}`);
             do_exit(255);
         }
-        if (DEBUG) worker_console_log("done.");
+        worker_console_log("done.");
     } else {
         setTimeout(function () {
             start_wasm();
