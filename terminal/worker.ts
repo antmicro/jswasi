@@ -7,7 +7,7 @@
 //NODE// import * as fs from "fs";
 //NODE// import { parentPort } from "worker_threads";
 import * as constants from "./constants.js";
-import {fix_path, realpath} from "./utils";
+import {fix_path, realpath} from "./utils.js";
 
 type ptr = number;
 
@@ -182,7 +182,7 @@ function WASI() {
     }
 
     function fd_write(fd: number, iovs_ptr, iovs_len: number, nwritten_ptr) {
-        if (fd > 2) worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
+        worker_console_log(`fd_write(${fd}, ${iovs_ptr}, ${iovs_len}, ${nwritten_ptr})`);
         const view = new DataView(moduleInstanceExports.memory.buffer);
 
         let written = 0;
@@ -215,10 +215,8 @@ function WASI() {
 
         const err = Atomics.load(lck, 0);
         if (err === 0) {
-	        if (fd > 2) {
-                worker_console_log(`fd_write written ${written} bytes.`);
-                view.setUint32(nwritten_ptr, written, true);
-            }
+            worker_console_log(`fd_write written ${written} bytes.`);
+            view.setUint32(nwritten_ptr, written, true);
         } else {
 	        worker_console_log(`fd_write ERROR!.`);
 	    }

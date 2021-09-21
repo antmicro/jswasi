@@ -9,105 +9,11 @@ export class Filesystem {
     rootDir: Directory;
 
     async getRootDirectory(): Promise<Directory> {
-        const root = await navigator.storage.getDirectory();
-	this.rootDir = new Directory("", root, this);
-        return this.rootDir;
-    }
-
-    async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
-        // TODO: for now path must be absolute
-        const {parts, name} = parsePath(absolute_path);
-	console.log(`Adding path ${absolute_path} --> parsed to ${name}`);
-	console.log("Parts: ", parts.join("/"));
-        this.mounts.push({parts, name, handle: mount_directory});
-    }
-
-    removeMount(absolute_path: string) {
-        // TODO: for now path must be absolute
-        const {parts: del_parts, name: del_name} = parsePath(absolute_path);
-        for (let i = 0; i < this.mounts.length; i++) {
-            const {parts, name} = this.mounts[i];
-            if (arraysEqual(parts, del_parts) && name === del_name) {
-                this.mounts.splice(i, 1);
-                return;
-            }
-        }
-    }
-
-    async resolveAbsolute(path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
-	path = realpath(path);
-	console.log(`Resolving absolute path '${path}'`);
-	if ((path == "/") || (path == "/.")) return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: await navigator.storage.getDirectory()};
-        const {parts, name} = parsePath(path);
-	let dir_handle = await navigator.storage.getDirectory();
-
-	try {
-            for (const part of parts) {
-                    dir_handle = await dir_handle.getDirectoryHandle(part);
-            }
-  	    //dir_handle = await dir_handle.getDirectoryHandle(name);
-	    return {err: constants.WASI_ESUCCESS, name, dir_handle};
-	} catch (err) {
-	    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-	}
-    }
-
-    async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
-	if (path.includes("\\")) return { err: constants.WASI_EEXIST, name: null, dir_handle: null };
-
-
-
-/////////////////
+        if (!this.rootDir) {
             const root = await navigator.storage.getDirectory();
-	    let mypath = await root.resolve(dir_handle);
-	    if (mypath == null) {
-		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
-		    console.log("dirhandle.name = ",dir_handle.name);
-		    for (const a of this.mounts) {
-			    console.log("Mount: ");
-			    let realpath = "/" + a.parts.join("/");
-			    console.log(a.name);
-			    console.log("a.handle.name = ",a.handle.name);
-			    if (a.handle == dir_handle) {
-				    // TODO
-				    console.log("THIS IS THE SAME HANDLE");
-				   return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: dir_handle};
-			    }
-
-			    let dr = await a.handle.resolve(dir_handle);
-			    console.log("found (parent) dr.name = ",dr.name);
-			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: a.name, dir_handle: dr};
-		    }
-                    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-	    }
-
-		    for (const a of this.mounts) {
-			    console.log(a.parts.join("/"));
-			    console.log(a.name);
-		    }
-
-	    let pth = "/" + mypath.join("/") + "/" + path;
-	    pth = pth.replace("//", "/");
-	    return this.resolveAbsolute(pth);
-//////////////
-
-	const {parts, name} = parsePath(path);
-	for (const part of parts) {
-            try {
-                dir_handle = await this.getDirectoryHandle(dir_handle, part);
-            } catch (err) {
-                if (err.name === "NotFoundError") {
-                    return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
-                } else if (err.name === "TypeMismatchError") {
-                    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-                } else if (err.name === "TypeError") {
-		    return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
-		} else {
-                    throw err;
-                }
-            }
+	        this.rootDir = new Directory("", root, this);
         }
-        return {err: constants.WASI_ESUCCESS, name, dir_handle};
+        return this.rootDir;
     }
 
     async getDirectoryHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemDirectoryHandle> {
@@ -148,6 +54,83 @@ export class Filesystem {
             }
         }
         return await handle.getFileHandle(name, options);
+    }
+
+    async addMount(absolute_path: string, mount_directory: FileSystemDirectoryHandle) {
+        // TODO: for now path must be absolute
+        const {parts, name} = parsePath(absolute_path);
+	    console.log(`Adding path ${absolute_path} --> parsed to ${name}`);
+	    console.log("Parts: ", parts.join("/"));
+        this.mounts.push({parts, name, handle: mount_directory});
+    }
+
+    removeMount(absolute_path: string) {
+        // TODO: for now path must be absolute
+        const {parts: del_parts, name: del_name} = parsePath(absolute_path);
+        for (let i = 0; i < this.mounts.length; i++) {
+            const {parts, name} = this.mounts[i];
+            if (arraysEqual(parts, del_parts) && name === del_name) {
+                this.mounts.splice(i, 1);
+                return;
+            }
+        }
+    }
+
+    async resolveAbsolute(path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+	    path = realpath(path, {HOME: "/home/ant"});
+	    console.log(`Resolving absolute path '${path}'`);
+	    if ((path == "/") || (path == "/.")) return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: await navigator.storage.getDirectory()};
+        const {parts, name} = parsePath(path);
+	    let dir_handle = await navigator.storage.getDirectory();
+
+	    try {
+            for (const part of parts) {
+                dir_handle = await this.getDirectoryHandle(dir_handle, part);
+            }
+	        return {err: constants.WASI_ESUCCESS, name, dir_handle};
+	    } catch (err) {
+            if (err.name === "NotFoundError") {
+                return {err: constants.WASI_ENOENT, name: null, dir_handle: null};
+            } else if (err.name === "TypeMismatchError") {
+                return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+            } else if (err.name === "TypeError") {
+		        return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+		    } else {
+                throw err;
+            }
+        }
+    }
+
+    async resolve(dir_handle: FileSystemDirectoryHandle, path: string): Promise<{err: number, name: string, dir_handle: FileSystemDirectoryHandle}> {
+	    if (path.includes("\\")) return { err: constants.WASI_EEXIST, name: null, dir_handle: null };
+
+        const root = await navigator.storage.getDirectory();
+	    let mypath = await root.resolve(dir_handle);
+	    if (mypath == null) {
+		    console.log("TODO: This is probably a mounted dir -- not part of the root!");
+		    console.log("dirhandle.name = ",dir_handle.name);
+		    for (const a of this.mounts) {
+			    console.log("Mount: ");
+			    let realpath = "/" + a.parts.join("/");
+			    console.log(a.name);
+			    console.log("a.handle.name = ",a.handle.name);
+			    if (a.handle == dir_handle) {
+				    // TODO
+				    console.log("THIS IS THE SAME HANDLE");
+				   return {err: constants.WASI_ESUCCESS, name: ".", dir_handle: dir_handle};
+			    }
+
+                // FIXME: something's not right here
+                console.log("!!! check Filesystem.resolve");
+			    let dr = await a.handle.resolve(dir_handle);
+			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: a.name, dir_handle: dr};
+		    }
+            return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
+	    }
+
+	    let pth = "/" + mypath.join("/") + "/" + path;
+	    pth = pth.replace("//", "/");
+	    return this.resolveAbsolute(pth);
     }
 
     async entries(dir_handle: FileSystemDirectoryHandle): Promise<(File | Directory)[]>  {
@@ -223,9 +206,8 @@ abstract class Entry {
     // TODO: fill dummy values with something meaningful
     async stat() {
         console.log(`Entry.stat() -- Entry -- mostly dummy. path = ${this.path} file_type = ${this.file_type}`);
-    const root = await navigator.storage.getDirectory();
         let lmod = await this.lastModified();
-	if (!isFinite(lmod)) lmod = 0; // TODO:
+	    if (!isFinite(lmod)) lmod = 0; // TODO:
         const time = BigInt(lmod) * BigInt(1_000_000n);
         return {
             dev: 0n,
@@ -254,9 +236,11 @@ export class Directory extends Entry {
     }
 
     async lastModified(): Promise<number> {
-        const entries = await this.entries();
-        const dates = await Promise.all(entries.map(entry => entry.lastModified()));
-        return Math.max(...dates);
+        return 0;
+        // // TODO: this is very slow for massive local directories
+        // const entries = await this.entries();
+        // const dates = await Promise.all(entries.map(entry => entry.lastModified()));
+        // return Math.max(...dates);
     }
 
     open() {
