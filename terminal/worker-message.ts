@@ -2,39 +2,77 @@ import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { mount, umount, wget } from "./browser-shell.js";
 
-export const on_worker_message = async (event, workerTable) => {
+export const on_worker_message = async function (event, workerTable) {
     const [worker_id, action, data] = event.data;
     switch (action) {
         case "console": {
-            console.log("WORKER " + worker_id + ": " + data);
+	    let worker_name = "unknown";
+	    try {
+                worker_name = workerTable.workerInfos[worker_id].cmd;
+	    } catch {}
+	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+            console.log(`[dbg (${worker_name}:${worker_id})] ${data}`);
             break;
         }
-	    case "exit": {
-		    let worker_name = workerTable.workerInfos[worker_id].cmd;
-            worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
-            workerTable.terminateWorker(worker_id);
-		    console.log(`WORKER ${worker_id} (${worker_name}) exited with result code: ${data}`);
-		    // @ts-ignore
+	case "exit": {
+	    let worker_name = workerTable.workerInfos[worker_id].cmd;
+	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+            workerTable.terminateWorker(worker_id, data);
+	    console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
+	    // @ts-ignore
             if (worker_id == 0) window.alive = false;
-		    break;
+            break;
         }
+	case "chdir": {
+	        const [pwd, sbuf] = data;
+                const parent_lck = new Int32Array(sbuf, 0, 1);
+                const { fds } = workerTable.workerInfos[worker_id];
+		if (fds[3] != undefined) {
+		    // fds[3] should be root, so we can store '.' in fds[4]
+		    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
+  		    fds[4] = await entry.open();
+		    fds[4].path = ".";
+		}
+                Atomics.store(parent_lck, 0, 0);
+                Atomics.notify(parent_lck, 0);
+	        break;
+	}
         case "spawn": {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
             switch(fullpath) {
-                case "/usr/bin/mount.wasm": {
-                    await mount(workerTable, worker_id, args, env);
-                    Atomics.store(parent_lck, 0, 0);
+		case "/usr/bin/ps": {
+	            let ps_data = "  PID TTY          TIME CMD\n\r";
+		    for (let id = 0; id < workerTable.nextWorkerId; id++) {
+			    if (workerTable.alive[id]) {
+		               let now = new Date();
+                               let time = Math.floor(now.getTime()/1000) - workerTable.workerInfos[id].timestamp;
+                               let seconds = time % 60;
+                               let minutes = ((time - seconds) / 60) % 60;
+                               let hours = (time - seconds - minutes * 60) / 60 / 60;
+                               ps_data +=    ("     " + id).slice(-5) + " pts/0    "+("00" + hours).slice(-2)+":"+("00" + minutes).slice(-2)+":"+("00" + seconds).slice(-2) +" " + workerTable.workerInfos[id].cmd.split("/").slice(-1)[0]+ "\n\r";
+			    }
+	            }
+                    workerTable.receive_callback(ps_data); // TODO
+		    Atomics.store(parent_lck, 0, 0);
+		    Atomics.notify(parent_lck, 0);
+		    break;
+		}
+                case "/usr/bin/mount": {
+                    let result = await mount(workerTable, worker_id, args, env);
+		    let err = constants.WASI_ESUCCESS;
+		    if (result == null) err = constants.WASI_EBADF;
+                    Atomics.store(parent_lck, 0, err);
                     Atomics.notify(parent_lck, 0);
                     break;
                 }
-                case "/usr/bin/umount.wasm": {
+                case "/usr/bin/umount": {
                     await umount(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
                     break;
                 }
-                case "/usr/bin/wget.wasm": {
+                case "/usr/bin/wget": {
                     await wget(workerTable, worker_id, args, env);
                     Atomics.store(parent_lck, 0, 0);
                     Atomics.notify(parent_lck, 0);
@@ -48,6 +86,9 @@ export const on_worker_message = async (event, workerTable) => {
                     );
                     workerTable.workerInfos[id].cmd = fullpath;
                     workerTable.postMessage(id, ["start", fullpath, id, args, env]);
+                    //Atomics.store(parent_lck, 0, 0);
+                    //Atomics.notify(parent_lck, 0);
+                    break;
                 }
             }
             break;
@@ -62,7 +103,9 @@ export const on_worker_message = async (event, workerTable) => {
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
                 preopen_type[0] = fds[fd].file_type;
-                name_len[0] = fds[fd].path.length;
+                if (fds[fd].path == "") if (fd == 3) fds[fd].path = "/";
+                if (fds[fd].path == "") if (fd == 4) fds[fd].path = ".";
+		name_len[0] = fds[fd].path.length;
                 err = constants.WASI_ESUCCESS;
             } else {
                 err = constants.WASI_EBADF;
@@ -73,6 +116,35 @@ export const on_worker_message = async (event, workerTable) => {
 
             break;
         }
+
+        case "path_symlink": {
+            const [sbuf, path, fd, newpath] = data;
+            const lck = new Int32Array(sbuf, 0, 1);
+
+            let err, entry;
+            const { fds } = workerTable.workerInfos[worker_id];
+            if (fds[fd] != undefined) {
+		let linkpath = newpath + ".link";
+	        console.log(`We should symlink ${newpath} --> ${path} [dir fd=${fd}]`);
+		({err, entry} = await fds[fd].get_entry(linkpath, FileOrDir.File, 1 | 4));
+		if (err == constants.WASI_ESUCCESS) {
+                    let file = await entry.open();
+		//    let databuf = new ArrayBuffer(path.length);
+		    let data = new Uint8Array(path.length);
+		    data.set(new TextEncoder().encode(path), 0);
+		    await file.write(data);
+		}
+            } else {
+                err = constants.WASI_EBADF;
+            }
+
+
+            Atomics.store(lck, 0, err);
+            Atomics.notify(lck, 0);
+
+	    break;
+	}
+
         case "fd_prestat_dir_name": {
             const [sbuf, fd, path_len] = data;
             const lck = new Int32Array(sbuf, 0, 1);
@@ -93,8 +165,9 @@ export const on_worker_message = async (event, workerTable) => {
             break;
         }
         case "fd_write": {
-            const [sbuf, fd, content] = data;
+            const [sbuf, fd, content_] = data;
             const lck = new Int32Array(sbuf, 0, 1);
+            const content = new Uint8Array(content_);
 
             let err;
             switch (fd) {
@@ -102,12 +175,16 @@ export const on_worker_message = async (event, workerTable) => {
                     throw "can't write to stdin!";
                 }
                 case 1: {
-                    const output = content.replaceAll("\n", "\r\n");
-                    workerTable.receive_callback(output);
+	            let output = "";
+                    for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
+                    workerTable.receive_callback(output.replaceAll("\n", "\r\n")); // TODO
                     break;
                 }
                 case 2: {
-                    const output = content.replaceAll("\n", "\r\n");
+                    // TODO: should print in red, use ANSI color codes around output
+                    let output = "";
+                    for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
+		            output = output.replaceAll("\n", "\r\n");
                     const RED_ANSI = '\u001b[31m';
                     const RESET = '\u001b[0m';
                     workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
@@ -116,7 +193,10 @@ export const on_worker_message = async (event, workerTable) => {
                 default: {
                     const { fds } = workerTable.workerInfos[worker_id];
                     if (fds[fd] != undefined) {
-                        fds[fd].write(content);
+			let local_content = new Uint8Array(content.byteLength);
+			local_content.set(content);
+			// for some reason writable cannot use shared arrays?
+                        await fds[fd].write(local_content);
                         err = constants.WASI_ESUCCESS;
                     } else {
                         err = constants.WASI_EBADF;
@@ -230,29 +310,42 @@ export const on_worker_message = async (event, workerTable) => {
             Atomics.notify(lck, 0);
             break;
         }
-        case "path_filestat_get": {
-            const [sbuf, fd, path, flags] = data;
-            const lck = new Int32Array(sbuf, 0, 1);
-            const buf = new DataView(sbuf, 4);
+            case "path_filestat_get": {
+                const [sbuf, fd, path, flags] = data;
+                const lck = new Int32Array(sbuf, 0, 1);
+                const buf = new DataView(sbuf, 4);
 
-            let err, entry;
-            const { fds } = workerTable.workerInfos[worker_id];
-            if (fds[fd] != undefined) {
-                ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
-                if (err === constants.WASI_ESUCCESS) {
-                    let stat = await entry.stat();
-                    buf.setBigUint64(0, stat.dev, true);
-                    buf.setBigUint64(8, stat.ino, true);
-                    buf.setUint8(16, stat.file_type);
-                    buf.setBigUint64(24, stat.nlink, true);
-                    buf.setBigUint64(32, stat.size, true);
-                    buf.setBigUint64(40, stat.atim, true);
-                    buf.setBigUint64(48, stat.mtim, true);
-                    buf.setBigUint64(56, stat.ctim, true);
+                let err, entry;
+
+                if (path[0] != '!') {
+                    const fds = workerTable.workerInfos[worker_id].fds;
+                    if (fds[fd] != undefined) {
+                        ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
+                        if (err === constants.WASI_ESUCCESS) {
+                            let stat = await entry.stat();
+                            buf.setBigUint64(0, stat.dev, true);
+                           buf.setBigUint64(8, stat.ino, true);
+                            buf.setUint8(16, stat.file_type);
+                            buf.setBigUint64(24, stat.nlink, true);
+                            buf.setBigUint64(32, stat.size, true);
+                            buf.setBigUint64(40, stat.atim, true);
+                            buf.setBigUint64(48, stat.mtim, true);
+                            buf.setBigUint64(56, stat.ctim, true);
+                        }
+                    } else {
+                       err = constants.WASI_EBADF;
+                    }
+                } else {
+                            buf.setBigUint64(0, BigInt(0), true);
+                            buf.setBigUint64(8, BigInt(0), true);
+                            buf.setUint8(16, 0);
+                            buf.setBigUint64(24, BigInt(0), true);
+                            buf.setBigUint64(32, BigInt(4096), true);
+                            buf.setBigUint64(40, BigInt(0), true);
+                            buf.setBigUint64(48, BigInt(0), true);
+                            buf.setBigUint64(56, BigInt(0), true);
+                            err = constants.WASI_ESUCCESS;
                 }
-            } else {
-                err = constants.WASI_EBADF;
-            }
 
             Atomics.store(lck, 0, err);
             Atomics.notify(lck, 0);

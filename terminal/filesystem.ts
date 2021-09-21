@@ -13,7 +13,15 @@ export const enum OpenFlags {
 
 export function parsePath(path: string): {parts: string[], name: string} {
     const parts = [];
-
+    if (path == null) {
+	    console.log("Error, path is null.");
+	    return {parts: null, name: ""};
+    }
+    if (path == "..") {
+	    parts.push("..");
+	    const name = parts.pop();
+	    return {parts, name};
+    }
     for(const component of path.split("/")) {
         if (component == "..") {
             parts.pop()
@@ -25,3 +33,6 @@ export function parsePath(path: string): {parts: string[], name: string} {
     const name = parts.pop();
     return {parts, name};
 }
+
+// TODO: we can use dynamic import() expression to export different filesystem classes
+//  under the same name depending on the platform (browser/node)

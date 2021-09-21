@@ -6,6 +6,7 @@ const IS_NODE = typeof self === 'undefined';
 class WorkerInfo {
     public id: number;
     public cmd: string;
+    public timestamp: number;
     public worker: Worker;
     public parent_id: number;
     public parent_lock: Int32Array;
@@ -17,6 +18,8 @@ class WorkerInfo {
 	this.id = id;
         this.cmd = cmd;
         this.worker = worker;
+	let now = new Date();
+	this.timestamp = Math.floor(now.getTime() / 1000);
         this.fds = fds;
         this.parent_id = parent_id;
         this.parent_lock = parent_lock;
@@ -28,7 +31,8 @@ class WorkerInfo {
 export class WorkerTable {
     public buffer = "";
     public currentWorker = null;
-    private _nextWorkerId = 0;
+    public nextWorkerId = 0;
+    public alive: Array<boolean>;
     public workerInfos: Record<number, WorkerInfo> = {};
     public script_name: string;
     public receive_callback;
@@ -38,14 +42,16 @@ export class WorkerTable {
         this.script_name = sname;
         this.receive_callback = receive_callback;
         this.fds = fds;
+	this.alive = new Array<boolean>();
     }
 
     spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
-        const id = this._nextWorkerId;
+        const id = this.nextWorkerId;
         this.currentWorker = id;
-        this._nextWorkerId += 1;
+        this.nextWorkerId += 1;
         let private_data = {};
         if (!IS_NODE) private_data = {type: "module"};
+	this.alive.push(true);
         let worker = new Worker(this.script_name, private_data);
         this.workerInfos[id] = new WorkerInfo(id, "(unknown)", worker, this.fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
@@ -61,14 +67,15 @@ export class WorkerTable {
 	this.workerInfos[id].worker.postMessage(message);
     }
 
-    terminateWorker(id: number) {
+    terminateWorker(id: number, exit_no: number = 0) {
         const worker = this.workerInfos[id];
         worker.worker.terminate();
         // notify parent that they can resume operation
         if (id != 0) {
-            Atomics.store(worker.parent_lock, 0, 0);
+            Atomics.store(worker.parent_lock, 0, exit_no);
             Atomics.notify(worker.parent_lock, 0);
         }
+	this.alive[id] = false;
         this.currentWorker = worker.parent_id;
         // remove worker from workers array
         delete this.workerInfos[id];

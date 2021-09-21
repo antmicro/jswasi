@@ -1,24 +1,38 @@
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {BrowserFilesystem} from "./browser-fs.js";
+import {Filesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
-    "shell.wasm": "shell.wasm",
-    "uutils.wasm": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/uutils.async.wasm",
+    "/etc/motd" : "motd.txt",
+    "/usr/bin/shell": "shell.wasm",
+    "/usr/bin/uutils": "uutils.async.wasm",
+    "/usr/bin/tree": "tree.wasm",
 };
 
+// TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
 const OPTIONAL_BINARIES = {
-    "tree.wasm": "tree.wasm",
-    "duk.wasm": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
-    "cowsay.wasm": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
-    "qjs.wasm": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
-    "viu.wasm": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
-    "python.wasm": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "/usr/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
+    "/usr/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    "/usr/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
+    "/usr/bin/viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+    "/usr/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "/usr/bin/coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
-    const handle = await dir_handle.getFileHandle(filename, {create: true});
+    let new_dir_handle = dir_handle;
+    let new_filename = filename;
+    if (filename[0] == '/') {
+	    // got an absolute path
+        const { err: err, name: nfilename, dir_handle: dir_handl } = await filesystem.resolveAbsolute(filename);
+	    new_filename = nfilename;
+	    new_dir_handle = dir_handl;
+    } else if (filename.lastIndexOf("/") != -1) {
+	    console.log("Error: unsupported path!");
+	    // TODO: unsupported situation where its a relative path but not direct
+    }
+    const handle = await new_dir_handle.getFileHandle(new_filename, {create: true});
     const file = await handle.getFile();
     // only fetch binary if not yet present
     if (file.size === 0) {
@@ -40,41 +54,46 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     }
 }
 
-export async function init_fs() {
+export async function init_fs(anchor: HTMLElement) {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
+    const tmp = await root.getDirectoryHandle("tmp", {create: true});
     const home = await root.getDirectoryHandle("home", {create: true});
     const ant = await home.getDirectoryHandle("ant", {create: true});
     const shell_history = await ant.getFileHandle(".shell_history", {create: true});
+    const etc = await root.getDirectoryHandle("etc", {create: true});
 
     const usr = await root.getDirectoryHandle("usr", {create: true});
     const bin = await usr.getDirectoryHandle("bin", {create: true});
 
     // create dummy files for browser executed commands
-    await bin.getFileHandle("mount.wasm", {create: true});
-    await bin.getFileHandle("umount.wasm", {create: true});
-    await bin.getFileHandle("wget.wasm", {create: true});
+    await bin.getFileHandle("mount", {create: true});
+    await bin.getFileHandle("umount", {create: true});
+    await bin.getFileHandle("wget", {create: true});
+    await bin.getFileHandle("ps", {create: true});
 
     const local = await usr.getDirectoryHandle("local", {create: true});
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
-    // TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(bin, filename, address));
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     
     // don't await this on purpose
     // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
     //       it can say that command is not found or just fail at instantiation
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of optional";
     Promise.all(optional_promises);
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of mandatory";
     await Promise.all(necessary_promises);
+    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Mandatory finished.";
 }
 
 // things that are global and should be shared between all tab instances
-const filesystem = new BrowserFilesystem();
+const filesystem = new Filesystem();
 
 export async function init_all(anchor: HTMLElement) {
     anchor.innerHTML = 'Fetching binaries, this should only happen once.';
-    await init_fs();
+    await init_fs(anchor);
     anchor.innerHTML = '';
 
     // FIXME: for now we assume hterm is in scope
@@ -87,8 +106,13 @@ export async function init_all(anchor: HTMLElement) {
         "worker.js",
         // receive_callback
         // @ts-ignore
-        (output) => { terminal.io.print(output); if (window.stdout_attached != undefined) if (window.stdout_attached) window.buffer = window.buffer + output; },
-        [null, null, null, await root_dir.open()]
+        (output) => {
+            terminal.io.print(output);
+            if (window.stdout_attached != undefined && window.stdout_attached) {
+                window.buffer = window.buffer + output;
+            }
+        },
+        [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()]
     );
 
     terminal.decorate(anchor);
@@ -104,7 +128,7 @@ export async function init_all(anchor: HTMLElement) {
             data = String.fromCharCode(10);
         }
 
-        if (code !== 10 && code < 32) {
+	    if (code == 3 || code == 4) {
             // control characters
             if (code == 3) {
                 workerTable.sendSigInt(workerTable.currentWorker);
@@ -114,10 +138,15 @@ export async function init_all(anchor: HTMLElement) {
         } else {
             // regular characters
             workerTable.push_to_buffer(data);
+	        if (window.stdout_attached != undefined && window.stdout_attached) {
+                window.buffer = window.buffer + data;
+            }
+        }
 
+	    if ((code === 10) || code >= 32) {
             // echo
             terminal.io.print(code === 10 ? "\r\n" : data);
-        }
+	    }
     };
 
     io.onTerminalResize = (columns, rows) => {
@@ -128,27 +157,31 @@ export async function init_all(anchor: HTMLElement) {
         null, // parent_lock
         on_worker_message
     );
-    workerTable.workerInfos[0].cmd = "/usr/bin/shell.wasm";
+    workerTable.workerInfos[0].cmd = "/usr/bin/shell";
 
-    workerTable.postMessage(0, ["start", "/usr/bin/shell.wasm", 0, [], {
+    workerTable.postMessage(0, ["start", "/usr/bin/shell", 0, [], {
         RUST_BACKTRACE: "full",
         PATH: "/usr/bin:/usr/local/bin",
         PWD: "/",
+	    TMPDIR: "/tmp",
+	    TERM: "xterm-256color",
+	    HOME: "/home/ant",
     }]);
 }
 
 export async function mount(workerTable, worker_id, args, env) {
-    console.log(`mount(${worker_id}, ${args}`);
+    console.log(`mount(${worker_id}, ${args})`);
     let mount_point;
     try {
         mount_point = await showDirectoryPicker();
     } catch(e) {
         // TODO: write this to terminal
         // terminal.io.println("mount: failed to open local directory");
-        return;
+        return null;
     }
     // this will be included in all program
     await filesystem.addMount(args[1], mount_point);
+    return mount_point;
 }
 
 export function umount(workerTable, worker_id, args, env) {
@@ -169,8 +202,6 @@ export async function wget(workerTable, worker_id, args, env) {
         // terminal.io.println("write: help: write <address> <filename>");
         return;
     }
-    // TODO: fetch to CWD
-    const root = await navigator.storage.getDirectory();
-    fetch_file(root, filename, address); 
+    const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
+    fetch_file(dir_handle, filename, address); 
 }
-

@@ -32,6 +32,13 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = 8000
-    httpd = socketserver.ForkingTCPServer(('', port), CustomHTTPRequestHandler)
+    httpd = None;
+    while (httpd == None):
+        try:
+            httpd = socketserver.ForkingTCPServer(('', port), CustomHTTPRequestHandler)
+        except:
+            httpd = None
+            time.sleep(2)
     print("Serving content on :%d" % port)
-    httpd.serve_forever()
+
+    httpd.serve_forever();
