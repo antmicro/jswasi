@@ -15,14 +15,13 @@ const NECESSARY_BINARIES = {
     "/usr/bin/tree": "resources/tree.wasm",
 };
 
-// TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
 const OPTIONAL_BINARIES = {
-    "/usr/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
-    "/usr/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
-    "/usr/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
-    "/usr/bin/viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
-    "/usr/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
-    "/usr/bin/coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
+    "/usr/local/bin/duk": "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
+    "/usr/local/bin/cowsay": "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    "/usr/local/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
+    "/usr/local/bin/viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
+    "/usr/local/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
+    "/usr/local/bin/coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
