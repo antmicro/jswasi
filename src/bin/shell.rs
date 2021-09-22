@@ -449,7 +449,14 @@ fn main() {
                                         }
                                     }
                                     if !found {
-                                        println!("command not found: {}", command);
+                                        let _result = fs::read_link(
+                                            format!("/!spawn {} {}", command, input)
+                                                .trim(),
+                                        )
+                                        .unwrap()
+                                        .to_str()
+                                        .unwrap()
+                                        .trim_matches(char::from(0));
                                     }
                                 }
                             }
