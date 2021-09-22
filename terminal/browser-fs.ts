@@ -252,7 +252,6 @@ export class Directory extends Entry {
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
     
-        debugger;
         let {err, name, dir_handle} = await this._filesystem.resolve(this._handle, path);
 
         if (err !== constants.WASI_ESUCCESS) {
