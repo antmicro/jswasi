@@ -1,5 +1,6 @@
 //NODE// import { Worker } from 'worker_threads';
 import * as constants from "./constants.js";
+import {FileOrDir} from "./filesystem.js";
 
 const IS_NODE = typeof self === 'undefined';
 
@@ -15,11 +16,11 @@ class WorkerInfo {
     public callback;
 
     constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback) {
-	this.id = id;
+	    this.id = id;
         this.cmd = cmd;
         this.worker = worker;
-	let now = new Date();
-	this.timestamp = Math.floor(now.getTime() / 1000);
+	    let now = new Date();
+	    this.timestamp = Math.floor(now.getTime() / 1000);
         this.fds = fds;
         this.parent_id = parent_id;
         this.parent_lock = parent_lock;
@@ -29,25 +30,29 @@ class WorkerInfo {
 
 
 export class WorkerTable {
+    public readonly terminal;
+    public readonly filesystem;
+    public readonly receive_callback;
+    public readonly script_name: string;
+
+    public fds;
     public buffer = "";
-    public terminal;
     public currentWorker = null;
     public nextWorkerId = 0;
     public alive: Array<boolean>;
     public workerInfos: Record<number, WorkerInfo> = {};
-    public script_name: string;
-    public receive_callback;
-    public fds;
+    public compiledModules: Record<string, WebAssembly.Module> = {};
 
-    constructor(sname: string, receive_callback, fds, terminal) {
+    constructor(sname: string, receive_callback, fds, terminal, filesystem) {
         this.script_name = sname;
         this.receive_callback = receive_callback;
         this.fds = fds;
         this.terminal = terminal;
+        this.filesystem = filesystem;
 	    this.alive = new Array<boolean>();
     }
 
-    spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
+    async spawnWorker(parent_id: number, parent_lock: Int32Array, callback, command, args, env): Promise<number> {
         const id = this.nextWorkerId;
         this.currentWorker = id;
         this.nextWorkerId += 1;
@@ -55,18 +60,31 @@ export class WorkerTable {
         if (!IS_NODE) private_data = {type: "module"};
 	    this.alive.push(true);
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, "(unknown)", worker, this.fds, parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, command, worker, this.fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
             worker.onmessage = (event) => callback(event, this);
         } else {
             // @ts-ignore
             worker.on('message', (event) => callback(event, this));
         }
+
+        // save compiled module to cache
+        // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
+        if (!this.compiledModules[command]) {
+            const rootDir = await this.filesystem.getRootDirectory();
+            const binary = await rootDir.get_entry(command, FileOrDir.File);
+            const file = await binary.entry._handle.getFile();
+            const buffer_source = await file.arrayBuffer();
+            this.compiledModules[command] = await WebAssembly.compile(buffer_source);
+        }
+
+        // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
+	    this.workerInfos[id].worker.postMessage(["start", this.compiledModules[command], id, args, env]);
         return id;
     }
 
     postMessage(id: number, message) {
-	this.workerInfos[id].worker.postMessage(message);
+	    this.workerInfos[id].worker.postMessage(message);
     }
 
     terminateWorker(id: number, exit_no: number = 0) {

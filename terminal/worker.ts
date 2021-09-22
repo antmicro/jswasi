@@ -17,7 +17,8 @@ const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 
 let started = false;
-let fname = "";
+// TODO: rename to module
+let mod = "";
 let myself = null;
 let args = [];
 let env = {};
@@ -27,7 +28,7 @@ const onmessage_ = function (e) {
     if (!started) {
         if (e.data[0] === "start") {
             started = true;
-            fname = e.data[1];
+            mod = e.data[1];
             myself = e.data[2];
             args = e.data[3];
             env = e.data[4];
@@ -810,22 +811,10 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
     };
 
 
-    if (WebAssembly.instantiateStreaming) {
-        worker_console_log(`WebAssembly.instantiateStreaming`);
+    if (WebAssembly.instantiate) {
+        worker_console_log(`WebAssembly.instantiate`);
 
-        // TODO: rework this, so that other PATH directories work as well
-        // maybe compile module in main thread and pass it on postMessage
-        // or create SharedArrayBuffer and request file contents
-        const root = await navigator.storage.getDirectory();
-        const usr = await root.getDirectoryHandle("usr");
-        const bin = await usr.getDirectoryHandle("bin");
-        const binary = await bin.getFileHandle(moduleName.split("/").slice(-1));
-        const file = await binary.getFile();
-        const response = new Response(file);
-	    let buffer = null;
-	    await response.arrayBuffer().then(buf => { buffer = buf });
-
-        const {module, instance} = await WebAssembly.instantiate(buffer, moduleImports);
+        const instance = await WebAssembly.instantiate(mod, moduleImports);
 
         wasiCallbacks.setModuleInstance(instance);
         try {
@@ -867,20 +856,20 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
 }
 
 async function start_wasm() {
-    if (started && fname != "") {
-        worker_console_log("Loading " + fname);
+    if (started && mod != "") {
+        worker_console_log("Loading " + mod);
         try {
             if (IS_NODE) {
                 // @ts-ignore
-                if (!fs.existsSync(fname)) {
-                    worker_console_log(`File ${fname} not found!`);
+                if (!fs.existsSync(mod)) {
+                    worker_console_log(`File ${mod} not found!`);
                     started = false;
-                    fname = "";
+                    mod = "";
                     do_exit(255);
                     return;
                 }
             }
-            await importWasmModule(fname, WASI);
+            await importWasmModule(mod, WASI);
         } catch(err) {
             worker_console_log(`Failed instantiating WASM module: ${err}`);
             do_exit(255);

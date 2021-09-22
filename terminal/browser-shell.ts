@@ -118,7 +118,8 @@ export async function init_all(anchor: HTMLElement) {
             }
         },
         [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()],
-        terminal
+        terminal,
+        filesystem,
     );
 
     terminal.decorate(anchor);
@@ -158,21 +159,21 @@ export async function init_all(anchor: HTMLElement) {
     io.onTerminalResize = (columns, rows) => {
     };
 
-    workerTable.spawnWorker(
+    await workerTable.spawnWorker(
         null, // parent_id
         null, // parent_lock
-        on_worker_message
+        on_worker_message,
+        "/usr/bin/shell",
+        [],
+        {
+            RUST_BACKTRACE: "full",
+            PATH: "/usr/bin:/usr/local/bin",
+            PWD: "/",
+	        TMPDIR: "/tmp",
+	        TERM: "xterm-256color",
+	        HOME: "/home/ant",
+        }
     );
-    workerTable.workerInfos[0].cmd = "/usr/bin/shell";
-
-    workerTable.postMessage(0, ["start", "/usr/bin/shell", 0, [], {
-        RUST_BACKTRACE: "full",
-        PATH: "/usr/bin:/usr/local/bin",
-        PWD: "/",
-	    TMPDIR: "/tmp",
-	    TERM: "xterm-256color",
-	    HOME: "/home/ant",
-    }]);
 }
 
 export async function mount(workerTable, worker_id, args, env) {
