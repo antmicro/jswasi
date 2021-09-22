@@ -112,7 +112,8 @@ export async function init_all(anchor: HTMLElement) {
                 window.buffer = window.buffer + output;
             }
         },
-        [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()]
+        [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()],
+        terminal
     );
 
     terminal.decorate(anchor);
@@ -171,21 +172,48 @@ export async function init_all(anchor: HTMLElement) {
 
 export async function mount(workerTable, worker_id, args, env) {
     console.log(`mount(${worker_id}, ${args})`);
-    let mount_point;
-    try {
-        mount_point = await showDirectoryPicker();
-    } catch(e) {
-        // TODO: write this to terminal
-        // terminal.io.println("mount: failed to open local directory");
-        return null;
+
+    switch (args.length) {
+        case 1: {
+            workerTable.terminal.io.println("wasmfs on /");
+            for (const mount of filesystem.mounts) {
+                workerTable.terminal.io.println(`fsapi on /${mount.parts.join("/") + "/" + mount.name} (${mount.handle.name})`);
+            }
+            break;
+        }
+        case 2: {
+            let mount_point;
+            try {
+                mount_point = await showDirectoryPicker();
+            } catch(e) {
+                workerTable.terminal.io.println("mount: failed to open local directory");
+                return null;
+            }
+            let path = args[1];
+            // handle relative path
+            if (!path.startsWith("/")) {
+                path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
+            }
+            const err = await filesystem.addMount(path, mount_point);
+            if (err === constants.WASI_ENOENT) {
+                workerTable.terminal.io.println(`mount: ${path}: no such file or directory`);
+                return null;
+            }
+            return mount_point;
+        }
+        default: {
+            workerTable.terminal.io.println("mount: help: mount [<mountpoint>]");
+        }
     }
-    // this will be included in all program
-    await filesystem.addMount(args[1], mount_point);
-    return mount_point;
 }
 
 export function umount(workerTable, worker_id, args, env) {
-    filesystem.removeMount(args[1]);
+    let path = args[1];
+    // handle relative path
+    if (!path.startsWith("/")) {
+        path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
+    }
+    filesystem.removeMount(path);
 }
 
 export async function wget(workerTable, worker_id, args, env) {
@@ -198,8 +226,7 @@ export async function wget(workerTable, worker_id, args, env) {
         address = args[1];
         filename = args[2];
     } else {
-        // TODO: pass terminal to function 
-        // terminal.io.println("write: help: write <address> <filename>");
+        workerTable.terminal.io.println("wget: help: wget <address> [<filename>]");
         return;
     }
     const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);

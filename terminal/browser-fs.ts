@@ -64,7 +64,13 @@ export class Filesystem {
         // TODO: refactor this when adding relative paths support for mount
         const rootDir = await this.getRootDirectory();
         const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Any, 0);
+        try {
+            await padre.entry._handle.getDirectoryHandle(name);
+        } catch {
+            return constants.WASI_ENOENT;
+        }
         this.mounts.push({parts, name, handle: mounted_directory, parent: padre.entry});
+        return constants.WASI_ESUCCESS;
     }
 
     removeMount(absolute_path: string) {

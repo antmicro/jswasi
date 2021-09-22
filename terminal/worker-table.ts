@@ -30,6 +30,7 @@ class WorkerInfo {
 
 export class WorkerTable {
     public buffer = "";
+    public terminal;
     public currentWorker = null;
     public nextWorkerId = 0;
     public alive: Array<boolean>;
@@ -38,11 +39,12 @@ export class WorkerTable {
     public receive_callback;
     public fds;
 
-    constructor(sname: string, receive_callback, fds) {
+    constructor(sname: string, receive_callback, fds, terminal) {
         this.script_name = sname;
         this.receive_callback = receive_callback;
         this.fds = fds;
-	this.alive = new Array<boolean>();
+        this.terminal = terminal;
+	    this.alive = new Array<boolean>();
     }
 
     spawnWorker(parent_id: number, parent_lock: Int32Array, callback): number {
@@ -51,7 +53,7 @@ export class WorkerTable {
         this.nextWorkerId += 1;
         let private_data = {};
         if (!IS_NODE) private_data = {type: "module"};
-	this.alive.push(true);
+	    this.alive.push(true);
         let worker = new Worker(this.script_name, private_data);
         this.workerInfos[id] = new WorkerInfo(id, "(unknown)", worker, this.fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
@@ -75,7 +77,7 @@ export class WorkerTable {
             Atomics.store(worker.parent_lock, 0, exit_no);
             Atomics.notify(worker.parent_lock, 0);
         }
-	this.alive[id] = false;
+	    this.alive[id] = false;
         this.currentWorker = worker.parent_id;
         // remove worker from workers array
         delete this.workerInfos[id];
