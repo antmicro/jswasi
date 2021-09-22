@@ -344,23 +344,21 @@ fn main() {
                                 }
                                 "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
                                 | "ls" | "date" | "printf" | "env" | "cat" => {
+                                    args.insert(0, command.as_str().to_string());
                                     fs::read_link(
                                         format!(
-                                            "/!spawn /usr/bin/uutils\x1b{}\x1b{}",
-                                            command,
+                                            "/!spawn /usr/bin/uutils\x1b{}",
                                             args.join("\x1b")
-                                        )
-                                        .trim(),
+                                        ),
                                     );
                                 }
                                 "ln" | "printenv" | "md5sum" => {
+                                    args.insert(0, command.as_str().to_string());
                                     fs::read_link(
                                         format!(
-                                            "/!spawn /usr/bin/coreutils\x1b{}\x1b{}",
-                                            command,
+                                            "/!spawn /usr/bin/coreutils\x1b{}",
                                             args.join("\x1b")
-                                        )
-                                        .trim(),
+                                        ),
                                     );
                                 }
                                 "write" => {
@@ -436,9 +434,9 @@ fn main() {
                                         let bin_dir = PathBuf::from(bin_dir);
                                         let fullpath = bin_dir.join(format!("{}", command));
                                         if fullpath.is_file() {
+                                            args.insert(0, fullpath.display().to_string());
                                             let _result = fs::read_link(
-                                                format!("/!spawn {}\x1b{}", fullpath.display(), args.join("\x1b"))
-                                                    .trim(),
+                                                format!("/!spawn {}", args.join("\x1b")),
                                             )
                                             .unwrap()
                                             .to_str()

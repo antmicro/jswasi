@@ -514,11 +514,11 @@ function WASI() {
         if (cmd == "set_env") {
             env[args[0]] = args.slice(1).join(" ");
             if (args[0] == "PWD") {
-                env[args[0]] = realpath(args[1], env);
+                env[args[0]] = realpath(env[args[0]], env);
                 const sbuf = new SharedArrayBuffer(4);
                 const lck = new Int32Array(sbuf, 0, 1);
                 lck[0] = -1;
-                worker_send(["chdir", [realpath(args[1], env), sbuf]]);
+                worker_send(["chdir", [realpath(env[args[0]], env), sbuf]]);
                 Atomics.wait(lck, 0, -1);
             }
             worker_console_log("set " +args[0]+ " to " + env[args[0]]);
