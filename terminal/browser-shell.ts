@@ -12,6 +12,7 @@ const NECESSARY_BINARIES = {
     "/etc/motd" : "resources/motd.txt",
     "/usr/bin/shell": "resources/shell.wasm",
     "/usr/bin/uutils": "resources/uutils.async.wasm",
+    "/usr/bin/coreutils": "resources/coreutils.async.wasm",
     "/usr/bin/tree": "resources/tree.wasm",
 };
 
@@ -21,7 +22,6 @@ const OPTIONAL_BINARIES = {
     "/usr/local/bin/qjs": "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
     "/usr/local/bin/viu": "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
     "/usr/local/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
-    "/usr/local/bin/coreutils": "https://github.com/GoogleChromeLabs/wasi-fs-access/raw/main/coreutils.async.wasm",
 };
 
 async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
