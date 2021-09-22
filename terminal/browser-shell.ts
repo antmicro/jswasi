@@ -4,10 +4,10 @@ import {Filesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
 
 const NECESSARY_BINARIES = {
-    "/etc/motd" : "motd.txt",
-    "/usr/bin/shell": "shell.wasm",
-    "/usr/bin/uutils": "uutils.async.wasm",
-    "/usr/bin/tree": "tree.wasm",
+    "/etc/motd" : "resources/motd.txt",
+    "/usr/bin/shell": "resources/shell.wasm",
+    "/usr/bin/uutils": "resources/uutils.async.wasm",
+    "/usr/bin/tree": "resources/tree.wasm",
 };
 
 // TODO: save optional binaries to /usr/local/bin once module instantiation is reworked
