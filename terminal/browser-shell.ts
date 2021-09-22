@@ -1,3 +1,8 @@
+declare global {
+    var stdout_attached: boolean;
+    var buffer: string;
+}
+
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 import {Filesystem} from "./browser-fs.js";

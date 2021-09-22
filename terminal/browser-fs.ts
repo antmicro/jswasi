@@ -63,7 +63,7 @@ export class Filesystem {
 	    console.log("Parts: ", parts.join("/"));
         // TODO: refactor this when adding relative paths support for mount
         const rootDir = await this.getRootDirectory();
-        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Any, 0);
+        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory, 0);
         try {
             await padre.entry._handle.getDirectoryHandle(name);
         } catch {
@@ -127,8 +127,8 @@ export class Filesystem {
 
                 // FIXME: something's not right here
                 console.log("!!! check Filesystem.resolve");
-			    let dr = await mount.handle.resolve(dir_handle);
-			    if (dr != null) return {err: constants.WASI_ESUCCESS, name: mount.name, dir_handle: dr};
+			    // let dr = await mount.handle.resolve(dir_handle);
+			    // if (dr != null) return {err: constants.WASI_ESUCCESS, name: mount.name, dir_handle: dr};
 		    }
             if (mypath == null) {
                 return {err: constants.WASI_EEXIST, name: null, dir_handle: null};
@@ -255,6 +255,21 @@ export class Directory extends Entry {
     }
 
     // basically copied form RReverser's wasi-fs-access
+    get_entry(
+        path: string,
+        mode: FileOrDir.File,
+        openFlags?: OpenFlags
+    ): Promise<{err: number, entry: File}>;
+    get_entry(
+        path: string,
+        mode: FileOrDir.Directory,
+        openFlags?: OpenFlags
+    ): Promise<{err: number, entry: Directory}>;
+    get_entry(
+        path: string,
+        mode: FileOrDir,
+        openFlags?: OpenFlags
+    ): Promise<{err: number, entry: File | Directory}>;
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
         console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
     
