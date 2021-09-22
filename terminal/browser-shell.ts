@@ -39,12 +39,17 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
         let response;
         if (!(address.startsWith("http://") || address.startsWith("https://")) || address.startsWith(location.origin)) {
             // files served from same origin
-            response = await fetch(address);
         } else {
-            // files requested from cross-orign that require proxy server
-            let proxy_address = location.origin + "/proxy/" + btoa(unescape(encodeURIComponent(address)));
-            response = await fetch(proxy_address);
+            if (location.origin.startsWith("http://localhost")) {
+                // files requested from cross-orign that require proxy server
+                address = "proxy/" + btoa(unescape(encodeURIComponent(address)));
+            } else {
+                // hack for current beta server, where only static files are avaible
+                address = "proxy/" + address.split("/").slice(-1)[0];
+            }
         }
+        
+        response = await fetch(address);
         if (response.status === 200) {
             const writable = await handle.createWritable();
             await response.body.pipeTo(writable);
