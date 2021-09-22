@@ -496,11 +496,12 @@ function WASI() {
     function special_parse(fullcmd: string) {
         let [cmd, ...args] = fullcmd.split(" ");
         if (cmd == "spawn") {
-            worker_console_log("We are going to send a spawn message!");
+            // reparse args
+            let new_args = fullcmd.substring(6,1000).split("\x1b");
             const sbuf = new SharedArrayBuffer(4);
             const lck = new Int32Array(sbuf, 0, 1);
             lck[0] = -1;
-            worker_send(["spawn", [args[0], args.slice(1), env, sbuf]]);
+            worker_send(["spawn", [new_args[0], new_args.slice(1), env, sbuf]]);
             worker_console_log("sent.");
             // wait for child process to finish
             Atomics.wait(lck, 0, -1);

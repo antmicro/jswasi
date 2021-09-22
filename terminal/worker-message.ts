@@ -40,6 +40,7 @@ export const on_worker_message = async function (event, workerTable) {
         case "spawn": {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
+            args.splice(0, 0, fullpath.split("/").pop());
             switch(fullpath) {
 		case "/usr/bin/ps": {
 	            let ps_data = "  PID TTY          TIME CMD\n\r";

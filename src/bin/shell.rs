@@ -346,9 +346,9 @@ fn main() {
                                 | "ls" | "date" | "printf" | "env" | "cat" => {
                                     fs::read_link(
                                         format!(
-                                            "/!spawn /usr/bin/uutils {} {}",
+                                            "/!spawn /usr/bin/uutils\x1b{}\x1b{}",
                                             command,
-                                            args.join(" ")
+                                            args.join("\x1b")
                                         )
                                         .trim(),
                                     );
@@ -356,9 +356,9 @@ fn main() {
                                 "ln" | "printenv" | "md5sum" => {
                                     fs::read_link(
                                         format!(
-                                            "/!spawn /usr/bin/coreutils {} {}",
+                                            "/!spawn /usr/bin/coreutils\x1b{}\x1b{}",
                                             command,
-                                            args.join(" ")
+                                            args.join("\x1b")
                                         )
                                         .trim(),
                                     );
@@ -437,7 +437,7 @@ fn main() {
                                         let fullpath = bin_dir.join(format!("{}", command));
                                         if fullpath.is_file() {
                                             let _result = fs::read_link(
-                                                format!("/!spawn {} {}", fullpath.display(), input)
+                                                format!("/!spawn {}\x1b{}", fullpath.display(), args.join("\x1b"))
                                                     .trim(),
                                             )
                                             .unwrap()
