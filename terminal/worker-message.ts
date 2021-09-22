@@ -6,37 +6,37 @@ export const on_worker_message = async function (event, workerTable) {
     const [worker_id, action, data] = event.data;
     switch (action) {
         case "console": {
-	    let worker_name = "unknown";
-	    try {
+	        let worker_name = "unknown";
+	        try {
                 worker_name = workerTable.workerInfos[worker_id].cmd;
-	    } catch {}
-	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+	        } catch {}
+	        worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
             console.log(`[dbg (${worker_name}:${worker_id})] ${data}`);
             break;
         }
-	case "exit": {
-	    let worker_name = workerTable.workerInfos[worker_id].cmd;
-	    worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
-            workerTable.terminateWorker(worker_id, data);
-	    console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
-	    // @ts-ignore
+	    case "exit": {
+	        let worker_name = workerTable.workerInfos[worker_id].cmd;
+	        worker_name = worker_name.substr(worker_name.lastIndexOf('/')+1);
+                workerTable.terminateWorker(worker_id, data);
+	        console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
+	        // @ts-ignore
             if (worker_id == 0) window.alive = false;
             break;
         }
-	case "chdir": {
+	    case "chdir": {
 	        const [pwd, sbuf] = data;
                 const parent_lck = new Int32Array(sbuf, 0, 1);
                 const { fds } = workerTable.workerInfos[worker_id];
-		if (fds[3] != undefined) {
-		    // fds[3] should be root, so we can store '.' in fds[4]
-		    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
-  		    fds[4] = await entry.open();
-		    fds[4].path = ".";
-		}
-                Atomics.store(parent_lck, 0, 0);
-                Atomics.notify(parent_lck, 0);
+	    	if (fds[3] != undefined) {
+	    	    // fds[3] should be root, so we can store '.' in fds[4]
+	    	    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
+  	    	    fds[4] = await entry.open();
+	    	    fds[4].path = ".";
+	    	}
+            Atomics.store(parent_lck, 0, 0);
+            Atomics.notify(parent_lck, 0);
 	        break;
-	}
+	    }
         case "spawn": {
             const [fullpath, args, env, sbuf] = data;
             const parent_lck = new Int32Array(sbuf, 0, 1);
@@ -153,9 +153,7 @@ export const on_worker_message = async function (event, workerTable) {
             let err;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
-                // FIXME: this broke relative paths, if we would never set path they would work
-                //console.log(`path is ${fds[fd].path}`);
-		path.set(new TextEncoder().encode(fds[fd].path), 0);
+                path.set(new TextEncoder().encode(fds[fd].path), 0);
                 err = constants.WASI_ESUCCESS;
             } else {
                 err = constants.WASI_EBADF;
@@ -186,7 +184,7 @@ export const on_worker_message = async function (event, workerTable) {
                     // TODO: should print in red, use ANSI color codes around output
                     let output = "";
                     for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
-		    output = output.replaceAll("\n", "\r\n");
+		            output = output.replaceAll("\n", "\r\n");
                     const RED_ANSI = '\u001b[31m';
                     const RESET = '\u001b[0m';
                     workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
