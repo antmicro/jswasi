@@ -44,7 +44,7 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
                             },
                         })
                         .collect::<Vec<String>>();
-                    println!("{:?}", words);
+                    // println!("{:?}", words);
                     return Action::Command {
                         name: words.remove(0),
                         args: words,

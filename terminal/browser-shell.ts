@@ -14,6 +14,7 @@ const NECESSARY_BINARIES = {
     "/usr/bin/uutils": "resources/uutils.async.wasm",
     "/usr/bin/coreutils": "resources/coreutils.async.wasm",
     "/usr/bin/tree": "resources/tree.wasm",
+    "/usr/bin/purge": "resources/purge.wasm",
 };
 
 const OPTIONAL_BINARIES = {
