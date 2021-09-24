@@ -87,14 +87,14 @@ export async function init_fs(anchor: HTMLElement) {
     const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
     
+    anchor.innerHTML += "<br/>" + "Starting download of mandatory";
+    await Promise.all(necessary_promises);
+    anchor.innerHTML += "<br/>" + "Mandatory finished.";
+    anchor.innerHTML += "<br/>" + "Starting download of optional";
     // don't await this on purpose
     // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
     //       it can say that command is not found or just fail at instantiation
-    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of optional";
     Promise.all(optional_promises);
-    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Starting download of mandatory";
-    await Promise.all(necessary_promises);
-    anchor.innerHTML = anchor.innerHTML + "<br/>" + "Mandatory finished.";
 }
 
 // things that are global and should be shared between all tab instances
@@ -223,6 +223,7 @@ export function umount(workerTable, worker_id, args, env) {
     if (!path.startsWith("/")) {
         path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
     }
+    // TODO: handle no dir and not mounted
     filesystem.removeMount(path);
 }
 

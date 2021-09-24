@@ -345,21 +345,17 @@ fn main() {
                                 "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
                                 | "ls" | "date" | "printf" | "env" | "cat" => {
                                     args.insert(0, command.as_str().to_string());
-                                    fs::read_link(
-                                        format!(
-                                            "/!spawn /usr/bin/uutils\x1b{}",
-                                            args.join("\x1b")
-                                        ),
-                                    );
+                                    fs::read_link(format!(
+                                        "/!spawn /usr/bin/uutils\x1b{}",
+                                        args.join("\x1b")
+                                    ));
                                 }
                                 "ln" | "printenv" | "md5sum" => {
                                     args.insert(0, command.as_str().to_string());
-                                    fs::read_link(
-                                        format!(
-                                            "/!spawn /usr/bin/coreutils\x1b{}",
-                                            args.join("\x1b")
-                                        ),
-                                    );
+                                    fs::read_link(format!(
+                                        "/!spawn /usr/bin/coreutils\x1b{}",
+                                        args.join("\x1b")
+                                    ));
                                 }
                                 "write" => {
                                     if args.len() < 2 {
@@ -428,33 +424,73 @@ fn main() {
                                 "" => {}
                                 // external commands or command not found
                                 _ => {
-                                    let mut found = false;
-                                    // get PATH env varaible, split it and look for binaries in each directory
-                                    for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
-                                        let bin_dir = PathBuf::from(bin_dir);
-                                        let fullpath = bin_dir.join(format!("{}", command));
+                                    let fullpath = if command.starts_with("/") {
+                                        let fullpath = PathBuf::from(command);
                                         if fullpath.is_file() {
-                                            args.insert(0, fullpath.display().to_string());
-                                            let _result = fs::read_link(
-                                                format!("/!spawn {}", args.join("\x1b")),
-                                            )
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!(
+                                                "shell: no such file or directory: {}",
+                                                fullpath.display()
+                                            ))
+                                        }
+                                    } else if command.starts_with(".") {
+                                        let pwd = PathBuf::from(&pwd);
+                                        let fullpath = pwd.join(command);
+                                        if fullpath.is_file() {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!(
+                                                "shell: no such file or directory: {}",
+                                                fullpath.display()
+                                            ))
+                                        }
+                                    } else if command.starts_with("~") {
+                                        let home =
+                                            PathBuf::from(env::var("HOME").unwrap_or_default());
+                                        let fullpath = home.join(command);
+                                        if fullpath.is_file() {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!(
+                                                "shell: no such file or directory: {}",
+                                                fullpath.display()
+                                            ))
+                                        }
+                                    } else {
+                                        let mut found = false;
+                                        let mut fullpath = PathBuf::new();
+                                        // get PATH env varaible, split it and look for binaries in each directory
+                                        for bin_dir in
+                                            env::var("PATH").unwrap_or_default().split(":")
+                                        {
+                                            let bin_dir = PathBuf::from(bin_dir);
+                                            fullpath = bin_dir.join(&command);
+                                            if fullpath.is_file() {
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                        if found {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!("command not found: {}", command))
+                                        }
+                                    };
+
+                                    match fullpath {
+                                        Ok(path) => {
+                                            args.insert(0, path.display().to_string());
+                                            let _result = fs::read_link(format!(
+                                                "/!spawn {}",
+                                                args.join("\x1b")
+                                            ))
                                             .unwrap()
                                             .to_str()
                                             .unwrap()
                                             .trim_matches(char::from(0));
-                                            found = true;
-                                            break;
                                         }
-                                    }
-                                    if !found {
-                                        let _result = fs::read_link(
-                                            format!("/!spawn {} {}", command, input)
-                                                .trim(),
-                                        )
-                                        .unwrap()
-                                        .to_str()
-                                        .unwrap()
-                                        .trim_matches(char::from(0));
+                                        Err(reason) => println!("{}", reason),
                                     }
                                 }
                             }

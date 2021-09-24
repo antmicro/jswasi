@@ -17,28 +17,21 @@ export class Filesystem {
     }
 
     async getDirectoryHandle(handle: FileSystemDirectoryHandle, name: string, options: {create: boolean}={create: false}): Promise<FileSystemDirectoryHandle> {
-	    console.log("We are in getDirectoryHandle! handle.name=", handle.name, " name = ",name);
-	const root = await navigator.storage.getDirectory();
-	    console.log("got root!", root);
-	let components = null;
-	try {
-            components = await root.resolve(handle);
-	} catch {
-	    console.log("There was an error in root.resolve...");
-	}
-	console.log("got components! components = ", components);
+	    const root = await navigator.storage.getDirectory();
+	    let components = null;
+	    try {
+                components = await root.resolve(handle);
+	    } catch {
+	        console.log("There was an error in root.resolve...");
+	    }
 
         // if there are many mounts for the same path, we want to return the latest
         const reversed_mounts = [].concat(this.mounts).reverse();
-	console.log("mounts count = ", reversed_mounts.length);
         for (const {parts,  name: child_name, handle: child_handle} of reversed_mounts) {
-	    console.log("We are in itaration!");
             if (arraysEqual(parts, components) && child_name === name) {
-		console.log("Returning a mount handle ",child_handle);
                 return child_handle;
             }
         }
-	console.log("going to return handle.getDirectoryHandle...");
         return await handle.getDirectoryHandle(name, options);
     }
     
@@ -59,8 +52,6 @@ export class Filesystem {
     async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle) {
         // TODO: for now path must be absolute
         const {parts, name} = parsePath(absolute_path);
-	    console.log(`Adding path ${absolute_path} --> parsed to ${name}`);
-	    console.log("Parts: ", parts.join("/"));
         // TODO: refactor this when adding relative paths support for mount
         const rootDir = await this.getRootDirectory();
         const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory, 0);
