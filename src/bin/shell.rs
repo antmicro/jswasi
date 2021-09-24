@@ -460,7 +460,7 @@ fn main() {
                                     } else {
                                         let mut found = false;
                                         let mut fullpath = PathBuf::new();
-                                        // get PATH env varaible, split it and look for binaries in each directory
+                                        // get PATH env variable, split it and look for binaries in each directory
                                         for bin_dir in
                                             env::var("PATH").unwrap_or_default().split(":")
                                         {

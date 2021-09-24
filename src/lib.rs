@@ -11,12 +11,14 @@ pub enum Action {
         key: String,
         value: String,
     },
+    Invalid,
 }
 
 pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Action {
+    // println!("{:?}", cmd);
     match &cmd.0 {
         ast::Command::Job(list) => handle_listable_command(list, true),
-        ast::Command::List(list) => handle_listable_command(list, false)
+        ast::Command::List(list) => handle_listable_command(list, false),
     }
 }
 
@@ -30,35 +32,26 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
                         .iter()
                         .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
                             ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
-                            ast::RedirectOrCmdWord::CmdWord(cmd_word) => {
-                                match &cmd_word.0 {
-                                    ast::ComplexWord::Single(word) => match &word {
-                                        ast::Word::SingleQuoted(w) => Some(w.clone()),
-                                        ast::Word::Simple(w) => {
-                                            get_simple_word_as_string(w)
-                                        }
-                                        ast::Word::DoubleQuoted(words) => Some(
-                                            words
-                                                .iter()
-                                                .filter_map(|w| {
-                                                    get_simple_word_as_string(w)
-                                                })
-                                                .collect::<Vec<_>>()
-                                                .join(" "),
-                                        ),
-                                    },
-                                    ast::ComplexWord::Concat(_) => None, // TODO: handle concat (just join together?)
-                                }
-                            }
+                            ast::RedirectOrCmdWord::CmdWord(cmd_word) => match &cmd_word.0 {
+                                ast::ComplexWord::Single(word) => handle_single(&word),
+                                ast::ComplexWord::Concat(words) => Some(
+                                    words
+                                        .iter()
+                                        .filter_map(|w| handle_single(w))
+                                        .collect::<Vec<_>>()
+                                        .join(""),
+                                ),
+                            },
                         })
                         .collect::<Vec<String>>();
+                    println!("{:?}", words);
                     return Action::Command {
                         name: words.remove(0),
                         args: words,
                         background,
-                    }
+                    };
                 }
-                _ => unimplemented!(),
+                _ => return Action::Invalid,
             };
         }
         ast::ListableCommand::Pipe(_, cmds) => unimplemented!(),
@@ -67,10 +60,24 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
     // TODO: handle list.rest
 }
 
+fn handle_single(word: &ast::DefaultWord) -> Option<String> {
+    match &word {
+        ast::Word::SingleQuoted(w) => Some(w.clone()),
+        ast::Word::Simple(w) => get_simple_word_as_string(w),
+        ast::Word::DoubleQuoted(words) => Some(
+            words
+                .iter()
+                .filter_map(|w| get_simple_word_as_string(w))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+    }
+}
 
 fn get_simple_word_as_string(word: &ast::DefaultSimpleWord) -> Option<String> {
     match word {
         ast::SimpleWord::Literal(w) => Some(w.clone()),
+        ast::SimpleWord::Colon => Some(":".to_string()),
         _ => None, // Ignoring substitutions and others for simplicity here
     }
 }
