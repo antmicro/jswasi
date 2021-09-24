@@ -73,6 +73,10 @@ export class WorkerTable {
         if (!this.compiledModules[command]) {
             const rootDir = await this.filesystem.getRootDirectory();
             const binary = await rootDir.get_entry(command, FileOrDir.File);
+            if (binary.entry === null) {
+                console.warn(`No such binary: ${command}`);
+                return;
+            }
             const file = await binary.entry._handle.getFile();
             const buffer_source = await file.arrayBuffer();
             this.compiledModules[command] = await WebAssembly.compile(buffer_source);

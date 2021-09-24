@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use std::env;
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,11 +12,45 @@ use substring::Substring;
 
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
+use sha1;
+use sha1::{Digest, Sha1};
+
 use msh::{interpret, Action};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // check if new shell version is available
+
+    // operation not supported on this platform
+    // let shell_path = env::current_exe()?.display();
+    let shell_path = "/usr/bin/shell";
+
+    // calculate hash of shell binary stored in browser filesystem
+    let current_hash = {
+        let mut file = File::open(shell_path)?;
+        let mut hasher = Sha1::new();
+        io::copy(&mut file, &mut hasher)?;
+        let hash = hasher.finalize();
+        format!("{:x}", hash)
+    };
+
+    // calculate hash of shell available on server
+    let server_hash = {
+        fs::read_link(format!(
+            "/!spawn /usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version"
+        ))?;
+        fs::read_to_string("/tmp/shell.version")?
+    };
+
+    if current_hash != server_hash {
+        fs::read_link(format!(
+            "/!spawn /usr/bin/wget\x1bresources/shell.wasm\x1b{}",
+            shell_path
+        ))?;
+        println!("Reload page for new shell!");
+    }
+
     // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
-    env::set_current_dir(env::var("PWD").unwrap());
+    env::set_current_dir(env::var("PWD")?)?;
 
     let mut history: Vec<String> = Vec::new();
 

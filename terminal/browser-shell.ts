@@ -25,7 +25,7 @@ const OPTIONAL_BINARIES = {
     "/usr/local/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
 };
 
-async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string) {
+async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string, refetch: boolean = true) {
     let new_dir_handle = dir_handle;
     let new_filename = filename;
     if (filename[0] == '/') {
@@ -40,7 +40,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
     const handle = await new_dir_handle.getFileHandle(new_filename, {create: true});
     const file = await handle.getFile();
     // only fetch binary if not yet present
-    if (file.size === 0) {
+    if (refetch || file.size === 0) {
         let response;
         if (!(address.startsWith("http://") || address.startsWith("https://")) || address.startsWith(location.origin)) {
             // files served from same origin
@@ -85,8 +85,8 @@ export async function init_fs(anchor: HTMLElement) {
     const local = await usr.getDirectoryHandle("local", {create: true});
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address));
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address, false));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address, false));
     
     anchor.innerHTML += "<br/>" + "Starting download of mandatory";
     await Promise.all(necessary_promises);
@@ -242,5 +242,5 @@ export async function wget(workerTable, worker_id, args, env) {
         return;
     }
     const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
-    fetch_file(dir_handle, filename, address); 
+    await fetch_file(dir_handle, filename, address); 
 }
