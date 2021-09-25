@@ -49,12 +49,24 @@ export class Filesystem {
         return await handle.getFileHandle(name, options);
     }
 
+    async path_exists(absolute_path, mode: FileOrDir = FileOrDir.Any) {
+        const {parts, name} = parsePath(absolute_path);
+        const rootDir = await this.getRootDirectory();
+        const padre = await rootDir.get_entry(parts.join("/"), mode, 0);
+        try {
+            await padre.entry._handle.getDirectoryHandle(name);
+        } catch {
+            return false;
+        }
+        return true;
+    }
+
     async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle) {
         // TODO: for now path must be absolute
         const {parts, name} = parsePath(absolute_path);
         // TODO: refactor this when adding relative paths support for mount
         const rootDir = await this.getRootDirectory();
-        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory, 0);
+        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory);
         try {
             await padre.entry._handle.getDirectoryHandle(name);
         } catch {

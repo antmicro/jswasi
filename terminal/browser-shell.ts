@@ -5,8 +5,10 @@ declare global {
 
 import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
-import {Filesystem} from "./browser-fs.js";
 import {on_worker_message} from "./worker-message.js";
+
+import {FileOrDir} from "./filesystem.js";
+import {Filesystem} from "./browser-fs.js";
 
 const NECESSARY_BINARIES = {
     "/etc/motd" : "resources/motd.txt",
@@ -193,6 +195,18 @@ export async function mount(workerTable, worker_id, args, env) {
             break;
         }
         case 2: {
+            let path = args[1];
+            // handle relative path
+            if (!path.startsWith("/")) {
+                path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
+            }
+
+            // check if path exits
+            if (!await filesystem.path_exists(path, FileOrDir.Directory)) {
+                workerTable.terminal.io.println(`mount: ${path}: no such directory`);
+                return null;
+            }
+            
             let mount_point;
             try {
                 mount_point = await showDirectoryPicker();
@@ -200,16 +214,8 @@ export async function mount(workerTable, worker_id, args, env) {
                 workerTable.terminal.io.println("mount: failed to open local directory");
                 return null;
             }
-            let path = args[1];
-            // handle relative path
-            if (!path.startsWith("/")) {
-                path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
-            }
-            const err = await filesystem.addMount(path, mount_point);
-            if (err === constants.WASI_ENOENT) {
-                workerTable.terminal.io.println(`mount: ${path}: no such file or directory`);
-                return null;
-            }
+            
+            await filesystem.addMount(path, mount_point);
             return mount_point;
         }
         default: {
