@@ -230,7 +230,12 @@ export function umount(workerTable, worker_id, args, env) {
     if (!path.startsWith("/")) {
         path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
     }
-    // TODO: handle no dir and not mounted
+
+    if (!filesystem.isMounted(path)) {
+        workerTable.terminal.io.println(`umount: ${path}: not mounted`);
+        return;
+    }
+
     filesystem.removeMount(path);
 }
 

@@ -49,7 +49,7 @@ export class Filesystem {
         return await handle.getFileHandle(name, options);
     }
 
-    async path_exists(absolute_path, mode: FileOrDir = FileOrDir.Any) {
+    async path_exists(absolute_path, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
         const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
         const padre = await rootDir.get_entry(parts.join("/"), mode, 0);
@@ -61,7 +61,7 @@ export class Filesystem {
         return true;
     }
 
-    async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle) {
+    async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle): Promise<number> {
         // TODO: for now path must be absolute
         const {parts, name} = parsePath(absolute_path);
         // TODO: refactor this when adding relative paths support for mount
@@ -74,6 +74,17 @@ export class Filesystem {
         }
         this.mounts.push({parts, name, handle: mounted_directory, parent: padre.entry});
         return constants.WASI_ESUCCESS;
+    }
+
+    isMounted(absolute_path: string): boolean {
+        const {parts: del_parts, name: del_name} = parsePath(absolute_path);
+        for (let i = 0; i < this.mounts.length; i++) {
+            const {parts, name} = this.mounts[i];
+            if (arraysEqual(parts, del_parts) && name === del_name) {
+                return true;
+            }
+        }
+        return false;
     }
 
     removeMount(absolute_path: string) {
