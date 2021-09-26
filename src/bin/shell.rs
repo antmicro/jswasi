@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if current_hash != server_hash {
             syscall("spawn", format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str());
-            println!("Reload page for a new version of shell!", current_hash, server_hash);
+            println!("Reload page for a new version of shell!");
         }
     }
 
