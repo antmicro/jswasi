@@ -17,6 +17,15 @@ use sha1::{Digest, Sha1};
 
 use msh::{interpret, Action};
 
+// communicate with the worker thread
+fn syscall(command: &str, args: &str) -> String {
+    let result = fs::read_link(format!("/!{} {}",command, args));
+    if result.is_err() {
+        return "".to_string();
+    }
+    return result.unwrap().to_str().unwrap().trim_matches(char::from(0)).to_string();
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // check if new shell version is available
 
@@ -36,18 +45,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // calculate hash of shell available on server
         let server_hash = {
-            fs::read_link(format!(
-                "/!spawn /usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version"
-            ))?;
+            syscall("spawn", "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version");
             fs::read_to_string("/tmp/shell.version")?
         };
 
         if current_hash != server_hash {
-            fs::read_link(format!(
-                "/!spawn /usr/bin/wget\x1bresources/shell.wasm\x1b{}",
-                shell_path
-            ))?;
-            println!("Reload page for new shell!");
+            syscall("spawn", format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str());
+            println!("Reload page for a new version of shell!", current_hash, server_hash);
         }
     }
 
@@ -79,13 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             display_path.push_str(&pwd);
         }
-        print!(
-            "{}[1;34mant@webshell {}[1;33m{}$ {}[0m",
-            char::from_u32(27).unwrap(),
-            char::from_u32(27).unwrap(),
-            display_path,
-            char::from_u32(27).unwrap()
-        );
+        print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
         io::stdout().flush();
         let mut c = [0];
         let mut escaped = false;
@@ -303,7 +301,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 var_contents = iter2.next().unwrap();
             }
             env::set_var(var_name, var_contents);
-            fs::read_link(format!("/!set_env {} {}", var_name, var_contents));
+            syscall("set_env", format!("{} {}", var_name, var_contents).as_str());
             input.clear();
             continue;
         }
@@ -354,20 +352,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 "OLDPWD",
                                                 env::current_dir().unwrap().to_str().unwrap(),
                                             ); // TODO: WASI does not support this
-                                            fs::read_link(format!(
-                                                "/!set_env OLDPWD {}",
-                                                env::current_dir().unwrap().to_str().unwrap()
-                                            ));
-                                            let pwd_path = PathBuf::from(
-                                                fs::read_link(format!(
-                                                    "/!set_env PWD {}",
-                                                    new_path.to_str().unwrap()
-                                                ))
-                                                .unwrap()
-                                                .to_str()
-                                                .unwrap()
-                                                .trim_matches(char::from(0)),
+                                            syscall("set_env", format!("OLDPWD {}",
+                                                env::current_dir().unwrap().to_str().unwrap()).as_str()
                                             );
+                                            let pwd_path = PathBuf::from(syscall("set_env", format!(
+                                                    "PWD {}",
+                                                    new_path.to_str().unwrap()).as_str()
+                                            ));
                                             env::set_var("PWD", pwd_path.to_str().unwrap());
                                             env::set_current_dir(&pwd_path);
                                         }
@@ -389,17 +380,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
                                 | "ls" | "date" | "printf" | "env" | "cat" => {
                                     args.insert(0, command.as_str().to_string());
-                                    fs::read_link(format!(
-                                        "/!spawn /usr/bin/uutils\x1b{}",
+                                    syscall("spawn", format!(
+                                        "/usr/bin/uutils\x1b{}",
                                         args.join("\x1b")
-                                    ));
+                                    ).as_str());
                                 }
                                 "ln" | "printenv" | "md5sum" => {
                                     args.insert(0, command.as_str().to_string());
-                                    fs::read_link(format!(
-                                        "/!spawn /usr/bin/coreutils\x1b{}",
+                                    syscall("spawn", format!(
+                                        "/usr/bin/coreutils\x1b{}",
                                         args.join("\x1b")
-                                    ));
+                                    ).as_str());
                                 }
                                 "write" => {
                                     if args.len() < 2 {
@@ -525,14 +516,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     match fullpath {
                                         Ok(path) => {
                                             args.insert(0, path.display().to_string());
-                                            let _result = fs::read_link(format!(
-                                                "/!spawn {}",
+                                            let _result = syscall("spawn", format!(
+                                                "{}",
                                                 args.join("\x1b")
-                                            ))
-                                            .unwrap()
-                                            .to_str()
-                                            .unwrap()
-                                            .trim_matches(char::from(0));
+                                            ).as_str());
                                         }
                                         Err(reason) => println!("{}", reason),
                                     }
