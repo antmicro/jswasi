@@ -24,29 +24,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let shell_path = env::current_exe()?.display();
     let shell_path = "/usr/bin/shell";
 
-    // calculate hash of shell binary stored in browser filesystem
-    let current_hash = {
-        let mut file = File::open(shell_path)?;
-        let mut hasher = Sha1::new();
-        io::copy(&mut file, &mut hasher)?;
-        let hash = hasher.finalize();
-        format!("{:x}", hash)
-    };
+    if Path::new(&shell_path).exists() {
+        // calculate hash of shell binary stored in browser filesystem
+        let current_hash = {
+            let mut file = File::open(shell_path)?;
+            let mut hasher = Sha1::new();
+            io::copy(&mut file, &mut hasher)?;
+            let hash = hasher.finalize();
+            format!("{:x}", hash)
+        };
 
-    // calculate hash of shell available on server
-    let server_hash = {
-        fs::read_link(format!(
-            "/!spawn /usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version"
-        ))?;
-        fs::read_to_string("/tmp/shell.version")?
-    };
+        // calculate hash of shell available on server
+        let server_hash = {
+            fs::read_link(format!(
+                "/!spawn /usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version"
+            ))?;
+            fs::read_to_string("/tmp/shell.version")?
+        };
 
-    if current_hash != server_hash {
-        fs::read_link(format!(
-            "/!spawn /usr/bin/wget\x1bresources/shell.wasm\x1b{}",
-            shell_path
-        ))?;
-        println!("Reload page for new shell!");
+        if current_hash != server_hash {
+            fs::read_link(format!(
+                "/!spawn /usr/bin/wget\x1bresources/shell.wasm\x1b{}",
+                shell_path
+            ))?;
+            println!("Reload page for new shell!");
+        }
+    }
+
+    if env::var("PWD").is_err() {
+        env::set_var("PWD", "/");
+    }
+    if env::var("HOME").is_err() {
+        env::set_var("HOME", "/");
     }
 
     // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
