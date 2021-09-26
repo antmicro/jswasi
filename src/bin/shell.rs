@@ -328,40 +328,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     }
                                 }
                                 "cd" => {
-                                    if args.is_empty() {
-                                        // TODO: cd should be equal to cd ~ not cd /
-                                        env::set_current_dir(PathBuf::from("/"));
-                                    } else {
-                                        let path = &args[0];
-
-                                        let new_path = if path.starts_with("/") {
-                                            PathBuf::from(path)
+                                    let path = {
+                                        if args.is_empty() {
+                                            PathBuf::from(env::var("HOME").unwrap())
+                                        } else if args[0] == "~" {
+                                            PathBuf::from(env::var("HOME").unwrap())
+                                        } else if args[0].starts_with("/") {
+                                            PathBuf::from(args[0].clone())
+                                        } else if args[0].starts_with("~/") {
+                                            let pwd = PathBuf::from(env::var("HOME").unwrap());
+                                            pwd.join(args[0].substring(2,1024))
                                         } else {
                                             let pwd = env::current_dir().unwrap();
-                                            pwd.join(path)
-                                        };
-
-                                        // simply including this in source breaks shell
-                                        if !Path::new(&new_path).exists() {
-                                            println!(
-                                                "cd: no such file or directory: {}",
-                                                new_path.to_str().unwrap()
-                                            );
-                                        } else {
-                                            env::set_var(
-                                                "OLDPWD",
-                                                env::current_dir().unwrap().to_str().unwrap(),
-                                            ); // TODO: WASI does not support this
-                                            syscall("set_env", format!("OLDPWD {}",
-                                                env::current_dir().unwrap().to_str().unwrap()).as_str()
-                                            );
-                                            let pwd_path = PathBuf::from(syscall("set_env", format!(
-                                                    "PWD {}",
-                                                    new_path.to_str().unwrap()).as_str()
-                                            ));
-                                            env::set_var("PWD", pwd_path.to_str().unwrap());
-                                            env::set_current_dir(&pwd_path);
+                                            pwd.join(&args[0])
                                         }
+                                    };
+
+                                    // simply including this in source breaks shell
+                                    if !Path::new(&path).exists() {
+                                        println!(
+                                            "cd: no such file or directory: {}",
+                                            path.to_str().unwrap()
+                                        );
+                                    } else {
+                                        env::set_var(
+                                            "OLDPWD",
+                                            env::current_dir().unwrap().to_str().unwrap(),
+                                        ); // TODO: WASI does not support this
+                                        syscall("set_env", format!("OLDPWD {}",
+                                            env::current_dir().unwrap().to_str().unwrap()).as_str()
+                                        );
+                                        let pwd_path = PathBuf::from(syscall("set_env", format!(
+                                                "PWD {}",
+                                                path.to_str().unwrap()).as_str()
+                                        ));
+                                        env::set_var("PWD", pwd_path.to_str().unwrap());
+                                        env::set_current_dir(&pwd_path);
                                     }
                                 }
                                 "pwd" => println!("{}", env::current_dir().unwrap().display()),
