@@ -171,7 +171,7 @@ export async function init_all(anchor: HTMLElement) {
         null, // parent_lock
         on_worker_message,
         "/usr/bin/shell",
-        [],
+        ["shell"],
         {
             RUST_BACKTRACE: "full",
             PATH: "/usr/bin:/usr/local/bin",

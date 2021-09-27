@@ -10,13 +10,13 @@ use std::thread;
 use std::time::Duration;
 use substring::Substring;
 
-use clap::App;
+use clap::{App, Arg};
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
 use sha1;
 use sha1::{Digest, Sha1};
 
-use msh::{interpret, Action};
+use shell::{interpret, Action};
 
 // communicate with the worker thread
 fn syscall(command: &str, args: &str) -> String {
@@ -33,15 +33,24 @@ fn syscall(command: &str, args: &str) -> String {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = App::new("wasi-shell")
+    let name = {
+        let mut filename = PathBuf::from(env::args().next().unwrap_or("shell".to_string()));
+        filename.set_extension("");
+        filename.display().to_string()
+    };
+    let matches = App::new(name)
         .version(&*format!(
-            "{}-{} (built: {})",
+            "{}-{} ({})\nCopyright (c) 2021 Antmicro <www.antmicro.com>",
             env!("CARGO_PKG_VERSION"),
             env!("WASI_SHELL_COMMIT_HASH"),
-            env!("WASI_SHELL_DATE")
+            env!("WASI_SHELL_TARGET")
         ))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .about("Shell living in a browser, implemented in WASI")
+        .arg(
+            Arg::new("FILE")
+                .about("Execute commands from file")
+                .index(1),
+        )
         .get_matches();
 
     // check if new shell version is available
