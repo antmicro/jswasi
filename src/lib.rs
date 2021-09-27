@@ -33,7 +33,7 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
                         .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
                             ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
                             ast::RedirectOrCmdWord::CmdWord(cmd_word) => match &cmd_word.0 {
-                                ast::ComplexWord::Single(word) => handle_single(&word),
+                                ast::ComplexWord::Single(word) => handle_single(word),
                                 ast::ComplexWord::Concat(words) => Some(
                                     words
                                         .iter()
@@ -45,16 +45,16 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
                         })
                         .collect::<Vec<String>>();
                     // println!("{:?}", words);
-                    return Action::Command {
+                    Action::Command {
                         name: words.remove(0),
                         args: words,
                         background,
-                    };
+                    }
                 }
-                _ => return Action::Invalid,
-            };
+                _ => Action::Invalid,
+            }
         }
-        ast::ListableCommand::Pipe(_, _cmds) => return Action::Invalid, // TODO: handle pipes
+        ast::ListableCommand::Pipe(_, _cmds) => Action::Invalid, // TODO: handle pipes
     }
 
     // TODO: handle list.rest

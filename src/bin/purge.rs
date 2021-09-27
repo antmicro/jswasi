@@ -10,10 +10,8 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry) -> Result<(), io::Error>) -> io
             let path = entry.path();
             if path.is_dir() {
                 visit_dirs(&path, cb)?;
-                cb(&entry)?;
-            } else {
-                cb(&entry)?;
             }
+            cb(&entry)?;
         }
     }
     Ok(())

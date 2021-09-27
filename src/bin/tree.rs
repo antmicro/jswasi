@@ -8,11 +8,9 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
+            cb(&entry);
             if path.is_dir() {
-                cb(&entry);
                 visit_dirs(&path, cb)?;
-            } else {
-                cb(&entry);
             }
         }
     }
@@ -20,7 +18,7 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let dir = env::args().skip(1).next().unwrap();
+    let dir = env::args().nth(1).unwrap();
 
     visit_dirs(Path::new(&dir), &|entry: &DirEntry| {
         println!("{}", entry.path().to_str().unwrap());

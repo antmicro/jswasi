@@ -12,7 +12,6 @@ use substring::Substring;
 use clap::{App, Arg};
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
-use sha1;
 use sha1::{Digest, Sha1};
 
 use shell::{interpret, Action};
@@ -29,7 +28,7 @@ fn syscall(command: &str, args: &str) -> Result<String, Box<dyn std::error::Erro
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {
-        let mut filename = PathBuf::from(env::args().next().unwrap_or("shell".to_string()));
+        let mut filename = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
         filename.set_extension("");
         filename.display().to_string()
     };
@@ -56,9 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn handle_input(
-    input: String,
-    pwd: &String,
-    history: &Vec<String>,
+    input: &str,
+    pwd: &str,
+    history: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lex = Lexer::new(input.chars());
     let parser = DefaultParser::new(lex);
@@ -70,7 +69,7 @@ fn handle_input(
                     Action::Command {
                         name: command,
                         mut args,
-                        background,
+                        background, // TODO: spawn in background if flag set
                     } => {
                         match command.as_str() {
                             // built in commands
@@ -83,13 +82,11 @@ fn handle_input(
                             }
                             "cd" => {
                                 let path = {
-                                    if args.is_empty() {
+                                    if args.is_empty() || args[0] == "~" {
                                         PathBuf::from(env::var("HOME")?)
-                                    } else if args[0] == "~" {
-                                        PathBuf::from(env::var("HOME")?)
-                                    } else if args[0].starts_with("/") {
+                                    } else if args[0].starts_with('/') {
                                         PathBuf::from(args[0].clone())
-                                    } else if args[0].starts_with("~/") {
+                                    } else if args[0].starts_with("\\~/") {
                                         let pwd = PathBuf::from(env::var("HOME")?);
                                         pwd.join(args[0].substring(2, 1024))
                                     } else {
@@ -163,7 +160,7 @@ fn handle_input(
                                 print!(""); // TODO: send clear escape codes
                             }
                             "hexdump" => {
-                                if args.len() < 1 {
+                                if args.is_empty() {
                                     println!("hexdump: help: hexump <filename>");
                                 } else {
                                     let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
@@ -194,10 +191,10 @@ fn handle_input(
                                                 }
                                             }
                                             print!(" |");
-                                            for k in 0..count {
-                                                if (0x20..0x7e).contains(&(v[k] as u8)) {
-                                                    print!("{}", v[k] as char);
-                                                    v[k] = '.';
+                                            for c in v.iter_mut().take(count) {
+                                                if (0x20..0x7e).contains(&(*c as u8)) {
+                                                    print!("{}", *c as char);
+                                                    *c = '.';
                                                 } else {
                                                     print!(".");
                                                 }
@@ -212,7 +209,7 @@ fn handle_input(
                             "" => {}
                             // external commands or command not found
                             _ => {
-                                let fullpath = if command.starts_with("/") {
+                                let fullpath = if command.starts_with('/') {
                                     let fullpath = PathBuf::from(command);
                                     if fullpath.is_file() {
                                         Ok(fullpath)
@@ -222,7 +219,7 @@ fn handle_input(
                                             fullpath.display()
                                         ))
                                     }
-                                } else if command.starts_with(".") {
+                                } else if command.starts_with('.') {
                                     let pwd = PathBuf::from(&pwd);
                                     let fullpath = pwd.join(command);
                                     if fullpath.is_file() {
@@ -233,7 +230,7 @@ fn handle_input(
                                             fullpath.display()
                                         ))
                                     }
-                                } else if command.starts_with("~") {
+                                } else if command.starts_with('~') {
                                     let home = PathBuf::from(env::var("HOME").unwrap_or_default());
                                     let fullpath = home.join(command);
                                     if fullpath.is_file() {
@@ -248,7 +245,7 @@ fn handle_input(
                                     let mut found = false;
                                     let mut fullpath = PathBuf::new();
                                     // get PATH env variable, split it and look for binaries in each directory
-                                    for bin_dir in env::var("PATH").unwrap_or_default().split(":") {
+                                    for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
                                         let bin_dir = PathBuf::from(bin_dir);
                                         fullpath = bin_dir.join(&command);
                                         if fullpath.is_file() {
@@ -266,10 +263,7 @@ fn handle_input(
                                 match fullpath {
                                     Ok(path) => {
                                         args.insert(0, path.display().to_string());
-                                        let _result = syscall(
-                                            "spawn",
-                                            format!("{}", args.join("\x1b")).as_str(),
-                                        );
+                                        let _result = syscall("spawn", &args.join("\x1b"));
                                     }
                                     Err(reason) => println!("{}", reason),
                                 }
@@ -290,7 +284,7 @@ fn handle_input(
 fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let pwd = env::current_dir()?.display().to_string();
     let history: Vec<String> = Vec::new();
-    handle_input(fs::read_to_string(script_name.into())?, &pwd, &history)
+    handle_input(&fs::read_to_string(script_name.into())?, &pwd, &history)
 }
 
 fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
@@ -353,7 +347,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
         // prompt for input
         let pwd = env::current_dir()?.display().to_string();
         if pwd.substring(0, env::var("HOME")?.len()) == env::var("HOME")? {
-            display_path.push_str("~");
+            display_path.push('~');
             display_path.push_str(pwd.substring(env::var("HOME")?.len(), 4096));
         } else {
             display_path.push_str(&pwd);
@@ -413,13 +407,13 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                             0x41 => {
-                                if history.len() != 0 {
+                                if !history.is_empty() {
                                     if history_entry_to_display == -1 {
                                         history_entry_to_display = (history.len() - 1) as i32;
                                         input_stash.clear();
                                         input_stash.push_str(&input);
                                     } else if history_entry_to_display > 0 {
-                                        history_entry_to_display = history_entry_to_display - 1;
+                                        history_entry_to_display -= 1;
                                     }
                                     let to_delete = input.len();
                                     for _ in 0..to_delete {
@@ -439,7 +433,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                                     }
                                     input.clear();
                                     if history.len() - 1 > (history_entry_to_display as usize) {
-                                        history_entry_to_display = history_entry_to_display + 1;
+                                        history_entry_to_display += 1;
                                         input.push_str(&history[history_entry_to_display as usize]);
                                     } else {
                                         input.push_str(&input_stash);
@@ -515,12 +509,12 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
 
         // TODO: incorporate this into interpreter of parsed input
 
-        if input == "" {
+        if input.is_empty() {
             continue;
         }
 
         // handle '!' history
-        if input.starts_with("!") {
+        if input.starts_with('!') {
             let sbstr = input
                 .split_whitespace()
                 .next()
@@ -530,22 +524,22 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                 .next()
                 .unwrap();
             let history_entry_id: usize = sbstr.parse().unwrap_or_else(|_| {
-                if sbstr == "" {
+                if sbstr.is_empty() {
                     return 0;
                 }
                 let mut j = 0;
                 let mut found = 0;
                 for entry in &history {
-                    j = j + 1;
+                    j += 1;
                     if entry.substring(0, sbstr.len()) == sbstr {
                         found = j;
                         break;
                     }
                 }
-                return found;
+                found
             });
             if history_entry_id == 0 || history.len() < history_entry_id {
-                if sbstr != "" {
+                if sbstr.is_empty() {
                     println!("!{}: event not found", sbstr);
                 }
                 input.clear();
@@ -559,20 +553,19 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        if input.substring(0, 1) != "!" && input.replace(" ", "").len() != 0 {
-            let entry = format!("{}", input);
-            history.push(entry);
+        if input.substring(0, 1) != "!" && !input.replace(" ", "").is_empty() {
+            history.push(input.clone());
         }
 
-        if input.contains("=") {
-            let mut iter = input.split("=");
+        if input.contains('=') {
+            let mut iter = input.split('=');
             let var_name = iter.next().unwrap();
-            if var_name.contains(" ") {
+            if var_name.contains(' ') {
                 continue;
             }
             let mut var_contents = iter.next().unwrap();
-            if var_contents.substring(0, 1) == "\"" {
-                let mut iter2 = var_contents.split("\"");
+            if var_contents.starts_with('"') {
+                let mut iter2 = var_contents.split('"');
                 iter2.next();
                 var_contents = iter2.next().unwrap();
             }
@@ -582,7 +575,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
 
-        if let Err(error) = handle_input(input, &pwd, &history) {
+        if let Err(error) = handle_input(&input, &pwd, &history) {
             println!("{:#?}", error);
         };
     }
