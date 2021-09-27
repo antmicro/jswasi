@@ -1,4 +1,3 @@
-#[allow(unused_imports)]
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -19,17 +18,13 @@ use sha1::{Digest, Sha1};
 use shell::{interpret, Action};
 
 // communicate with the worker thread
-fn syscall(command: &str, args: &str) -> String {
-    let result = fs::read_link(format!("/!{} {}", command, args));
-    if result.is_err() {
-        return "".to_string();
-    }
-    return result
-        .unwrap()
+fn syscall(command: &str, args: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let result = fs::read_link(format!("/!{} {}", command, args))?;
+    Ok(result
         .to_str()
         .unwrap()
         .trim_matches(char::from(0))
-        .to_string();
+        .to_string())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -89,16 +84,16 @@ fn handle_input(
                             "cd" => {
                                 let path = {
                                     if args.is_empty() {
-                                        PathBuf::from(env::var("HOME").unwrap())
+                                        PathBuf::from(env::var("HOME")?)
                                     } else if args[0] == "~" {
-                                        PathBuf::from(env::var("HOME").unwrap())
+                                        PathBuf::from(env::var("HOME")?)
                                     } else if args[0].starts_with("/") {
                                         PathBuf::from(args[0].clone())
                                     } else if args[0].starts_with("~/") {
-                                        let pwd = PathBuf::from(env::var("HOME").unwrap());
+                                        let pwd = PathBuf::from(env::var("HOME")?);
                                         pwd.join(args[0].substring(2, 1024))
                                     } else {
-                                        let pwd = env::current_dir().unwrap();
+                                        let pwd = env::current_dir()?;
                                         pwd.join(&args[0])
                                     }
                                 };
@@ -110,27 +105,21 @@ fn handle_input(
                                         path.to_str().unwrap()
                                     );
                                 } else {
-                                    env::set_var(
-                                        "OLDPWD",
-                                        env::current_dir().unwrap().to_str().unwrap(),
-                                    ); // TODO: WASI does not support this
+                                    env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                                     syscall(
                                         "set_env",
-                                        format!(
-                                            "OLDPWD {}",
-                                            env::current_dir().unwrap().to_str().unwrap()
-                                        )
-                                        .as_str(),
+                                        format!("OLDPWD {}", env::current_dir()?.to_str().unwrap())
+                                            .as_str(),
                                     );
                                     let pwd_path = PathBuf::from(syscall(
                                         "set_env",
                                         format!("PWD {}", path.to_str().unwrap()).as_str(),
-                                    ));
+                                    )?);
                                     env::set_var("PWD", pwd_path.to_str().unwrap());
                                     env::set_current_dir(&pwd_path);
                                 }
                             }
-                            "pwd" => println!("{}", env::current_dir().unwrap().display()),
+                            "pwd" => println!("{}", env::current_dir()?.display()),
                             "sleep" => {
                                 // TODO: requires poll_oneoff implementation
                                 if let Some(sec_str) = &args.get(0) {
@@ -299,7 +288,7 @@ fn handle_input(
 }
 
 fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
-    let pwd = env::current_dir().unwrap().display().to_string();
+    let pwd = env::current_dir()?.display().to_string();
     let mut history: Vec<String> = Vec::new();
     handle_input(fs::read_to_string(script_name.into())?, &pwd, &history)
 }
@@ -362,10 +351,10 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
         let mut display_path = String::new();
 
         // prompt for input
-        let pwd = env::current_dir().unwrap().display().to_string();
-        if pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap() {
+        let pwd = env::current_dir()?.display().to_string();
+        if pwd.substring(0, env::var("HOME")?.len()) == env::var("HOME")? {
             display_path.push_str("~");
-            display_path.push_str(pwd.substring(env::var("HOME").unwrap().len(), 4096));
+            display_path.push_str(pwd.substring(env::var("HOME")?.len(), 4096));
         } else {
             display_path.push_str(&pwd);
         }
@@ -385,7 +374,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                         io::stdin().read_exact(&mut c2);
                         match c2[0] {
                             0x32 | 0x33 | 0x35 | 0x36 => {
-                                io::stdout().flush().unwrap();
+                                io::stdout().flush()?;
                                 let mut c3 = [0];
                                 io::stdin().read_exact(&mut c3);
                                 match [c2[0], c3[0]] {
@@ -407,7 +396,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                                     }
                                     [0x33, 0x3b] => {
                                         println!("TODO: SHIFT + DELETE");
-                                        io::stdout().flush().unwrap();
+                                        io::stdout().flush()?;
                                         let mut c4 = [0];
                                         // TWO MORE! TODO: improve!
                                         io::stdin().read_exact(&mut c4);
@@ -519,7 +508,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            io::stdout().flush().unwrap();
+            io::stdout().flush()?;
         }
 
         // handle line
