@@ -16,4 +16,5 @@ rand = "0.8.4"
 conch-parser = "0.1.1"
 substring = "1.4.5"
 sha-1 = "0.9.8"
+clap = "3.0.0-beta.4"
 

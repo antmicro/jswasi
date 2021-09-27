@@ -10,6 +10,7 @@ use std::thread;
 use std::time::Duration;
 use substring::Substring;
 
+use clap::App;
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
 use sha1;
@@ -19,14 +20,25 @@ use msh::{interpret, Action};
 
 // communicate with the worker thread
 fn syscall(command: &str, args: &str) -> String {
-    let result = fs::read_link(format!("/!{} {}",command, args));
+    let result = fs::read_link(format!("/!{} {}", command, args));
     if result.is_err() {
         return "".to_string();
     }
-    return result.unwrap().to_str().unwrap().trim_matches(char::from(0)).to_string();
+    return result
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .trim_matches(char::from(0))
+        .to_string();
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = App::new("wasi-shell")
+        .version("0.1.0")
+        .author("Tomasz Karwowski <tkarwowski@internships.antmicro.com")
+        .about("Shell living in a browser, implemented in WASI")
+        .get_matches();
+
     // check if new shell version is available
 
     // operation not supported on this platform
@@ -45,12 +57,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // calculate hash of shell available on server
         let server_hash = {
-            syscall("spawn", "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version");
+            syscall(
+                "spawn",
+                "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version",
+            );
             fs::read_to_string("/tmp/shell.version")?
         };
 
         if current_hash != server_hash {
-            syscall("spawn", format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str());
+            syscall(
+                "spawn",
+                format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str(),
+            );
             println!("Reload page for a new version of shell!");
         }
     }
@@ -337,7 +355,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             PathBuf::from(args[0].clone())
                                         } else if args[0].starts_with("~/") {
                                             let pwd = PathBuf::from(env::var("HOME").unwrap());
-                                            pwd.join(args[0].substring(2,1024))
+                                            pwd.join(args[0].substring(2, 1024))
                                         } else {
                                             let pwd = env::current_dir().unwrap();
                                             pwd.join(&args[0])
@@ -355,12 +373,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             "OLDPWD",
                                             env::current_dir().unwrap().to_str().unwrap(),
                                         ); // TODO: WASI does not support this
-                                        syscall("set_env", format!("OLDPWD {}",
-                                            env::current_dir().unwrap().to_str().unwrap()).as_str()
+                                        syscall(
+                                            "set_env",
+                                            format!(
+                                                "OLDPWD {}",
+                                                env::current_dir().unwrap().to_str().unwrap()
+                                            )
+                                            .as_str(),
                                         );
-                                        let pwd_path = PathBuf::from(syscall("set_env", format!(
-                                                "PWD {}",
-                                                path.to_str().unwrap()).as_str()
+                                        let pwd_path = PathBuf::from(syscall(
+                                            "set_env",
+                                            format!("PWD {}", path.to_str().unwrap()).as_str(),
                                         ));
                                         env::set_var("PWD", pwd_path.to_str().unwrap());
                                         env::set_current_dir(&pwd_path);
@@ -382,17 +405,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
                                 | "ls" | "date" | "printf" | "env" | "cat" => {
                                     args.insert(0, command.as_str().to_string());
-                                    syscall("spawn", format!(
-                                        "/usr/bin/uutils\x1b{}",
-                                        args.join("\x1b")
-                                    ).as_str());
+                                    syscall(
+                                        "spawn",
+                                        format!("/usr/bin/uutils\x1b{}", args.join("\x1b"))
+                                            .as_str(),
+                                    );
                                 }
                                 "ln" | "printenv" | "md5sum" => {
                                     args.insert(0, command.as_str().to_string());
-                                    syscall("spawn", format!(
-                                        "/usr/bin/coreutils\x1b{}",
-                                        args.join("\x1b")
-                                    ).as_str());
+                                    syscall(
+                                        "spawn",
+                                        format!("/usr/bin/coreutils\x1b{}", args.join("\x1b"))
+                                            .as_str(),
+                                    );
                                 }
                                 "write" => {
                                     if args.len() < 2 {
@@ -518,10 +543,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     match fullpath {
                                         Ok(path) => {
                                             args.insert(0, path.display().to_string());
-                                            let _result = syscall("spawn", format!(
-                                                "{}",
-                                                args.join("\x1b")
-                                            ).as_str());
+                                            let _result = syscall(
+                                                "spawn",
+                                                format!("{}", args.join("\x1b")).as_str(),
+                                            );
                                         }
                                         Err(reason) => println!("{}", reason),
                                     }
