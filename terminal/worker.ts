@@ -48,7 +48,7 @@ if (IS_NODE) {
 
 function worker_send(msg) {
     if (IS_NODE) {
-        const msg_ = {data: [myself, msg[0], msg[1]]};
+        const msg_ = {data: [myself, ...msg]};
         // @ts-ignore
         parentPort.postMessage(msg_);
     } else {
@@ -824,7 +824,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             do_exit(0);
         } catch (e) {
             worker_console_log("exception while running wasm");
-            worker_console_log(e.stack);
+            worker_send(["stderr", e.stack + "\n"]);
             do_exit(255);
         }
     } else if (IS_NODE) {
@@ -837,7 +837,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             instance = await WebAssembly.instantiate(module, moduleImports);
         } catch (e) {
             worker_console_log("exception while instantiating wasm");
-            worker_console_log(e.stack);
+            worker_send(["stderr", e.stack + "\n"]);
             do_exit(255);
             return;
         }
@@ -848,11 +848,11 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
             do_exit(0);
         } catch (e) {
             worker_console_log("exception while running wasm");
-            worker_console_log(e.stack);
+            worker_send(["stderr", e.stack + "\n"]);
             do_exit(255);
         }
     } else {
-        worker_console_log(`WebAssembly.instantiateStreaming is not supported`);
+        worker_console_log(`WebAssembly.instantiate is not supported`);
     }
 }
 

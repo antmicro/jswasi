@@ -5,6 +5,17 @@ import { mount, umount, wget } from "./browser-shell.js";
 export const on_worker_message = async function (event, workerTable) {
     const [worker_id, action, data] = event.data;
     switch (action) {
+        case "stdout": {
+            workerTable.receive_callback(data.replaceAll("\n", "\r\n")); // TODO
+            break;
+        }
+        case "stderr": {
+		    const output = data.replaceAll("\n", "\r\n");
+            const RED_ANSI = '\u001b[31m';
+            const RESET = '\u001b[0m';
+            workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
+            break;
+        }
         case "console": {
 	        let worker_name = "unknown";
 	        try {
@@ -175,13 +186,12 @@ export const on_worker_message = async function (event, workerTable) {
                     throw "can't write to stdin!";
                 }
                 case 1: {
-	            let output = "";
+                    let output = "";
                     for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
                     workerTable.receive_callback(output.replaceAll("\n", "\r\n")); // TODO
                     break;
                 }
                 case 2: {
-                    // TODO: should print in red, use ANSI color codes around output
                     let output = "";
                     for (let i = 0; i < content.byteLength; i++) output = output + String.fromCharCode(content[i]);
 		            output = output.replaceAll("\n", "\r\n");

@@ -54,6 +54,7 @@ export class Filesystem {
         const rootDir = await this.getRootDirectory();
         const padre = await rootDir.get_entry(parts.join("/"), mode, 0);
         try {
+            // @ts-ignore Property '_handle' does not exist on type 'Directory | File'
             await padre.entry._handle.getDirectoryHandle(name);
         } catch {
             return false;
