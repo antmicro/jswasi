@@ -1,7 +1,7 @@
 [package]
 name = "msh"
 version = "0.1.0"
-authors = ["Tomek Karwowski <tkarwowski@internships.antmicro.com>"]
+authors = ["Tomasz Karwowski <tkarwowski@internships.antmicro.com>"]
 edition = "2018"
 
 #[lib]

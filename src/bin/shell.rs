@@ -34,8 +34,13 @@ fn syscall(command: &str, args: &str) -> String {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = App::new("wasi-shell")
-        .version("0.1.0")
-        .author("Tomasz Karwowski <tkarwowski@internships.antmicro.com")
+        .version(&*format!(
+            "{}-{} (built: {})",
+            env!("CARGO_PKG_VERSION"),
+            env!("WASI_SHELL_COMMIT_HASH"),
+            env!("WASI_SHELL_DATE")
+        ))
+        .author(env!("CARGO_PKG_AUTHORS"))
         .about("Shell living in a browser, implemented in WASI")
         .get_matches();
 
