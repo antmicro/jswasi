@@ -105,12 +105,12 @@ fn handle_input(
                                     env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                                     syscall(
                                         "set_env",
-                                        format!("OLDPWD {}", env::current_dir()?.to_str().unwrap())
+                                        format!("OLDPWD\x1b{}", env::current_dir()?.to_str().unwrap())
                                             .as_str(),
                                     )?;
                                     let pwd_path = PathBuf::from(syscall(
                                         "set_env",
-                                        format!("PWD {}", path.to_str().unwrap()).as_str(),
+                                        format!("PWD\x1b{}", path.to_str().unwrap()).as_str(),
                                     )?);
                                     env::set_var("PWD", pwd_path.to_str().unwrap());
                                     env::set_current_dir(&pwd_path)?;
@@ -570,7 +570,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                 var_contents = iter2.next().unwrap();
             }
             env::set_var(var_name, var_contents);
-            syscall("set_env", format!("{} {}", var_name, var_contents).as_str())?;
+            syscall("set_env", format!("{}\x1b{}", var_name, var_contents).as_str())?;
             input.clear();
             continue;
         }
