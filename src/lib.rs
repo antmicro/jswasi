@@ -54,7 +54,7 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
                 _ => return Action::Invalid,
             };
         }
-        ast::ListableCommand::Pipe(_, cmds) => unimplemented!(),
+        ast::ListableCommand::Pipe(_, _cmds) => return Action::Invalid, // TODO: handle pipes
     }
 
     // TODO: handle list.rest

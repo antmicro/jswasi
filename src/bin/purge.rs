@@ -1,4 +1,4 @@
-use std::{env, fs, io};
+use std::{fs, io};
 
 use std::fs::DirEntry;
 use std::path::Path;

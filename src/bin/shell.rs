@@ -110,13 +110,13 @@ fn handle_input(
                                         "set_env",
                                         format!("OLDPWD {}", env::current_dir()?.to_str().unwrap())
                                             .as_str(),
-                                    );
+                                    )?;
                                     let pwd_path = PathBuf::from(syscall(
                                         "set_env",
                                         format!("PWD {}", path.to_str().unwrap()).as_str(),
                                     )?);
                                     env::set_var("PWD", pwd_path.to_str().unwrap());
-                                    env::set_current_dir(&pwd_path);
+                                    env::set_current_dir(&pwd_path)?;
                                 }
                             }
                             "pwd" => println!("{}", env::current_dir()?.display()),
@@ -138,14 +138,14 @@ fn handle_input(
                                 syscall(
                                     "spawn",
                                     format!("/usr/bin/uutils\x1b{}", args.join("\x1b")).as_str(),
-                                );
+                                )?;
                             }
                             "ln" | "printenv" | "md5sum" => {
                                 args.insert(0, command.as_str().to_string());
                                 syscall(
                                     "spawn",
                                     format!("/usr/bin/coreutils\x1b{}", args.join("\x1b")).as_str(),
-                                );
+                                )?;
                             }
                             "write" => {
                                 if args.len() < 2 {
@@ -289,7 +289,7 @@ fn handle_input(
 
 fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let pwd = env::current_dir()?.display().to_string();
-    let mut history: Vec<String> = Vec::new();
+    let history: Vec<String> = Vec::new();
     handle_input(fs::read_to_string(script_name.into())?, &pwd, &history)
 }
 
@@ -315,7 +315,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             syscall(
                 "spawn",
                 "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version",
-            );
+            )?;
             fs::read_to_string("/tmp/shell.version")?
         };
 
@@ -323,7 +323,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             syscall(
                 "spawn",
                 format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str(),
-            );
+            )?;
             println!("Reload page for a new version of shell!");
         }
 
@@ -359,24 +359,24 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             display_path.push_str(&pwd);
         }
         print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
-        io::stdout().flush();
+        io::stdout().flush()?;
         let mut c = [0];
         let mut escaped = false;
         let mut history_entry_to_display: i32 = -1;
         // read line
         loop {
-            io::stdin().read_exact(&mut c);
+            io::stdin().read_exact(&mut c)?;
             if escaped {
                 match c[0] {
                     0x5b => {
-                        io::stdout().flush();
+                        io::stdout().flush()?;
                         let mut c2 = [0];
-                        io::stdin().read_exact(&mut c2);
+                        io::stdin().read_exact(&mut c2)?;
                         match c2[0] {
                             0x32 | 0x33 | 0x35 | 0x36 => {
                                 io::stdout().flush()?;
                                 let mut c3 = [0];
-                                io::stdin().read_exact(&mut c3);
+                                io::stdin().read_exact(&mut c3)?;
                                 match [c2[0], c3[0]] {
                                     [0x35, 0x7e] => {
                                         println!("TODO: PAGE UP");
@@ -399,8 +399,8 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                                         io::stdout().flush()?;
                                         let mut c4 = [0];
                                         // TWO MORE! TODO: improve!
-                                        io::stdin().read_exact(&mut c4);
-                                        io::stdin().read_exact(&mut c4);
+                                        io::stdin().read_exact(&mut c4)?;
+                                        io::stdin().read_exact(&mut c4)?;
                                         escaped = false;
                                     }
                                     _ => {
@@ -577,11 +577,13 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                 var_contents = iter2.next().unwrap();
             }
             env::set_var(var_name, var_contents);
-            syscall("set_env", format!("{} {}", var_name, var_contents).as_str());
+            syscall("set_env", format!("{} {}", var_name, var_contents).as_str())?;
             input.clear();
             continue;
         }
 
-        handle_input(input, &pwd, &history);
+        if let Err(error) = handle_input(input, &pwd, &history) {
+            println!("{:#?}", error);
+        };
     }
 }
