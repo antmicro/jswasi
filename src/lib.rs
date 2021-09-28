@@ -16,12 +16,12 @@ pub enum Action {
 }
 
 pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Action {
-    println!("{:?}", cmd);
+    // println!("{:?}", cmd);
     let action = match &cmd.0 {
         ast::Command::Job(list) => handle_listable_command(list, true),
         ast::Command::List(list) => handle_listable_command(list, false),
     };
-    dbg!(&action);
+    // dbg!(&action);
     action
 }
 
