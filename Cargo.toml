@@ -1,11 +1,8 @@
 [package]
 name = "shell"
 version = "0.1.0"
-authors = ["Antmicro <www.antmicro.com>"]
+authors = ["Tomasz Karwowski <tkarwowski@internships.antmicro.com", "Peter Gielda <pgielda@antmicro.com"]
 edition = "2018"
-
-#[lib]
-#crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

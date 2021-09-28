@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             env!("WASI_SHELL_COMMIT_HASH"),
             env!("WASI_SHELL_TARGET")
         ))
-        .author(env!("CARGO_PKG_AUTHORS"))
+        .author("Antmicro <www.antmicro.com>")
         .arg(
             Arg::new("FILE")
                 .about("Execute commands from file")
@@ -81,21 +81,12 @@ fn handle_input(
                                 }
                             }
                             "cd" => {
-                                let path = {
-                                    if args.is_empty() || args[0] == "~" {
-                                        PathBuf::from(env::var("HOME")?)
-                                    } else if args[0].starts_with('/') {
-                                        PathBuf::from(args[0].clone())
-                                    } else if args[0].starts_with("\\~/") {
-                                        let pwd = PathBuf::from(env::var("HOME")?);
-                                        pwd.join(args[0].substring(2, 1024))
-                                    } else {
-                                        let pwd = env::current_dir()?;
-                                        pwd.join(&args[0])
-                                    }
+                                let path = if args.is_empty() {
+                                    PathBuf::from(env::var("HOME")?)
+                                } else {
+                                    PathBuf::from(&args[0])
                                 };
 
-                                // simply including this in source breaks shell
                                 if !Path::new(&path).exists() {
                                     println!(
                                         "cd: no such file or directory: {}",
@@ -105,8 +96,11 @@ fn handle_input(
                                     env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                                     syscall(
                                         "set_env",
-                                        format!("OLDPWD\x1b{}", env::current_dir()?.to_str().unwrap())
-                                            .as_str(),
+                                        format!(
+                                            "OLDPWD\x1b{}",
+                                            env::current_dir()?.to_str().unwrap()
+                                        )
+                                        .as_str(),
                                     )?;
                                     let pwd_path = PathBuf::from(syscall(
                                         "set_env",
@@ -570,7 +564,10 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                 var_contents = iter2.next().unwrap();
             }
             env::set_var(var_name, var_contents);
-            syscall("set_env", format!("{}\x1b{}", var_name, var_contents).as_str())?;
+            syscall(
+                "set_env",
+                format!("{}\x1b{}", var_name, var_contents).as_str(),
+            )?;
             input.clear();
             continue;
         }

@@ -425,6 +425,10 @@ function WASI() {
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len))
+	    if (path != fix_path(path, env)) {
+	    	path = fix_path(path, env);
+	    	worker_console_log(`fixing path to ${path}`);
+	    }
 
         worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
 	    if (path != fix_path(path, env)) {

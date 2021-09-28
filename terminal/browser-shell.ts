@@ -175,7 +175,7 @@ export async function init_all(anchor: HTMLElement) {
         {
             RUST_BACKTRACE: "full",
             PATH: "/usr/bin:/usr/local/bin",
-            PWD: "/",
+            PWD: "/home/ant",
 	        TMPDIR: "/tmp",
 	        TERM: "xterm-256color",
 	        HOME: "/home/ant",
