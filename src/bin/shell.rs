@@ -223,17 +223,6 @@ fn handle_input(
                                             fullpath.display()
                                         ))
                                     }
-                                } else if command.starts_with('~') {
-                                    let home = PathBuf::from(env::var("HOME").unwrap_or_default());
-                                    let fullpath = home.join(command);
-                                    if fullpath.is_file() {
-                                        Ok(fullpath)
-                                    } else {
-                                        Err(format!(
-                                            "shell: no such file or directory: {}",
-                                            fullpath.display()
-                                        ))
-                                    }
                                 } else {
                                     let mut found = false;
                                     let mut fullpath = PathBuf::new();

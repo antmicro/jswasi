@@ -11,7 +11,7 @@ import {fix_path, realpath} from "./utils.js";
 
 type ptr = number;
 
-const DEBUG = true;
+const DEBUG = false;
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -520,11 +520,11 @@ function WASI() {
             let args = fullcmd.substring(cmd.length + 1,1000).split("\x1b");
             env[args[0]] = args[1];
             if (args[0] == "PWD") {
-                env[args[0]] = realpath(env[args[0]], env);
+                env[args[0]] = realpath(env[args[0]]);
                 const sbuf = new SharedArrayBuffer(4);
                 const lck = new Int32Array(sbuf, 0, 1);
                 lck[0] = -1;
-                worker_send(["chdir", [realpath(env[args[0]], env), sbuf]]);
+                worker_send(["chdir", [realpath(env[args[0]]), sbuf]]);
                 Atomics.wait(lck, 0, -1);
             }
             worker_console_log("set " +args[0]+ " to " + env[args[0]]);
