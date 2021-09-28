@@ -1,4 +1,5 @@
 use conch_parser::ast;
+use std::env;
 
 #[derive(Debug)]
 pub enum Action {
@@ -63,21 +64,22 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ac
 fn handle_single(word: &ast::DefaultWord) -> Option<String> {
     match &word {
         ast::Word::SingleQuoted(w) => Some(w.clone()),
-        ast::Word::Simple(w) => get_simple_word_as_string(w),
+        ast::Word::Simple(w) => handle_simple_word(w),
         ast::Word::DoubleQuoted(words) => Some(
             words
                 .iter()
-                .filter_map(|w| get_simple_word_as_string(w))
+                .filter_map(|w| handle_simple_word(w))
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
     }
 }
 
-fn get_simple_word_as_string(word: &ast::DefaultSimpleWord) -> Option<String> {
+fn handle_simple_word(word: &ast::DefaultSimpleWord) -> Option<String> {
     match word {
         ast::SimpleWord::Literal(w) => Some(w.clone()),
         ast::SimpleWord::Colon => Some(":".to_string()),
-        _ => None, // Ignoring substitutions and others for simplicity here
+        ast::SimpleWord::Tilde => Some(env::var("HOME").unwrap()),
+        any => Some(format!("{:?}", any)),
     }
 }

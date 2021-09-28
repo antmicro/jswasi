@@ -13,10 +13,6 @@ export function arraysEqual(a: any[], b: any[]) {
 }
 
 export function fix_path(path: string, env) {
-    // TODO: home handling should be moved to shell in the end
-    if (path === "~") return env['HOME'];
-    if (path.substr(0,2) === "~/") return env['HOME'] + path.substr(1,4096);
-    // if (path[0] == ".") if (env['PWD'] != "/") return path.replace(".", env['PWD']);
     let pwd = env['PWD'];
     if (pwd !== "/") pwd = pwd + "/";
     if (path.length === 0) return path;

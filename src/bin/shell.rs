@@ -74,24 +74,23 @@ fn handle_input(
                         match command.as_str() {
                             // built in commands
                             "history" => {
-                                let mut i = 0;
-                                for history_entry in history {
-                                    i += 1;
+                                for (i, history_entry) in history.iter().enumerate() {
                                     println!("{}: {}", i, history_entry);
                                 }
                             }
                             "cd" => {
                                 let path = if args.is_empty() {
                                     PathBuf::from(env::var("HOME")?)
-                                } else {
+                                } else if args[0].starts_with('/') {
                                     PathBuf::from(&args[0])
+                                } else {
+                                    let pwd = env::current_dir()?;
+                                    pwd.join(&args[0])
                                 };
 
+                                // simply including this in source breaks shell
                                 if !Path::new(&path).exists() {
-                                    println!(
-                                        "cd: no such file or directory: {}",
-                                        path.to_str().unwrap()
-                                    );
+                                    println!("cd: no such file or directory: {}", path.display());
                                 } else {
                                     env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                                     syscall(
