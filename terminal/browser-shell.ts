@@ -8,7 +8,7 @@ import {WorkerTable} from "./worker-table.js";
 import {on_worker_message} from "./worker-message.js";
 
 import {FileOrDir} from "./filesystem.js";
-import {Filesystem} from "./browser-fs.js";
+import {Filesystem, Directory} from "./browser-fs.js";
 
 const NECESSARY_BINARIES = {
     "/etc/motd" : "resources/motd.txt",
@@ -27,20 +27,20 @@ const OPTIONAL_BINARIES = {
     "/usr/local/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
 };
 
-async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: string, address: string, refetch: boolean = true) {
-    let new_dir_handle = dir_handle;
+async function fetch_file(dir: Directory, filename: string, address: string, refetch: boolean = true) {
+    let new_dir_handle = dir;
     let new_filename = filename;
     if (filename[0] == '/') {
 	    // got an absolute path
-        const { err: err, name: nfilename, dir_handle: dir_handl } = await filesystem.resolveAbsolute(filename);
+        const { err: err, name: nfilename, dir: dir_handl } = await filesystem.resolveAbsolute(filename);
 	    new_filename = nfilename;
 	    new_dir_handle = dir_handl;
     } else if (filename.lastIndexOf("/") != -1) {
 	    console.log("Error: unsupported path!");
 	    // TODO: unsupported situation where its a relative path but not direct
     }
-    const handle = await new_dir_handle.getFileHandle(new_filename, {create: true});
-    const file = await handle.getFile();
+    const handle = await new_dir_handle._filesystem.getFile(new_dir_handle, new_filename, {create: true});
+    const file = await handle._handle.getFile();
     // only fetch binary if not yet present
     if (refetch || file.size === 0) {
         let response;
@@ -58,7 +58,7 @@ async function fetch_file(dir_handle: FileSystemDirectoryHandle, filename: strin
         
         response = await fetch(address);
         if (response.status === 200) {
-            const writable = await handle.createWritable();
+            const writable = await handle._handle.createWritable();
             await response.body.pipeTo(writable);
         } else {
             console.log(`Failed downloading ${filename} from ${address}`);
@@ -87,8 +87,9 @@ export async function init_fs(anchor: HTMLElement) {
     const local = await usr.getDirectoryHandle("local", {create: true});
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(root, filename, address, false));
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(root, filename, address, false));
+    const rootDir = await filesystem.getRootDirectory();
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
     
     anchor.innerHTML += "<br/>" + "Starting download of mandatory";
     await Promise.all(necessary_promises);
@@ -252,6 +253,6 @@ export async function wget(workerTable, worker_id, args, env) {
         workerTable.terminal.io.println("wget: help: wget <address> [<filename>]");
         return;
     }
-    const { err, name, dir_handle } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
-    await fetch_file(dir_handle, filename, address); 
+    const { err, name, dir } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
+    await fetch_file(dir, filename, address); 
 }
