@@ -28,9 +28,9 @@ fn syscall(command: &str, args: &str) -> Result<String, Box<dyn std::error::Erro
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {
-        let mut filename = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
-        filename.set_extension("");
-        filename.display().to_string()
+        let mut path = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
+        path.set_extension("");
+        path.file_name().unwrap().to_str().unwrap().to_string()
     };
     let matches = App::new(name)
         .version(&*format!(
