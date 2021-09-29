@@ -29,11 +29,8 @@ fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
             let mut iter = args.iter();
             let mut cmd = Command::new(iter.next().unwrap());
             for arg in iter { cmd.arg(arg); }
-            // TODO: this is not a good implementation, it will only work on non-interactive stuff
-            //       just a demonstrator it can be done.
-            let output = cmd.output().unwrap();
-            io::stdout().write_all(&output.stdout).unwrap();
-            io::stderr().write_all(&output.stderr).unwrap();
+            let mut app = cmd.spawn().unwrap();
+            app.wait();
             PathBuf::from("")
         } else if command == "set_env" {
             // TODO: should be more careful
