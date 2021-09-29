@@ -34,9 +34,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let matches = App::new(name)
         .version(&*format!(
-            "{}-{}\nCopyright (c) 2021 Antmicro <www.antmicro.com>",
+            "{}-{} ({})\nCopyright (c) 2021 Antmicro <www.antmicro.com>",
             env!("CARGO_PKG_VERSION"),
-            include_str!(concat!(env!("OUT_DIR"), "/shell-commit-hash.txt")),
+            env!("SHELL_COMMIT_HASH"),
+            env!("SHELL_TARGET")
         ))
         .author("Antmicro <www.antmicro.com>")
         .arg(
