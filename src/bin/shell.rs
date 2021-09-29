@@ -318,8 +318,10 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut history: Vec<String> = Vec::new();
 
-    // TODO: fetch program list from PATH bin directories
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, write, exit, duk, shell, cowsay, python, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv, touch, cp, mkdir, rmdir)");
+    let motd_path = PathBuf::from("/etc/motd");
+    if motd_path.exists() {
+        println!("{}", fs::read_to_string(motd_path)?);
+    }
 
     loop {
         let mut input = String::new();
