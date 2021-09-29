@@ -18,7 +18,18 @@ use shell::{interpret, Action};
 
 // communicate with the worker thread
 fn syscall(command: &str, args: &str) -> Result<String, Box<dyn std::error::Error>> {
+#[cfg(target_os="wasi")]
     let result = fs::read_link(format!("/!{} {}", command, args))?;
+#[cfg(not(target_os="wasi"))]
+    let result = {
+        if command == "spawn" {
+            println!("TODO: spawn not implemented yet on {}.", std::env::consts::OS);
+        }
+        if command == "set_env" {
+            println!("TODO: set_env not implemented yet on {}.", std::env::consts::OS);
+        }
+        PathBuf::from("")
+    };
     Ok(result
         .to_str()
         .unwrap()
