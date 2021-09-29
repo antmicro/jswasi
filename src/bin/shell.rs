@@ -16,19 +16,31 @@ use sha1::{Digest, Sha1};
 
 use shell::{interpret, Action};
 
+#[cfg(not(target_os="wasi"))]
+use std::process::Command;
+
 // communicate with the worker thread
-fn syscall(command: &str, args: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
 #[cfg(target_os="wasi")]
-    let result = fs::read_link(format!("/!{} {}", command, args))?;
+    let result = fs::read_link(format!("/!{} {}", command, args.join("\x1b")))?;
 #[cfg(not(target_os="wasi"))]
     let result = {
         if command == "spawn" {
-            println!("TODO: spawn not implemented yet on {}.", std::env::consts::OS);
+            let mut iter = args.iter();
+            let mut cmd = Command::new(iter.next().unwrap());
+            for arg in iter { cmd.arg(arg); }
+            // TODO: this is not a good implementation, it will only work on non-interactive stuff
+            //       just a demonstrator it can be done.
+            let output = cmd.output().unwrap();
+            io::stdout().write_all(&output.stdout).unwrap();
+            io::stderr().write_all(&output.stderr).unwrap();
+            PathBuf::from("")
+        } else if command == "set_env" {
+            // TODO: should be more careful
+            PathBuf::from(args[1])
+        } else {
+            PathBuf::from("")
         }
-        if command == "set_env" {
-            println!("TODO: set_env not implemented yet on {}.", std::env::consts::OS);
-        }
-        PathBuf::from("")
     };
     Ok(result
         .to_str()
@@ -104,18 +116,8 @@ fn handle_input(
                                     println!("cd: no such file or directory: {}", path.display());
                                 } else {
                                     env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
-                                    syscall(
-                                        "set_env",
-                                        format!(
-                                            "OLDPWD\x1b{}",
-                                            env::current_dir()?.to_str().unwrap()
-                                        )
-                                        .as_str(),
-                                    )?;
-                                    let pwd_path = PathBuf::from(syscall(
-                                        "set_env",
-                                        format!("PWD\x1b{}", path.to_str().unwrap()).as_str(),
-                                    )?);
+                                    syscall("set_env", &["OLDPWD", env::current_dir()?.to_str().unwrap()])?;
+                                    let pwd_path = PathBuf::from(syscall("set_env", &["PWD", path.to_str().unwrap()])?);
                                     env::set_var("PWD", pwd_path.to_str().unwrap());
                                     env::set_current_dir(&pwd_path)?;
                                 }
@@ -136,17 +138,21 @@ fn handle_input(
                             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls"
                             | "date" | "printf" | "env" | "cat" => {
                                 args.insert(0, command.as_str().to_string());
-                                syscall(
-                                    "spawn",
-                                    format!("/usr/bin/uutils\x1b{}", args.join("\x1b")).as_str(),
-                                )?;
+                                #[cfg(target_os="wasi")]
+                                args.insert(0, String::from("/usr/bin/uutils"));
+                                #[cfg(not(target_os="wasi"))]
+                                args.insert(0, String::from("/bin/busybox"));
+                                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                syscall("spawn", &args_[..])?;
                             }
                             "ln" | "printenv" | "md5sum" => {
                                 args.insert(0, command.as_str().to_string());
-                                syscall(
-                                    "spawn",
-                                    format!("/usr/bin/coreutils\x1b{}", args.join("\x1b")).as_str(),
-                                )?;
+                                #[cfg(target_os="wasi")]
+                                args.insert(0, String::from("/usr/bin/coreutils"));
+                                #[cfg(not(target_os="wasi"))]
+                                args.insert(0, String::from("/bin/busybox"));
+                                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                syscall("spawn", &args_[..])?;
                             }
                             "write" => {
                                 if args.len() < 2 {
@@ -256,7 +262,8 @@ fn handle_input(
                                 match fullpath {
                                     Ok(path) => {
                                         args.insert(0, path.display().to_string());
-                                        let _result = syscall("spawn", &args.join("\x1b"));
+                                        let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                        let _result = syscall("spawn", &args_[..]);
                                     }
                                     Err(reason) => println!("{}", reason),
                                 }
@@ -299,18 +306,12 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
 
         // calculate hash of shell available on server
         let server_hash = {
-            syscall(
-                "spawn",
-                "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version",
-            )?;
+            syscall("spawn", &["/usr/bin/wget", "resources/shell.version", "/tmp/shell.version"])?;
             fs::read_to_string("/tmp/shell.version")?
         };
 
         if current_hash != server_hash {
-            syscall(
-                "spawn",
-                format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str(),
-            )?;
+            syscall("spawn", &["/usr/bin/wget", "resources/shell.wasm", shell_path])?;
             println!("Reload page for a new version of shell!");
         }
 
@@ -563,10 +564,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                 var_contents = iter2.next().unwrap();
             }
             env::set_var(var_name, var_contents);
-            syscall(
-                "set_env",
-                format!("{}\x1b{}", var_name, var_contents).as_str(),
-            )?;
+            syscall("set_env", &[var_name, var_contents])?;
             input.clear();
             continue;
         }
