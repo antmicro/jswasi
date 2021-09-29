@@ -192,7 +192,7 @@ export async function mount(workerTable, worker_id, args, env) {
         case 1: {
             workerTable.terminal.io.println("wasmfs on /");
             for (const mount of filesystem.mounts) {
-                workerTable.terminal.io.println(`fsapi on /${mount.parts.join("/") + "/" + mount.name} (${mount.handle.name})`);
+                workerTable.terminal.io.println(`fsapi on /${mount.parts.join("/") + "/" + mount.name}`);
             }
             break;
         }

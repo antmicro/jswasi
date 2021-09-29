@@ -4,7 +4,7 @@ import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
 
 
 export class Filesystem {
-    mounts: {parts: string[], name: string, handle: FileSystemDirectoryHandle, parent: Directory}[] = [];
+    mounts: {parts: string[], name: string, dir: Directory}[] = [];
 
     rootDir: Directory;
 
@@ -63,27 +63,23 @@ export class Filesystem {
     async path_exists(absolute_path, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
         const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
-        const padre = await rootDir.get_entry(parts.join("/"), mode, 0);
+        const padre = (await rootDir.get_entry(parts.join("/"), mode, 0)).entry;
         try {
-            await padre.entry._handle.getDirectoryHandle(name);
+            await padre._handle.getDirectoryHandle(name);
         } catch {
             return false;
         }
         return true;
     }
 
-    async addMount(absolute_path: string, mounted_directory: FileSystemDirectoryHandle): Promise<number> {
+    async addMount(absolute_path: string, mounted_handle: FileSystemDirectoryHandle): Promise<number> {
         // TODO: for now path must be absolute
-        const {parts, name} = parsePath(absolute_path);
         // TODO: refactor this when adding relative paths support for mount
+        const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
-        const padre = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory);
-        try {
-            await padre.entry._handle.getDirectoryHandle(name);
-        } catch {
-            return constants.WASI_ENOENT;
-        }
-        this.mounts.push({parts, name, handle: mounted_directory, parent: padre.entry});
+        const parent = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory);
+        const dir = new Directory(name, mounted_handle, parent.entry, this);
+        this.mounts.push({parts, name, dir});
         return constants.WASI_ESUCCESS;
     }
 
@@ -147,9 +143,9 @@ export class Filesystem {
 	    if (mypath == null) {
 		    for (const mount of this.mounts) {
 			    let realpath = "/" + mount.parts.join("/");
-			    if (mount.handle === dir._handle) {
+			    if (mount.dir._handle === dir._handle) {
 				    // TODO
-                    mypath = await root.resolve(mount.parent._handle)
+                    mypath = await root.resolve(mount.dir.parent._handle)
                     mypath.push(mount.name); // TODO: which name to use mount point or local?
                     break;
 			    }
@@ -174,28 +170,19 @@ export class Filesystem {
         const root = await navigator.storage.getDirectory();
         const components = await root.resolve(dir._handle);
 
-        const a = [];
+        const entries: (File | Directory)[] = [];
 
         const reversed_mounts = [].concat(this.mounts).reverse();
-        for (const {parts,  name, handle} of reversed_mounts) {
+        for (const {parts,  name, dir} of reversed_mounts) {
             if (arraysEqual(parts, components)) {
-                switch(handle.kind) {
-                    case "file": {
-                        a.push(new File(name, handle, dir, this));
-                        break;
-                    }
-                    case "directory": {
-                        a.push(new Directory(name, handle, dir, this));
-                        break;
-                    }
-                }
+                entries.push(dir);
             }
         }
 
         for await (const [name, handle] of dir._handle.entries()) {
             // mounted direcotries hide directories they are mounted to
             let already_exists = false;
-            for (const entry of a) {
+            for (const entry of entries) {
                 if (entry.path === name) {
                     already_exists = true;
                     break;
@@ -207,19 +194,19 @@ export class Filesystem {
 
             switch(handle.kind) {
                 case "file": {
-                    a.push(new File(name, handle, dir, this));
+                    entries.push(new File(name, handle, dir, this));
                     break;
                 }
                 case "directory": {
-                    a.push(new Directory(name, handle, dir, this));
+                    entries.push(new Directory(name, handle, dir, this));
                     break;
                 }
             }
         }
 
-        a.push(new Directory(".", dir._handle, dir, this));
-        a.push(new Directory("..", dir.parent._handle, dir.parent, this));
-        return a;
+        entries.push(new Directory(".", dir._handle, dir, this));
+        entries.push(new Directory("..", dir.parent._handle, dir.parent, this));
+        return entries;
     }
 }
 
@@ -391,7 +378,7 @@ export class Directory extends Entry {
             await writable.close();
         }
 
-        return {err: constants.WASI_ESUCCESS, entry};
+        return {err, entry};
     }
 
 }
