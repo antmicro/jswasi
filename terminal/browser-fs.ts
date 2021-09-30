@@ -214,7 +214,7 @@ abstract class Entry {
 
     // TODO: fill dummy values with something meaningful
     async stat() {
-        console.log(`Entry.stat() -- Entry -- mostly dummy. path = ${this.path} file_type = ${this.file_type}`);
+        console.log(`Entry(${this.path}).stat()`);
         let lmod = await this.lastModified();
 	    if (!isFinite(lmod)) lmod = 0; // TODO:
         const time = BigInt(lmod) * BigInt(1_000_000n);
@@ -240,7 +240,7 @@ export class Directory extends Entry {
     }
     
     async entries(): Promise<(File | Directory)[]>  {
-        console.log('OpenDirectory.entries()');
+        console.log(`Directory(${this.path}).entries()`);
         return await this._filesystem.entries(this);
     }
 
@@ -273,7 +273,7 @@ export class Directory extends Entry {
         openFlags?: OpenFlags
     ): Promise<{err: number, entry: File | Directory}>;
     async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-        console.log(`OpenDirectory.get_entry(${path}, mode=${mode}, ${oflags})`);
+        console.log(`Directory(${this.path}).get_entry(${path}, mode=${mode}, ${oflags})`);
     
         let {err: resolve_err, name, dir} = await this._filesystem.resolve(this, path);
 
@@ -400,12 +400,12 @@ export class OpenFile extends File {
     private _file_pos: number = 0;
 
     async read(len: number): Promise<[Uint8Array, number]> {
-        console.log(`OpenFile.read(${this.path} ${len})`);
-	let size = await this.size();
+        console.log(`OpenFile(${this.path}).read(${this.path} ${len})`);
+        let size = await this.size();
         if (this._file_pos < size) {
             let file = await this._handle.getFile();
             let data = await file.slice(this._file_pos, this._file_pos + len).arrayBuffer();
-	    data = await data.slice(0);
+            data = await data.slice(0);
             let slice = new Uint8Array(data);
             this._file_pos += slice.byteLength;
             return [slice, 0];
@@ -416,7 +416,7 @@ export class OpenFile extends File {
 
     // TODO: each write creates new writable, store it on creation
     async write(buffer: Uint8Array): Promise<number> {
-	console.log(`OpenFile.write(${this.path} len=${buffer.byteLength}, position ${this._file_pos})`);
+	console.log(`OpenFile(${this.path}).write(${this.path} len=${buffer.byteLength}, position ${this._file_pos})`);
 	try {
             const w = await this._handle.createWritable({ keepExistingData: true });
             await w.write({type: "write", position: this._file_pos, data: buffer});
@@ -430,7 +430,7 @@ export class OpenFile extends File {
     }
 
     async seek(offset: number, whence: number) {
-        console.log(`OpenFile.seek(${offset}, ${whence})`);
+        console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
         switch (whence) {
             case constants.WASI_WHENCE_SET: {
                 this._file_pos = offset;
@@ -449,7 +449,7 @@ export class OpenFile extends File {
     }
 
     async truncate() {
-        console.log(`OpenFile.truncate()`);
+        console.log(`OpenFile(${this.path}).truncate()`);
         const w = await this._handle.createWritable();
         await w.write({type: "truncate", size: 0})
         this._file_pos = 0;
