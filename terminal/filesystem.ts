@@ -12,24 +12,7 @@ export const enum OpenFlags {
 }
 
 export function parsePath(path: string): {parts: string[], name: string} {
-    const parts = [];
-    if (path == null) {
-	    console.log("Error, path is null.");
-	    return {parts: null, name: ""};
-    }
-    if (path == "..") {
-	    parts.push("..");
-	    const name = parts.pop();
-	    return {parts, name};
-    }
-    for(const component of path.split("/")) {
-        if (component == "..") {
-            parts.pop()
-        } else if (component !== "." && component !== "") {
-            parts.push(component);
-        }
-    }
-
+    const parts = path.split("/").filter(part => part !== "");
     const name = parts.pop();
     return {parts, name};
 }

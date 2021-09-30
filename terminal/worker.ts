@@ -7,7 +7,7 @@
 //NODE// import * as fs from "fs";
 //NODE// import { parentPort } from "worker_threads";
 import * as constants from "./constants.js";
-import {fix_path, realpath} from "./utils.js";
+import {realpath} from "./utils.js";
 
 type ptr = number;
 
@@ -425,16 +425,8 @@ function WASI() {
         const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len))
-	    if (path != fix_path(path, env)) {
-	    	path = fix_path(path, env);
-	    	worker_console_log(`fixing path to ${path}`);
-	    }
 
         worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path_ptr}, ${path_len}, ${buf}) [path=${path}]`);
-	    if (path != fix_path(path, env)) {
-	    	path = fix_path(path, env);
-	    	worker_console_log(`Fixing path to ${path}`);
-	    }
 
         const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
         const lck = new Int32Array(sbuf, 0, 1);
@@ -477,10 +469,7 @@ function WASI() {
 
         let path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
         worker_console_log(`path_open: path = ${path}`);
-	    if (path != fix_path(path, env)) {
-	    	path = fix_path(path, env);
-	    	worker_console_log(`fixing path to ${path}`);
-	    }
+
         const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;

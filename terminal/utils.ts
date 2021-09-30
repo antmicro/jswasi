@@ -12,18 +12,6 @@ export function arraysEqual(a: any[], b: any[]) {
     return true;
 }
 
-export function fix_path(path: string, env): string {
-    return path; // TODO: tmp
-    let pwd = env['PWD'];
-    if (pwd !== "/") pwd = pwd + "/";
-    if (path.length === 0) return path;
-    if (path[0] === '!') return path;
-    if (path[0] === '/') return path;
-    if (path[0] !== '.') return "/" + path;
-    if (path.substr(0,2) === "./") return pwd + path.substr(2);
-    return pwd + path;
-}
-
 export function realpath(path): string {
     console.log(`realpath(${path})`);
     let result = [];
