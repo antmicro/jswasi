@@ -10,9 +10,12 @@ import {on_worker_message} from "./worker-message.js";
 import {FileOrDir} from "./filesystem.js";
 import {Filesystem, Directory} from "./browser-fs.js";
 
-const NECESSARY_BINARIES = {
+const ALWAYS_FETCH_BINARIES = {
     "/etc/motd" : "resources/motd.txt",
     "/usr/bin/shell": "resources/shell.wasm",
+};
+
+const NECESSARY_BINARIES = {
     "/usr/bin/uutils": "resources/uutils.async.wasm",
     "/usr/bin/coreutils": "resources/coreutils.async.wasm",
     "/usr/bin/tree": "resources/tree.wasm",
@@ -88,10 +91,12 @@ export async function init_fs(anchor: HTMLElement) {
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
     const rootDir = await filesystem.getRootDirectory();
+    const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, true));
     const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
     const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
     
     anchor.innerHTML += "<br/>" + "Starting download of mandatory";
+    await Promise.all(always_fetch_promises);
     await Promise.all(necessary_promises);
     anchor.innerHTML += "<br/>" + "Mandatory finished.";
     anchor.innerHTML += "<br/>" + "Starting download of optional";

@@ -270,42 +270,6 @@ fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error:
 }
 
 fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
-    // check if new shell version is available
-
-    // operation not supported on this platform
-    // let shell_path = env::current_exe()?.display();
-    let shell_path = "/usr/bin/shell";
-
-    if Path::new(&shell_path).exists() {
-        // calculate hash of shell binary stored in browser filesystem
-        let current_hash = {
-            let mut file = File::open(shell_path)?;
-            let mut hasher = Sha1::new();
-            io::copy(&mut file, &mut hasher)?;
-            let hash = hasher.finalize();
-            format!("{:x}", hash)
-        };
-
-        // calculate hash of shell available on server
-        let server_hash = {
-            syscall(
-                "spawn",
-                "/usr/bin/wget\x1bresources/shell.version\x1b/tmp/shell.version",
-            )?;
-            fs::read_to_string("/tmp/shell.version")?
-        };
-
-        if current_hash != server_hash {
-            syscall(
-                "spawn",
-                format!("/usr/bin/wget\x1bresources/shell.wasm\x1b{}", shell_path).as_str(),
-            )?;
-            println!("Reload page for a new version of shell!");
-        }
-
-        fs::remove_file("/tmp/shell.version")?;
-    }
-
     if env::var("PWD").is_err() {
         env::set_var("PWD", "/");
     }
