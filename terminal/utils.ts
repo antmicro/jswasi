@@ -12,6 +12,12 @@ export function arraysEqual(a: any[], b: any[]) {
     return true;
 }
 
+export function parsePath(path: string): {parts: string[], name: string} {
+    const parts = path.split("/").filter(part => part !== "");
+    const name = parts.pop();
+    return {parts, name};
+}
+
 export function realpath(path): string {
     console.log(`realpath(${path})`);
     let result = [];

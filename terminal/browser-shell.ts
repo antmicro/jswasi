@@ -130,7 +130,6 @@ export async function init_all(anchor: HTMLElement) {
                 window.buffer = window.buffer + output;
             }
         },
-        [null, null, null, await root_dir.open(), await root_dir.open(), await root_dir.open()],
         terminal,
         filesystem,
     );
@@ -172,11 +171,15 @@ export async function init_all(anchor: HTMLElement) {
     io.onTerminalResize = (columns, rows) => {
     };
 
+    const pwd_dir = (await root_dir.get_entry("/home/ant", FileOrDir.Directory)).entry;
+    pwd_dir.path = ".";
     await workerTable.spawnWorker(
         null, // parent_id
         null, // parent_lock
         on_worker_message,
         "/usr/bin/shell",
+        // stdin, stderr, stdout, root, pwd, TODO: why must fds[5] be present for ls to work, and what should it be
+        [null, null, null, await root_dir.open(), pwd_dir.open(), root_dir.open()],
         ["shell"],
         {
             RUST_BACKTRACE: "full",

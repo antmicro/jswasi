@@ -36,14 +36,15 @@ export const on_worker_message = async function (event, workerTable) {
         }
 	    case "chdir": {
 	        const [pwd, sbuf] = data;
-                const parent_lck = new Int32Array(sbuf, 0, 1);
-                const { fds } = workerTable.workerInfos[worker_id];
-	    	if (fds[3] != undefined) {
-	    	    // fds[3] should be root, so we can store '.' in fds[4]
-	    	    let {err, entry} = await fds[3].get_entry(pwd.substr(1),FileOrDir.Directory);
-  	    	    fds[4] = await entry.open();
-	    	    fds[4].path = ".";
-	    	}
+            const parent_lck = new Int32Array(sbuf, 0, 1);
+            const { fds } = workerTable.workerInfos[worker_id];
+
+            const rootDir = workerTable.filesystem.getRootDirectory();
+            const {err, entry} = await rootDir.get_entry(pwd.substr(1),FileOrDir.Directory);
+            const open_pwd = entry.open();
+            open_pwd.path = ".";
+            fds[4] = open_pwd;
+
             Atomics.store(parent_lck, 0, 0);
             Atomics.notify(parent_lck, 0);
 	        break;
@@ -91,11 +92,14 @@ export const on_worker_message = async function (event, workerTable) {
                     break;
                 }
                 default: {
+                    const parent = workerTable.workerInfos[worker_id];
+
                     const id = workerTable.spawnWorker(
                         worker_id,
                         parent_lck,
                         on_worker_message,
                         fullpath,
+                        parent.fds,
                         args,
                         env
                     );

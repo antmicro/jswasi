@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
-import {realpath, arraysEqual} from "./utils.js";
-import {FileOrDir, OpenFlags, parsePath} from "./filesystem.js";
+import {realpath, parsePath, arraysEqual} from "./utils.js";
+import {FileOrDir, OpenFlags} from "./filesystem.js";
 
 
 export class Filesystem {
