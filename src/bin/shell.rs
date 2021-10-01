@@ -1,6 +1,5 @@
 use std::env;
 use std::fs;
-use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -12,7 +11,6 @@ use substring::Substring;
 use clap::{App, Arg};
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
-use sha1::{Digest, Sha1};
 
 use shell::{interpret, Action};
 
@@ -65,9 +63,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .about("Execute commands from file")
                 .index(1),
         )
+        .arg(
+            Arg::new("command")
+                .about("Execute provided command")
+                .short('c')
+                .long("command")
+                .value_name("COMMAND")
+                .takes_value(true)
+        )
         .get_matches();
 
-    if let Some(file) = matches.value_of("FILE") {
+    if let Some(command) = matches.value_of("command") {
+        run_command(command)
+    } else if let Some(file) = matches.value_of("FILE") {
         run_script(file)
     } else {
         run_interpreter()
@@ -89,7 +97,7 @@ fn handle_input(
                     Action::Command {
                         name: command,
                         mut args,
-                        background, // TODO: spawn in background if flag set
+                        background: _, // TODO: spawn in background if flag set
                     } => {
                         match command.as_str() {
                             // built in commands
@@ -276,6 +284,12 @@ fn handle_input(
         }
     }
     Ok(())
+}
+
+fn run_command(command: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let pwd = env::current_dir()?.display().to_string();
+    let history: Vec<String> = Vec::new();
+    handle_input(command, &pwd, &history)
 }
 
 fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
