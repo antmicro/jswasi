@@ -30,7 +30,7 @@ const OPTIONAL_BINARIES = {
     "/usr/local/bin/python": "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
 };
 
-async function fetch_file(dir: Directory, filename: string, address: string, refetch: boolean = true) {
+async function fetchFile(dir: Directory, filename: string, address: string, refetch: boolean = true) {
     const {err, entry} = await dir.getEntry(filename, FileOrDir.File, OpenFlags.Create);
     if (err !== constants.WASI_ESUCCESS) {
         console.warn(`Unable to resolve path for ${dir.path} and ${filename}`);
@@ -86,9 +86,9 @@ export async function init_fs(anchor: HTMLElement) {
     const local_bin = await local.getDirectoryHandle("bin", {create: true});
 
     const rootDir = await filesystem.getRootDirectory();
-    const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, true));
-    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
-    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetch_file(rootDir, filename, address, false));
+    const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(([filename, address]) => fetchFile(rootDir, filename, address, true));
+    const necessary_promises = Object.entries(NECESSARY_BINARIES).map(([filename, address]) => fetchFile(rootDir, filename, address, false));
+    const optional_promises = Object.entries(OPTIONAL_BINARIES).map(([filename, address]) => fetchFile(rootDir, filename, address, false));
     
     anchor.innerHTML += "<br/>" + "Starting download of mandatory";
     await Promise.all(always_fetch_promises);
@@ -258,5 +258,5 @@ export async function wget(workerTable, worker_id, args, env) {
         return;
     }
     const { err, name, dir } = await filesystem.resolveAbsolute(env['PWD'] + "/" + filename);
-    await fetch_file(dir, filename, address); 
+    await fetchFile(dir, filename, address); 
 }
