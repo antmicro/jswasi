@@ -7,7 +7,6 @@ However, JavaScript WASI is focused on:
  * Make easy to plug different filesystems
  * Provide a type-safe api using Typescript
 
-
 Copyright 2019 Gus Caplan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
