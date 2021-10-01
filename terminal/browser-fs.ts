@@ -19,6 +19,7 @@ export class Filesystem {
 
     async getDirectory(dir: Directory, name: string, options: {create: boolean}={create: false}): Promise<Directory> {
         // TODO: revisit this hack
+        if (dir.path === "" && (name === "." || name === ".." || name === "" || name === "/")) return await this.getRootDirectory();
         if (name === ".") {
             return dir;
         } else if (name === "..") {
@@ -122,6 +123,7 @@ export class Filesystem {
         console.log(`getParent(${dir._handle.name}, ${path})`);
 
 	    if (path.includes("\\")) return { err: constants.WASI_EINVAL, name: null, parent: null };
+        if (dir.path === "" && (path === "." || path === ".." || path === "" || path === "/")) return { err: constants.WASI_ESUCCESS, name: "", parent: dir };
         if (path.startsWith("/")) dir = await this.getRootDirectory();
         
         const {parts, name} = parsePath(path);

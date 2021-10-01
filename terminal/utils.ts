@@ -39,6 +39,7 @@ export function realpath(path): string {
         }
     }
     result_path = result.slice(0, level).join("/");
+    console.log(`= ${result_path}`);
     if (root_path) if (result_path == "") return "/";
     return result_path;
 }

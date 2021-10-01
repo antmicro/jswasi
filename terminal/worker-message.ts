@@ -40,7 +40,7 @@ export const on_worker_message = async function (event, workerTable) {
             const { fds } = workerTable.workerInfos[worker_id];
 
             const rootDir = await workerTable.filesystem.getRootDirectory();
-            const {err, entry} = await rootDir.get_entry(pwd.substr(1),FileOrDir.Directory);
+            const {err, entry} = await rootDir.get_entry(pwd, FileOrDir.Directory);
             const open_pwd = entry.open();
             open_pwd.path = ".";
             fds[4] = open_pwd;
