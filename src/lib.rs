@@ -16,12 +16,12 @@ pub enum Action {
 }
 
 pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Vec<Action> {
-    println!("{:#?}", cmd);
+    // println!("{:#?}", cmd);
     let actions = match &cmd.0 {
         ast::Command::Job(list) => handle_listable_command(list, true),
         ast::Command::List(list) => handle_listable_command(list, false),
     };
-    dbg!(&actions);
+    // dbg!(&actions);
     actions
 }
 
@@ -109,6 +109,10 @@ fn handle_simple_word(word: &ast::DefaultSimpleWord) -> Option<String> {
         ast::SimpleWord::Literal(w) => Some(w.clone()),
         ast::SimpleWord::Colon => Some(":".to_string()),
         ast::SimpleWord::Tilde => Some(env::var("HOME").unwrap()),
+        ast::SimpleWord::Param(p) => match p {
+            ast::Parameter::Var(key) => Some(env::var(key).unwrap_or_else(|_| format!("No env var: {}", key))),
+            any => Some(format!("{:?}", any)),
+        }
         any => Some(format!("{:?}", any)),
     }
 }
