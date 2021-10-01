@@ -104,7 +104,7 @@ export async function initFs(anchor: HTMLElement) {
 // things that are global and should be shared between all tab instances
 const filesystem = new Filesystem();
 
-export async function initAll(anchor: HTMLElement) {
+export async function init(anchor: HTMLElement) {
     anchor.innerHTML = 'Fetching binaries, this should only happen once.';
     await initFs(anchor);
     anchor.innerHTML = '';

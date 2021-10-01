@@ -6,7 +6,7 @@
 </head>
 <body>
 <script type="module">
-    import { initAll } from "./browser-shell.js";
+    import { init } from "./browser-shell.js";
     window.buffer = "";
     window.alive = true;
     window.stdout_read_data = function() {
@@ -22,7 +22,7 @@
     script.src = "./hterm_all.js";
     script.onload = async () => {
       await lib.init();
-      await initAll(document.querySelector("#terminal"));
+      await init(document.querySelector("#terminal"));
     };
 document.body.appendChild(script);
 </script>
