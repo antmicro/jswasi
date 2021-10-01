@@ -82,210 +82,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn handle_input(
-    input: &str,
-    pwd: &str,
-    history: &[String],
-) -> Result<(), Box<dyn std::error::Error>> {
-    let lex = Lexer::new(input.chars());
-    let parser = DefaultParser::new(lex);
-    for cmd in parser {
-        match cmd {
-            Ok(cmd) => {
-                let action = interpret(&cmd);
-                match action {
-                    Action::Command {
-                        name: command,
-                        mut args,
-                        background: _, // TODO: spawn in background if flag set
-                    } => {
-                        match command.as_str() {
-                            // built in commands
-                            "history" => {
-                                for (i, history_entry) in history.iter().enumerate() {
-                                    println!("{}: {}", i, history_entry);
-                                }
-                            }
-                            "cd" => {
-                                let path = if args.is_empty() {
-                                    PathBuf::from(env::var("HOME")?)
-                                } else if args[0].starts_with('/') {
-                                    PathBuf::from(&args[0])
-                                } else {
-                                    let pwd = env::current_dir()?;
-                                    pwd.join(&args[0])
-                                };
-
-                                // simply including this in source breaks shell
-                                if !Path::new(&path).exists() {
-                                    println!("cd: no such file or directory: {}", path.display());
-                                } else {
-                                    env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
-                                    syscall("set_env", &["OLDPWD", env::current_dir()?.to_str().unwrap()])?;
-                                    let pwd_path = PathBuf::from(syscall("set_env", &["PWD", path.to_str().unwrap()])?);
-                                    env::set_var("PWD", pwd_path.to_str().unwrap());
-                                    env::set_current_dir(&pwd_path)?;
-                                }
-                            }
-                            "pwd" => println!("{}", env::current_dir()?.display()),
-                            "sleep" => {
-                                // TODO: requires poll_oneoff implementation
-                                if let Some(sec_str) = &args.get(0) {
-                                    if let Ok(sec) = sec_str.parse() {
-                                        thread::sleep(Duration::new(sec, 0));
-                                    } else {
-                                        println!("sleep: invalid time interval `{}`", sec_str);
-                                    }
-                                } else {
-                                    println!("sleep: missing operand");
-                                }
-                            }
-                            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls"
-                            | "date" | "printf" | "env" | "cat" => {
-                                args.insert(0, command.as_str().to_string());
-                                #[cfg(target_os="wasi")]
-                                args.insert(0, String::from("/usr/bin/uutils"));
-                                #[cfg(not(target_os="wasi"))]
-                                args.insert(0, String::from("/bin/busybox"));
-                                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                                syscall("spawn", &args_[..])?;
-                            }
-                            "ln" | "printenv" | "md5sum" => {
-                                args.insert(0, command.as_str().to_string());
-                                #[cfg(target_os="wasi")]
-                                args.insert(0, String::from("/usr/bin/coreutils"));
-                                #[cfg(not(target_os="wasi"))]
-                                args.insert(0, String::from("/bin/busybox"));
-                                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                                syscall("spawn", &args_[..])?;
-                            }
-                            "write" => {
-                                if args.len() < 2 {
-                                    println!("write: help: write <filename> <contents>");
-                                } else {
-                                    match fs::write(args.remove(0), args.join(" ")) {
-                                        Ok(_) => {}
-                                        Err(error) => {
-                                            println!("write: failed to write to file: {}", error)
-                                        }
-                                    }
-                                }
-                            }
-                            "clear" => {
-                                print!(""); // TODO: send clear escape codes
-                            }
-                            "hexdump" => {
-                                if args.is_empty() {
-                                    println!("hexdump: help: hexump <filename>");
-                                } else {
-                                    let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
-                                        println!("hexdump: error: file not found.");
-                                        return vec![];
-                                    });
-                                    let len = contents.len();
-                                    let mut v = ['.'; 16];
-                                    for j in 0..len {
-                                        let c = contents[j] as char;
-                                        v[j % 16] = c;
-                                        if (j % 16) == 0 {
-                                            print!("{:08x} ", j);
-                                        }
-                                        if (j % 8) == 0 {
-                                            print!(" ");
-                                        }
-                                        print!("{:02x} ", c as u8);
-                                        if (j + 1) == len || (j % 16) == 15 {
-                                            let mut count = 16;
-                                            if (j + 1) == len {
-                                                count = len % 16;
-                                                for _ in 0..(16 - (len % 16)) {
-                                                    print!("   ");
-                                                }
-                                                if count < 8 {
-                                                    print!(" ");
-                                                }
-                                            }
-                                            print!(" |");
-                                            for c in v.iter_mut().take(count) {
-                                                if (0x20..0x7e).contains(&(*c as u8)) {
-                                                    print!("{}", *c as char);
-                                                    *c = '.';
-                                                } else {
-                                                    print!(".");
-                                                }
-                                            }
-                                            println!("|");
-                                        }
-                                    }
-                                }
-                            }
-                            "exit" => exit(0),
-                            // no input
-                            "" => {}
-                            // external commands or command not found
-                            _ => {
-                                let fullpath = if command.starts_with('/') {
-                                    let fullpath = PathBuf::from(command);
-                                    if fullpath.is_file() {
-                                        Ok(fullpath)
-                                    } else {
-                                        Err(format!(
-                                            "shell: no such file or directory: {}",
-                                            fullpath.display()
-                                        ))
-                                    }
-                                } else if command.starts_with('.') {
-                                    let pwd = PathBuf::from(&pwd);
-                                    let fullpath = pwd.join(command);
-                                    if fullpath.is_file() {
-                                        Ok(fullpath)
-                                    } else {
-                                        Err(format!(
-                                            "shell: no such file or directory: {}",
-                                            fullpath.display()
-                                        ))
-                                    }
-                                } else {
-                                    let mut found = false;
-                                    let mut fullpath = PathBuf::new();
-                                    // get PATH env variable, split it and look for binaries in each directory
-                                    for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
-                                        let bin_dir = PathBuf::from(bin_dir);
-                                        fullpath = bin_dir.join(&command);
-                                        if fullpath.is_file() {
-                                            found = true;
-                                            break;
-                                        }
-                                    }
-                                    if found {
-                                        Ok(fullpath)
-                                    } else {
-                                        Err(format!("command not found: {}", command))
-                                    }
-                                };
-
-                                match fullpath {
-                                    Ok(path) => {
-                                        args.insert(0, path.display().to_string());
-                                        let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                                        let _result = syscall("spawn", &args_[..]);
-                                    }
-                                    Err(reason) => println!("{}", reason),
-                                }
-                            }
-                        }
-                    }
-                    _ => unimplemented!(),
-                }
-            }
-            Err(e) => {
-                println!("{:?}", e);
-            }
-        }
-    }
-    Ok(())
-}
-
 fn run_command(command: &str) -> Result<(), Box<dyn std::error::Error>> {
     let pwd = env::current_dir()?.display().to_string();
     let history: Vec<String> = Vec::new();
@@ -534,26 +330,217 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             history.push(input.clone());
         }
 
-        if input.contains('=') {
-            let mut iter = input.split('=');
-            let var_name = iter.next().unwrap();
-            if var_name.contains(' ') {
-                continue;
-            }
-            let mut var_contents = iter.next().unwrap();
-            if var_contents.starts_with('"') {
-                let mut iter2 = var_contents.split('"');
-                iter2.next();
-                var_contents = iter2.next().unwrap();
-            }
-            env::set_var(var_name, var_contents);
-            syscall("set_env", &[var_name, var_contents])?;
-            input.clear();
-            continue;
-        }
-
         if let Err(error) = handle_input(&input, &pwd, &history) {
             println!("{:#?}", error);
         };
     }
+}
+
+fn handle_input(
+    input: &str,
+    pwd: &str,
+    history: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let lex = Lexer::new(input.chars());
+    let parser = DefaultParser::new(lex);
+    for cmd in parser {
+        match cmd {
+            Ok(cmd) => {
+                let actions = interpret(&cmd);
+                for action in actions {
+                    match action {
+                        Action::Command {
+                            name: command,
+                            mut args,
+                            background: _, // TODO: spawn in background if flag set
+                        } => {
+                            match command.as_str() {
+                                // built in commands
+                                "history" => {
+                                    for (i, history_entry) in history.iter().enumerate() {
+                                        println!("{}: {}", i, history_entry);
+                                    }
+                                }
+                                "cd" => {
+                                    let path = if args.is_empty() {
+                                        PathBuf::from(env::var("HOME")?)
+                                    } else if args[0].starts_with('/') {
+                                        PathBuf::from(&args[0])
+                                    } else {
+                                        let pwd = env::current_dir()?;
+                                        pwd.join(&args[0])
+                                    };
+
+                                    // simply including this in source breaks shell
+                                    if !Path::new(&path).exists() {
+                                        println!("cd: no such file or directory: {}", path.display());
+                                    } else {
+                                        env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
+                                        syscall("set_env", &["OLDPWD", env::current_dir()?.to_str().unwrap()])?;
+                                        let pwd_path = PathBuf::from(syscall("set_env", &["PWD", path.to_str().unwrap()])?);
+                                        env::set_var("PWD", pwd_path.to_str().unwrap());
+                                        env::set_current_dir(&pwd_path)?;
+                                    }
+                                }
+                                "pwd" => println!("{}", env::current_dir()?.display()),
+                                "sleep" => {
+                                    // TODO: requires poll_oneoff implementation
+                                    if let Some(sec_str) = &args.get(0) {
+                                        if let Ok(sec) = sec_str.parse() {
+                                            thread::sleep(Duration::new(sec, 0));
+                                        } else {
+                                            println!("sleep: invalid time interval `{}`", sec_str);
+                                        }
+                                    } else {
+                                        println!("sleep: missing operand");
+                                    }
+                                }
+                                "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls"
+                                | "date" | "printf" | "env" | "cat" => {
+                                    args.insert(0, command.as_str().to_string());
+                                    #[cfg(target_os="wasi")]
+                                    args.insert(0, String::from("/usr/bin/uutils"));
+                                    #[cfg(not(target_os="wasi"))]
+                                    args.insert(0, String::from("/bin/busybox"));
+                                    let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                    syscall("spawn", &args_[..])?;
+                                }
+                                "ln" | "printenv" | "md5sum" => {
+                                    args.insert(0, command.as_str().to_string());
+                                    #[cfg(target_os="wasi")]
+                                    args.insert(0, String::from("/usr/bin/coreutils"));
+                                    #[cfg(not(target_os="wasi"))]
+                                    args.insert(0, String::from("/bin/busybox"));
+                                    let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                    syscall("spawn", &args_[..])?;
+                                }
+                                "write" => {
+                                    if args.len() < 2 {
+                                        println!("write: help: write <filename> <contents>");
+                                    } else {
+                                        match fs::write(args.remove(0), args.join(" ")) {
+                                            Ok(_) => {}
+                                            Err(error) => {
+                                                println!("write: failed to write to file: {}", error)
+                                            }
+                                        }
+                                    }
+                                }
+                                "clear" => {
+                                    print!(""); // TODO: send clear escape codes
+                                }
+                                "hexdump" => {
+                                    if args.is_empty() {
+                                        println!("hexdump: help: hexump <filename>");
+                                    } else {
+                                        let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
+                                            println!("hexdump: error: file not found.");
+                                            return vec![];
+                                        });
+                                        let len = contents.len();
+                                        let mut v = ['.'; 16];
+                                        for j in 0..len {
+                                            let c = contents[j] as char;
+                                            v[j % 16] = c;
+                                            if (j % 16) == 0 {
+                                                print!("{:08x} ", j);
+                                            }
+                                            if (j % 8) == 0 {
+                                                print!(" ");
+                                            }
+                                            print!("{:02x} ", c as u8);
+                                            if (j + 1) == len || (j % 16) == 15 {
+                                                let mut count = 16;
+                                                if (j + 1) == len {
+                                                    count = len % 16;
+                                                    for _ in 0..(16 - (len % 16)) {
+                                                        print!("   ");
+                                                    }
+                                                    if count < 8 {
+                                                        print!(" ");
+                                                    }
+                                                }
+                                                print!(" |");
+                                                for c in v.iter_mut().take(count) {
+                                                    if (0x20..0x7e).contains(&(*c as u8)) {
+                                                        print!("{}", *c as char);
+                                                        *c = '.';
+                                                    } else {
+                                                        print!(".");
+                                                    }
+                                                }
+                                                println!("|");
+                                            }
+                                        }
+                                    }
+                                }
+                                "exit" => exit(0),
+                                // no input
+                                "" => {}
+                                // external commands or command not found
+                                _ => {
+                                    let fullpath = if command.starts_with('/') {
+                                        let fullpath = PathBuf::from(command);
+                                        if fullpath.is_file() {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!(
+                                                "shell: no such file or directory: {}",
+                                                fullpath.display()
+                                            ))
+                                        }
+                                    } else if command.starts_with('.') {
+                                        let pwd = PathBuf::from(&pwd);
+                                        let fullpath = pwd.join(command);
+                                        if fullpath.is_file() {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!(
+                                                "shell: no such file or directory: {}",
+                                                fullpath.display()
+                                            ))
+                                        }
+                                    } else {
+                                        let mut found = false;
+                                        let mut fullpath = PathBuf::new();
+                                        // get PATH env variable, split it and look for binaries in each directory
+                                        for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
+                                            let bin_dir = PathBuf::from(bin_dir);
+                                            fullpath = bin_dir.join(&command);
+                                            if fullpath.is_file() {
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                        if found {
+                                            Ok(fullpath)
+                                        } else {
+                                            Err(format!("command not found: {}", command))
+                                        }
+                                    };
+
+                                    match fullpath {
+                                        Ok(path) => {
+                                            args.insert(0, path.display().to_string());
+                                            let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                            let _result = syscall("spawn", &args_[..]);
+                                        }
+                                        Err(reason) => println!("{}", reason),
+                                    }
+                                }
+                            }
+                        }
+                        Action::SetEnv{ key, value } => {
+                            syscall("set_env", &[&key, &value])?;
+                        }
+                        action => println!("{:#?} not yet implemented in shell", action),
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{:?}", e);
+            }
+        }
+    }
+    Ok(())
 }
