@@ -5,17 +5,16 @@ import {FileOrDir, OpenFlags} from "./filesystem.js";
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
-
-    rootDir: Directory;
+    _rootDir: Directory;
 
     async getRootDirectory(): Promise<Directory> {
-        if (!this.rootDir) {
+        if (!this._rootDir) {
             const root = await navigator.storage.getDirectory();
             const rootDir = new Directory("", root, null, this);
             rootDir.parent = rootDir; // TODO: root dir parent should root dir or null?
-	        this.rootDir = rootDir;
+	        this._rootDir = rootDir;
         }
-        return this.rootDir;
+        return this._rootDir;
     }
 
     async getDirectory(dir: Directory, name: string, options: {create: boolean}={create: false}): Promise<Directory> {
@@ -50,7 +49,7 @@ export class Filesystem {
         return new File(name, handle, dir, this);
     }
 
-    async path_exists(absolute_path, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
+    async path_exists(absolute_path: string, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
         const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
         const padre = (await rootDir.get_entry(parts.join("/"), mode, 0)).entry;
@@ -183,8 +182,6 @@ export class Filesystem {
             }
         }
 
-        entries.push(new Directory(".", dir._handle, dir, this));
-        entries.push(new Directory("..", dir.parent._handle, dir.parent, this));
         return entries;
     }
 }
@@ -281,24 +278,23 @@ export class Directory extends Entry {
             return {err, entry: null};
         }    
 
-        // TODO: that's not right
-	    if (name == ".") {
-            let entry = new Directory(name, parent._handle, this, this._filesystem);
-            return {err: constants.WASI_ESUCCESS, entry};
-	    }
-	    if (name == "..") {
-            let entry = new Directory(name, parent.parent._handle, this.parent, this._filesystem);
-            return {err: constants.WASI_ESUCCESS, entry};
-	    }
 
-        if (name === undefined) {
+        if (name === "." || name === "..") {
             if (oflags & (OpenFlags.Create | OpenFlags.Exclusive)) {
                 return {err: constants.WASI_EEXIST, entry: null};
             }
             if (oflags & OpenFlags.Truncate) {
                 return {err: constants.WASI_EISDIR, entry: null};
             }
-            return {err: constants.WASI_ESUCCESS, entry: new Directory(this.path, this._handle, this, this._filesystem)};
+ 
+	        if (name == ".") {
+                let entry = new Directory(parent.name, parent._handle, parent.parent, this._filesystem);
+                return {err: constants.WASI_ESUCCESS, entry};
+	        }
+	        if (name == "..") {
+                let entry = new Directory(parent.parent.name, parent.parent._handle, parent.parent.parent, this._filesystem);
+                return {err: constants.WASI_ESUCCESS, entry};
+	        } 
         }
 
         if (oflags & OpenFlags.Directory) {
