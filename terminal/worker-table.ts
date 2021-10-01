@@ -35,7 +35,6 @@ export class WorkerTable {
     public readonly receive_callback;
     public readonly script_name: string;
 
-    public fds;
     public buffer = "";
     public currentWorker = null;
     public nextWorkerId = 0;
@@ -43,16 +42,15 @@ export class WorkerTable {
     public workerInfos: Record<number, WorkerInfo> = {};
     public compiledModules: Record<string, WebAssembly.Module> = {};
 
-    constructor(sname: string, receive_callback, fds, terminal, filesystem) {
+    constructor(sname: string, receive_callback, terminal, filesystem) {
         this.script_name = sname;
         this.receive_callback = receive_callback;
-        this.fds = fds;
         this.terminal = terminal;
         this.filesystem = filesystem;
 	    this.alive = new Array<boolean>();
     }
 
-    async spawnWorker(parent_id: number, parent_lock: Int32Array, callback, command, args, env): Promise<number> {
+    async spawnWorker(parent_id: number, parent_lock: Int32Array, callback, command, fds, args, env): Promise<number> {
         const id = this.nextWorkerId;
         this.currentWorker = id;
         this.nextWorkerId += 1;
@@ -60,7 +58,7 @@ export class WorkerTable {
         if (!IS_NODE) private_data = {type: "module"};
 	    this.alive.push(true);
         let worker = new Worker(this.script_name, private_data);
-        this.workerInfos[id] = new WorkerInfo(id, command, worker, this.fds, parent_id, parent_lock, callback);
+        this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parent_id, parent_lock, callback);
         if (!IS_NODE) {
             worker.onmessage = (event) => callback(event, this);
         } else {

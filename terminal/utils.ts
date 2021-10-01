@@ -12,16 +12,10 @@ export function arraysEqual(a: any[], b: any[]) {
     return true;
 }
 
-export function fix_path(path: string, env): string {
-    return path; // TODO: tmp
-    let pwd = env['PWD'];
-    if (pwd !== "/") pwd = pwd + "/";
-    if (path.length === 0) return path;
-    if (path[0] === '!') return path;
-    if (path[0] === '/') return path;
-    if (path[0] !== '.') return "/" + path;
-    if (path.substr(0,2) === "./") return pwd + path.substr(2);
-    return pwd + path;
+export function parsePath(path: string): {parts: string[], name: string} {
+    const parts = path.split("/").filter(part => part !== "");
+    const name = parts.pop();
+    return {parts, name};
 }
 
 export function realpath(path): string {
@@ -45,6 +39,7 @@ export function realpath(path): string {
         }
     }
     result_path = result.slice(0, level).join("/");
+    console.log(`= ${result_path}`);
     if (root_path) if (result_path == "") return "/";
     return result_path;
 }

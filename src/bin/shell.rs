@@ -285,36 +285,6 @@ fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error:
 }
 
 fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
-    // check if new shell version is available
-
-    // operation not supported on this platform
-    // let shell_path = env::current_exe()?.display();
-    let shell_path = "/usr/bin/shell";
-
-    if Path::new(&shell_path).exists() {
-        // calculate hash of shell binary stored in browser filesystem
-        let current_hash = {
-            let mut file = File::open(shell_path)?;
-            let mut hasher = Sha1::new();
-            io::copy(&mut file, &mut hasher)?;
-            let hash = hasher.finalize();
-            format!("{:x}", hash)
-        };
-
-        // calculate hash of shell available on server
-        let server_hash = {
-            syscall("spawn", &["/usr/bin/wget", "resources/shell.version", "/tmp/shell.version"])?;
-            fs::read_to_string("/tmp/shell.version")?
-        };
-
-        if current_hash != server_hash {
-            syscall("spawn", &["/usr/bin/wget", "resources/shell.wasm", shell_path])?;
-            println!("Reload page for a new version of shell!");
-        }
-
-        fs::remove_file("/tmp/shell.version")?;
-    }
-
     if env::var("PWD").is_err() {
         env::set_var("PWD", "/");
     }
@@ -327,8 +297,10 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut history: Vec<String> = Vec::new();
 
-    // TODO: fetch program list from PATH bin directories
-    println!("Welcome to Antmicro's WASM shell!\nAvailable (and working) commands are:\ncd, pwd, write, exit, duk, shell, cowsay, python, \nuutils (ls, cat, echo, env, basename, dirname, sum, printf, wc, rm, mv, touch, cp, mkdir, rmdir)");
+    let motd_path = PathBuf::from("/etc/motd");
+    if motd_path.exists() {
+        println!("{}", fs::read_to_string(motd_path)?);
+    }
 
     loop {
         let mut input = String::new();
