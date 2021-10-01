@@ -40,7 +40,7 @@ export const on_worker_message = async function (event, workerTable) {
             const { fds } = workerTable.workerInfos[worker_id];
 
             const rootDir = await workerTable.filesystem.getRootDirectory();
-            const {err, entry} = await rootDir.get_entry(pwd, FileOrDir.Directory);
+            const {err, entry} = await rootDir.getEntry(pwd, FileOrDir.Directory);
             const open_pwd = entry.open();
             open_pwd.path = ".";
             fds[4] = open_pwd;
@@ -141,7 +141,7 @@ export const on_worker_message = async function (event, workerTable) {
             if (fds[fd] != undefined) {
 		let linkpath = newpath + ".link";
 	        console.log(`We should symlink ${newpath} --> ${path} [dir fd=${fd}]`);
-		({err, entry} = await fds[fd].get_entry(linkpath, FileOrDir.File, 1 | 4));
+		({err, entry} = await fds[fd].getEntry(linkpath, FileOrDir.File, 1 | 4));
 		if (err == constants.WASI_ESUCCESS) {
                     let file = await entry.open();
 		//    let databuf = new ArrayBuffer(path.length);
@@ -267,7 +267,7 @@ export const on_worker_message = async function (event, workerTable) {
             let err, entry;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[dir_fd] != undefined) {
-                ({err, entry} = await fds[dir_fd].get_entry(path, FileOrDir.Any, oflags));
+                ({err, entry} = await fds[dir_fd].getEntry(path, FileOrDir.Any, oflags));
                 if (err === constants.WASI_ESUCCESS) {
                     fds.push(await entry.open());
                     opened_fd[0] = fds.length - 1;
@@ -334,7 +334,7 @@ export const on_worker_message = async function (event, workerTable) {
                 if (path[0] != '!') {
                     const fds = workerTable.workerInfos[worker_id].fds;
                     if (fds[fd] != undefined) {
-                        ({err, entry} = await fds[fd].get_entry(path, FileOrDir.Any));
+                        ({err, entry} = await fds[fd].getEntry(path, FileOrDir.Any));
                         if (err === constants.WASI_ESUCCESS) {
                             let stat = await entry.stat();
                             buf.setBigUint64(0, stat.dev, true);
@@ -467,7 +467,7 @@ export const on_worker_message = async function (event, workerTable) {
             let err;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
-                err = await fds[fd].get_entry(path, FileOrDir.Directory, OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive);
+                err = await fds[fd].getEntry(path, FileOrDir.Directory, OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive);
             } else {
                 err = constants.WASI_EBADF;
             }

@@ -51,15 +51,9 @@ export class Filesystem {
     }
 
     async path_exists(absolute_path: string, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
-        const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
-        const padre = (await rootDir.get_entry(parts.join("/"), mode, 0)).entry;
-        try {
-            await padre._handle.getDirectoryHandle(name);
-        } catch {
-            return false;
-        }
-        return true;
+        const {err} = (await rootDir.getEntry(absolute_path, FileOrDir.Directory, 0));
+        return err === constants.WASI_ESUCCESS;
     }
 
     async addMount(absolute_path: string, mounted_handle: FileSystemDirectoryHandle): Promise<number> {
@@ -67,7 +61,7 @@ export class Filesystem {
         // TODO: refactor this when adding relative paths support for mount
         const {parts, name} = parsePath(absolute_path);
         const rootDir = await this.getRootDirectory();
-        const parent = await rootDir.get_entry(parts.join("/"), FileOrDir.Directory);
+        const parent = await rootDir.getEntry(parts.join("/"), FileOrDir.Directory);
         const dir = new Directory(name, mounted_handle, parent.entry, this);
         this.mounts.push({parts, name, dir});
         return constants.WASI_ESUCCESS;
@@ -232,7 +226,7 @@ abstract class Entry {
 
 export class Directory extends Entry {
     public readonly file_type: number = constants.WASI_FILETYPE_DIRECTORY;
-    declare _handle: FileSystemDirectoryHandle;
+    declare readonly _handle: FileSystemDirectoryHandle;
 
     async size(): Promise<number> {
         return 0;
@@ -256,23 +250,23 @@ export class Directory extends Entry {
     }
 
     // basically copied form RReverser's wasi-fs-access
-    get_entry(
+    getEntry(
         path: string,
         mode: FileOrDir.File,
         openFlags?: OpenFlags
     ): Promise<{err: number, entry: File}>;
-    get_entry(
+    getEntry(
         path: string,
         mode: FileOrDir.Directory,
         openFlags?: OpenFlags
     ): Promise<{err: number, entry: Directory}>;
-    get_entry(
+    getEntry(
         path: string,
         mode: FileOrDir,
         openFlags?: OpenFlags
     ): Promise<{err: number, entry: File | Directory}>;
-    async get_entry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-        console.log(`Directory(${this.path}).get_entry(${path}, mode=${mode}, ${oflags})`);
+    async getEntry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
+        console.log(`Directory(${this.path}).getEntry(${path}, mode=${mode}, ${oflags})`);
     
         let {err: err, name, parent} = await this._filesystem.getParent(this, path);
 
@@ -377,7 +371,7 @@ export class OpenDirectory extends Directory {
 
 export class File extends Entry {
     public readonly file_type: number = constants.WASI_FILETYPE_REGULAR_FILE;
-    declare protected readonly _handle: FileSystemFileHandle;
+    declare readonly _handle: FileSystemFileHandle;
 
     async size(): Promise<number> {
         let file = await this._handle.getFile();

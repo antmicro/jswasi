@@ -171,7 +171,7 @@ export async function init_all(anchor: HTMLElement) {
     io.onTerminalResize = (columns, rows) => {
     };
 
-    const pwd_dir = (await root_dir.get_entry("/home/ant", FileOrDir.Directory)).entry;
+    const pwd_dir = (await root_dir.getEntry("/home/ant", FileOrDir.Directory)).entry;
     pwd_dir.path = ".";
     await workerTable.spawnWorker(
         null, // parent_id
