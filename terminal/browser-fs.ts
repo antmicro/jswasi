@@ -140,7 +140,7 @@ export class Filesystem {
             }
         }
 
-	    console.log(`= ${name}, ${dir}`);
+	    console.log(`= ${name}, ${dir.path}`);
 	    return {err: constants.WASI_ESUCCESS, name, parent: dir};
     }
 
@@ -250,7 +250,7 @@ export class Directory extends Entry {
     }
 
     open() {
-        return new OpenDirectory(this.path, this._handle, this, this._filesystem);
+        return new OpenDirectory(this.path, this._handle, this.parent, this._filesystem);
     }
 
     // basically copied form RReverser's wasi-fs-access
@@ -287,12 +287,12 @@ export class Directory extends Entry {
                 return {err: constants.WASI_EISDIR, entry: null};
             }
  
-	        if (name == ".") {
-                let entry = new Directory(parent.name, parent._handle, parent.parent, this._filesystem);
+	        if (name === ".") {
+                let entry = new Directory(parent.path, parent._handle, parent.parent, this._filesystem);
                 return {err: constants.WASI_ESUCCESS, entry};
 	        }
-	        if (name == "..") {
-                let entry = new Directory(parent.parent.name, parent.parent._handle, parent.parent.parent, this._filesystem);
+	        if (name === "..") {
+                let entry = new Directory(parent.parent.path, parent.parent._handle, parent.parent.parent, this._filesystem);
                 return {err: constants.WASI_ESUCCESS, entry};
 	        } 
         }
