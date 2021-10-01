@@ -50,7 +50,7 @@ export class Filesystem {
         return new File(name, handle, dir, this);
     }
 
-    async path_exists(absolute_path: string, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
+    async pathExists(absolute_path: string, mode: FileOrDir = FileOrDir.Any): Promise<boolean> {
         const rootDir = await this.getRootDirectory();
         const {err} = (await rootDir.getEntry(absolute_path, FileOrDir.Directory, 0));
         return err === constants.WASI_ESUCCESS;

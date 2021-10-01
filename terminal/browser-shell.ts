@@ -7,7 +7,7 @@ import * as constants from "./constants.js";
 import {WorkerTable} from "./worker-table.js";
 import {on_worker_message} from "./worker-message.js";
 
-import {FileOrDir} from "./filesystem.js";
+import {FileOrDir, OpenFlags} from "./filesystem.js";
 import {Filesystem, Directory} from "./browser-fs.js";
 
 const ALWAYS_FETCH_BINARIES = {
@@ -31,19 +31,13 @@ const OPTIONAL_BINARIES = {
 };
 
 async function fetch_file(dir: Directory, filename: string, address: string, refetch: boolean = true) {
-    let new_dir_handle = dir;
-    let new_filename = filename;
-    if (filename[0] == '/') {
-	    // got an absolute path
-        const { err: err, name: nfilename, dir: dir_handl } = await filesystem.resolveAbsolute(filename);
-	    new_filename = nfilename;
-	    new_dir_handle = dir_handl;
-    } else if (filename.lastIndexOf("/") != -1) {
-	    console.log("Error: unsupported path!");
-	    // TODO: unsupported situation where its a relative path but not direct
+    const {err, entry} = await dir.getEntry(filename, FileOrDir.File, OpenFlags.Create);
+    if (err !== constants.WASI_ESUCCESS) {
+        console.warn(`Unable to resolve path for ${dir.path} and ${filename}`);
+        return;
     }
-    const handle = await new_dir_handle._filesystem.getFile(new_dir_handle, new_filename, {create: true});
-    const file = await handle._handle.getFile();
+    // @ts-ignore TODO: add API for file manipulation to File class
+    const file = await entry._handle.getFile();
     // only fetch binary if not yet present
     if (refetch || file.size === 0) {
         let response;
@@ -61,7 +55,8 @@ async function fetch_file(dir: Directory, filename: string, address: string, ref
         
         response = await fetch(address);
         if (response.status === 200) {
-            const writable = await handle._handle.createWritable();
+            // @ts-ignore TODO: add API for file manipulation to File class
+            const writable = await entry._handle.createWritable();
             await response.body.pipeTo(writable);
         } else {
             console.log(`Failed downloading ${filename} from ${address}`);
@@ -212,7 +207,7 @@ export async function mount(workerTable, worker_id, args, env) {
             }
 
             // check if path exits
-            if (!await filesystem.path_exists(path, FileOrDir.Directory)) {
+            if (!await filesystem.pathExists(path, FileOrDir.Directory)) {
                 workerTable.terminal.io.println(`mount: ${path}: no such directory`);
                 return null;
             }

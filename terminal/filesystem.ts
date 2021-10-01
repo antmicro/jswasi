@@ -11,11 +11,5 @@ export const enum OpenFlags {
     Truncate = 8, // constants.WASI_O_TRUNC,
 }
 
-export function parsePath(path: string): {parts: string[], name: string} {
-    const parts = path.split("/").filter(part => part !== "");
-    const name = parts.pop();
-    return {parts, name};
-}
-
 // TODO: we can use dynamic import() expression to export different filesystem classes
 //  under the same name depending on the platform (browser/node)
