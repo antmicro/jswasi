@@ -439,7 +439,7 @@ export const on_worker_message = async function (event, workerTable) {
             let err;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
-                ({err} = fds[fd].delete_entry(path));
+                ({err} = fds[fd].deleteEntry(path));
             }
 
             Atomics.store(lck, 0, err);
@@ -453,7 +453,7 @@ export const on_worker_message = async function (event, workerTable) {
             let err;
             const { fds } = workerTable.workerInfos[worker_id];
             if (fds[fd] != undefined) {
-                ({err} = fds[fd].delete_entry(path, {recursive: true}));
+                ({err} = fds[fd].deleteEntry(path, {recursive: true}));
             }
 
             Atomics.store(lck, 0, err);

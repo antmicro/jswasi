@@ -362,7 +362,8 @@ export class Directory extends Entry {
 export class OpenDirectory extends Directory {
     public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
-    async delete_entry(path: string, options): Promise<{err: number}> {
+    async deleteEntry(path: string, options): Promise<{err: number}> {
+        console.log(`OpenDirectory(${this.path}).deleteEntry(${path}, ${options})`);
         const {err, name, parent} = await this._filesystem.getParent(this, path);
         await parent._handle.removeEntry(name, options);
         return {err: constants.WASI_ESUCCESS};
@@ -395,7 +396,7 @@ export class OpenFile extends File {
     private _file_pos: number = 0;
 
     async read(len: number): Promise<[Uint8Array, number]> {
-        console.log(`OpenFile(${this.path}).read(${this.path} ${len})`);
+        console.log(`OpenFile(${this.path}).read(${len})`);
         let size = await this.size();
         if (this._file_pos < size) {
             let file = await this._handle.getFile();
