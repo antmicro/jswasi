@@ -186,7 +186,7 @@ export async function init(anchor: HTMLElement) {
   );
 }
 
-export async function mount(workerTable, worker_id, args, env) {
+export async function mount(workerTable, worker_id, args, env): Promise<number> {
   console.log(`mount(${worker_id}, ${args})`);
 
   switch (args.length) {
@@ -195,7 +195,7 @@ export async function mount(workerTable, worker_id, args, env) {
       for (const mount of filesystem.mounts) {
         workerTable.terminal.io.println(`fsapi on /${`${mount.parts.join('/')}/${mount.name}`}`);
       }
-      break;
+      return constants.WASI_ESUCCESS;
     }
     case 2: {
       let path = args[1];
@@ -207,7 +207,7 @@ export async function mount(workerTable, worker_id, args, env) {
       // check if path exits
       if (!await filesystem.pathExists(path, FileOrDir.Directory)) {
         workerTable.terminal.io.println(`mount: ${path}: no such directory`);
-        return null;
+        return 1;
       }
 
       let mount_point;
@@ -215,19 +215,20 @@ export async function mount(workerTable, worker_id, args, env) {
         mount_point = await showDirectoryPicker();
       } catch (e) {
         workerTable.terminal.io.println('mount: failed to open local directory');
-        return null;
+        return 1; // TODO: what would be a proper error here?
       }
 
       await filesystem.addMount(path, mount_point);
-      return mount_point;
+      return 0;
     }
     default: {
       workerTable.terminal.io.println('mount: help: mount [<mountpoint>]');
+      return 1;
     }
   }
 }
 
-export function umount(workerTable, worker_id, args, env) {
+export function umount(workerTable, worker_id, args, env): number {
   let path = args[1];
   // handle relative path
   if (!path.startsWith('/')) {
@@ -236,13 +237,14 @@ export function umount(workerTable, worker_id, args, env) {
 
   if (!filesystem.isMounted(path)) {
     workerTable.terminal.io.println(`umount: ${path}: not mounted`);
-    return;
+    return 1;
   }
 
   filesystem.removeMount(path);
+  return 0;
 }
 
-export async function wget(workerTable, worker_id, args, env) {
+export async function wget(workerTable, worker_id, args, env): Promise<number> {
   let filename: string;
   let address: string;
   if (args.length == 2) {
@@ -253,8 +255,9 @@ export async function wget(workerTable, worker_id, args, env) {
     filename = args[2];
   } else {
     workerTable.terminal.io.println('wget: help: wget <address> [<filename>]');
-    return;
+    return 1;
   }
   const { err, name, dir } = await filesystem.resolveAbsolute(`${env.PWD}/${filename}`);
   await fetchFile(dir, filename, address);
+  return 0;
 }

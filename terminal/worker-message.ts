@@ -6,7 +6,7 @@ export const on_worker_message = async function (event, workerTable) {
   const [worker_id, action, data] = event.data;
   switch (action) {
     case 'stdout': {
-      workerTable.receive_callback(data.replaceAll('\n', '\r\n')); // TODO
+      workerTable.receive_callback(data.replaceAll('\n', '\r\n'));
       break;
     }
     case 'stderr': {
@@ -54,34 +54,32 @@ export const on_worker_message = async function (event, workerTable) {
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
-		        case '/usr/bin/ps': {
-	                let ps_data = '  PID TTY          TIME CMD\n\r';
-		            for (let id = 0; id < workerTable.nextWorkerId; id++) {
-			            if (workerTable.alive[id]) {
-		                    const now = new Date();
+		case '/usr/bin/ps': {
+	      let ps_data = '  PID TTY          TIME CMD\n\r';
+		  for (let id = 0; id < workerTable.nextWorkerId; id++) {
+		    if (workerTable.alive[id]) {
+		      const now = new Date();
               const time = Math.floor(now.getTime() / 1000) - workerTable.workerInfos[id].timestamp;
               const seconds = time % 60;
               const minutes = ((time - seconds) / 60) % 60;
               const hours = (time - seconds - minutes * 60) / 60 / 60;
               ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerTable.workerInfos[id].cmd.split('/').slice(-1)[0]}\n\r`;
-			            }
-	                    }
-          workerTable.receive_callback(ps_data); // TODO
-		            Atomics.store(parent_lck, 0, 0);
-		            Atomics.notify(parent_lck, 0);
-		            break;
-		        }
+			}
+	      }
+          workerTable.receive_callback(ps_data);
+		  Atomics.store(parent_lck, 0, 0);
+		  Atomics.notify(parent_lck, 0);
+		  break;
+		}
         case '/usr/bin/mount': {
           const result = await mount(workerTable, worker_id, args, env);
-		            let err = constants.WASI_ESUCCESS;
-		            if (result == null) err = constants.WASI_EBADF;
-          Atomics.store(parent_lck, 0, err);
+          Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
           break;
         }
         case '/usr/bin/umount': {
-          await umount(workerTable, worker_id, args, env);
-          Atomics.store(parent_lck, 0, 0);
+          const result = umount(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
           break;
         }

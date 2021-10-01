@@ -11,7 +11,8 @@ export class Filesystem {
       if (!this._rootDir) {
         const root = await navigator.storage.getDirectory();
         const rootDir = new Directory('', root, null, this);
-        rootDir.parent = rootDir; // TODO: root dir parent should root dir or null?
+        // root parent is the root itself
+        rootDir.parent = rootDir;
 	        this._rootDir = rootDir;
       }
       return this._rootDir;
@@ -26,13 +27,13 @@ export class Filesystem {
         return dir.parent;
       }
 
-	    const root = await navigator.storage.getDirectory();
-	    let components = null;
-	    try {
-        components = await root.resolve(dir._handle);
-	    } catch {
-	        console.log('There was an error in root.resolve...');
-	    }
+	  const root = await navigator.storage.getDirectory();
+	  let components = null;
+	  try {
+      components = await root.resolve(dir._handle);
+	  } catch {
+	      console.log('There was an error in root.resolve...');
+	  }
 
       // if there are many mounts for the same path, we want to return the latest
       const reversed_mounts = [].concat(this.mounts).reverse();
@@ -57,8 +58,7 @@ export class Filesystem {
     }
 
     async addMount(absolute_path: string, mounted_handle: FileSystemDirectoryHandle): Promise<number> {
-      // TODO: for now path must be absolute
-      // TODO: refactor this when adding relative paths support for mount
+      // TODO: for now path must be absolute, refactor this when adding relative paths support for mount
       const { parts, name } = parsePath(absolute_path);
       const rootDir = await this.getRootDirectory();
       const parent = await rootDir.getEntry(parts.join('/'), FileOrDir.Directory);
