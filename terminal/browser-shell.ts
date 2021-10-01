@@ -64,7 +64,7 @@ async function fetchFile(dir: Directory, filename: string, address: string, refe
     }
 }
 
-export async function init_fs(anchor: HTMLElement) {
+export async function initFs(anchor: HTMLElement) {
     // setup filesystem
     const root = await navigator.storage.getDirectory();
     const tmp = await root.getDirectoryHandle("tmp", {create: true});
@@ -104,13 +104,13 @@ export async function init_fs(anchor: HTMLElement) {
 // things that are global and should be shared between all tab instances
 const filesystem = new Filesystem();
 
-export async function init_all(anchor: HTMLElement) {
+export async function initAll(anchor: HTMLElement) {
     anchor.innerHTML = 'Fetching binaries, this should only happen once.';
-    await init_fs(anchor);
+    await initFs(anchor);
     anchor.innerHTML = '';
 
     // FIXME: for now we assume hterm is in scope
-    // attempt to pass Terminal to init_all as a parameter would fail
+    // attempt to pass Terminal to initAll as a parameter would fail
     // @ts-ignore
     const terminal = new hterm.Terminal();
 
