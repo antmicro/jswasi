@@ -523,7 +523,16 @@ fn handle_input(
                                         }
                                     }
                                 }
-                                "exit" => exit(0),
+                                "exit" => {
+                                    let exit_code: i32 = {
+                                        if args.is_empty() {
+                                            0
+                                        } else {
+                                            args[0].parse().unwrap()
+                                        }
+                                    };
+                                    exit(exit_code);
+                                }
                                 // no input
                                 "" => {}
                                 // external commands or command not found
