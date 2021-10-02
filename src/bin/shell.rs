@@ -233,13 +233,12 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
                                 escaped = false;
                             }
                             _ => {
-                                println!("WE HAVE UKNOWN CONTROL CODE '[' + {}", c2[0] as u8);
+                                println!("WE HAVE UNKNOWN CONTROL CODE '[' + {}", c2[0] as u8);
                                 escaped = false;
                             }
                         }
                     }
                     _ => {
-                        //println!("WE HAVE UNKNOWN CONTROL CODE {}", c[0] as u8);
                         escaped = false;
                     }
                 }
@@ -429,6 +428,26 @@ fn handle_input(
                                 "clear" => {
                                     print!(""); // TODO: send clear escape codes
                                 }
+                                "export" => {
+                                        // export creates a local value if A=B notation is used, or just
+                                        // copies a local value to env if no "=" is used. export on 
+                                        // unexisting local var does nothing.
+                                        // to implement it fully we need local vars support.
+                                        if args.len() < 1 {
+                                            println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                                        }
+                                        for arg in args {
+                                           if arg.contains("=") {
+                                               let mut args_ = arg.split("=");
+                                               let key = args_.next().unwrap();
+                                               let value = args_.next().unwrap();
+                                               env::set_var(&key, &value);
+                                               syscall("set_env", &[&key, &value])?;
+                                           } else {
+                                               println!("TODO: export local vars is not yet implemented. should export {}", arg);
+                                           }
+                                        }
+                                }
                                 "hexdump" => {
                                     if args.is_empty() {
                                         println!("hexdump: help: hexump <filename>");
@@ -531,6 +550,10 @@ fn handle_input(
                             }
                         }
                         Action::SetEnv{ key, value } => {
+                            // TODO: this should only happen if we are setting a var
+                            //       via "export KEY VALUE", normally we need an additional
+                            //       "local" set of variables visible only to this process
+                            env::set_var(&key, &value);
                             syscall("set_env", &[&key, &value])?;
                         }
                         action => println!("{:#?} not yet implemented in shell", action),
