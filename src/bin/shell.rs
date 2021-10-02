@@ -358,6 +358,8 @@ fn handle_input(
                                 "cd" => {
                                     let path = if args.is_empty() {
                                         PathBuf::from(env::var("HOME")?)
+                                    } else if args[0] == "-" {
+                                        PathBuf::from(env::var("OLDPWD")?)
                                     } else if args[0].starts_with('/') {
                                         PathBuf::from(&args[0])
                                     } else {
