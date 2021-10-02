@@ -505,17 +505,22 @@ function WASI() {
     }
     if (cmd == 'set_env') {
       const args = fullcmd.substring(cmd.length + 1, 1000).split('\x1b');
-      env[args[0]] = args[1];
-      if (args[0] == 'PWD') {
-        env[args[0]] = realpath(env[args[0]]);
-        const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sbuf, 0, 1);
-        lck[0] = -1;
-        worker_send(['chdir', [realpath(env[args[0]]), sbuf]]);
-        Atomics.wait(lck, 0, -1);
-      }
-      worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
-      return env[args[0]];
+      if (args.length == 1) {
+          delete env[args[0]];
+	  return '';
+      } else {
+          env[args[0]] = args[1];
+          if (args[0] == 'PWD') {
+            env[args[0]] = realpath(env[args[0]]);
+            const sbuf = new SharedArrayBuffer(4);
+            const lck = new Int32Array(sbuf, 0, 1);
+            lck[0] = -1;
+            worker_send(['chdir', [realpath(env[args[0]]), sbuf]]);
+            Atomics.wait(lck, 0, -1);
+          }
+          worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
+          return env[args[0]];
+        }
     }
 
     worker_console_log(`Special command ${cmd} not found.`);

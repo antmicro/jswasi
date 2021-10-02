@@ -433,9 +433,15 @@ fn handle_input(
                                             println!("export: help: unset <VAR> [<VAR>] ...");
                                         }
                                         for arg in args {
-                                            env::remove_var(&arg);
-                                            // TODO: add syscall to unset
-                                            println!("TODO: unset not fully implemented. should unset {}", arg);
+                                            if arg == "PWD" || arg == "HOME" {
+                                                println!("unset: cannot unset {}", &arg);
+                                            } else {
+                                                // TODO: also unset a local var if exists
+                                                if !env::var(&arg).is_err() {
+                                                    env::remove_var(&arg);
+                                                    syscall("set_env", &[&arg])?;
+                                                }
+                                            }
                                         }
                                 }
                                 "export" => {
