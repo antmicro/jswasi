@@ -428,6 +428,16 @@ fn handle_input(
                                 "clear" => {
                                     print!(""); // TODO: send clear escape codes
                                 }
+                                "unset" => {
+                                        if args.len() < 1 {
+                                            println!("export: help: unset <VAR> [<VAR>] ...");
+                                        }
+                                        for arg in args {
+                                            env::remove_var(&arg);
+                                            // TODO: add syscall to unset
+                                            println!("TODO: unset not fully implemented. should unset {}", arg);
+                                        }
+                                }
                                 "export" => {
                                         // export creates a local value if A=B notation is used, or just
                                         // copies a local value to env if no "=" is used. export on 
