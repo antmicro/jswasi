@@ -426,7 +426,7 @@ fn handle_input(
                                     }
                                 }
                                 "clear" => {
-                                    print!(""); // TODO: send clear escape codes
+                                    print!("\x1b[2J\x1b[H");
                                 }
                                 "unset" => {
                                         if args.len() < 1 {
@@ -444,12 +444,28 @@ fn handle_input(
                                             }
                                         }
                                 }
+                                "declare" => {
+                                        if args.is_empty() {
+                                            // TODO: list local variables
+                                            println!("TODO: listing local vars is not yet implemented.");
+                                        } else {
+                                            for arg in args {
+                                                if arg.contains("=") {
+                                                   let mut args_ = arg.split("=");
+                                                   let key = args_.next().unwrap();
+                                                   let value = args_.next().unwrap();
+                                                   println!("TODO: declaring local vars is not yet implemented. should declare {}={}", key, value);
+                                                    // TODO: register local value
+                                                }
+                                            }
+                                        }
+                                }
                                 "export" => {
-                                        // export creates a local value if A=B notation is used, or just
-                                        // copies a local value to env if no "=" is used. export on 
+                                        // export creates an env value if A=B notation is used, or just
+                                        // copies a local var to env if no "=" is used. export on 
                                         // unexisting local var does nothing.
                                         // to implement it fully we need local vars support.
-                                        if args.len() < 1 {
+                                        if args.is_empty() {
                                             println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                                         }
                                         for arg in args {
