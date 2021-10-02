@@ -28,14 +28,9 @@ fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
             let mut cmd = Command::new(iter.next().unwrap());
             for arg in iter { cmd.arg(arg); }
             let mut app = cmd.spawn().unwrap();
-            app.wait();
-            PathBuf::from("")
-        } else if command == "set_env" {
-            // TODO: should be more careful
-            PathBuf::from(args[1])
-        } else {
-            PathBuf::from("")
+            app.wait()?;
         }
+        PathBuf::from("")
     };
     Ok(result
         .to_str()
@@ -376,6 +371,9 @@ fn handle_input(
                                     } else {
                                         env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                                         syscall("set_env", &["OLDPWD", env::current_dir()?.to_str().unwrap()])?;
+                                        #[cfg(not(target_os="wasi"))]
+                                        let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
+                                        #[cfg(target_os="wasi")]
                                         let pwd_path = PathBuf::from(syscall("set_env", &["PWD", path.to_str().unwrap()])?);
                                         env::set_var("PWD", pwd_path.to_str().unwrap());
                                         env::set_current_dir(&pwd_path)?;
