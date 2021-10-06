@@ -17,6 +17,10 @@ use shell::{interpret, Action};
 #[cfg(not(target_os="wasi"))]
 use std::process::Command;
 
+use std::collections::HashMap;
+
+static mut VARS: Option<HashMap<String, String>> = None;
+
 // communicate with the worker thread
 fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
 #[cfg(target_os="wasi")]
@@ -40,6 +44,9 @@ fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    unsafe {
+        VARS = Some(HashMap::new());
+    }
     let name = {
         let mut path = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
         path.set_extension("");
@@ -436,7 +443,10 @@ fn handle_input(
                                             if arg == "PWD" || arg == "HOME" {
                                                 println!("unset: cannot unset {}", &arg);
                                             } else {
-                                                // TODO: also unset a local var if exists
+                                                unsafe {
+                                                    // TODO: check if exists etc
+                                                    VARS.as_mut().unwrap().remove(&arg);
+                                                }
                                                 if !env::var(&arg).is_err() {
                                                     env::remove_var(&arg);
                                                     syscall("set_env", &[&arg])?;
@@ -446,16 +456,22 @@ fn handle_input(
                                 }
                                 "declare" => {
                                         if args.is_empty() {
-                                            // TODO: list local variables
-                                            println!("TODO: listing local vars is not yet implemented.");
+                                            // TODO: check some stuff?
+                                            unsafe {
+                                                for (key, value) in VARS.as_mut().unwrap() {
+                                                    println!("{}={}", key, value);
+                                                }
+                                            }
                                         } else {
                                             for arg in args {
                                                 if arg.contains("=") {
                                                    let mut args_ = arg.split("=");
                                                    let key = args_.next().unwrap();
                                                    let value = args_.next().unwrap();
-                                                   println!("TODO: declaring local vars is not yet implemented. should declare {}={}", key, value);
-                                                    // TODO: register local value
+                                                   unsafe {
+                                                       // TODO: check if exists etc
+                                                       VARS.as_mut().unwrap().insert(key.to_string(), value.to_string());
+                                                   }
                                                 }
                                             }
                                         }
@@ -476,7 +492,14 @@ fn handle_input(
                                                env::set_var(&key, &value);
                                                syscall("set_env", &[&key, &value])?;
                                            } else {
-                                               println!("TODO: export local vars is not yet implemented. should export {}", arg);
+                                               let value = {
+                                                   unsafe {
+                                                       // TODO: check if exists
+                                                       &VARS.as_mut().unwrap()[&arg]
+                                                   }
+                                               };
+                                               env::set_var(&arg, value);
+                                               syscall("set_env", &[&arg, value])?;
                                            }
                                         }
                                 }
