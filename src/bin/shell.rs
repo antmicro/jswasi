@@ -14,23 +14,23 @@ use conch_parser::parse::DefaultParser;
 
 use shell::{interpret, Action};
 
-#[cfg(not(target_os="wasi"))]
+#[cfg(not(target_os = "wasi"))]
 use std::process::Command;
 
 use std::collections::HashMap;
 
-static mut VARS: Option<HashMap<String, String>> = None;
-
 // communicate with the worker thread
 fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
-#[cfg(target_os="wasi")]
+    #[cfg(target_os = "wasi")]
     let result = fs::read_link(format!("/!{} {}", command, args.join("\x1b")))?;
-#[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
             let mut iter = args.iter();
             let mut cmd = Command::new(iter.next().unwrap());
-            for arg in iter { cmd.arg(arg); }
+            for arg in iter {
+                cmd.arg(arg);
+            }
             let mut app = cmd.spawn().unwrap();
             app.wait()?;
         }
@@ -44,9 +44,6 @@ fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    unsafe {
-        VARS = Some(HashMap::new());
-    }
     let name = {
         let mut path = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
         path.set_extension("");
@@ -71,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short('c')
                 .long("command")
                 .value_name("COMMAND")
-                .takes_value(true)
+                .takes_value(true),
         )
         .get_matches();
 
@@ -86,14 +83,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_command(command: &str) -> Result<(), Box<dyn std::error::Error>> {
     let pwd = env::current_dir()?.display().to_string();
-    let history: Vec<String> = Vec::new();
-    handle_input(command, &pwd, &history)
+    let history = Vec::new();
+    let mut vars = HashMap::new();
+    handle_input(command, &pwd, &history, &mut vars)
 }
 
 fn run_script(script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let pwd = env::current_dir()?.display().to_string();
     let history: Vec<String> = Vec::new();
-    handle_input(&fs::read_to_string(script_name.into())?, &pwd, &history)
+    let mut vars = HashMap::new();
+    handle_input(
+        &fs::read_to_string(script_name.into())?,
+        &pwd,
+        &history,
+        &mut vars,
+    )
 }
 
 fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
@@ -108,6 +112,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
     env::set_current_dir(env::var("PWD")?)?;
 
     let mut history: Vec<String> = Vec::new();
+    let mut vars = HashMap::new();
 
     let motd_path = PathBuf::from("/etc/motd");
     if motd_path.exists() {
@@ -331,7 +336,7 @@ fn run_interpreter() -> Result<(), Box<dyn std::error::Error>> {
             history.push(input.clone());
         }
 
-        if let Err(error) = handle_input(&input, &pwd, &history) {
+        if let Err(error) = handle_input(&input, &pwd, &history, &mut vars) {
             println!("{:#?}", error);
         };
     }
@@ -341,6 +346,7 @@ fn handle_input(
     input: &str,
     pwd: &str,
     history: &[String],
+    vars: &mut HashMap<String, String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lex = Lexer::new(input.chars());
     let parser = DefaultParser::new(lex);
@@ -376,14 +382,27 @@ fn handle_input(
 
                                     // simply including this in source breaks shell
                                     if !Path::new(&path).exists() {
-                                        println!("cd: no such file or directory: {}", path.display());
+                                        println!(
+                                            "cd: no such file or directory: {}",
+                                            path.display()
+                                        );
                                     } else {
-                                        env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
-                                        syscall("set_env", &["OLDPWD", env::current_dir()?.to_str().unwrap()])?;
-                                        #[cfg(not(target_os="wasi"))]
-                                        let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
-                                        #[cfg(target_os="wasi")]
-                                        let pwd_path = PathBuf::from(syscall("set_env", &["PWD", path.to_str().unwrap()])?);
+                                        env::set_var(
+                                            "OLDPWD",
+                                            env::current_dir()?.to_str().unwrap(),
+                                        ); // TODO: WASI does not support this
+                                        syscall(
+                                            "set_env",
+                                            &["OLDPWD", env::current_dir()?.to_str().unwrap()],
+                                        )?;
+                                        #[cfg(not(target_os = "wasi"))]
+                                        let pwd_path =
+                                            PathBuf::from(fs::canonicalize(path).unwrap());
+                                        #[cfg(target_os = "wasi")]
+                                        let pwd_path = PathBuf::from(syscall(
+                                            "set_env",
+                                            &["PWD", path.to_str().unwrap()],
+                                        )?);
                                         env::set_var("PWD", pwd_path.to_str().unwrap());
                                         env::set_current_dir(&pwd_path)?;
                                     }
@@ -401,21 +420,21 @@ fn handle_input(
                                         println!("sleep: missing operand");
                                     }
                                 }
-                                "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls"
-                                | "date" | "printf" | "env" | "cat" => {
+                                "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
+                                | "ls" | "date" | "printf" | "env" | "cat" => {
                                     args.insert(0, command.as_str().to_string());
-                                    #[cfg(target_os="wasi")]
+                                    #[cfg(target_os = "wasi")]
                                     args.insert(0, String::from("/usr/bin/uutils"));
-                                    #[cfg(not(target_os="wasi"))]
+                                    #[cfg(not(target_os = "wasi"))]
                                     args.insert(0, String::from("/bin/busybox"));
                                     let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
                                     syscall("spawn", &args_[..])?;
                                 }
                                 "ln" | "printenv" | "md5sum" => {
                                     args.insert(0, command.as_str().to_string());
-                                    #[cfg(target_os="wasi")]
+                                    #[cfg(target_os = "wasi")]
                                     args.insert(0, String::from("/usr/bin/coreutils"));
-                                    #[cfg(not(target_os="wasi"))]
+                                    #[cfg(not(target_os = "wasi"))]
                                     args.insert(0, String::from("/bin/busybox"));
                                     let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
                                     syscall("spawn", &args_[..])?;
@@ -427,7 +446,10 @@ fn handle_input(
                                         match fs::write(args.remove(0), args.join(" ")) {
                                             Ok(_) => {}
                                             Err(error) => {
-                                                println!("write: failed to write to file: {}", error)
+                                                println!(
+                                                    "write: failed to write to file: {}",
+                                                    error
+                                                )
                                             }
                                         }
                                     }
@@ -436,81 +458,70 @@ fn handle_input(
                                     print!("\x1b[2J\x1b[H");
                                 }
                                 "unset" => {
-                                        if args.len() < 1 {
-                                            println!("export: help: unset <VAR> [<VAR>] ...");
-                                        }
-                                        for arg in args {
-                                            if arg == "PWD" || arg == "HOME" {
-                                                println!("unset: cannot unset {}", &arg);
-                                            } else {
-                                                unsafe {
-                                                    // TODO: check if exists etc
-                                                    VARS.as_mut().unwrap().remove(&arg);
-                                                }
-                                                if !env::var(&arg).is_err() {
-                                                    env::remove_var(&arg);
-                                                    syscall("set_env", &[&arg])?;
-                                                }
+                                    if args.len() < 1 {
+                                        println!("export: help: unset <VAR> [<VAR>] ...");
+                                    }
+                                    for arg in args {
+                                        if arg == "PWD" || arg == "HOME" {
+                                            println!("unset: cannot unset {}", &arg);
+                                        } else {
+                                            vars.remove(&arg);
+                                            if !env::var(&arg).is_err() {
+                                                env::remove_var(&arg);
+                                                syscall("set_env", &[&arg])?;
                                             }
                                         }
+                                    }
                                 }
                                 "declare" => {
-                                        if args.is_empty() {
-                                            // TODO: check some stuff?
-                                            unsafe {
-                                                for (key, value) in VARS.as_mut().unwrap() {
-                                                    println!("{}={}", key, value);
-                                                }
-                                            }
-                                        } else {
-                                            for arg in args {
-                                                if arg.contains("=") {
-                                                   let mut args_ = arg.split("=");
-                                                   let key = args_.next().unwrap();
-                                                   let value = args_.next().unwrap();
-                                                   unsafe {
-                                                       // TODO: check if exists etc
-                                                       VARS.as_mut().unwrap().insert(key.to_string(), value.to_string());
-                                                   }
-                                                }
+                                    if args.is_empty() {
+                                        // TODO: check some stuff?
+                                        for (key, value) in vars.iter() {
+                                            println!("{}={}", key, value);
+                                        }
+                                    } else {
+                                        for arg in args {
+                                            if arg.contains("=") {
+                                                let mut args_ = arg.split("=");
+                                                let key = args_.next().unwrap();
+                                                let value = args_.next().unwrap();
+                                                // TODO: check if exists etc
+                                                vars.insert(key.to_string(), value.to_string());
                                             }
                                         }
+                                    }
                                 }
                                 "export" => {
-                                        // export creates an env value if A=B notation is used, or just
-                                        // copies a local var to env if no "=" is used. export on 
-                                        // unexisting local var does nothing.
-                                        // to implement it fully we need local vars support.
-                                        if args.is_empty() {
-                                            println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                                    // export creates an env value if A=B notation is used, or just
+                                    // copies a local var to env if no "=" is used. export on
+                                    // unexisting local var does nothing.
+                                    // to implement it fully we need local vars support.
+                                    if args.is_empty() {
+                                        println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                                    }
+                                    for arg in args {
+                                        if arg.contains("=") {
+                                            let mut args_ = arg.split("=");
+                                            let key = args_.next().unwrap();
+                                            let value = args_.next().unwrap();
+                                            env::set_var(&key, &value);
+                                            syscall("set_env", &[&key, &value])?;
+                                        } else {
+                                            let value = &vars[&arg];
+                                            env::set_var(&arg, value);
+                                            syscall("set_env", &[&arg, value])?;
                                         }
-                                        for arg in args {
-                                           if arg.contains("=") {
-                                               let mut args_ = arg.split("=");
-                                               let key = args_.next().unwrap();
-                                               let value = args_.next().unwrap();
-                                               env::set_var(&key, &value);
-                                               syscall("set_env", &[&key, &value])?;
-                                           } else {
-                                               let value = {
-                                                   unsafe {
-                                                       // TODO: check if exists
-                                                       &VARS.as_mut().unwrap()[&arg]
-                                                   }
-                                               };
-                                               env::set_var(&arg, value);
-                                               syscall("set_env", &[&arg, value])?;
-                                           }
-                                        }
+                                    }
                                 }
                                 "hexdump" => {
                                     if args.is_empty() {
                                         println!("hexdump: help: hexump <filename>");
                                     } else {
-                                        let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
-                                            println!("hexdump: error: file not found.");
-                                            return vec![];
-                                        });
+                                        let contents =
+                                            fs::read(args.remove(0)).unwrap_or_else(|_| {
+                                                println!("hexdump: error: file not found.");
+                                                return vec![];
+                                            });
                                         let len = contents.len();
                                         let mut v = ['.'; 16];
                                         for j in 0..len {
@@ -587,7 +598,9 @@ fn handle_input(
                                         let mut found = false;
                                         let mut fullpath = PathBuf::new();
                                         // get PATH env variable, split it and look for binaries in each directory
-                                        for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
+                                        for bin_dir in
+                                            env::var("PATH").unwrap_or_default().split(':')
+                                        {
                                             let bin_dir = PathBuf::from(bin_dir);
                                             fullpath = bin_dir.join(&command);
                                             if fullpath.is_file() {
@@ -605,7 +618,8 @@ fn handle_input(
                                     match fullpath {
                                         Ok(path) => {
                                             args.insert(0, path.display().to_string());
-                                            let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                                            let args_: Vec<&str> =
+                                                args.iter().map(|s| &**s).collect();
                                             let _result = syscall("spawn", &args_[..]);
                                         }
                                         Err(reason) => println!("{}", reason),
@@ -613,7 +627,7 @@ fn handle_input(
                                 }
                             }
                         }
-                        Action::SetEnv{ key, value } => {
+                        Action::SetEnv { key, value } => {
                             // TODO: this should only happen if we are setting a var
                             //       via "export KEY VALUE", normally we need an additional
                             //       "local" set of variables visible only to this process
