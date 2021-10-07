@@ -628,12 +628,9 @@ fn handle_input(
                             }
                         }
                         Action::SetEnv { key, value } => {
-                            // TODO: this should only happen if we are setting a var
-                            //       via "export KEY VALUE", normally we need an additional
-                            //       "local" set of variables visible only to this process
-                            env::set_var(&key, &value);
-                            syscall("set_env", &[&key, &value])?;
+                            vars.insert(key, value);
                         }
+
                         action => println!("{:#?} not yet implemented in shell", action),
                     }
                 }
