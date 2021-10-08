@@ -51,10 +51,14 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
             ast::RedirectOrCmdWord::CmdWord(cmd_word) => handle_top_level_word(&shell, &cmd_word.0),
         });
 
-    let command = words.next().unwrap();
-    let mut args = words.collect::<Vec<_>>();
-
-    let result = shell.execute_command(&command, &mut args, &env, background);
+    if let Some(command) = words.next() {
+        let mut args = words.collect::<Vec<_>>();
+        let result = shell.execute_command(&command, &mut args, &env, background);
+    } else {
+        for (key, value) in env.iter() {
+            shell.vars.insert(key.clone(), value.clone());
+        }
+    }
 }
 
 fn handle_top_level_word<'a>(
