@@ -172,7 +172,7 @@ export async function init(anchor: HTMLElement) {
     on_worker_message,
     '/usr/bin/shell',
     // stdin, stderr, stdout, root, pwd, TODO: why must fds[5] be present for ls to work, and what should it be
-    [null, null, null, await root_dir.open(), pwd_dir.open(), root_dir.open()],
+    [null, null, null, await root_dir.open(), await pwd_dir.open(), await root_dir.open()],
     ['shell'],
     {
       RUST_BACKTRACE: 'full',
@@ -182,6 +182,9 @@ export async function init(anchor: HTMLElement) {
       TMPDIR: '/tmp',
       TERM: 'xterm-256color',
       HOME: '/home/ant',
+      SHELL: '/usr/bin/shell',
+      LANG: 'en_US.UTF-8',
+      USER: 'ant',
     },
   );
 }
