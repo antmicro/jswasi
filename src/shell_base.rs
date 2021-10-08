@@ -21,7 +21,7 @@ use std::collections::HashMap;
 // communicate with the worker thread
 pub fn syscall(command: &str, args: &[&str], env: &HashMap<String, String>) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
-    let result = fs::read_link(format!("/!{} {} {}", command, args.join("\x1b"), env.iter().map(|(key, val)| format!("{}={}", key, val)).collect::<Vec<_>>().join("\x1b")))?;
+    let result = fs::read_link(format!("/!{}\x1b\x1b{}\x1b\x1b{}", command, args.join("\x1b"), env.iter().map(|(key, val)| format!("{}={}", key, val)).collect::<Vec<_>>().join("\x1b")))?;
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
@@ -355,7 +355,7 @@ impl Shell {
                                             let pwd_path = PathBuf::from(syscall(
                                                 "set_env",
                                                 &["PWD", path.to_str().unwrap()],
-                                                &self.vars,
+                                                &HashMap::new(),
                                             )?);
                                             env::set_var("PWD", pwd_path.to_str().unwrap());
                                             env::set_current_dir(&pwd_path)?;
@@ -385,7 +385,7 @@ impl Shell {
                                         #[cfg(not(target_os = "wasi"))]
                                         args.insert(0, String::from("/bin/busybox"));
                                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                                        syscall("spawn", &args_[..], &self.vars)?;
+                                        syscall("spawn", &args_[..], &HashMap::new())?;
                                     }
                                     "ln" | "printenv" | "md5sum" => {
                                         args.insert(0, command.as_str().to_string());
@@ -394,7 +394,7 @@ impl Shell {
                                         #[cfg(not(target_os = "wasi"))]
                                         args.insert(0, String::from("/bin/busybox"));
                                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                                        syscall("spawn", &args_[..], &self.vars)?;
+                                        syscall("spawn", &args_[..], &HashMap::new())?;
                                     }
                                     "write" => {
                                         if args.len() < 2 {
@@ -425,7 +425,7 @@ impl Shell {
                                                 self.vars.remove(&arg);
                                                 if !env::var(&arg).is_err() {
                                                     env::remove_var(&arg);
-                                                    syscall("set_env", &[&arg], &self.vars)?;
+                                                    syscall("set_env", &[&arg], &HashMap::new())?;
                                                 }
                                             }
                                         }
@@ -462,7 +462,7 @@ impl Shell {
                                                 let key = args_.next().unwrap();
                                                 let value = args_.next().unwrap();
                                                 env::set_var(&key, &value);
-                                                syscall("set_env", &[&key, &value], &self.vars)?;
+                                                syscall("set_env", &[&key, &value], &HashMap::new())?;
                                             } else {
                                                 let value = &self.vars[&arg];
                                                 env::set_var(&arg, value);
