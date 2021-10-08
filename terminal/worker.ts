@@ -495,10 +495,10 @@ function WASI() {
       return '';
     }
     if (cmd == 'set_env') {
-      const args = fullcmd.substring(cmd.length + 1, 1000).split('\x1b');
+      const args = args_string.split('\x1b');
       if (args.length == 1) {
-          delete env[args[0]];
-	  return '';
+        delete env[args[0]];
+	    return '';
       } else {
           env[args[0]] = args[1];
           if (args[0] == 'PWD') {

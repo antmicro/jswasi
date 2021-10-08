@@ -10,7 +10,6 @@ pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
         ast::Command::Job(list) => handle_listable_command(shell, list, true),
         ast::Command::List(list) => handle_listable_command(shell, list, false),
     };
-    // dbg!(&actions);
 }
 
 fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) {
