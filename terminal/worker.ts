@@ -10,12 +10,11 @@ const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 
-let started = false;
-// TODO: rename to module
-let mod = '';
-let myself = null;
-let args = [];
-let env = {};
+let started: boolean;
+let mod: string;
+let myself: number;
+let args: string[];
+let env: {key: string, val: string};
 
 const onmessage_ = function (e) {
   worker_console_log('got a message!');

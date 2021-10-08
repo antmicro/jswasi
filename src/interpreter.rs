@@ -1,6 +1,8 @@
 use conch_parser::ast;
 use std::env;
 
+use crate::shell_base::syscall;
+
 #[derive(Debug)]
 pub enum Action {
     Command {
@@ -16,7 +18,7 @@ pub enum Action {
 }
 
 pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Vec<Action> {
-    // println!("{:#?}", cmd);
+    println!("{:#?}", cmd);
     let actions = match &cmd.0 {
         ast::Command::Job(list) => handle_listable_command(list, true),
         ast::Command::List(list) => handle_listable_command(list, false),
@@ -29,46 +31,7 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ve
     match &list.first {
         ast::ListableCommand::Single(cmd) => {
             match cmd {
-                ast::PipeableCommand::Simple(cmd) => {
-                    let mut env_vars = cmd
-                        .redirects_or_env_vars
-                        .iter()
-                        .filter_map(|redirect_or_env_var| match redirect_or_env_var {
-                            ast::RedirectOrEnvVar::EnvVar(key, value) => {
-                                let value = match value {
-                                    None => Some("".to_string()),
-                                    Some(top_level_word) => handle_top_level_word(&top_level_word),
-                                };
-                                match value {
-                                    None => None,
-                                    Some(value) => Some(Action::SetEnv {
-                                        key: key.clone(),
-                                        value,
-                                    }),
-                                }
-                            }
-                            _ => None,
-                        })
-                        .collect::<Vec<Action>>();
-                    let mut words = cmd
-                        .redirects_or_cmd_words
-                        .iter()
-                        .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
-                            ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
-                            ast::RedirectOrCmdWord::CmdWord(cmd_word) => {
-                                handle_top_level_word(&cmd_word.0)
-                            }
-                        })
-                        .collect::<Vec<String>>();
-                    if !words.is_empty() {
-                        env_vars.push(Action::Command {
-                            name: words.remove(0),
-                            args: words,
-                            background,
-                        });
-                    }
-                    env_vars
-                }
+                ast::PipeableCommand::Simple(cmd) => handle_simple_command(&cmd, background),
                 _ => vec![],
             }
         }
@@ -77,6 +40,50 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ve
 
     // TODO: handle list.rest
 }
+
+fn handle_simple_command(cmd: &ast::DefaultSimpleCommand, background: bool) -> Vec<Action> {
+    let mut env_vars = cmd
+        .redirects_or_env_vars
+        .iter()
+        .filter_map(|redirect_or_env_var| match redirect_or_env_var {
+            ast::RedirectOrEnvVar::EnvVar(key, value) => {
+                let value = match value {
+                    None => Some("".to_string()),
+                    Some(top_level_word) => handle_top_level_word(&top_level_word),
+                };
+                match value {
+                    None => None,
+                    Some(value) => Some(Action::SetEnv {
+                        key: key.clone(),
+                        value,
+                    }),
+                }
+            }
+            _ => None,
+        })
+        .collect::<Vec<Action>>();
+    let mut words = cmd
+        .redirects_or_cmd_words
+        .iter()
+        .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
+            ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
+            ast::RedirectOrCmdWord::CmdWord(cmd_word) => {
+                handle_top_level_word(&cmd_word.0)
+            }
+        })
+        .collect::<Vec<String>>();
+    if !words.is_empty() {
+        env_vars.push(Action::Command {
+            name: words.remove(0),
+            args: words,
+            background,
+        });
+    }
+
+    // TODO: syscall should happen here
+    env_vars
+}
+
 
 fn handle_top_level_word(word: &ast::DefaultComplexWord) -> Option<String> {
     match word {

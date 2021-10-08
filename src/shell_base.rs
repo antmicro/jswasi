@@ -19,7 +19,7 @@ use std::process::Command;
 use std::collections::HashMap;
 
 // communicate with the worker thread
-fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+pub fn syscall(command: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
     let result = fs::read_link(format!("/!{} {}", command, args.join("\x1b")))?;
     #[cfg(not(target_os = "wasi"))]
@@ -376,7 +376,7 @@ impl Shell {
                                         }
                                     }
                                     "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
-                                    | "ls" | "date" | "printf" | "env" | "cat" => {
+                                    | "ls" | "date" | "printf" | "env" | "cat" | "realpath" => {
                                         args.insert(0, command.as_str().to_string());
                                         #[cfg(target_os = "wasi")]
                                         args.insert(0, String::from("/usr/bin/uutils"));
