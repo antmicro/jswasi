@@ -83,6 +83,13 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if env::var("PWD").is_err() {
+            env::set_var("PWD", "/");
+        }
+        if env::var("HOME").is_err() {
+            env::set_var("HOME", "/");
+        }
+
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
 

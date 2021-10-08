@@ -1,7 +1,7 @@
 use std::env;
 
-use std::path::PathBuf;
 use clap::{App, Arg};
+use std::path::PathBuf;
 
 use shell::Shell;
 
@@ -49,4 +49,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         shell.run_interpreter()
     }
 }
-
