@@ -1,7 +1,7 @@
 use conch_parser::ast;
 use std::env;
 
-use crate::shell_base::syscall;
+use crate::shell_base::{Shell, syscall};
 
 #[derive(Debug)]
 pub enum Action {
@@ -17,21 +17,21 @@ pub enum Action {
     Invalid,
 }
 
-pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Vec<Action> {
+pub fn interpret(shell: &Shell, cmd: &ast::TopLevelCommand<String>) -> Vec<Action> {
     // println!("{:#?}", cmd);
     let actions = match &cmd.0 {
-        ast::Command::Job(list) => handle_listable_command(list, true),
-        ast::Command::List(list) => handle_listable_command(list, false),
+        ast::Command::Job(list) => handle_listable_command(&shell, list, true),
+        ast::Command::List(list) => handle_listable_command(&shell, list, false),
     };
     // dbg!(&actions);
     actions
 }
 
-fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Vec<Action> {
+fn handle_listable_command(shell: &Shell, list: &ast::DefaultAndOrList, background: bool) -> Vec<Action> {
     match &list.first {
         ast::ListableCommand::Single(cmd) => {
             match cmd {
-                ast::PipeableCommand::Simple(cmd) => handle_simple_command(&cmd, background),
+                ast::PipeableCommand::Simple(cmd) => handle_simple_command(&shell, &cmd, background),
                 _ => vec![],
             }
         }
@@ -41,7 +41,7 @@ fn handle_listable_command(list: &ast::DefaultAndOrList, background: bool) -> Ve
     // TODO: handle list.rest
 }
 
-fn handle_simple_command(cmd: &ast::DefaultSimpleCommand, background: bool) -> Vec<Action> {
+fn handle_simple_command(shell: &Shell, cmd: &ast::DefaultSimpleCommand, background: bool) -> Vec<Action> {
     let mut env_vars = cmd
         .redirects_or_env_vars
         .iter()
@@ -49,7 +49,7 @@ fn handle_simple_command(cmd: &ast::DefaultSimpleCommand, background: bool) -> V
             ast::RedirectOrEnvVar::EnvVar(key, value) => {
                 let value = match value {
                     None => Some("".to_string()),
-                    Some(top_level_word) => handle_top_level_word(&top_level_word),
+                    Some(top_level_word) => handle_top_level_word(&shell, &top_level_word),
                 };
                 match value {
                     None => None,
@@ -68,7 +68,7 @@ fn handle_simple_command(cmd: &ast::DefaultSimpleCommand, background: bool) -> V
         .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
             ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
             ast::RedirectOrCmdWord::CmdWord(cmd_word) => {
-                handle_top_level_word(&cmd_word.0)
+                handle_top_level_word(&shell, &cmd_word.0)
             }
         })
         .collect::<Vec<String>>();
@@ -85,41 +85,45 @@ fn handle_simple_command(cmd: &ast::DefaultSimpleCommand, background: bool) -> V
 }
 
 
-fn handle_top_level_word(word: &ast::DefaultComplexWord) -> Option<String> {
+fn handle_top_level_word(shell: &Shell, word: &ast::DefaultComplexWord) -> Option<String> {
     match word {
-        ast::ComplexWord::Single(word) => handle_single(word),
+        ast::ComplexWord::Single(word) => handle_single(&shell, word),
         ast::ComplexWord::Concat(words) => Some(
             words
                 .iter()
-                .filter_map(|w| handle_single(w))
+                .filter_map(|w| handle_single(&shell, w))
                 .collect::<Vec<_>>()
                 .join(""),
         ),
     }
 }
 
-fn handle_single(word: &ast::DefaultWord) -> Option<String> {
+fn handle_single(shell: &Shell, word: &ast::DefaultWord) -> Option<String> {
     match &word {
         ast::Word::SingleQuoted(w) => Some(w.clone()),
-        ast::Word::Simple(w) => handle_simple_word(w),
+        ast::Word::Simple(w) => handle_simple_word(&shell, w),
         ast::Word::DoubleQuoted(words) => Some(
             words
                 .iter()
-                .filter_map(|w| handle_simple_word(w))
+                .filter_map(|w| handle_simple_word(&shell, w))
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
     }
 }
 
-fn handle_simple_word(word: &ast::DefaultSimpleWord) -> Option<String> {
+fn handle_simple_word(shell: &Shell, word: &ast::DefaultSimpleWord) -> Option<String> {
     match word {
         ast::SimpleWord::Literal(w) => Some(w.clone()),
         ast::SimpleWord::Colon => Some(":".to_string()),
         ast::SimpleWord::Tilde => Some(env::var("HOME").unwrap()),
         ast::SimpleWord::Param(p) => match p {
             ast::Parameter::Var(key) => {
-                Some(env::var(key).unwrap_or_else(|_| format!("No env var: {}", key)))
+                if let Some(variable) = shell.vars.get(key) {
+                    Some(variable.clone())
+                } else {
+                    env::var(key).ok()
+                }
             }
             any => Some(format!("{:?}", any)),
         },

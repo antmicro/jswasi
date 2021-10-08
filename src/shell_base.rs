@@ -43,9 +43,9 @@ pub fn syscall(command: &str, args: &[&str], env: &HashMap<String, String>) -> R
 }
 
 pub struct Shell {
-    pwd: String,
-    history: Vec<String>,
-    vars: HashMap<String, String>,
+    pub pwd: String,
+    pub history: Vec<String>,
+    pub vars: HashMap<String, String>,
 }
 
 impl Shell {
@@ -306,7 +306,7 @@ impl Shell {
         for cmd in parser {
             match cmd {
                 Ok(cmd) => {
-                    let actions = interpret(&cmd);
+                    let actions = interpret(&self, &cmd);
                     for action in actions {
                         match action {
                             Action::Command {
