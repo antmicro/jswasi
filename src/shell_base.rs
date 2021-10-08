@@ -19,13 +19,21 @@ use std::process::Command;
 use std::collections::HashMap;
 
 // communicate with the worker thread
-pub fn syscall(command: &str, args: &[&str], env: &HashMap<&str, &str>, background: bool) -> Result<String, Box<dyn std::error::Error>> {
+pub fn syscall(
+    command: &str,
+    args: &[&str],
+    env: &HashMap<String, String>,
+    background: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
     let result = fs::read_link(format!(
         "/!{}\x1b\x1b{}\x1b\x1b{}\x1b\x1b{}",
         command,
         args.join("\x1b"),
-        env.iter().map(|(key, val)| format!("{}={}", key, val)).collect::<Vec<_>>().join("\x1b"),
+        env.iter()
+            .map(|(key, val)| format!("{}={}", key, val))
+            .collect::<Vec<_>>()
+            .join("\x1b"),
         background
     ))?;
     #[cfg(not(target_os = "wasi"))]
@@ -67,7 +75,10 @@ impl Shell {
         self.handle_input(command)
     }
 
-    pub fn run_script(&mut self, script_name: impl Into<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run_script(
+        &mut self,
+        script_name: impl Into<PathBuf>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.handle_input(&fs::read_to_string(script_name.into())?)
     }
 
@@ -149,7 +160,8 @@ impl Shell {
                                 0x41 => {
                                     if !self.history.is_empty() {
                                         if history_entry_to_display == -1 {
-                                            history_entry_to_display = (self.history.len() - 1) as i32;
+                                            history_entry_to_display =
+                                                (self.history.len() - 1) as i32;
                                             input_stash.clear();
                                             input_stash.push_str(&input);
                                         } else if history_entry_to_display > 0 {
@@ -161,7 +173,9 @@ impl Shell {
                                             // '\b \b', clear left of cursor
                                         }
                                         input.clear();
-                                        input.push_str(&self.history[history_entry_to_display as usize]);
+                                        input.push_str(
+                                            &self.history[history_entry_to_display as usize],
+                                        );
                                         print!("{}", input);
                                     }
                                     escaped = false;
@@ -174,7 +188,9 @@ impl Shell {
                                             // '\b \b', clear left of cursor
                                         }
                                         input.clear();
-                                        if self.history.len() - 1 > (history_entry_to_display as usize) {
+                                        if self.history.len() - 1
+                                            > (history_entry_to_display as usize)
+                                        {
                                             history_entry_to_display += 1;
                                             input.push_str(
                                                 &self.history[history_entry_to_display as usize],
@@ -306,7 +322,13 @@ impl Shell {
         }
     }
 
-    fn execute_command(&mut self, command: String, mut args: Vec<String>, env: &HashMap<&str, &str>, background: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn execute_command(
+        &mut self,
+        command: &String,
+        args: &mut Vec<String>,
+        env: &HashMap<String, String>,
+        background: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         match command.as_str() {
             // built in commands
             "history" => {
@@ -327,15 +349,9 @@ impl Shell {
 
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
-                    println!(
-                        "cd: no such file or directory: {}",
-                        path.display()
-                    );
+                    println!("cd: no such file or directory: {}", path.display());
                 } else {
-                    env::set_var(
-                        "OLDPWD",
-                        env::current_dir()?.to_str().unwrap(),
-                    ); // TODO: WASI does not support this
+                    env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
                     syscall(
                         "set_env",
                         &["OLDPWD", env::current_dir()?.to_str().unwrap()],
@@ -343,8 +359,7 @@ impl Shell {
                         false,
                     )?;
                     #[cfg(not(target_os = "wasi"))]
-                    let pwd_path =
-                        PathBuf::from(fs::canonicalize(path).unwrap());
+                    let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
                     #[cfg(target_os = "wasi")]
                     let pwd_path = PathBuf::from(syscall(
                         "set_env",
@@ -363,17 +378,14 @@ impl Shell {
                     if let Ok(sec) = sec_str.parse() {
                         thread::sleep(Duration::new(sec, 0));
                     } else {
-                        println!(
-                            "sleep: invalid time interval `{}`",
-                            sec_str
-                        );
+                        println!("sleep: invalid time interval `{}`", sec_str);
                     }
                 } else {
                     println!("sleep: missing operand");
                 }
             }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo"
-            | "ls" | "date" | "printf" | "env" | "cat" | "realpath" => {
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date"
+            | "printf" | "env" | "cat" | "realpath" => {
                 args.insert(0, command.as_str().to_string());
                 #[cfg(target_os = "wasi")]
                 args.insert(0, String::from("/usr/bin/uutils"));
@@ -398,10 +410,7 @@ impl Shell {
                     match fs::write(args.remove(0), args.join(" ")) {
                         Ok(_) => {}
                         Err(error) => {
-                            println!(
-                                "write: failed to write to file: {}",
-                                error
-                            )
+                            println!("write: failed to write to file: {}", error)
                         }
                     }
                 }
@@ -417,7 +426,7 @@ impl Shell {
                     if arg == "PWD" || arg == "HOME" {
                         println!("unset: cannot unset {}", &arg);
                     } else {
-                        self.vars.remove(&arg);
+                        self.vars.remove(arg);
                         if !env::var(&arg).is_err() {
                             env::remove_var(&arg);
                             syscall("set_env", &[&arg], env, false)?;
@@ -459,7 +468,7 @@ impl Shell {
                         env::set_var(&key, &value);
                         syscall("set_env", &[&key, &value], env, false)?;
                     } else {
-                        let value = &self.vars[&arg];
+                        let value = &self.vars[arg];
                         env::set_var(&arg, value);
                         syscall("set_env", &[&arg, value], env, false)?;
                     }
@@ -469,11 +478,10 @@ impl Shell {
                 if args.is_empty() {
                     println!("hexdump: help: hexump <filename>");
                 } else {
-                    let contents =
-                        fs::read(args.remove(0)).unwrap_or_else(|_| {
-                            println!("hexdump: error: file not found.");
-                            return vec![];
-                        });
+                    let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
+                        println!("hexdump: error: file not found.");
+                        return vec![];
+                    });
                     let len = contents.len();
                     let mut v = ['.'; 16];
                     for j in 0..len {
@@ -550,9 +558,7 @@ impl Shell {
                     let mut found = false;
                     let mut fullpath = PathBuf::new();
                     // get PATH env variable, split it and look for binaries in each directory
-                    for bin_dir in
-                        env::var("PATH").unwrap_or_default().split(':')
-                    {
+                    for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
                         let bin_dir = PathBuf::from(bin_dir);
                         fullpath = bin_dir.join(&command);
                         if fullpath.is_file() {
@@ -570,9 +576,8 @@ impl Shell {
                 match fullpath {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
-                        let args_: Vec<&str> =
-                            args.iter().map(|s| &**s).collect();
-                        let _result = syscall("spawn", &args_[..], env, false);
+                        let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                        let _result = syscall("spawn", &args_[..], env, false)?;
                     }
                     Err(reason) => println!("{}", reason),
                 }
@@ -586,7 +591,7 @@ impl Shell {
         let parser = DefaultParser::new(lex);
         for cmd in parser {
             match cmd {
-                Ok(cmd) => interpret(&self, &cmd),
+                Ok(cmd) => interpret(self, &cmd),
                 Err(e) => {
                     println!("{:?}", e);
                 }
