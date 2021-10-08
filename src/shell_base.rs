@@ -13,9 +13,6 @@ use conch_parser::parse::DefaultParser;
 
 use crate::interpreter::interpret;
 
-#[cfg(not(target_os = "wasi"))]
-use std::process::Command;
-
 use std::collections::HashMap;
 
 // communicate with the worker thread
@@ -40,7 +37,7 @@ pub fn syscall(
     let result = {
         if command == "spawn" {
             let mut iter = args.iter();
-            let mut cmd = Command::new(iter.next().unwrap());
+            let mut cmd = std::process::Command::new(iter.next().unwrap());
             for arg in iter {
                 cmd.arg(arg);
             }
@@ -83,13 +80,6 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if env::var("PWD").is_err() {
-            env::set_var("PWD", "/");
-        }
-        if env::var("HOME").is_err() {
-            env::set_var("HOME", "/");
-        }
-
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
 

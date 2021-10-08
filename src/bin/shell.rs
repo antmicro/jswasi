@@ -37,6 +37,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .get_matches();
 
+    if env::var("PWD").is_err() {
+        env::set_var("PWD", "/");
+    }
+    if env::var("HOME").is_err() {
+        env::set_var("HOME", "/");
+    }
     let pwd = env::var("PWD")?;
     env::set_current_dir(&pwd)?;
     let mut shell = Shell::new(&pwd);
