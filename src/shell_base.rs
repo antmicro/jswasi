@@ -306,7 +306,7 @@ impl Shell {
         }
     }
 
-    fn execute_command(&mut self, command: String, mut args: Vec<String>, env: &HashMap<String, String>, background: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute_command(&mut self, command: String, mut args: Vec<String>, env: &HashMap<&str, &str>, background: bool) -> Result<(), Box<dyn std::error::Error>> {
         match command.as_str() {
             // built in commands
             "history" => {
@@ -339,7 +339,7 @@ impl Shell {
                     syscall(
                         "set_env",
                         &["OLDPWD", env::current_dir()?.to_str().unwrap()],
-                        &env,
+                        env,
                         false,
                     )?;
                     #[cfg(not(target_os = "wasi"))]
@@ -349,7 +349,7 @@ impl Shell {
                     let pwd_path = PathBuf::from(syscall(
                         "set_env",
                         &["PWD", path.to_str().unwrap()],
-                        &env,
+                        env,
                         false,
                     )?);
                     env::set_var("PWD", pwd_path.to_str().unwrap());
@@ -380,7 +380,7 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], &env, false)?;
+                syscall("spawn", &args_[..], env, false)?;
             }
             "ln" | "printenv" | "md5sum" => {
                 args.insert(0, command.as_str().to_string());
@@ -389,7 +389,7 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], &env, false)?;
+                syscall("spawn", &args_[..], env, false)?;
             }
             "write" => {
                 if args.len() < 2 {
@@ -420,7 +420,7 @@ impl Shell {
                         self.vars.remove(&arg);
                         if !env::var(&arg).is_err() {
                             env::remove_var(&arg);
-                            syscall("set_env", &[&arg], &env, false)?;
+                            syscall("set_env", &[&arg], env, false)?;
                         }
                     }
                 }
@@ -457,11 +457,11 @@ impl Shell {
                         let key = args_.next().unwrap();
                         let value = args_.next().unwrap();
                         env::set_var(&key, &value);
-                        syscall("set_env", &[&key, &value], &env, false)?;
+                        syscall("set_env", &[&key, &value], env, false)?;
                     } else {
                         let value = &self.vars[&arg];
                         env::set_var(&arg, value);
-                        syscall("set_env", &[&arg, value], &env, false)?;
+                        syscall("set_env", &[&arg, value], env, false)?;
                     }
                 }
             }
@@ -572,7 +572,7 @@ impl Shell {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> =
                             args.iter().map(|s| &**s).collect();
-                        let _result = syscall("spawn", &args_[..], &env, false);
+                        let _result = syscall("spawn", &args_[..], env, false);
                     }
                     Err(reason) => println!("{}", reason),
                 }

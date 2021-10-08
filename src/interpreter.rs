@@ -40,14 +40,14 @@ fn handle_simple_command(shell: &Shell, cmd: &ast::DefaultSimpleCommand, backgro
                 match value {
                     None => None,
                     Some(value) => Some((
-                        key,
+                        key.as_str(),
                         value,
                     )),
                 }
             }
             _ => None,
         })
-        .collect::<HashMap::<_, _>>();
+        .collect::<HashMap::<&str, &str>>();
     let (command, args) = cmd
         .redirects_or_cmd_words
         .iter()
