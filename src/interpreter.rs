@@ -18,7 +18,7 @@ pub enum Action {
 }
 
 pub fn interpret(cmd: &ast::TopLevelCommand<String>) -> Vec<Action> {
-    println!("{:#?}", cmd);
+    // println!("{:#?}", cmd);
     let actions = match &cmd.0 {
         ast::Command::Job(list) => handle_listable_command(list, true),
         ast::Command::List(list) => handle_listable_command(list, false),

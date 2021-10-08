@@ -475,14 +475,16 @@ function WASI() {
 
   // used solely in path_readlink
   function special_parse(fullcmd: string) {
-    const [cmd, ...args_] = fullcmd.split(' ');
+    const [cmd, args_string, env_string] = fullcmd.split(' ');
     if (cmd == 'spawn') {
       // reparse args
-      const args = fullcmd.substring(cmd.length + 1, 1000).split('\x1b');
+      const args = args_string.split('\x1b');
+      const new_env = Object.fromEntries(env_string.split('\x1b').map((kv) => kv.split('=')));
+      const extended_env = {...env, ...new_env};
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
       lck[0] = -1;
-      worker_send(['spawn', [args[0], args.slice(1), env, sbuf]]);
+      worker_send(['spawn', [args[0], args.slice(1), extended_env, sbuf]]);
       worker_console_log('sent.');
       // wait for child process to finish
       Atomics.wait(lck, 0, -1);
