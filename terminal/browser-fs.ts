@@ -442,8 +442,10 @@ export class OpenFile extends File {
         }
         case constants.WASI_WHENCE_END: {
           this._file_pos = await this.size() + offset;
+	  break;
         }
       }
+      return this._file_pos;
       // TODO: this only makes sense if we store WritableFileStream on class
       // await w.write({type: "seek", position: offset});
     }

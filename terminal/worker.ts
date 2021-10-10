@@ -380,6 +380,7 @@ function WASI() {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
+    worker_console_log(`fd_seek returned ${err}, file_pos = ${file_pos[0]}`);
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }

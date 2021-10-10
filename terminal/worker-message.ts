@@ -34,7 +34,7 @@ export const on_worker_message = async function (event, workerTable) {
         break;
     }
     case 'console': {
-        console.log(`%c [dbg (%c${worker_name}:${worker_id}%x)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+        console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
         break;
     }
     case 'exit': {
@@ -406,7 +406,7 @@ export const on_worker_message = async function (event, workerTable) {
       let err;
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
-        fds[fd].seek(Number(offset), whence);
+        file_pos[0] = BigInt(await fds[fd].seek(Number(offset), whence));
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

@@ -369,6 +369,33 @@ impl Shell {
                     env::set_current_dir(&pwd_path)?;
                 }
             }
+            "unzip" => {
+                if let Some(filepath) = &args.get(0) {
+                    let file = fs::File::open(&PathBuf::from(filepath)).unwrap();
+                    let mut archive_ = zip::ZipArchive::new(file);
+                    if (archive_.is_err()) {
+                        println!("Cannot decompress {}", filepath);
+                    } else {
+                        let mut archive = archive_.unwrap();
+                        for i in 0..archive.len() {
+                            let mut file_ = archive.by_index(i);
+                            if (file_.is_err()) {
+                                println!("Cannot decompress {}", filepath);
+                                break;
+                            } else {
+                                let mut file = file_.unwrap();
+                                let mut outpath = file.enclosed_name().to_owned().unwrap();
+                                let mut outfile = fs::File::create(&outpath).unwrap();
+                                println!("decompressing {}", file.enclosed_name().unwrap().display());
+                                io::copy(&mut file, &mut outfile).unwrap();
+                                println!("decompressing {} done.", file.enclosed_name().unwrap().display());
+                            }
+                        }
+                    }
+                } else {
+                    println!("unzip: missing operand");
+                }
+            }
             "pwd" => println!("{}", env::current_dir()?.display()),
             "sleep" => {
                 // TODO: requires poll_oneoff implementation
