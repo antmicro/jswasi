@@ -19,7 +19,6 @@ export function parsePath(path: string): {parts: string[], name: string} {
 }
 
 export function realpath(path): string {
-  console.log(`realpath(${path})`);
   const result = [];
   let result_path = '';
   let tmp_path = path;
@@ -33,13 +32,15 @@ export function realpath(path): string {
     tmp_path = tmp_path.substr(part.length + 1);
     if (part == '..') {
       if (level > 0) level -= 1;
+    } else if (part == '.') {
+      continue;
     } else {
       result[level] = part;
       level++;
     }
   }
   result_path = result.slice(0, level).join('/');
-  console.log(`= ${result_path}`);
   if (root_path) if (result_path == '') return '/';
+  result_path = result_path.replace('/./', '/');
   return result_path;
 }

@@ -4,6 +4,7 @@ import { FileOrDir, OpenFlags } from './filesystem.js';
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
+    DEBUG: boolean = false;
 
     _rootDir: Directory;
 
@@ -32,7 +33,7 @@ export class Filesystem {
 	  try {
       components = await root.resolve(dir._handle);
 	  } catch {
-	      console.log('There was an error in root.resolve...');
+	      if (this.DEBUG) console.log('There was an error in root.resolve...');
 	  }
 
       // if there are many mounts for the same path, we want to return the latest
@@ -91,7 +92,7 @@ export class Filesystem {
     }
 
     async resolveAbsolute(path: string): Promise<{err: number, name: string, dir: Directory}> {
-	    console.log(`resolveAbsolute(${path})`);
+	    if (this.DEBUG) console.log(`resolveAbsolute(${path})`);
 
       const { parts, name } = parsePath(path);
       let dir = await this.getRootDirectory();
@@ -100,7 +101,7 @@ export class Filesystem {
         for (const part of parts) {
           dir = await this.getDirectory(dir, part);
         }
-	        console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
+	        if (this.DEBUG) console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
 	        return { err: constants.WASI_ESUCCESS, name, dir };
 	    } catch (err) {
         if (err.name === 'NotFoundError') {
@@ -113,7 +114,7 @@ export class Filesystem {
     }
 
     async getParent(dir: Directory, path: string): Promise<{err: number, name: string, parent: Directory}> {
-      console.log(`getParent(dir._handle.name="${dir._handle.name}", path="${path}")`);
+      if (this.DEBUG) console.log(`getParent(dir._handle.name="${dir._handle.name}", path="${path}")`);
 
 	    if (path.includes('\\')) return { err: constants.WASI_EINVAL, name: null, parent: null };
       if (dir.path === '' && (path === '.' || path === '..' || path === '' || path === '/')) return { err: constants.WASI_ESUCCESS, name: '', parent: dir };
@@ -134,7 +135,7 @@ export class Filesystem {
         throw err;
       }
 
-	    console.log(`getParent resolved as = {"${name}", "${dir.path}"}`);
+	    if (this.DEBUG) console.log(`getParent resolved as = {"${name}", "${dir.path}"}`);
 	    return { err: constants.WASI_ESUCCESS, name, parent: dir };
     }
 
@@ -196,7 +197,7 @@ abstract class Entry {
     protected readonly _filesystem: Filesystem;
 
     constructor(path: string, handle: FileSystemDirectoryHandle | FileSystemFileHandle, parent: Directory, filesystem: Filesystem) {
-      console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
+      if (filesystem.DEBUG) console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
       this.path = path;
       this._handle = handle;
       this.parent = parent;
@@ -209,7 +210,7 @@ abstract class Entry {
 
     // TODO: fill dummy values with something meaningful
     async stat() {
-      console.log(`Entry(this.path="${this.path}").stat()`);
+      if (this._filesystem.DEBUG) console.log(`Entry(this.path="${this.path}").stat()`);
       let lmod = await this.lastModified();
 	    if (!isFinite(lmod)) lmod = 0; // TODO:
       const time = BigInt(lmod) * BigInt(1_000_000n);
@@ -236,7 +237,7 @@ export class Directory extends Entry {
     }
 
     async entries(): Promise<(File | Directory)[]> {
-      console.log(`Directory(this.path="${this.path}").entries()`);
+      if (this._filesystem.DEBUG) console.log(`Directory(this.path="${this.path}").entries()`);
       return await this._filesystem.entries(this);
     }
 
@@ -272,7 +273,7 @@ export class Directory extends Entry {
     ): Promise<{err: number, entry: File | Directory}>;
 
     async getEntry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-      console.log(`Directory(this.path="${this.path}").getEntry(path="${path}", mode=${mode}, oflags=${oflags})`);
+      if (this._filesystem.DEBUG) console.log(`Directory(this.path="${this.path}").getEntry(path="${path}", mode=${mode}, oflags=${oflags})`);
 
       let { err, name, parent } = await this._filesystem.getParent(this, path);
 
@@ -399,9 +400,10 @@ export class OpenFile extends File {
     public readonly file_type: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
     private _file_pos: number = 0;
+    private DEBUG: boolean = false;
 
     async read(len: number): Promise<[Uint8Array, number]> {
-      console.log(`OpenFile(${this.path}).read(${len})`);
+      if (this.DEBUG) console.log(`OpenFile(${this.path}).read(${len})`);
       const size = await this.size();
       if (this._file_pos < size) {
         const file = await this._handle.getFile();
@@ -416,21 +418,21 @@ export class OpenFile extends File {
 
     // TODO: each write creates new writable, store it on creation
     async write(buffer: Uint8Array): Promise<number> {
-      console.log(`OpenFile(${this.path}).write(${this.path} len=${buffer.byteLength}, position ${this._file_pos})`);
+      if (this.DEBUG) console.log(`OpenFile(${this.path}).write(${this.path} len=${buffer.byteLength}, position ${this._file_pos})`);
       try {
         const w = await this._handle.createWritable({ keepExistingData: true });
         await w.write({ type: 'write', position: this._file_pos, data: buffer });
 	    await w.close();
         this._file_pos += buffer.byteLength;
       } catch {
-        console.log('There was an error during writing!');
+        console.log('Error: there was an error during writing!');
         return 1;
       }
       return 0;
     }
 
     async seek(offset: number, whence: number) {
-      console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
+      if (this.DEBUG) console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
       switch (whence) {
         case constants.WASI_WHENCE_SET: {
           this._file_pos = offset;
@@ -451,7 +453,7 @@ export class OpenFile extends File {
     }
 
     async truncate() {
-      console.log(`OpenFile(${this.path}).truncate()`);
+      if (this.DEBUG) console.log(`OpenFile(${this.path}).truncate()`);
       const w = await this._handle.createWritable();
       await w.write({ type: 'truncate', size: 0 });
       this._file_pos = 0;
