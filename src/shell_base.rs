@@ -433,18 +433,38 @@ impl Shell {
             }
             "declare" => {
                 if args.is_empty() {
-                    // TODO: check some stuff?
+                    // TODO: we should join and sort the variables!
                     for (key, value) in self.vars.iter() {
                         println!("{}={}", key, value);
                     }
+                    for (key, value) in env::vars() {
+                        println!("{}={}", key, value);
+                    }
                 } else {
-                    for arg in args {
-                        if arg.contains("=") {
-                            let mut args_ = arg.split("=");
-                            let key = args_.next().unwrap();
-                            let value = args_.next().unwrap();
-                            // TODO: check if exists etc
-                            self.vars.insert(key.to_string(), value.to_string());
+                    if args[0] == "-x" || args[0] == "+x" {
+                        // TODO: if -x is provided declare works as export
+                        //       if +x then makes global var local
+                        let mut _args = args.iter();
+                        _args.next();
+                        for arg in _args {
+                            let mut arg_ = arg.split("=");
+                            let key = arg_.next().unwrap();
+                            let value = arg_.next().unwrap();
+                            if args[0] == "-x" {
+                                println!("TODO: should export variable '{}'", key);
+                            } else {
+                                println!("TODO: should make variable '{}' local", key);
+                            }
+                        }
+                    } else {
+                        for arg in args {
+                            if arg.contains("=") {
+                                let mut arg_ = arg.split("=");
+                                let key = arg_.next().unwrap();
+                                let value = arg_.next().unwrap();
+                                // TODO: check if exists etc
+                                self.vars.insert(key.to_string(), value.to_string());
+                            }
                         }
                     }
                 }
