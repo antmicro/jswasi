@@ -18,8 +18,7 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let dir = env::args().nth(1).unwrap();
-
+    let dir = (env::args().nth(1).or_else(|| Some(String::from(".")))).unwrap();
     visit_dirs(Path::new(&dir), &|entry: &DirEntry| {
         println!("{}", entry.path().to_str().unwrap());
     })?;
