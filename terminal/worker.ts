@@ -5,7 +5,7 @@ import { realpath } from './utils.js';
 
 type ptr = number;
 
-const DEBUG = false;
+let DEBUG = false;
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -25,6 +25,7 @@ const onmessage_ = function (e) {
       myself = e.data[2];
       args = e.data[3];
       env = e.data[4];
+      if (env["DEBUG"] === "1") DEBUG = true;
     }
   }
 };
