@@ -113,7 +113,7 @@ export class Filesystem {
     }
 
     async getParent(dir: Directory, path: string): Promise<{err: number, name: string, parent: Directory}> {
-      console.log(`getParent(${dir._handle.name}, ${path})`);
+      console.log(`getParent(dir._handle.name="${dir._handle.name}", path="${path}")`);
 
 	    if (path.includes('\\')) return { err: constants.WASI_EINVAL, name: null, parent: null };
       if (dir.path === '' && (path === '.' || path === '..' || path === '' || path === '/')) return { err: constants.WASI_ESUCCESS, name: '', parent: dir };
@@ -134,7 +134,7 @@ export class Filesystem {
         throw err;
       }
 
-	    console.log(`= ${name}, ${dir.path}`);
+	    console.log(`getParent resolved as = {"${name}", "${dir.path}"}`);
 	    return { err: constants.WASI_ESUCCESS, name, parent: dir };
     }
 
@@ -196,7 +196,7 @@ abstract class Entry {
     protected readonly _filesystem: Filesystem;
 
     constructor(path: string, handle: FileSystemDirectoryHandle | FileSystemFileHandle, parent: Directory, filesystem: Filesystem) {
-      console.log(`new Entry(path=${path}, parent=${parent?.path})`);
+      console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
       this.path = path;
       this._handle = handle;
       this.parent = parent;
@@ -209,7 +209,7 @@ abstract class Entry {
 
     // TODO: fill dummy values with something meaningful
     async stat() {
-      console.log(`Entry(${this.path}).stat()`);
+      console.log(`Entry(this.path="${this.path}").stat()`);
       let lmod = await this.lastModified();
 	    if (!isFinite(lmod)) lmod = 0; // TODO:
       const time = BigInt(lmod) * BigInt(1_000_000n);
@@ -236,7 +236,7 @@ export class Directory extends Entry {
     }
 
     async entries(): Promise<(File | Directory)[]> {
-      console.log(`Directory(${this.path}).entries()`);
+      console.log(`Directory(this.path="${this.path}").entries()`);
       return await this._filesystem.entries(this);
     }
 
@@ -272,7 +272,7 @@ export class Directory extends Entry {
     ): Promise<{err: number, entry: File | Directory}>;
 
     async getEntry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-      console.log(`Directory(${this.path}).getEntry(${path}, mode=${mode}, ${oflags})`);
+      console.log(`Directory(this.path="${this.path}").getEntry(path="${path}", mode=${mode}, oflags=${oflags})`);
 
       let { err, name, parent } = await this._filesystem.getParent(this, path);
 

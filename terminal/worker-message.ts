@@ -15,38 +15,37 @@ function human_readable(bytes) {
 
 export const on_worker_message = async function (event, workerTable) {
   const [worker_id, action, data] = event.data;
+  let worker_name = 'unknown';
+  try {
+      worker_name = workerTable.workerInfos[worker_id].cmd;
+  } catch {}
+  worker_name = worker_name.substr(worker_name.lastIndexOf('/') + 1);
+
   switch (action) {
     case 'stdout': {
-      workerTable.receive_callback(data.replaceAll('\n', '\r\n'));
-      break;
+        workerTable.receive_callback(data.replaceAll('\n', '\r\n'));
+        break;
     }
     case 'stderr': {
-		    const output = data.replaceAll('\n', '\r\n');
-      const RED_ANSI = '\u001b[31m';
-      const RESET = '\u001b[0m';
-      workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
-      break;
+        const output = data.replaceAll('\n', '\r\n');
+        const RED_ANSI = '\u001b[31m';
+        const RESET = '\u001b[0m';
+        workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
+        break;
     }
     case 'console': {
-	        let worker_name = 'unknown';
-	        try {
-        worker_name = workerTable.workerInfos[worker_id].cmd;
-	        } catch {}
-	        worker_name = worker_name.substr(worker_name.lastIndexOf('/') + 1);
-      console.log(`[dbg (${worker_name}:${worker_id})] ${data}`);
-      break;
+        console.log(`%c [dbg (%c${worker_name}:${worker_id}%x)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+        break;
     }
     case 'exit': {
-	        let worker_name = workerTable.workerInfos[worker_id].cmd;
-	        worker_name = worker_name.substr(worker_name.lastIndexOf('/') + 1);
-      workerTable.terminateWorker(worker_id, data);
-	        console.log(`[dbg (${worker_name}:${worker_id})] exited with result code: ${data}`);
-	        // @ts-ignore
-      if (worker_id == 0) window.alive = false;
-      break;
+        workerTable.terminateWorker(worker_id, data);
+	  console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+        // @ts-ignore
+        if (worker_id == 0) window.alive = false;
+        break;
     }
     case 'chdir': {
-	        const [pwd, sbuf] = data;
+      const [pwd, sbuf] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       const { fds } = workerTable.workerInfos[worker_id];
 
@@ -59,7 +58,7 @@ export const on_worker_message = async function (event, workerTable) {
       Atomics.store(parent_lck, 0, 0);
       Atomics.notify(parent_lck, 0);
 	        break;
-	    }
+    }
     case 'spawn': {
       const [fullpath, args, env, sbuf] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
@@ -81,7 +80,7 @@ export const on_worker_message = async function (event, workerTable) {
 		  Atomics.store(parent_lck, 0, 0);
 		  Atomics.notify(parent_lck, 0);
 		  break;
-		}
+        }
         case '/usr/bin/mount': {
           const result = await mount(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, result);
@@ -124,8 +123,7 @@ export const on_worker_message = async function (event, workerTable) {
         }
         default: {
           const parent = workerTable.workerInfos[worker_id];
-
-          const id = workerTable.spawnWorker(
+          const id = await workerTable.spawnWorker(
             worker_id,
             parent_lck,
             on_worker_message,
@@ -134,6 +132,8 @@ export const on_worker_message = async function (event, workerTable) {
             args,
             env,
           );
+	  let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
+	  console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
           break;
         }
       }
