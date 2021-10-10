@@ -364,7 +364,8 @@ impl Shell {
                         env,
                         false,
                     )?);
-                    env::set_var("PWD", pwd_path.to_str().unwrap());
+                    self.pwd = String::from(pwd_path.to_str().unwrap());
+                    env::set_var("PWD", &self.pwd);
                     env::set_current_dir(&pwd_path)?;
                 }
             }
