@@ -79,6 +79,7 @@ export async function initFs(anchor: HTMLElement) {
   await bin.getFileHandle('umount', { create: true });
   await bin.getFileHandle('wget', { create: true });
   await bin.getFileHandle('ps', { create: true });
+  await bin.getFileHandle('free', { create: true });
 
   const local = await usr.getDirectoryHandle('local', { create: true });
   const local_bin = await local.getDirectoryHandle('bin', { create: true });

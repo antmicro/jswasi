@@ -2,6 +2,17 @@ import * as constants from './constants.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
 import { mount, umount, wget } from './browser-shell.js';
 
+function human_readable(bytes) {
+	const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
+	let result = bytes;
+	let unit = 0;
+	while ((result >= 1024) && ((unit+1) < units.length)) {
+	     result /= 1024;
+	     unit++;
+	}
+	return `${result.toFixed(1)}${units[unit]}`;
+}
+
 export const on_worker_message = async function (event, workerTable) {
   const [worker_id, action, data] = event.data;
   switch (action) {
@@ -25,7 +36,7 @@ export const on_worker_message = async function (event, workerTable) {
       console.log(`[dbg (${worker_name}:${worker_id})] ${data}`);
       break;
     }
-	    case 'exit': {
+    case 'exit': {
 	        let worker_name = workerTable.workerInfos[worker_id].cmd;
 	        worker_name = worker_name.substr(worker_name.lastIndexOf('/') + 1);
       workerTable.terminateWorker(worker_id, data);
@@ -34,7 +45,7 @@ export const on_worker_message = async function (event, workerTable) {
       if (worker_id == 0) window.alive = false;
       break;
     }
-	    case 'chdir': {
+    case 'chdir': {
 	        const [pwd, sbuf] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       const { fds } = workerTable.workerInfos[worker_id];
@@ -83,6 +94,28 @@ export const on_worker_message = async function (event, workerTable) {
           Atomics.notify(parent_lck, 0);
           break;
         }
+	case '/usr/bin/free': {
+	  let total_mem_raw = performance.memory.jsHeapSizeLimit; 
+          let used_mem_raw = performance.memory.usedJSHeapSize;
+	  let total_mem = "";
+	  let used_mem = "";
+	  let avail_mem = "";
+	  if ((args.length > 1) && (args[1] == "-h")) {
+	      total_mem = human_readable(total_mem_raw);
+	      used_mem = human_readable(used_mem_raw);
+	      avail_mem = human_readable(total_mem_raw - used_mem_raw);
+	  } else {
+              total_mem = `${Math.round(total_mem_raw / 1024)}`;
+	      used_mem = `${Math.round(used_mem_raw / 1024)}`;
+	      avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
+	  }
+	  let free_data = `               total        used   available\n\r`;
+	  free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
+	  workerTable.receive_callback(free_data);
+          Atomics.store(parent_lck, 0, 0);
+          Atomics.notify(parent_lck, 0);
+	  break;
+	}
         case '/usr/bin/wget': {
           await wget(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, 0);
