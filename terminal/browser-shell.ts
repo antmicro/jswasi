@@ -23,6 +23,7 @@ const NECESSARY_BINARIES = {
 };
 
 const OPTIONAL_BINARIES = {
+  '/lib/python36.zip': 'https://github.com/pgielda/wasmpython-bin/raw/main/python36.zip',
   '/usr/local/bin/duk': 'https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm',
   '/usr/local/bin/cowsay': 'https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm',
   '/usr/local/bin/qjs': 'https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm',
@@ -75,6 +76,7 @@ export async function initFs(anchor: HTMLElement) {
 
   const usr = await root.getDirectoryHandle('usr', { create: true });
   const bin = await usr.getDirectoryHandle('bin', { create: true });
+  const lib = await usr.getDirectoryHandle('lib', { create: true });
 
   // create dummy files for browser executed commands
   await bin.getFileHandle('mount', { create: true });

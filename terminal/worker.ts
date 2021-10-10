@@ -17,7 +17,7 @@ let args: string[];
 let env: {key: string, val: string};
 
 const onmessage_ = function (e) {
-  worker_console_log('got a message!');
+  //worker_console_log('got a message!');
   if (!started) {
     if (e.data[0] === 'start') {
       started = true;
@@ -158,14 +158,20 @@ function WASI() {
 
     const err = Atomics.load(lck, 0);
     if (err !== constants.WASI_ESUCCESS) {
+      worker_console_log(`fd_fdstat_get returned ${err}`);
       return err;
     }
 
     view.setUint8(buf, file_type[0]);
-    view.setUint32(buf + 2, 0, true); // file descriptor flags
+    if (fd <= 2) {
+        view.setUint32(buf + 2, constants.WASI_FDFLAG_APPEND, true);
+    } else {
+        view.setUint32(buf + 2, 0, true);
+    }
     view.setBigUint64(buf + 8, rights_base[0], true);
     view.setBigUint64(buf + 16, rights_inheriting[0], true);
 
+    worker_console_log(`fd_fdstat_get returned ${err}`);
     return constants.WASI_ESUCCESS;
   }
 
@@ -269,7 +275,7 @@ function WASI() {
   }
 
   function fd_filestat_get(fd, buf) {
-    worker_console_log(`fd_filestat_get(${fd}, ${buf})`);
+    worker_console_log(`fd_filestat_get(${fd}, 0x${buf.toString(16)})`);
 
     const view = new DataView(moduleInstanceExports.memory.buffer);
 
@@ -282,6 +288,7 @@ function WASI() {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
+    worker_console_log(`fd_filestat_get returned ${err}`);
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
@@ -414,7 +421,7 @@ function WASI() {
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
-    worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path}, ${path_len}, ${buf}) [path=${path}]`);
+    worker_console_log(`path_filestat_get(${fd}, ${flags}, ${path}, ${path_len}, 0x${buf.toString(16)}) [path=${path}]`);
 
     const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
     const lck = new Int32Array(sbuf, 0, 1);
@@ -425,6 +432,7 @@ function WASI() {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
+    worker_console_log(`path_filestat_get returned ${err}`);
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
@@ -606,8 +614,10 @@ function WASI() {
     if (err === constants.WASI_ESUCCESS) {
       view.setUint8(buf, preopen_type[0]);
       view.setUint32(buf + 4, name_len[0], true);
+      worker_console_log(`fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`);
+    } else {
+      worker_console_log(`fd_prestat_get returned ${err}`);
     }
-	    worker_console_log(`fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`);
     return err;
   }
 
@@ -615,7 +625,7 @@ function WASI() {
     worker_console_log(`fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`);
     const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
-	const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path
+    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
     const path = new Uint8Array(sbuf, 4, path_len);
@@ -627,7 +637,8 @@ function WASI() {
     if (err === constants.WASI_ESUCCESS) {
       view8.set(path, path_ptr);
     }
-	worker_console_log(`prestat returned ${path} of size ${path_len}`);
+    const path_str = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
+    worker_console_log(`prestat returned ${err}, "${path_str}" of size ${path_len}`);
     return err;
   }
 

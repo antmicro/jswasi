@@ -151,6 +151,7 @@ export const on_worker_message = async function (event, workerTable) {
         preopen_type[0] = fds[fd].file_type;
         if (fds[fd].path == '') if (fd == 3) fds[fd].path = '/';
         if (fds[fd].path == '') if (fd == 4) fds[fd].path = '.';
+        if (fds[fd].path == '') if (fd == 5) fds[fd].path = '/';
         name_len[0] = fds[fd].path.length;
         err = constants.WASI_ESUCCESS;
       } else {
@@ -199,6 +200,7 @@ export const on_worker_message = async function (event, workerTable) {
       let err;
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
+	// TODO: check if path_len is enough
         path.set(new TextEncoder().encode(fds[fd].path), 0);
         err = constants.WASI_ESUCCESS;
       } else {
@@ -304,8 +306,6 @@ export const on_worker_message = async function (event, workerTable) {
           fds.push(await entry.open());
           opened_fd[0] = fds.length - 1;
         }
-      } else {
-        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
@@ -520,12 +520,25 @@ export const on_worker_message = async function (event, workerTable) {
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
         file_type[0] = fds[fd].file_type;
-        rights_base[0] = -1n;
-        rights_inheriting[0] = ~(1n << 24n);
+	/*
+        rights_base[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+	if (file_type[0] == constants.WASI_FILETYPE_DIRECTORY) {
+		rights_base[0] |= constants.WASI_RIGHT_FD_READDIR;
+	}
+        rights_inheriting[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+	if (file_type[0] == constants.WASI_FILETYPE_DIRECTORY) {
+		rights_inheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
+	}
+        */
+        // TODO: analyze this
+        rights_base[0] = BigInt(0xFFFFFFFF);
+        rights_inheriting[0] = BigInt(0xFFFFFFFF);
 
+	
         err = constants.WASI_ESUCCESS;
+      } else {
+        err = constants.WASI_EBADF;
       }
-
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
       break;

@@ -346,47 +346,61 @@ impl Shell {
 
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
-                    println!("cd: no such file or directory: {}", path.display());
+                    println!("cd: {}: No such file or directory", path.display());
                 } else {
-                    env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap()); // TODO: WASI does not support this
-                    syscall(
-                        "set_env",
-                        &["OLDPWD", env::current_dir()?.to_str().unwrap()],
-                        env,
-                        false,
-                    )?;
-                    #[cfg(not(target_os = "wasi"))]
-                    let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
-                    #[cfg(target_os = "wasi")]
-                    let pwd_path = PathBuf::from(syscall(
-                        "set_env",
-                        &["PWD", path.to_str().unwrap()],
-                        env,
-                        false,
-                    )?);
-                    self.pwd = String::from(pwd_path.to_str().unwrap());
-                    env::set_var("PWD", &self.pwd);
-                    env::set_current_dir(&pwd_path)?;
+                    let metadata = fs::metadata(&path);
+                    if (metadata.unwrap().is_file()) {
+                        println!("cd: {}: Not a directory", path.display());
+                    } else {
+                        env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap());
+                        syscall(
+                            "set_env",
+                            &["OLDPWD", env::current_dir()?.to_str().unwrap()],
+                            env,
+                            false,
+                        )?;
+                        #[cfg(not(target_os = "wasi"))]
+                        let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
+                        #[cfg(target_os = "wasi")]
+                        let pwd_path = PathBuf::from(syscall(
+                            "set_env",
+                            &["PWD", path.to_str().unwrap()],
+                            env,
+                            false,
+                        )?);
+                        self.pwd = String::from(pwd_path.to_str().unwrap());
+                        env::set_var("PWD", &self.pwd);
+                        env::set_current_dir(&pwd_path)?;
+                    }
                 }
             }
             "unzip" => {
                 if let Some(filepath) = &args.get(0) {
                     let file = fs::File::open(&PathBuf::from(filepath)).unwrap();
-                    let mut archive_ = zip::ZipArchive::new(file);
-                    if (archive_.is_err()) {
+                    let archive_ = zip::ZipArchive::new(file);
+                    if archive_.is_err() {
                         println!("Cannot decompress {}", filepath);
                     } else {
                         let mut archive = archive_.unwrap();
                         for i in 0..archive.len() {
                             let mut file_ = archive.by_index(i);
-                            if (file_.is_err()) {
+                            if file_.is_err() {
                                 println!("Cannot decompress {}", filepath);
                                 break;
                             } else {
                                 let mut file = file_.unwrap();
-                                let mut outpath = file.enclosed_name().to_owned().unwrap();
-                                let mut outfile = fs::File::create(&outpath).unwrap();
+                                let outpath = file.enclosed_name().to_owned().unwrap();
+                                if (&*file.name()).ends_with('/') {
+                                    fs::create_dir_all(&outpath).unwrap();
+                                    continue;
+                                }
+                                if let Some(parent) = outpath.parent() {
+                                    if !parent.exists() {
+                                        fs::create_dir_all(&parent).unwrap();
+                                    }
+                                }
                                 println!("decompressing {}", file.enclosed_name().unwrap().display());
+                                let mut outfile = fs::File::create(&outpath).unwrap();
                                 io::copy(&mut file, &mut outfile).unwrap();
                                 println!("decompressing {} done.", file.enclosed_name().unwrap().display());
                             }
