@@ -41,7 +41,10 @@ export const on_worker_message = async function (event, workerTable) {
         workerTable.terminateWorker(worker_id, data);
 	  console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
         // @ts-ignore
-        if (worker_id == 0) window.alive = false;
+	if (worker_id == 0) {
+            window.alive = false;
+	    window.exit_code = data;
+	}
         break;
     }
     case 'chdir': {
