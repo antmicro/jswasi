@@ -76,7 +76,8 @@ export async function initFs(anchor: HTMLElement) {
 
   const usr = await root.getDirectoryHandle('usr', { create: true });
   const bin = await usr.getDirectoryHandle('bin', { create: true });
-  const lib = await usr.getDirectoryHandle('lib', { create: true });
+
+  const lib = await root.getDirectoryHandle('lib', { create: true });
 
   // create dummy files for browser executed commands
   await bin.getFileHandle('mount', { create: true });

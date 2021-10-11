@@ -324,7 +324,7 @@ export class Directory extends Entry {
           const entry = await this._filesystem.getDirectory(parent, name, { create });
           return { err: constants.WASI_ESUCCESS, entry };
         } catch (err) {
-          console.log(`we got an error! (${err.name})`);
+          //console.log(`we got an error '${err.name}' during getting dir '${name}' in parent '${parent?.path}'`);
           if (err.name === 'TypeMismatchError' || err.name === 'TypeError') {
             return { err: constants.WASI_ENOTDIR, entry: null };
           } if (err.name === 'NotFoundError') {

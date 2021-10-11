@@ -391,11 +391,13 @@ impl Shell {
                                 let mut file = file_.unwrap();
                                 let outpath = file.enclosed_name().to_owned().unwrap();
                                 if (&*file.name()).ends_with('/') {
+                                    println!("creating dir {}", outpath.display());
                                     fs::create_dir_all(&outpath).unwrap();
                                     continue;
                                 }
                                 if let Some(parent) = outpath.parent() {
                                     if !parent.exists() {
+                                        println!("creating dir {}", parent.display());
                                         fs::create_dir_all(&parent).unwrap();
                                     }
                                 }
