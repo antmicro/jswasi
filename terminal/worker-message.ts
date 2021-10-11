@@ -38,8 +38,11 @@ export const on_worker_message = async function (event, workerTable) {
         break;
     }
     case 'exit': {
+	const dbg = workerTable.workerInfos[worker_id].env["DEBUG"] == "1";
         workerTable.terminateWorker(worker_id, data);
+	if (dbg) {
 	  console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	}
         // @ts-ignore
 	if (worker_id == 0) {
             window.alive = false;
@@ -136,7 +139,9 @@ export const on_worker_message = async function (event, workerTable) {
             env,
           );
 	  let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
-	  console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	  if (env['DEBUG'] == "1") {
+              console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	  }
           break;
         }
       }

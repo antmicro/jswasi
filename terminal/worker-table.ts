@@ -23,7 +23,9 @@ class WorkerInfo {
 
     public callback;
 
-    constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback) {
+    public env;
+
+    constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback, env) {
 	    this.id = id;
       this.cmd = cmd;
       this.worker = worker;
@@ -33,6 +35,7 @@ class WorkerInfo {
       this.parent_id = parent_id;
       this.parent_lock = parent_lock;
       this.callback = callback;
+      this.env = env;
     }
 }
 
@@ -73,7 +76,7 @@ export class WorkerTable {
       if (!IS_NODE) private_data = { type: 'module' };
 	    this.alive.push(true);
       const worker = new Worker(this.script_name, private_data);
-      this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parent_id, parent_lock, callback);
+      this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parent_id, parent_lock, callback, env);
       if (!IS_NODE) {
         worker.onmessage = (event) => callback(event, this);
       } else {
