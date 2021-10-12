@@ -15,6 +15,8 @@ use crate::interpreter::interpret;
 
 use std::collections::HashMap;
 
+use iterm2;
+
 // communicate with the worker thread
 pub fn syscall(
     command: &str,
@@ -331,6 +333,19 @@ impl Shell {
             "history" => {
                 for (i, history_entry) in self.history.iter().enumerate() {
                     println!("{}: {}", i, history_entry);
+                }
+            }
+            "imgcat" => {
+                if args.is_empty() {
+                    println!("usage: imgcat image");
+                } else {
+                    // TODO: find out why it breaks the order of prompt
+                    // TODO: unhardcode size somehow
+                    iterm2::File::read(&args[0])?
+                    .width(iterm2::Dimension::Pixel(320))
+                    .height(iterm2::Dimension::Pixel(200))
+                    .preserve_aspect_ratio(true)
+                    .show()?;
                 }
             }
             "cd" => {
