@@ -2,7 +2,7 @@ use conch_parser::ast;
 use std::collections::HashMap;
 use std::env;
 
-use crate::shell_base::Shell;
+use crate::shell_base::{syscall, Shell};
 
 pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
     // println!("{:#?}", cmd);
@@ -55,7 +55,13 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
         let result = shell.execute_command(&command, &mut args, &env, background);
     } else {
         for (key, value) in env.iter() {
-            shell.vars.insert(key.clone(), value.clone());
+            // if it's a global update env, if shell variable update only vars
+            if env::var(key).is_ok() {
+                env::set_var(&key, &value);
+                syscall("set_env", &[&key, &value], &env, false);
+            } else {
+                shell.vars.insert(key.clone(), value.clone());
+            }
         }
     }
 }

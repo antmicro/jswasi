@@ -321,12 +321,12 @@ impl Shell {
 
     pub fn execute_command(
         &mut self,
-        command: &String,
+        command: &str,
         args: &mut Vec<String>,
         env: &HashMap<String, String>,
         background: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match command.as_str() {
+        match command {
             // built in commands
             "history" => {
                 for (i, history_entry) in self.history.iter().enumerate() {
@@ -419,7 +419,7 @@ impl Shell {
             }
             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date"
             | "printf" | "env" | "cat" | "realpath" => {
-                args.insert(0, command.as_str().to_string());
+                args.insert(0, command.to_string());
                 #[cfg(target_os = "wasi")]
                 args.insert(0, String::from("/usr/bin/uutils"));
                 #[cfg(not(target_os = "wasi"))]
@@ -428,7 +428,7 @@ impl Shell {
                 syscall("spawn", &args_[..], env, false)?;
             }
             "ln" | "printenv" | "md5sum" => {
-                args.insert(0, command.as_str().to_string());
+                args.insert(0, command.to_string());
                 #[cfg(target_os = "wasi")]
                 args.insert(0, String::from("/usr/bin/coreutils"));
                 #[cfg(not(target_os = "wasi"))]
@@ -518,12 +518,14 @@ impl Shell {
                         let mut args_ = arg.split("=");
                         let key = args_.next().unwrap();
                         let value = args_.next().unwrap();
+                        self.vars.remove(key);
                         env::set_var(&key, &value);
                         syscall("set_env", &[&key, &value], env, false)?;
                     } else {
-                        let value = &self.vars[arg];
-                        env::set_var(&arg, value);
-                        syscall("set_env", &[&arg, value], env, false)?;
+                        if let Some(value) = &self.vars.remove(arg) {
+                            env::set_var(&arg, value);
+                            syscall("set_env", &[&arg, value], env, false)?;
+                        }
                     }
                 }
             }
