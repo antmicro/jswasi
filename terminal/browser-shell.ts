@@ -46,12 +46,9 @@ async function fetchFile(dir: Directory, filename: string, address: string, refe
     let response;
     if (!(address.startsWith('http://') || address.startsWith('https://')) || address.startsWith(location.origin)) {
       // files served from same origin
-    } else if (location.origin.startsWith('http://localhost')) {
-      // files requested from cross-orign that require proxy server
-      address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
     } else {
-      // hack for current beta server, where only static files are avaible
-      address = `proxy/${address.split('/').slice(-1)[0]}`;
+      // files requested from cross-origin that require proxy server
+      address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
     }
 
     response = await fetch(address);
