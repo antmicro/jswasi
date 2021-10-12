@@ -71,7 +71,7 @@ export const on_worker_message = async function (event, workerTable) {
 	        break;
     }
     case 'spawn': {
-      const [fullpath, args, env, sbuf] = data;
+      let [fullpath, args, env, sbuf] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
@@ -134,20 +134,33 @@ export const on_worker_message = async function (event, workerTable) {
           Atomics.notify(parent_lck, 0);
           break;
         }
+	case '/usr/bin/nohup':
         default: {
-          const parent = workerTable.workerInfos[worker_id];
+          let background = false;
+	  if (fullpath == "/usr/bin/nohup") {
+		  args = args.splice(1);
+		  fullpath = args[0];
+		  args = args.splice(1);
+                  args.splice(0, 0, fullpath.split('/').pop());
+		  background = true;
+	  }
+          const parent_fds = workerTable.workerInfos[worker_id].fds;
           const id = await workerTable.spawnWorker(
             worker_id,
-            parent_lck,
+            background ? null : parent_lck,
             on_worker_message,
             fullpath,
-            parent.fds,
+            parent_fds,
             args,
             env,
           );
 	  let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
 	  if (env['DEBUG'] == "1") {
               console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	  }
+	  if (background) {
+              Atomics.store(parent_lck, 0, 0);
+              Atomics.notify(parent_lck, 0);
 	  }
           break;
         }

@@ -70,7 +70,9 @@ export class WorkerTable {
 
     async spawnWorker(parent_id: number, parent_lock: Int32Array, callback, command, fds, args, env): Promise<number> {
       const id = this.nextWorkerId;
-      this.currentWorker = id;
+      if (parent_lock != null || parent_id == null) {
+          this.currentWorker = id;
+      }
       this.nextWorkerId += 1;
       let private_data = {};
       if (!IS_NODE) private_data = { type: 'module' };
@@ -111,12 +113,12 @@ export class WorkerTable {
       const worker = this.workerInfos[id];
       worker.worker.terminate();
       // notify parent that they can resume operation
-      if (id != 0) {
+      this.alive[id] = false;
+      if (id != 0 && worker.parent_lock != null) {
         Atomics.store(worker.parent_lock, 0, exit_no);
         Atomics.notify(worker.parent_lock, 0);
+        this.currentWorker = worker.parent_id;
       }
-	    this.alive[id] = false;
-      this.currentWorker = worker.parent_id;
       // remove worker from workers array
       delete this.workerInfos[id];
     }
