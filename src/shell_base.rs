@@ -349,7 +349,7 @@ impl Shell {
                     println!("cd: {}: No such file or directory", path.display());
                 } else {
                     let metadata = fs::metadata(&path);
-                    if (metadata.unwrap().is_file()) {
+                    if metadata.unwrap().is_file() {
                         println!("cd: {}: Not a directory", path.display());
                     } else {
                         env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap());
@@ -376,37 +376,29 @@ impl Shell {
             }
             "unzip" => {
                 if let Some(filepath) = &args.get(0) {
-                    let file = fs::File::open(&PathBuf::from(filepath)).unwrap();
-                    let archive_ = zip::ZipArchive::new(file);
-                    if archive_.is_err() {
-                        println!("Cannot decompress {}", filepath);
-                    } else {
-                        let mut archive = archive_.unwrap();
-                        for i in 0..archive.len() {
-                            let mut file_ = archive.by_index(i);
-                            if file_.is_err() {
-                                println!("Cannot decompress {}", filepath);
-                                break;
-                            } else {
-                                let mut file = file_.unwrap();
-                                let outpath = file.enclosed_name().to_owned().unwrap();
-                                if (&*file.name()).ends_with('/') {
-                                    println!("creating dir {}", outpath.display());
-                                    fs::create_dir_all(&outpath).unwrap();
-                                    continue;
-                                }
-                                if let Some(parent) = outpath.parent() {
-                                    if !parent.exists() {
-                                        println!("creating dir {}", parent.display());
-                                        fs::create_dir_all(&parent).unwrap();
-                                    }
-                                }
-                                println!("decompressing {}", file.enclosed_name().unwrap().display());
-                                let mut outfile = fs::File::create(&outpath).unwrap();
-                                io::copy(&mut file, &mut outfile).unwrap();
-                                println!("decompressing {} done.", file.enclosed_name().unwrap().display());
+                    let file = fs::File::open(&PathBuf::from(filepath))?;
+                    let mut archive = zip::ZipArchive::new(file)?;
+                    for i in 0..archive.len() {
+                        let mut file = archive.by_index(i)?;
+                        let outpath = file.enclosed_name().to_owned().unwrap();
+                        if file.name().ends_with('/') {
+                            println!("creating dir {}", outpath.display());
+                            fs::create_dir_all(&outpath)?;
+                            continue;
+                        }
+                        if let Some(parent) = outpath.parent() {
+                            if !parent.exists() {
+                                println!("creating dir {}", parent.display());
+                                fs::create_dir_all(&parent)?;
                             }
                         }
+                        println!("decompressing {}", file.enclosed_name().unwrap().display());
+                        let mut outfile = fs::File::create(&outpath)?;
+                        io::copy(&mut file, &mut outfile)?;
+                        println!(
+                            "decompressing {} done.",
+                            file.enclosed_name().unwrap().display()
+                        );
                     }
                 } else {
                     println!("unzip: missing operand");
