@@ -514,18 +514,16 @@ impl Shell {
                     println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                 }
                 for arg in args {
-                    if arg.contains("=") {
-                        let mut args_ = arg.split("=");
-                        let key = args_.next().unwrap();
-                        let value = args_.next().unwrap();
+                    if let Some((key, value)) = arg.split_once("=") {
                         self.vars.remove(key);
                         env::set_var(&key, &value);
                         syscall("set_env", &[&key, &value], env, false)?;
+                    } else if let Some(value) = self.vars.remove(arg) {
+                        env::set_var(&arg, &value);
+                        syscall("set_env", &[&arg, &value], env, false)?;
                     } else {
-                        if let Some(value) = &self.vars.remove(arg) {
-                            env::set_var(&arg, value);
-                            syscall("set_env", &[&arg, value], env, false)?;
-                        }
+                        env::set_var(&arg, "");
+                        syscall("set_env", &[&arg, ""], env, false)?;
                     }
                 }
             }
