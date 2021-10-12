@@ -2,6 +2,11 @@ import * as constants from './constants.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
 import { mount, umount, wget } from './browser-shell.js';
 
+declare global {
+    var exit_code: number;
+    var alive: boolean;
+}
+
 function human_readable(bytes) {
 	const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
 	let result = bytes;
@@ -100,8 +105,10 @@ export const on_worker_message = async function (event, workerTable) {
           break;
         }
 	case '/usr/bin/free': {
+      // @ts-ignore memory is non-standard API available only in Chrome
 	  let total_mem_raw = performance.memory.jsHeapSizeLimit; 
-          let used_mem_raw = performance.memory.usedJSHeapSize;
+      // @ts-ignore
+      let used_mem_raw = performance.memory.usedJSHeapSize;
 	  let total_mem = "";
 	  let used_mem = "";
 	  let avail_mem = "";
