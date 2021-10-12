@@ -478,27 +478,27 @@ impl Shell {
                     }
                 } else {
                     if args[0] == "-x" || args[0] == "+x" {
-                        // TODO: if -x is provided declare works as export
-                        //       if +x then makes global var local
-                        let mut _args = args.iter();
-                        _args.next();
-                        for arg in _args {
-                            let mut arg_ = arg.split("=");
-                            let key = arg_.next().unwrap();
-                            let value = arg_.next().unwrap();
+                        // if -x is provided declare works as export
+                        // if +x then makes global var local
+                        for arg in args.iter().skip(1) {
                             if args[0] == "-x" {
-                                println!("TODO: should export variable '{}'", key);
+                                if let Some((key, value)) = arg.split_once("=") {
+                                    syscall("set_env", &[&key, &value], env, false)?;
+                                }
                             } else {
-                                println!("TODO: should make variable '{}' local", key);
+                                if let Some((key, value)) = arg.split_once("=") {
+                                    syscall("set_env", &[&key], env, false)?;
+                                    self.vars.insert(key.to_string(), value.to_string());
+                                } else {
+                                    let value = env::var(arg)?;
+                                    syscall("set_env", &[&arg], env, false)?;
+                                    self.vars.insert(arg.clone(), value.clone());
+                                }
                             }
                         }
                     } else {
                         for arg in args {
-                            if arg.contains("=") {
-                                let mut arg_ = arg.split("=");
-                                let key = arg_.next().unwrap();
-                                let value = arg_.next().unwrap();
-                                // TODO: check if exists etc
+                            if let Some((key, value)) = arg.split_once("=") {
                                 self.vars.insert(key.to_string(), value.to_string());
                             }
                         }
@@ -507,9 +507,8 @@ impl Shell {
             }
             "export" => {
                 // export creates an env value if A=B notation is used, or just
-                // copies a local var to env if no "=" is used. export on
-                // unexisting local var does nothing.
-                // to implement it fully we need local vars support.
+                // copies a local var to env if no "=" is used.
+                // export on unexisting local var exports empty variable.
                 if args.is_empty() {
                     println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                 }
