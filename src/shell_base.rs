@@ -104,6 +104,7 @@ impl Shell {
             io::stdout().flush()?;
             let mut c = [0];
             let mut escaped = false;
+            let mut cursor_position = 0;
             let mut history_entry_to_display: i32 = -1;
             // read line
             loop {
@@ -201,11 +202,19 @@ impl Shell {
                                     escaped = false;
                                 }
                                 0x43 => {
-                                    println!("TODO: RIGHT");
+                                    if cursor_position < input.len() {
+                                        print!("{}", input.chars().nth(cursor_position).unwrap());
+                                        cursor_position += 1;
+                                        io::stdout().flush()?;
+                                    }
                                     escaped = false;
                                 }
                                 0x44 => {
-                                    println!("TODO: LEFT");
+                                    if cursor_position > 0 {
+                                        print!("{}", 8 as char);
+                                        cursor_position -= 1;
+                                        io::stdout().flush()?;
+                                    }
                                     escaped = false;
                                 }
                                 0x46 => {
@@ -234,6 +243,7 @@ impl Shell {
                         // enter
                         10 => {
                             input = input.trim().to_string();
+                            println!();
                             break;
                         }
                         // backspace
@@ -241,6 +251,7 @@ impl Shell {
                             if !input.is_empty() {
                                 input.remove(input.len() - 1);
                                 print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
+                                cursor_position -= 1;
                             }
                         }
                         // control codes
@@ -252,9 +263,13 @@ impl Shell {
                         }
                         // regular characters
                         _ => {
-                            input.push(c[0] as char);
+                            input.insert(cursor_position, c[0] as char);
                             // echo
-                            // print!("{}", c[0] as char);
+                            print!(
+                                "{}",
+                                c[0] as char // input.chars().skip(cursor_position).collect::<String>()
+                            );
+                            cursor_position += 1;
                         }
                     }
                 }

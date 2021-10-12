@@ -48,6 +48,7 @@ async function fetchFile(dir: Directory, filename: string, address: string, refe
       // files served from same origin
     } else {
       // files requested from cross-origin that require proxy server
+      // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
       address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
     }
 
@@ -158,10 +159,10 @@ export async function init(anchor: HTMLElement) {
       }
     }
 
-	    if ((code === 10) || code >= 32) {
+	if ((code === 10) || code >= 32) {
       // echo
-      terminal.io.print(code === 10 ? '\r\n' : data);
-	    }
+      // terminal.io.print(code === 10 ? '\r\n' : data);
+	}
   };
 
   io.onTerminalResize = (columns, rows) => {
