@@ -5,7 +5,6 @@ import { realpath } from './utils.js';
 
 type ptr = number;
 
-let DEBUG = false;
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -25,7 +24,6 @@ const onmessage_ = function (e) {
       myself = e.data[2];
       args = e.data[3];
       env = e.data[4];
-      if (env["DEBUG"] === "1") DEBUG = true;
     }
   }
 };
@@ -53,7 +51,8 @@ function worker_send(msg) {
 }
 
 function worker_console_log(msg) {
-  if (DEBUG) {
+  // you can control debug logs dynamically based on DEBUG env variable
+  if (env['DEBUG'] && !(env['DEBUG'] === '0' || env['DEBUG'] === 'false' || env['DEBUG'] === '')) {
     worker_send(['console', msg]);
   }
 }

@@ -182,6 +182,7 @@ export async function init(anchor: HTMLElement) {
     ['shell'],
     {
       RUST_BACKTRACE: 'full',
+      DEBUG: 'false',
       PATH: '/usr/bin:/usr/local/bin',
       PWD: '/home/ant',
       OLDPWD: '/home/ant',
