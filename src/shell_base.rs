@@ -576,7 +576,7 @@ impl Shell {
                     if args.is_empty() {
                         0
                     } else {
-                        args[0].parse().unwrap()
+                        args[0].parse()?
                     }
                 };
                 exit(exit_code);

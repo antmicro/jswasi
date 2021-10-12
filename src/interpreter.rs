@@ -52,7 +52,10 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
 
     if let Some(command) = words.next() {
         let mut args = words.collect::<Vec<_>>();
-        let result = shell.execute_command(&command, &mut args, &env, background);
+        match shell.execute_command(&command, &mut args, &env, background) {
+            Ok(result) => result,
+            Err(error) => println!("shell error: {:?}", error),
+        }
     } else {
         for (key, value) in env.iter() {
             // if it's a global update env, if shell variable update only vars
