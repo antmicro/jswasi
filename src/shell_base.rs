@@ -114,12 +114,10 @@ impl Shell {
                 if escaped {
                     match c[0] {
                         0x5b => {
-                            io::stdout().flush()?;
                             let mut c2 = [0];
                             io::stdin().read_exact(&mut c2)?;
                             match c2[0] {
                                 0x32 | 0x33 | 0x35 | 0x36 => {
-                                    io::stdout().flush()?;
                                     let mut c3 = [0];
                                     io::stdin().read_exact(&mut c3)?;
                                     match [c2[0], c3[0]] {
@@ -136,6 +134,7 @@ impl Shell {
                                             escaped = false;
                                         }
                                         [0x33, 0x7e] => {
+                                            // delete key
                                             if input.len() - cursor_position > 0 {
                                                 print!(
                                                     "{}",
@@ -168,7 +167,6 @@ impl Shell {
                                         }
                                         [0x33, 0x3b] => {
                                             println!("TODO: SHIFT + DELETE");
-                                            io::stdout().flush()?;
                                             let mut c4 = [0];
                                             // TWO MORE! TODO: improve!
                                             io::stdin().read_exact(&mut c4)?;
@@ -184,65 +182,74 @@ impl Shell {
                                         }
                                     }
                                 }
+                                // up arrow
                                 0x41 => {
-                                    if !self.history.is_empty() {
+                                    if !self.history.is_empty() && history_entry_to_display != 0 {
                                         if history_entry_to_display == -1 {
                                             history_entry_to_display =
                                                 (self.history.len() - 1) as i32;
-                                            input_stash.clear();
-                                            input_stash.push_str(&input);
+                                            input_stash = input.clone();
                                         } else if history_entry_to_display > 0 {
                                             history_entry_to_display -= 1;
                                         }
-                                        let to_delete = input.len();
-                                        for _ in 0..to_delete {
+                                        // bring cursor to the end so that clearing later starts from
+                                        // proper position
+                                        print!(
+                                            "{}",
+                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        );
+                                        for _ in 0..input.len() {
                                             print!("{} {}", 8 as char, 8 as char);
                                             // '\b \b', clear left of cursor
                                         }
-                                        input.clear();
-                                        input.push_str(
-                                            &self.history[history_entry_to_display as usize],
-                                        );
+                                        input =
+                                            self.history[history_entry_to_display as usize].clone();
+                                        cursor_position = input.len();
                                         print!("{}", input);
                                     }
                                     escaped = false;
                                 }
+                                // down arrow
                                 0x42 => {
                                     if history_entry_to_display != -1 {
-                                        let to_delete = input.len();
-                                        for _ in 0..to_delete {
+                                        // bring cursor to the end so that clearing later starts from
+                                        // proper position
+                                        print!(
+                                            "{}",
+                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        );
+                                        for _ in 0..input.len() {
                                             print!("{} {}", 8 as char, 8 as char);
                                             // '\b \b', clear left of cursor
                                         }
-                                        input.clear();
                                         if self.history.len() - 1
                                             > (history_entry_to_display as usize)
                                         {
                                             history_entry_to_display += 1;
-                                            input.push_str(
-                                                &self.history[history_entry_to_display as usize],
-                                            );
+                                            input = self.history[history_entry_to_display as usize]
+                                                .clone();
                                         } else {
-                                            input.push_str(&input_stash);
+                                            input = input_stash.clone();
                                             history_entry_to_display = -1;
                                         }
+                                        cursor_position = input.len();
                                         print!("{}", input);
                                     }
                                     escaped = false;
                                 }
                                 0x43 => {
+                                    // right arrow
                                     if cursor_position < input.len() {
                                         print!("{}", input.chars().nth(cursor_position).unwrap());
                                         cursor_position += 1;
-                                        io::stdout().flush()?;
                                     }
                                     escaped = false;
                                 }
                                 0x44 => {
+                                    // left arrow
                                     if cursor_position > 0 {
                                         print!("{}", 8 as char);
                                         cursor_position -= 1;
-                                        io::stdout().flush()?;
                                     }
                                     escaped = false;
                                 }
