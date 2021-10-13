@@ -503,7 +503,7 @@ function WASI() {
       }
       return '';
     }
-    if (cmd == 'set_env') {
+    else if (cmd == 'set_env') {
       const args = args_string.split('\x1b');
       if (args.length == 1) {
         delete env[args[0]];
@@ -521,6 +521,10 @@ function WASI() {
           worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
           return env[args[0]];
         }
+    }
+    else if (cmd === 'set_echo') {
+        worker_send(['set_echo', args_string]);
+        return '';
     }
 
     worker_console_log(`Special command ${cmd} not found.`);

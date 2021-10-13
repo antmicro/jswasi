@@ -68,7 +68,11 @@ export const on_worker_message = async function (event, workerTable) {
 
       Atomics.store(parent_lck, 0, 0);
       Atomics.notify(parent_lck, 0);
-	        break;
+	  break;
+    }
+    case 'set_echo': {
+      workerTable.workerInfos[worker_id].shouldEcho = data === '1';
+      break;
     }
     case 'spawn': {
       const [fullpath, args, env, sbuf] = data;
@@ -104,30 +108,30 @@ export const on_worker_message = async function (event, workerTable) {
           Atomics.notify(parent_lck, 0);
           break;
         }
-	case '/usr/bin/free': {
-      // @ts-ignore memory is non-standard API available only in Chrome
-	  let total_mem_raw = performance.memory.jsHeapSizeLimit; 
-      // @ts-ignore
-      let used_mem_raw = performance.memory.usedJSHeapSize;
-	  let total_mem = "";
-	  let used_mem = "";
-	  let avail_mem = "";
-	  if ((args.length > 1) && (args[1] == "-h")) {
-	      total_mem = human_readable(total_mem_raw);
-	      used_mem = human_readable(used_mem_raw);
-	      avail_mem = human_readable(total_mem_raw - used_mem_raw);
-	  } else {
-              total_mem = `${Math.round(total_mem_raw / 1024)}`;
-	      used_mem = `${Math.round(used_mem_raw / 1024)}`;
-	      avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
-	  }
-	  let free_data = `               total        used   available\n\r`;
-	  free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
-	  workerTable.receive_callback(free_data);
-          Atomics.store(parent_lck, 0, 0);
-          Atomics.notify(parent_lck, 0);
-	  break;
-	}
+	    case '/usr/bin/free': {
+          // @ts-ignore memory is non-standard API available only in Chrome
+	      let total_mem_raw = performance.memory.jsHeapSizeLimit; 
+          // @ts-ignore
+          let used_mem_raw = performance.memory.usedJSHeapSize;
+	      let total_mem = "";
+	      let used_mem = "";
+	      let avail_mem = "";
+	      if ((args.length > 1) && (args[1] == "-h")) {
+	          total_mem = human_readable(total_mem_raw);
+	          used_mem = human_readable(used_mem_raw);
+	          avail_mem = human_readable(total_mem_raw - used_mem_raw);
+	      } else {
+                  total_mem = `${Math.round(total_mem_raw / 1024)}`;
+	          used_mem = `${Math.round(used_mem_raw / 1024)}`;
+	          avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
+	      }
+	      let free_data = `               total        used   available\n\r`;
+	      free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
+	      workerTable.receive_callback(free_data);
+              Atomics.store(parent_lck, 0, 0);
+              Atomics.notify(parent_lck, 0);
+	      break;
+	    }
         case '/usr/bin/wget': {
           await wget(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, 0);

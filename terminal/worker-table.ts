@@ -25,12 +25,14 @@ class WorkerInfo {
 
     public env;
 
+    public shouldEcho = true;
+
     constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback, env) {
-	    this.id = id;
+	  this.id = id;
       this.cmd = cmd;
       this.worker = worker;
-	    const now = new Date();
-	    this.timestamp = Math.floor(now.getTime() / 1000);
+	  const now = new Date();
+	  this.timestamp = Math.floor(now.getTime() / 1000);
       this.fds = fds;
       this.parent_id = parent_id;
       this.parent_lock = parent_lock;

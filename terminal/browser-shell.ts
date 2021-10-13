@@ -144,7 +144,7 @@ export async function init(anchor: HTMLElement) {
       data = String.fromCharCode(10);
     }
 
-	    if (code == 3 || code == 4) {
+	if (code == 3 || code == 4) {
       // control characters
       if (code == 3) {
         workerTable.sendSigInt(workerTable.currentWorker);
@@ -154,14 +154,16 @@ export async function init(anchor: HTMLElement) {
     } else {
       // regular characters
       workerTable.push_to_buffer(data);
-	        if (window.stdout_attached != undefined && window.stdout_attached) {
+	  if (window.stdout_attached) {
         window.buffer += data;
       }
     }
 
 	if ((code === 10) || code >= 32) {
       // echo
-      // terminal.io.print(code === 10 ? '\r\n' : data);
+      if (workerTable.workerInfos[workerTable.currentWorker].shouldEcho) {
+        terminal.io.print(code === 10 ? '\r\n' : data);
+      }
 	}
   };
 
