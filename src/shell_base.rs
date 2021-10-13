@@ -337,15 +337,14 @@ impl Shell {
             }
             "imgcat" => {
                 if args.is_empty() {
-                    println!("usage: imgcat image");
+                    println!("usage: imgcat <IMAGE>");
                 } else {
                     // TODO: find out why it breaks the order of prompt
-                    // TODO: unhardcode size somehow
                     iterm2::File::read(&args[0])?
-                    .width(iterm2::Dimension::Pixel(320))
-                    .height(iterm2::Dimension::Pixel(200))
-                    .preserve_aspect_ratio(true)
-                    .show()?;
+                        .width(iterm2::Dimension::Auto)
+                        .height(iterm2::Dimension::Auto)
+                        .preserve_aspect_ratio(true)
+                        .show()?;
                 }
             }
             "cd" => {
