@@ -81,8 +81,8 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // disable echoing on hterm side
-        syscall("set_echo", &["0"], &HashMap::new(), false)?;
+        // disable echoing on hterm side (ignore Error that will rise on platforms other than web
+        let _ = syscall("set_echo", &["0"], &HashMap::new(), false);
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
