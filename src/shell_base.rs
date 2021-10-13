@@ -136,7 +136,34 @@ impl Shell {
                                             escaped = false;
                                         }
                                         [0x33, 0x7e] => {
-                                            println!("TODO: DELETE");
+                                            if input.len() - cursor_position > 0 {
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(" ")
+                                                        .take(input.len() - cursor_position + 1)
+                                                        .collect::<String>()
+                                                );
+                                                input.remove(cursor_position);
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(format!("{}", 8 as char))
+                                                        .take(input.len() - cursor_position + 2)
+                                                        .collect::<String>()
+                                                );
+                                                print!(
+                                                    "{}",
+                                                    input
+                                                        .chars()
+                                                        .skip(cursor_position)
+                                                        .collect::<String>(),
+                                                );
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(format!("{}", 8 as char))
+                                                        .take(input.len() - cursor_position)
+                                                        .collect::<String>()
+                                                );
+                                            }
                                             escaped = false;
                                         }
                                         [0x33, 0x3b] => {
