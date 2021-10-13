@@ -818,6 +818,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       instance.exports._start();
       do_exit(0);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
     }
@@ -830,6 +831,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
     try {
       instance = await WebAssembly.instantiate(module, moduleImports);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
       return;
@@ -840,6 +842,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       instance.exports._start();
       do_exit(0);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
     }
@@ -856,6 +859,7 @@ async function start_wasm() {
         // @ts-ignore
         if (!fs.existsSync(mod)) {
           worker_console_log(`File ${mod} not found!`);
+          worker_send(['stderr', `File ${mod} not found!`]);
           started = false;
           mod = '';
           do_exit(255);

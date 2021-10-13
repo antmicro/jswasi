@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -88,6 +89,8 @@ impl Shell {
             println!("{}", fs::read_to_string(motd_path)?);
         }
 
+        let mut cursor_position = 0;
+
         loop {
             let mut input = String::new();
             let mut input_stash = String::new();
@@ -104,7 +107,6 @@ impl Shell {
             io::stdout().flush()?;
             let mut c = [0];
             let mut escaped = false;
-            let mut cursor_position = 0;
             let mut history_entry_to_display: i32 = -1;
             // read line
             loop {
@@ -244,14 +246,37 @@ impl Shell {
                         10 => {
                             input = input.trim().to_string();
                             println!();
+                            cursor_position = 0;
                             break;
                         }
                         // backspace
                         127 => {
-                            if !input.is_empty() {
-                                input.remove(input.len() - 1);
-                                print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
+                            if !input.is_empty() && cursor_position > 0 {
+                                print!("{}", 8 as char);
+                                print!(
+                                    "{}",
+                                    iter::repeat(" ")
+                                        .take(input.len() - cursor_position + 1)
+                                        .collect::<String>()
+                                );
+                                input.remove(cursor_position - 1);
                                 cursor_position -= 1;
+                                print!(
+                                    "{}",
+                                    iter::repeat(format!("{}", 8 as char))
+                                        .take(input.len() - cursor_position + 1)
+                                        .collect::<String>()
+                                );
+                                print!(
+                                    "{}",
+                                    input.chars().skip(cursor_position).collect::<String>(),
+                                );
+                                print!(
+                                    "{}",
+                                    iter::repeat(format!("{}", 8 as char))
+                                        .take(input.len() - cursor_position)
+                                        .collect::<String>()
+                                );
                             }
                         }
                         // control codes
@@ -266,8 +291,11 @@ impl Shell {
                             input.insert(cursor_position, c[0] as char);
                             // echo
                             print!(
-                                "{}",
-                                c[0] as char // input.chars().skip(cursor_position).collect::<String>()
+                                "{}{}",
+                                input.chars().skip(cursor_position).collect::<String>(),
+                                iter::repeat(format!("{}", 8 as char))
+                                    .take(input.len() - cursor_position - 1)
+                                    .collect::<String>()
                             );
                             cursor_position += 1;
                         }
@@ -321,6 +349,7 @@ impl Shell {
                     iter.push_str(input.strip_prefix(&prefix).unwrap());
                     input.clear();
                     input.push_str(&iter);
+                    cursor_position = input.len();
                 }
             }
 
