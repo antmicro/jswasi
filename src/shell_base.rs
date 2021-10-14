@@ -88,7 +88,13 @@ impl Shell {
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
 
-        let history_path = format!("{}/.shell_history", env::var("HOME")?);
+        let history_path = {
+            if PathBuf::from(env::var("HOME")?).exists() {
+                format!("{}/.shell_history", env::var("HOME")?)
+            } else {
+                format!("{}/.shell_history", env::var("PWD")?)
+            }
+        };
 
         if PathBuf::from(&history_path).exists() {
             self.history = fs::read_to_string(&history_path)?
