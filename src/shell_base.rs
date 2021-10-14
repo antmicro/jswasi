@@ -90,15 +90,17 @@ impl Shell {
 
         let history_path = format!("{}/.shell_history", env::var("HOME")?);
 
-        let mut shell_history = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&history_path)?;
+        if PathBuf::from(&history_path).exists() {
+            self.history = fs::read_to_string(&history_path)?
+                .lines()
+                .map(str::to_string)
+                .collect();
+        }
 
-        self.history = fs::read_to_string(&history_path)?
-            .lines()
-            .map(str::to_string)
-            .collect();
+        let mut shell_history = OpenOptions::new()
+             .create(true)
+             .append(true)
+             .open(&history_path)?;
 
         let mut cursor_position = 0;
 
