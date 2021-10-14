@@ -90,15 +90,15 @@ impl Shell {
 
         let history_path = format!("{}/.shell_history", env::var("HOME")?);
 
-        self.history = fs::read_to_string(&history_path)?
-            .lines()
-            .map(str::to_string)
-            .collect();
-
         let mut shell_history = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&history_path)?;
+
+        self.history = fs::read_to_string(&history_path)?
+            .lines()
+            .map(str::to_string)
+            .collect();
 
         let mut cursor_position = 0;
 
