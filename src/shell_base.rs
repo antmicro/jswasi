@@ -2,7 +2,6 @@ use std::env;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
-use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -11,12 +10,11 @@ use substring::Substring;
 
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
+use iterm2;
 
 use crate::interpreter::interpret;
 
 use std::collections::HashMap;
-
-use iterm2;
 
 // communicate with the worker thread
 pub fn syscall(
@@ -83,7 +81,7 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // disable echoing on hterm side (ignore Error that will rise on platforms other than web
+        // disable echoing on hterm side (ignore Error that will arise on platforms other than web
         let _ = syscall("set_echo", &["0"], &HashMap::new(), false);
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
@@ -143,16 +141,14 @@ impl Shell {
                                             if input.len() - cursor_position > 0 {
                                                 print!(
                                                     "{}",
-                                                    iter::repeat(" ")
-                                                        .take(input.len() - cursor_position + 1)
-                                                        .collect::<String>()
+                                                    format!("{}", 8 as char)
+                                                        .repeat(input.len() - cursor_position + 1)
                                                 );
                                                 input.remove(cursor_position);
                                                 print!(
                                                     "{}",
-                                                    iter::repeat(format!("{}", 8 as char))
-                                                        .take(input.len() - cursor_position + 2)
-                                                        .collect::<String>()
+                                                    format!("{}", 8 as char)
+                                                        .repeat(input.len() - cursor_position + 2)
                                                 );
                                                 print!(
                                                     "{}",
@@ -163,9 +159,8 @@ impl Shell {
                                                 );
                                                 print!(
                                                     "{}",
-                                                    iter::repeat(format!("{}", 8 as char))
-                                                        .take(input.len() - cursor_position)
-                                                        .collect::<String>()
+                                                    format!("{}", 8 as char)
+                                                        .repeat(input.len() - cursor_position)
                                                 );
                                             }
                                             escaped = false;
@@ -294,17 +289,15 @@ impl Shell {
                                 print!("{}", 8 as char);
                                 print!(
                                     "{}",
-                                    iter::repeat(" ")
-                                        .take(input.len() - cursor_position + 1)
-                                        .collect::<String>()
+                                    format!("{}", 8 as char)
+                                        .repeat(input.len() - cursor_position + 1)
                                 );
                                 input.remove(cursor_position - 1);
                                 cursor_position -= 1;
                                 print!(
                                     "{}",
-                                    iter::repeat(format!("{}", 8 as char))
-                                        .take(input.len() - cursor_position + 1)
-                                        .collect::<String>()
+                                    format!("{}", 8 as char)
+                                        .repeat(input.len() - cursor_position + 1)
                                 );
                                 print!(
                                     "{}",
@@ -312,9 +305,7 @@ impl Shell {
                                 );
                                 print!(
                                     "{}",
-                                    iter::repeat(format!("{}", 8 as char))
-                                        .take(input.len() - cursor_position)
-                                        .collect::<String>()
+                                    format!("{}", 8 as char).repeat(input.len() - cursor_position)
                                 );
                             }
                         }
@@ -332,9 +323,7 @@ impl Shell {
                             print!(
                                 "{}{}",
                                 input.chars().skip(cursor_position).collect::<String>(),
-                                iter::repeat(format!("{}", 8 as char))
-                                    .take(input.len() - cursor_position - 1)
-                                    .collect::<String>()
+                                format!("{}", 8 as char).repeat(input.len() - cursor_position - 1)
                             );
                             cursor_position += 1;
                         }
@@ -455,7 +444,7 @@ impl Shell {
                             false,
                         )?;
                         #[cfg(not(target_os = "wasi"))]
-                        let pwd_path = PathBuf::from(fs::canonicalize(path).unwrap());
+                        let pwd_path = fs::canonicalize(path)?;
                         #[cfg(target_os = "wasi")]
                         let pwd_path = PathBuf::from(syscall(
                             "set_env",
@@ -547,7 +536,7 @@ impl Shell {
                 print!("\x1b[2J\x1b[H");
             }
             "unset" => {
-                if args.len() < 1 {
+                if args.is_empty() {
                     println!("unset: help: unset <VAR> [<VAR>] ...");
                 }
                 for arg in args {
@@ -555,9 +544,9 @@ impl Shell {
                         println!("unset: cannot unset {}", &arg);
                     } else {
                         self.vars.remove(arg);
-                        if !env::var(&arg).is_err() {
+                        if env::var(&arg).is_ok() {
                             env::remove_var(&arg);
-                            syscall("set_env", &[&arg], env, false)?;
+                            syscall("set_env", &[arg], env, false)?;
                         }
                     }
                 }
@@ -571,31 +560,27 @@ impl Shell {
                     for (key, value) in env::vars() {
                         println!("{}={}", key, value);
                     }
-                } else {
-                    if args[0] == "-x" || args[0] == "+x" {
-                        // if -x is provided declare works as export
-                        // if +x then makes global var local
-                        for arg in args.iter().skip(1) {
-                            if args[0] == "-x" {
-                                if let Some((key, value)) = arg.split_once("=") {
-                                    syscall("set_env", &[&key, &value], env, false)?;
-                                }
-                            } else {
-                                if let Some((key, value)) = arg.split_once("=") {
-                                    syscall("set_env", &[&key], env, false)?;
-                                    self.vars.insert(key.to_string(), value.to_string());
-                                } else {
-                                    let value = env::var(arg)?;
-                                    syscall("set_env", &[&arg], env, false)?;
-                                    self.vars.insert(arg.clone(), value.clone());
-                                }
-                            }
-                        }
-                    } else {
-                        for arg in args {
+                } else if args[0] == "-x" || args[0] == "+x" {
+                    // if -x is provided declare works as export
+                    // if +x then makes global var local
+                    for arg in args.iter().skip(1) {
+                        if args[0] == "-x" {
                             if let Some((key, value)) = arg.split_once("=") {
-                                self.vars.insert(key.to_string(), value.to_string());
+                                syscall("set_env", &[key, value], env, false)?;
                             }
+                        } else if let Some((key, value)) = arg.split_once("=") {
+                            syscall("set_env", &[key], env, false)?;
+                            self.vars.insert(key.to_string(), value.to_string());
+                        } else {
+                            let value = env::var(arg)?;
+                            syscall("set_env", &[arg], env, false)?;
+                            self.vars.insert(arg.clone(), value.clone());
+                        }
+                    }
+                } else {
+                    for arg in args {
+                        if let Some((key, value)) = arg.split_once("=") {
+                            self.vars.insert(key.to_string(), value.to_string());
                         }
                     }
                 }
@@ -611,13 +596,13 @@ impl Shell {
                     if let Some((key, value)) = arg.split_once("=") {
                         self.vars.remove(key);
                         env::set_var(&key, &value);
-                        syscall("set_env", &[&key, &value], env, false)?;
+                        syscall("set_env", &[key, value], env, false)?;
                     } else if let Some(value) = self.vars.remove(arg) {
                         env::set_var(&arg, &value);
-                        syscall("set_env", &[&arg, &value], env, false)?;
+                        syscall("set_env", &[arg, &value], env, false)?;
                     } else {
                         env::set_var(&arg, "");
-                        syscall("set_env", &[&arg, ""], env, false)?;
+                        syscall("set_env", &[arg, ""], env, false)?;
                     }
                 }
             }
