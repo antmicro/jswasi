@@ -512,7 +512,7 @@ impl Shell {
                     println!("sleep: missing operand");
                 }
             }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date"
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
             | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" => {
                 args.insert(0, command.to_string());
                 #[cfg(target_os = "wasi")]
