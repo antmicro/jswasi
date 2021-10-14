@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -87,12 +88,18 @@ impl Shell {
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
 
+        let history_path = format!("{}/.shell_history", env::var("HOME")?);
+
+        // self.history = fs::read_to_string(&history_path).lines().collect();
+
+        let mut shell_history = OpenOptions::new().append(true).open(&history_path)?;
+
+        let mut cursor_position = 0;
+
         let motd_path = PathBuf::from("/etc/motd");
         if motd_path.exists() {
             println!("{}", fs::read_to_string(motd_path)?);
         }
-
-        let mut cursor_position = 0;
 
         loop {
             let mut input = String::new();
@@ -375,14 +382,14 @@ impl Shell {
                     let mut iter = self.history[history_entry_id - 1].clone();
                     let prefix = format!("!{}", sbstr);
                     iter.push_str(input.strip_prefix(&prefix).unwrap());
-                    input.clear();
-                    input.push_str(&iter);
+                    input = iter;
                     cursor_position = input.len();
                 }
             }
 
             if input.substring(0, 1) != "!" && !input.replace(" ", "").is_empty() {
                 self.history.push(input.clone());
+                writeln!(shell_history, "{}", &input)?;
             }
 
             if let Err(error) = self.handle_input(&input) {
