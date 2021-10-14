@@ -151,8 +151,7 @@ impl Shell {
                                             if input.len() - cursor_position > 0 {
                                                 print!(
                                                     "{}",
-                                                    format!("{}", 8 as char)
-                                                        .repeat(input.len() - cursor_position + 1)
+                                                    " ".repeat(input.len() - cursor_position + 1)
                                                 );
                                                 input.remove(cursor_position);
                                                 print!(
@@ -297,11 +296,7 @@ impl Shell {
                         127 => {
                             if !input.is_empty() && cursor_position > 0 {
                                 print!("{}", 8 as char);
-                                print!(
-                                    "{}",
-                                    format!("{}", 8 as char)
-                                        .repeat(input.len() - cursor_position + 1)
-                                );
+                                print!("{}", " ".repeat(input.len() - cursor_position + 1));
                                 input.remove(cursor_position - 1);
                                 cursor_position -= 1;
                                 print!(
@@ -382,10 +377,11 @@ impl Shell {
                     input.clear();
                     continue;
                 } else {
-                    let mut iter = self.history[history_entry_id - 1].clone();
-                    let prefix = format!("!{}", sbstr);
-                    iter.push_str(input.strip_prefix(&prefix).unwrap());
-                    input = iter;
+                    let input = format!(
+                        "{}{}",
+                        self.history[history_entry_id - 1],
+                        input.strip_prefix(&format!("!{}", sbstr)).unwrap()
+                    );
                     cursor_position = input.len();
                 }
             }
