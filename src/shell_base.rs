@@ -392,7 +392,8 @@ impl Shell {
             // don't push !commands and duplicate commands
             if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
                 self.history.push(input.clone());
-                writeln!(shell_history, "{}", &input)?;
+                // this breaks on WASM runtimes where you can't access HOME dir
+                let _ = writeln!(shell_history, "{}", &input);
             }
 
             if let Err(error) = self.handle_input(&input) {
