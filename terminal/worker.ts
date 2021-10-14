@@ -503,7 +503,7 @@ function WASI() {
       }
       return '';
     }
-    if (cmd == 'set_env') {
+    else if (cmd == 'set_env') {
       const args = args_string.split('\x1b');
       if (args.length == 1) {
         delete env[args[0]];
@@ -521,6 +521,10 @@ function WASI() {
           worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
           return env[args[0]];
         }
+    }
+    else if (cmd === 'set_echo') {
+        worker_send(['set_echo', args_string]);
+        return '';
     }
 
     worker_console_log(`Special command ${cmd} not found.`);
@@ -818,6 +822,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       instance.exports._start();
       do_exit(0);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
     }
@@ -830,6 +835,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
     try {
       instance = await WebAssembly.instantiate(module, moduleImports);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
       return;
@@ -840,6 +846,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       instance.exports._start();
       do_exit(0);
     } catch (e) {
+      worker_console_log(`error: ${e}`);
       worker_send(['stderr', `${e.stack}\n`]);
       do_exit(255);
     }
@@ -856,6 +863,7 @@ async function start_wasm() {
         // @ts-ignore
         if (!fs.existsSync(mod)) {
           worker_console_log(`File ${mod} not found!`);
+          worker_send(['stderr', `File ${mod} not found!`]);
           started = false;
           mod = '';
           do_exit(255);

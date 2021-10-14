@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -82,6 +83,9 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // disable echoing on hterm side (ignore Error that will rise on platforms other than web
+        let _ = syscall("set_echo", &["0"], &HashMap::new(), false);
+
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
 
@@ -89,6 +93,8 @@ impl Shell {
         if motd_path.exists() {
             println!("{}", fs::read_to_string(motd_path)?);
         }
+
+        let mut cursor_position = 0;
 
         loop {
             let mut input = String::new();
@@ -113,12 +119,10 @@ impl Shell {
                 if escaped {
                     match c[0] {
                         0x5b => {
-                            io::stdout().flush()?;
                             let mut c2 = [0];
                             io::stdin().read_exact(&mut c2)?;
                             match c2[0] {
                                 0x32 | 0x33 | 0x35 | 0x36 => {
-                                    io::stdout().flush()?;
                                     let mut c3 = [0];
                                     io::stdin().read_exact(&mut c3)?;
                                     match [c2[0], c3[0]] {
@@ -135,12 +139,39 @@ impl Shell {
                                             escaped = false;
                                         }
                                         [0x33, 0x7e] => {
-                                            println!("TODO: DELETE");
+                                            // delete key
+                                            if input.len() - cursor_position > 0 {
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(" ")
+                                                        .take(input.len() - cursor_position + 1)
+                                                        .collect::<String>()
+                                                );
+                                                input.remove(cursor_position);
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(format!("{}", 8 as char))
+                                                        .take(input.len() - cursor_position + 2)
+                                                        .collect::<String>()
+                                                );
+                                                print!(
+                                                    "{}",
+                                                    input
+                                                        .chars()
+                                                        .skip(cursor_position)
+                                                        .collect::<String>(),
+                                                );
+                                                print!(
+                                                    "{}",
+                                                    iter::repeat(format!("{}", 8 as char))
+                                                        .take(input.len() - cursor_position)
+                                                        .collect::<String>()
+                                                );
+                                            }
                                             escaped = false;
                                         }
                                         [0x33, 0x3b] => {
                                             println!("TODO: SHIFT + DELETE");
-                                            io::stdout().flush()?;
                                             let mut c4 = [0];
                                             // TWO MORE! TODO: improve!
                                             io::stdin().read_exact(&mut c4)?;
@@ -156,58 +187,75 @@ impl Shell {
                                         }
                                     }
                                 }
+                                // up arrow
                                 0x41 => {
-                                    if !self.history.is_empty() {
+                                    if !self.history.is_empty() && history_entry_to_display != 0 {
                                         if history_entry_to_display == -1 {
                                             history_entry_to_display =
                                                 (self.history.len() - 1) as i32;
-                                            input_stash.clear();
-                                            input_stash.push_str(&input);
+                                            input_stash = input.clone();
                                         } else if history_entry_to_display > 0 {
                                             history_entry_to_display -= 1;
                                         }
-                                        let to_delete = input.len();
-                                        for _ in 0..to_delete {
+                                        // bring cursor to the end so that clearing later starts from
+                                        // proper position
+                                        print!(
+                                            "{}",
+                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        );
+                                        for _ in 0..input.len() {
                                             print!("{} {}", 8 as char, 8 as char);
                                             // '\b \b', clear left of cursor
                                         }
-                                        input.clear();
-                                        input.push_str(
-                                            &self.history[history_entry_to_display as usize],
-                                        );
+                                        input =
+                                            self.history[history_entry_to_display as usize].clone();
+                                        cursor_position = input.len();
                                         print!("{}", input);
                                     }
                                     escaped = false;
                                 }
+                                // down arrow
                                 0x42 => {
                                     if history_entry_to_display != -1 {
-                                        let to_delete = input.len();
-                                        for _ in 0..to_delete {
+                                        // bring cursor to the end so that clearing later starts from
+                                        // proper position
+                                        print!(
+                                            "{}",
+                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        );
+                                        for _ in 0..input.len() {
                                             print!("{} {}", 8 as char, 8 as char);
                                             // '\b \b', clear left of cursor
                                         }
-                                        input.clear();
                                         if self.history.len() - 1
                                             > (history_entry_to_display as usize)
                                         {
                                             history_entry_to_display += 1;
-                                            input.push_str(
-                                                &self.history[history_entry_to_display as usize],
-                                            );
+                                            input = self.history[history_entry_to_display as usize]
+                                                .clone();
                                         } else {
-                                            input.push_str(&input_stash);
+                                            input = input_stash.clone();
                                             history_entry_to_display = -1;
                                         }
+                                        cursor_position = input.len();
                                         print!("{}", input);
                                     }
                                     escaped = false;
                                 }
                                 0x43 => {
-                                    println!("TODO: RIGHT");
+                                    // right arrow
+                                    if cursor_position < input.len() {
+                                        print!("{}", input.chars().nth(cursor_position).unwrap());
+                                        cursor_position += 1;
+                                    }
                                     escaped = false;
                                 }
                                 0x44 => {
-                                    println!("TODO: LEFT");
+                                    // left arrow
+                                    if cursor_position > 0 {
+                                        print!("{}", 8 as char);
+                                        cursor_position -= 1;
+                                    }
                                     escaped = false;
                                 }
                                 0x46 => {
@@ -236,13 +284,38 @@ impl Shell {
                         // enter
                         10 => {
                             input = input.trim().to_string();
+                            println!();
+                            cursor_position = 0;
                             break;
                         }
                         // backspace
                         127 => {
-                            if !input.is_empty() {
-                                input.remove(input.len() - 1);
-                                print!("{} {}", 8 as char, 8 as char); // '\b \b', clear left of cursor
+                            if !input.is_empty() && cursor_position > 0 {
+                                print!("{}", 8 as char);
+                                print!(
+                                    "{}",
+                                    iter::repeat(" ")
+                                        .take(input.len() - cursor_position + 1)
+                                        .collect::<String>()
+                                );
+                                input.remove(cursor_position - 1);
+                                cursor_position -= 1;
+                                print!(
+                                    "{}",
+                                    iter::repeat(format!("{}", 8 as char))
+                                        .take(input.len() - cursor_position + 1)
+                                        .collect::<String>()
+                                );
+                                print!(
+                                    "{}",
+                                    input.chars().skip(cursor_position).collect::<String>(),
+                                );
+                                print!(
+                                    "{}",
+                                    iter::repeat(format!("{}", 8 as char))
+                                        .take(input.len() - cursor_position)
+                                        .collect::<String>()
+                                );
                             }
                         }
                         // control codes
@@ -254,9 +327,16 @@ impl Shell {
                         }
                         // regular characters
                         _ => {
-                            input.push(c[0] as char);
+                            input.insert(cursor_position, c[0] as char);
                             // echo
-                            // print!("{}", c[0] as char);
+                            print!(
+                                "{}{}",
+                                input.chars().skip(cursor_position).collect::<String>(),
+                                iter::repeat(format!("{}", 8 as char))
+                                    .take(input.len() - cursor_position - 1)
+                                    .collect::<String>()
+                            );
+                            cursor_position += 1;
                         }
                     }
                 }
@@ -308,6 +388,7 @@ impl Shell {
                     iter.push_str(input.strip_prefix(&prefix).unwrap());
                     input.clear();
                     input.push_str(&iter);
+                    cursor_position = input.len();
                 }
             }
 

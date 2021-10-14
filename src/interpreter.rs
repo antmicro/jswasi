@@ -61,7 +61,7 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
             // if it's a global update env, if shell variable update only vars
             if env::var(key).is_ok() {
                 env::set_var(&key, &value);
-                syscall("set_env", &[&key, &value], &env, false);
+                let _ = syscall("set_env", &[&key, &value], &env, false);
             } else {
                 shell.vars.insert(key.clone(), value.clone());
             }
