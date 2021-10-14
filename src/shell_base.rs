@@ -95,7 +95,10 @@ impl Shell {
             .map(str::to_string)
             .collect();
 
-        let mut shell_history = OpenOptions::new().append(true).open(&history_path)?;
+        let mut shell_history = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&history_path)?;
 
         let mut cursor_position = 0;
 

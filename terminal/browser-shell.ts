@@ -69,7 +69,6 @@ export async function initFs(anchor: HTMLElement) {
   const tmp = await root.getDirectoryHandle('tmp', { create: true });
   const home = await root.getDirectoryHandle('home', { create: true });
   const ant = await home.getDirectoryHandle('ant', { create: true });
-  const shell_history = await ant.getFileHandle('.shell_history', { create: true });
   const etc = await root.getDirectoryHandle('etc', { create: true });
 
   const usr = await root.getDirectoryHandle('usr', { create: true });
