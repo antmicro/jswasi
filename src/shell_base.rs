@@ -512,17 +512,8 @@ impl Shell {
                     println!("sleep: missing operand");
                 }
             }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "ls" | "date"
-            | "printf" | "env" | "cat" | "realpath" => {
-                args.insert(0, command.to_string());
-                #[cfg(target_os = "wasi")]
-                args.insert(0, String::from("/usr/bin/uutils"));
-                #[cfg(not(target_os = "wasi"))]
-                args.insert(0, String::from("/bin/busybox"));
-                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, false)?;
-            }
-            "ln" | "printenv" | "md5sum" => {
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | | "date"
+            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" => {
                 args.insert(0, command.to_string());
                 #[cfg(target_os = "wasi")]
                 args.insert(0, String::from("/usr/bin/coreutils"));

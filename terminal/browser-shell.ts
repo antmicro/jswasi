@@ -16,13 +16,13 @@ const ALWAYS_FETCH_BINARIES = {
 };
 
 const NECESSARY_BINARIES = {
-  '/usr/bin/uutils': 'resources/uutils.async.wasm',
   '/usr/bin/coreutils': 'resources/coreutils.async.wasm',
   '/usr/bin/tree': 'resources/tree.wasm',
   '/usr/bin/purge': 'resources/purge.wasm',
 };
 
 const OPTIONAL_BINARIES = {
+  '/usr/bin/uutils': 'resources/uutils.async.wasm',
   '/lib/python36.zip': 'https://github.com/pgielda/wasmpython-bin/raw/main/python36.zip',
   '/usr/local/bin/duk': 'https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm',
   '/usr/local/bin/cowsay': 'https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm',
