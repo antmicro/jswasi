@@ -90,7 +90,10 @@ impl Shell {
 
         let history_path = format!("{}/.shell_history", env::var("HOME")?);
 
-        // self.history = fs::read_to_string(&history_path).lines().collect();
+        self.history = fs::read_to_string(&history_path)?
+            .lines()
+            .map(str::to_string)
+            .collect();
 
         let mut shell_history = OpenOptions::new().append(true).open(&history_path)?;
 
@@ -343,7 +346,7 @@ impl Shell {
 
             // TODO: incorporate this into interpreter of parsed input
 
-            if input.is_empty() {
+            if input.replace(" ", "").is_empty() {
                 continue;
             }
 
@@ -387,7 +390,8 @@ impl Shell {
                 }
             }
 
-            if input.substring(0, 1) != "!" && !input.replace(" ", "").is_empty() {
+            // don't push !commands and duplicate commands
+            if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
                 self.history.push(input.clone());
                 writeln!(shell_history, "{}", &input)?;
             }
