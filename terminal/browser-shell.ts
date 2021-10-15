@@ -80,6 +80,7 @@ export async function initFs(anchor: HTMLElement) {
   await bin.getFileHandle('mount', { create: true });
   await bin.getFileHandle('umount', { create: true });
   await bin.getFileHandle('wget', { create: true });
+  await bin.getFileHandle('download', { create: true });
   await bin.getFileHandle('ps', { create: true });
   await bin.getFileHandle('free', { create: true });
   await bin.getFileHandle('nohup', { create: true });
@@ -255,19 +256,47 @@ export function umount(workerTable, worker_id, args, env): number {
 }
 
 export async function wget(workerTable, worker_id, args, env): Promise<number> {
-  let filename: string;
+  let path: string;
   let address: string;
   if (args.length == 2) {
     address = args[1];
-    filename = address.split('/').slice(-1)[0];
+    path = address.split('/').slice(-1)[0];
   } else if (args.length == 3) {
     address = args[1];
-    filename = args[2];
+    path = args[2];
   } else {
-    workerTable.terminal.io.println('wget: help: wget <address> [<filename>]');
+    workerTable.terminal.io.println('wget: help: wget <address> [<path>]');
     return 1;
   }
-  const { err, name, dir } = await filesystem.resolveAbsolute(`${env.PWD}/${filename}`);
-  await fetchFile(dir, filename, address);
+  if (!path.startsWith('/')) {
+    path = `${env.PWD === '/' ? '' : env.PWD}/${path}`;
+  }
+  const { err, name, dir } = await filesystem.resolveAbsolute(path);
+  await fetchFile(dir, path, address);
+  return 0;
+}
+
+export async function download(workerTable, worker_id, args, env): Promise<number> {
+  if (args.length === 1) {
+    workerTable.terminal.io.println('download: help: download <address> [<path>]');
+    return 1;
+  }
+  for (let path of args.slice(1)) {
+
+    if (!path.startsWith('/')) {
+      path = `${env.PWD === '/' ? '' : env.PWD}/${path}`;
+    }
+
+    const {err, entry} = await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.File);
+    if (err !== constants.WASI_ESUCCESS) {
+      workerTable.terminal.io.println(`download: no such file: ${path}`);
+    } else {
+      const stream = (await entry._handle.getFile()).stream();
+      // @ts-ignore 'suggestedName' does not exist in type 'SaveFilePickerOptions' (it does)
+      const local_handle = await window.showSaveFilePicker({ suggestedName: path.split("/").slice(-1)[0] });
+      const writable = await local_handle.createWritable();
+      await stream.pipeTo(writable);
+    }
+  }
   return 0;
 }

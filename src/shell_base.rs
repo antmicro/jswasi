@@ -104,9 +104,9 @@ impl Shell {
         }
 
         let mut shell_history = OpenOptions::new()
-             .create(true)
-             .append(true)
-             .open(&history_path)?;
+            .create(true)
+            .append(true)
+            .open(&history_path)?;
 
         let mut cursor_position = 0;
 

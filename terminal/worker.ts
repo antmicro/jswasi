@@ -494,7 +494,6 @@ function WASI() {
       const lck = new Int32Array(sbuf, 0, 1);
       lck[0] = -1;
       worker_send(['spawn', [args[0], args.slice(1), extended_env, sbuf]]);
-      worker_console_log('sent.');
       // wait for child process to finish
       Atomics.wait(lck, 0, -1);
       const err = Atomics.load(lck, 0);
@@ -857,7 +856,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
 
 async function start_wasm() {
   if (started && mod != '') {
-    worker_console_log(`Loading ${mod}`);
+    worker_console_log(`Loading a module`);
     try {
       if (IS_NODE) {
         // @ts-ignore

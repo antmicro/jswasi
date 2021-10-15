@@ -1,6 +1,6 @@
 import * as constants from './constants.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
-import { mount, umount, wget } from './browser-shell.js';
+import { mount, umount, wget, download } from './browser-shell.js';
 
 declare global {
     var exit_code: number;
@@ -134,6 +134,12 @@ export const on_worker_message = async function (event, workerTable) {
 	    }
         case '/usr/bin/wget': {
           await wget(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, 0);
+          Atomics.notify(parent_lck, 0);
+          break;
+        }
+        case '/usr/bin/download': {
+          await download(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, 0);
           Atomics.notify(parent_lck, 0);
           break;

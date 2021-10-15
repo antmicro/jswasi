@@ -4,7 +4,7 @@ import { FileOrDir, OpenFlags } from './filesystem.js';
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
-    DEBUG: boolean = false;
+    DEBUG: boolean = true;
 
     _rootDir: Directory;
 
@@ -289,14 +289,14 @@ export class Directory extends Entry {
           return { err: constants.WASI_EISDIR, entry: null };
         }
 
-	        if (name === '.') {
+	    if (name === '.') {
           const entry = new Directory(parent.path, parent._handle, parent.parent, this._filesystem);
           return { err: constants.WASI_ESUCCESS, entry };
-	        }
-	        if (name === '..') {
+	    }
+	    if (name === '..') {
           const entry = new Directory(parent.parent.path, parent.parent._handle, parent.parent.parent, this._filesystem);
           return { err: constants.WASI_ESUCCESS, entry };
-	        }
+	    }
       }
 
       if (oflags & OpenFlags.Directory) {
