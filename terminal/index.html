@@ -23,7 +23,7 @@
     script.src = "./hterm_all.js";
     script.onload = async () => {
       await lib.init();
-      await init(document.querySelector("#terminal"));
+      await init(document.querySelector("#terminal"), (path, entryName) => console.log(`[added droped file as '${path}/${entryName}`));
     };
 document.body.appendChild(script);
 </script>

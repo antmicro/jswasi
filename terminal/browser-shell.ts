@@ -107,7 +107,10 @@ export async function initFs(anchor: HTMLElement) {
 // things that are global and should be shared between all tab instances
 const filesystem = new Filesystem();
 
-export async function init(anchor: HTMLElement) {
+// anchor is any HTMLElement that will be used to initialize hterm
+// notifyDropedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
+// you can use it to customize the behaviour
+export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: string, entryName: string) => void = null) {
   anchor.innerHTML = 'Fetching binaries, this should only happen once.';
   await initFs(anchor);
   anchor.innerHTML = '';
@@ -168,8 +171,43 @@ export async function init(anchor: HTMLElement) {
 	}
   };
 
-  io.onTerminalResize = (columns, rows) => {
-  };
+  // TODO: maybe save all output and rewrite it on adjusted size?
+  io.onTerminalResize = (columns, rows) => {};
+
+  // drag and drop support (save dragged files and folders to current directoru)
+  // hterm creates iframe child of provided anchor, we assume there's only one of those
+  const terminalContentWindow = anchor.getElementsByTagName('iframe')[0].contentWindow;
+  terminalContentWindow.addEventListener('dragover', (e) => e.preventDefault());
+  terminalContentWindow.addEventListener('drop', async (e) => {
+    e.preventDefault();
+
+    const copyEntry = async (entry, path) => {
+      if (entry.kind === 'directory') {
+        // TODO: create directory in VFS, expand path and fill directory contents
+        const dir = (await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.Directory)).entry;
+        await dir._handle.getDirectoryHandle(entry.name, {create: true});
+        for await (const [name, handle] of entry.entries()) {
+          await copyEntry(handle, `${path}/${entry.name}`);
+        }
+      } else {
+        // create VFS file, open dragged file as stream and pipe it to VFS file
+        const dir = (await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.Directory)).entry;
+        const handle = await dir._handle.getFileHandle(entry.name, {create: true});
+        const writable = await handle.createWritable();
+        const stream = (await entry.getFile()).stream();
+        await stream.pipeTo(writable);
+        if (notifyDropedFileSaved) notifyDropedFileSaved(path, entry.name);
+      }
+    };
+
+    const pwd = workerTable.workerInfos[workerTable.currentWorker].env['PWD'];
+    for (const item of e.dataTransfer.items) {
+      if (item.kind === 'file') {
+        const entry = await item.getAsFileSystemHandle();
+        await copyEntry(entry, pwd);
+      }
+    }
+  });
 
   const pwd_dir = (await root_dir.getEntry('/home/ant', FileOrDir.Directory)).entry;
   pwd_dir.path = '.';

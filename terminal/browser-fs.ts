@@ -4,7 +4,7 @@ import { FileOrDir, OpenFlags } from './filesystem.js';
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
-    DEBUG: boolean = true;
+    DEBUG: boolean = false;
 
     _rootDir: Directory;
 
