@@ -138,6 +138,10 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
   terminal.decorate(anchor);
   terminal.installKeyboard();
 
+  terminal.keyboard.bindings.addBindings({
+      "Ctrl-R": "PASS",
+  });
+
   const io = terminal.io.push();
 
   io.onVTKeystroke = io.sendString = (data) => {
@@ -148,11 +152,11 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       data = String.fromCharCode(10);
     }
 
-	if (code == 3 || code == 4) {
+    if (code === 3 || code === 4 || code === 81) {
       // control characters
-      if (code == 3) {
+      if (code === 3) {
         workerTable.sendSigInt(workerTable.currentWorker);
-      } else if (code == 4) {
+      } else if (code === 4) {
         workerTable.sendEndOfFile(workerTable.currentWorker, -1);
       }
     } else {
