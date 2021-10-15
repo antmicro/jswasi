@@ -334,8 +334,14 @@ export async function download(workerTable, worker_id, args, env): Promise<numbe
       workerTable.terminal.io.println(`download: no such file: ${path}`);
     } else {
       const stream = (await entry._handle.getFile()).stream();
-      // @ts-ignore 'suggestedName' does not exist in type 'SaveFilePickerOptions' (it does)
-      const local_handle = await window.showSaveFilePicker({ suggestedName: path.split("/").slice(-1)[0] });
+      let local_handle;
+      try {
+        // @ts-ignore 'suggestedName' does not exist in type 'SaveFilePickerOptions' (it does)
+        local_handle = await window.showSaveFilePicker({ suggestedName: path.split("/").slice(-1)[0] });
+      } catch (e) {
+        workerTable.terminal.io.println('download: unable to save file locally');
+        return 1; // TODO: what would be a proper error here?
+      }
       const writable = await local_handle.createWritable();
       await stream.pipeTo(writable);
     }
