@@ -57,7 +57,7 @@ export const on_worker_message = async function (event, workerTable) {
     }
     case 'chdir': {
       const [pwd, sbuf] = data;
-      const parent_lck = new Int32Array(sbuf, 0, 1);
+      const lock = new Int32Array(sbuf, 0, 1);
       const { fds } = workerTable.workerInfos[worker_id];
 
       const rootDir = await workerTable.filesystem.getRootDirectory();
@@ -66,12 +66,24 @@ export const on_worker_message = async function (event, workerTable) {
       open_pwd.path = '.';
       fds[4] = open_pwd;
 
-      Atomics.store(parent_lck, 0, 0);
-      Atomics.notify(parent_lck, 0);
+      Atomics.store(lock, 0, 0);
+      Atomics.notify(lock, 0);
 	  break;
     }
+    case 'set_env': {
+      const [[key, value], sbuf] = data;
+      const lock = new Int32Array(sbuf, 0, 1);
+      workerTable.workerInfos[worker_id].env[key] = value;
+      Atomics.store(lock, 0, 0);
+      Atomics.notify(lock, 0);
+    }
     case 'set_echo': {
+      const [shouldEcho, sbuf] = data;
+      const lock = new Int32Array(sbuf, 0, 1);
+      // TODO: should this be simply $ECHO env variable?
       workerTable.workerInfos[worker_id].shouldEcho = data === '1';
+      Atomics.store(lock, 0, 0);
+      Atomics.notify(lock, 0);
       break;
     }
     case 'spawn': {
@@ -117,19 +129,19 @@ export const on_worker_message = async function (event, workerTable) {
 	      let used_mem = "";
 	      let avail_mem = "";
 	      if ((args.length > 1) && (args[1] == "-h")) {
-	          total_mem = human_readable(total_mem_raw);
-	          used_mem = human_readable(used_mem_raw);
-	          avail_mem = human_readable(total_mem_raw - used_mem_raw);
+	        total_mem = human_readable(total_mem_raw);
+	        used_mem = human_readable(used_mem_raw);
+	        avail_mem = human_readable(total_mem_raw - used_mem_raw);
 	      } else {
-                  total_mem = `${Math.round(total_mem_raw / 1024)}`;
-	          used_mem = `${Math.round(used_mem_raw / 1024)}`;
-	          avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
+            total_mem = `${Math.round(total_mem_raw / 1024)}`;
+	        used_mem = `${Math.round(used_mem_raw / 1024)}`;
+	        avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
 	      }
 	      let free_data = `               total        used   available\n\r`;
 	      free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
 	      workerTable.receive_callback(free_data);
-              Atomics.store(parent_lck, 0, 0);
-              Atomics.notify(parent_lck, 0);
+          Atomics.store(parent_lck, 0, 0);
+          Atomics.notify(parent_lck, 0);
 	      break;
 	    }
         case '/usr/bin/wget': {
@@ -144,16 +156,16 @@ export const on_worker_message = async function (event, workerTable) {
           Atomics.notify(parent_lck, 0);
           break;
         }
-	case '/usr/bin/nohup':
+	    case '/usr/bin/nohup':
         default: {
           let background = false;
-	  if (fullpath == "/usr/bin/nohup") {
-		  args = args.splice(1);
-		  fullpath = args[0];
-		  args = args.splice(1);
-                  args.splice(0, 0, fullpath.split('/').pop());
-		  background = true;
-	  }
+	      if (fullpath == "/usr/bin/nohup") {
+	        args = args.splice(1);
+	        fullpath = args[0];
+	        args = args.splice(1);
+            args.splice(0, 0, fullpath.split('/').pop());
+	        background = true;
+	      }
           const parent_fds = workerTable.workerInfos[worker_id].fds;
           const id = await workerTable.spawnWorker(
             worker_id,
@@ -164,17 +176,18 @@ export const on_worker_message = async function (event, workerTable) {
             args,
             env,
           );
-	  let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
-	  if (env['DEBUG'] == "1") {
-              console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
-	  }
-	  if (background) {
-              Atomics.store(parent_lck, 0, 0);
-              Atomics.notify(parent_lck, 0);
-	  }
+	      let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
+	      if (env['DEBUG'] == "1") {
+            console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	      }
+	      if (background) {
+            Atomics.store(parent_lck, 0, 0);
+            Atomics.notify(parent_lck, 0);
+	      }
           break;
         }
       }
+
       break;
     }
     case 'fd_prestat_get': {
