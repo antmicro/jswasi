@@ -427,23 +427,20 @@ impl Shell {
     ) -> Result<(), Box<dyn std::error::Error>> {
         match command {
             // built in commands
-            "history" => {
-                for (i, history_entry) in self.history.iter().enumerate() {
-                    println!("{}: {}", i, history_entry);
-                }
+            "clear" => {
+                print!("\x1b[2J\x1b[H");
             }
-            "imgcat" => {
-                if args.is_empty() {
-                    println!("usage: imgcat <IMAGE>");
-                } else {
-                    // TODO: find out why it breaks the order of prompt
-                    iterm2::File::read(&args[0])?
-                        .width(iterm2::Dimension::Auto)
-                        .height(iterm2::Dimension::Auto)
-                        .preserve_aspect_ratio(true)
-                        .show()?;
-                }
+            "exit" => {
+                let exit_code: i32 = {
+                    if args.is_empty() {
+                        0
+                    } else {
+                        args[0].parse()?
+                    }
+                };
+                exit(exit_code);
             }
+            "pwd" => println!("{}", env::current_dir()?.display()),
             "cd" => {
                 let path = if args.is_empty() {
                     PathBuf::from(env::var("HOME")?)
@@ -485,73 +482,10 @@ impl Shell {
                     }
                 }
             }
-            "unzip" => {
-                if let Some(filepath) = &args.get(0) {
-                    let file = fs::File::open(&PathBuf::from(filepath))?;
-                    let mut archive = zip::ZipArchive::new(file)?;
-                    for i in 0..archive.len() {
-                        let mut file = archive.by_index(i)?;
-                        let outpath = file.enclosed_name().to_owned().unwrap();
-                        if file.name().ends_with('/') {
-                            println!("creating dir {}", outpath.display());
-                            fs::create_dir_all(&outpath)?;
-                            continue;
-                        }
-                        if let Some(parent) = outpath.parent() {
-                            if !parent.exists() {
-                                println!("creating dir {}", parent.display());
-                                fs::create_dir_all(&parent)?;
-                            }
-                        }
-                        println!("decompressing {}", file.enclosed_name().unwrap().display());
-                        let mut outfile = fs::File::create(&outpath)?;
-                        io::copy(&mut file, &mut outfile)?;
-                        println!(
-                            "decompressing {} done.",
-                            file.enclosed_name().unwrap().display()
-                        );
-                    }
-                } else {
-                    println!("unzip: missing operand");
+            "history" => {
+                for (i, history_entry) in self.history.iter().enumerate() {
+                    println!("{}: {}", i, history_entry);
                 }
-            }
-            "pwd" => println!("{}", env::current_dir()?.display()),
-            "sleep" => {
-                // TODO: requires poll_oneoff implementation
-                if let Some(sec_str) = &args.get(0) {
-                    if let Ok(sec) = sec_str.parse() {
-                        thread::sleep(Duration::new(sec, 0));
-                    } else {
-                        println!("sleep: invalid time interval `{}`", sec_str);
-                    }
-                } else {
-                    println!("sleep: missing operand");
-                }
-            }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
-            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" => {
-                args.insert(0, command.to_string());
-                #[cfg(target_os = "wasi")]
-                args.insert(0, String::from("/usr/bin/coreutils"));
-                #[cfg(not(target_os = "wasi"))]
-                args.insert(0, String::from("/bin/busybox"));
-                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, false)?;
-            }
-            "write" => {
-                if args.len() < 2 {
-                    println!("write: help: write <filename> <contents>");
-                } else {
-                    match fs::write(args.remove(0), args.join(" ")) {
-                        Ok(_) => {}
-                        Err(error) => {
-                            println!("write: failed to write to file: {}", error)
-                        }
-                    }
-                }
-            }
-            "clear" => {
-                print!("\x1b[2J\x1b[H");
             }
             "unset" => {
                 if args.is_empty() {
@@ -624,6 +558,72 @@ impl Shell {
                     }
                 }
             }
+            "write" => {
+                if args.len() < 2 {
+                    println!("write: help: write <filename> <contents>");
+                } else {
+                    match fs::write(args.remove(0), args.join(" ")) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            println!("write: failed to write to file: {}", error)
+                        }
+                    }
+                }
+            }
+            "imgcat" => {
+                if args.is_empty() {
+                    println!("usage: imgcat <IMAGE>");
+                } else {
+                    // TODO: find out why it breaks the order of prompt
+                    iterm2::File::read(&args[0])?
+                        .width(iterm2::Dimension::Auto)
+                        .height(iterm2::Dimension::Auto)
+                        .preserve_aspect_ratio(true)
+                        .show()?;
+                }
+            }
+            "unzip" => {
+                if let Some(filepath) = &args.get(0) {
+                    let file = fs::File::open(&PathBuf::from(filepath))?;
+                    let mut archive = zip::ZipArchive::new(file)?;
+                    for i in 0..archive.len() {
+                        let mut file = archive.by_index(i)?;
+                        let outpath = file.enclosed_name().to_owned().unwrap();
+                        if file.name().ends_with('/') {
+                            println!("creating dir {}", outpath.display());
+                            fs::create_dir_all(&outpath)?;
+                            continue;
+                        }
+                        if let Some(parent) = outpath.parent() {
+                            if !parent.exists() {
+                                println!("creating dir {}", parent.display());
+                                fs::create_dir_all(&parent)?;
+                            }
+                        }
+                        println!("decompressing {}", file.enclosed_name().unwrap().display());
+                        let mut outfile = fs::File::create(&outpath)?;
+                        io::copy(&mut file, &mut outfile)?;
+                        println!(
+                            "decompressing {} done.",
+                            file.enclosed_name().unwrap().display()
+                        );
+                    }
+                } else {
+                    println!("unzip: missing operand");
+                }
+            }
+            "sleep" => {
+                // TODO: requires poll_oneoff implementation
+                if let Some(sec_str) = &args.get(0) {
+                    if let Ok(sec) = sec_str.parse() {
+                        thread::sleep(Duration::new(sec, 0));
+                    } else {
+                        println!("sleep: invalid time interval `{}`", sec_str);
+                    }
+                } else {
+                    println!("sleep: missing operand");
+                }
+            }
             "hexdump" => {
                 if args.is_empty() {
                     println!("hexdump: help: hexump <filename>");
@@ -669,15 +669,15 @@ impl Shell {
                     }
                 }
             }
-            "exit" => {
-                let exit_code: i32 = {
-                    if args.is_empty() {
-                        0
-                    } else {
-                        args[0].parse()?
-                    }
-                };
-                exit(exit_code);
+            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
+            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" => {
+                args.insert(0, command.to_string());
+                #[cfg(target_os = "wasi")]
+                args.insert(0, String::from("/usr/bin/coreutils"));
+                #[cfg(not(target_os = "wasi"))]
+                args.insert(0, String::from("/bin/busybox"));
+                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                syscall("spawn", &args_[..], env, false)?;
             }
             // no input
             "" => {}
