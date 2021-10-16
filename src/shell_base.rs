@@ -129,6 +129,7 @@ impl Shell {
             }
             print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
             io::stdout().flush()?;
+
             let mut c = [0];
             let mut escaped = false;
             let mut history_entry_to_display: i32 = -1;
@@ -157,8 +158,8 @@ impl Shell {
                                             println!("TODO: INSERT");
                                             escaped = false;
                                         }
+                                        // delete key
                                         [0x33, 0x7e] => {
-                                            // delete key
                                             if input.len() - cursor_position > 0 {
                                                 print!(
                                                     "{}",
@@ -257,28 +258,35 @@ impl Shell {
                                     }
                                     escaped = false;
                                 }
+                                // right arrow
                                 0x43 => {
-                                    // right arrow
                                     if cursor_position < input.len() {
                                         print!("{}", input.chars().nth(cursor_position).unwrap());
                                         cursor_position += 1;
                                     }
                                     escaped = false;
                                 }
+                                // left arrow
                                 0x44 => {
-                                    // left arrow
                                     if cursor_position > 0 {
                                         print!("{}", 8 as char);
                                         cursor_position -= 1;
                                     }
                                     escaped = false;
                                 }
+                                // end key
                                 0x46 => {
-                                    println!("TODO: END");
+                                    print!(
+                                        "{}",
+                                        input.chars().skip(cursor_position).collect::<String>(),
+                                    );
+                                    cursor_position = input.len();
                                     escaped = false;
                                 }
+                                // home key
                                 0x48 => {
-                                    println!("TODO: HOME");
+                                    print!("{}", format!("{}", 8 as char).repeat(cursor_position));
+                                    cursor_position = 0;
                                     escaped = false;
                                 }
                                 _ => {
