@@ -20,7 +20,6 @@ export class WorkerTable {
     public buffer = '';
     public currentWorker = null;
     public nextWorkerId = 0;
-    public alive = new Array<boolean>();
     public workerInfos: Record<number, WorkerInfo> = {};
     public compiledModules: Record<string, WebAssembly.Module> = {};
 
@@ -34,7 +33,6 @@ export class WorkerTable {
       this.nextWorkerId += 1;
       let privateData = {};
       if (!IS_NODE) privateData = { type: 'module' };
-	    this.alive.push(true);
       const worker = new Worker(this.scriptName, privateData);
       this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parentId, parentLock, kernelCallback, env);
       if (!IS_NODE) {
@@ -67,7 +65,6 @@ export class WorkerTable {
       const worker = this.workerInfos[id];
       worker.worker.terminate();
       // notify parent that they can resume operation
-      this.alive[id] = false;
       if (id != 0 && worker.parentLock != null) {
         Atomics.store(worker.parentLock, 0, exitNo);
         Atomics.notify(worker.parentLock, 0);

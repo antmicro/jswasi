@@ -3,57 +3,56 @@ import { FileOrDir, OpenFlags } from './filesystem.js';
 import { mount, umount, wget, download } from './browser-shell.js';
 
 declare global {
-    var exit_code: number;
-    var alive: boolean;
+  var exit_code: number;
+  var alive: boolean;
 }
 
 function human_readable(bytes) {
-	const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
-	let result = bytes;
-	let unit = 0;
-	while ((result >= 1024) && ((unit+1) < units.length)) {
-	     result /= 1024;
-	     unit++;
-	}
-	return `${result.toFixed(1)}${units[unit]}`;
+  const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
+  let result = bytes;
+  let unit = 0;
+  while ((result >= 1024) && ((unit+1) < units.length)) {
+    result /= 1024;
+    unit += 1;
+  }
+  return `${result.toFixed(1)}${units[unit]}`;
 }
 
 export const on_worker_message = async function (event, workerTable) {
   const [worker_id, action, data] = event.data;
   let worker_name = 'unknown';
   try {
-      worker_name = workerTable.workerInfos[worker_id].cmd;
+    worker_name = workerTable.workerInfos[worker_id].cmd;
   } catch {}
   worker_name = worker_name.substr(worker_name.lastIndexOf('/') + 1);
 
   switch (action) {
     case 'stdout': {
-        workerTable.receive_callback(data.replaceAll('\n', '\r\n'));
-        break;
+      workerTable.receiveCallback(data.replaceAll('\n', '\r\n'));
+      break;
     }
     case 'stderr': {
-        const output = data.replaceAll('\n', '\r\n');
-        const RED_ANSI = '\u001b[31m';
-        const RESET = '\u001b[0m';
-        workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
-        break;
+      const output = data.replaceAll('\n', '\r\n');
+      const RED_ANSI = '\u001b[31m';
+      const RESET = '\u001b[0m';
+      workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
+      break;
     }
     case 'console': {
-        console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
-        break;
+      console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+      break;
     }
     case 'exit': {
-	const dbg = workerTable.workerInfos[worker_id].env["DEBUG"] == "1";
-        workerTable.terminateWorker(worker_id, data);
-	if (dbg) {
-	  console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
-	}
-        // @ts-ignore
-	if (worker_id == 0) {
-            window.alive = false;
+	  const dbg = workerTable.workerInfos[worker_id].env["DEBUG"] == "1";
+      workerTable.terminateWorker(worker_id, data);
+	  if (dbg) {
+	    console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	  }
+	  if (worker_id == 0) {
+        window.alive = false;
 	    window.exit_code = data;
-	}
-        break;
+	  }
+      break;
     }
     case 'chdir': {
       const [pwd, sbuf] = data;
@@ -93,17 +92,15 @@ export const on_worker_message = async function (event, workerTable) {
       switch (fullpath) {
 		case '/usr/bin/ps': {
 	      let ps_data = '  PID TTY          TIME CMD\n\r';
-		  for (let id = 0; id < workerTable.nextWorkerId; id++) {
-		    if (workerTable.alive[id]) {
-		      const now = new Date();
-              const time = Math.floor(now.getTime() / 1000) - workerTable.workerInfos[id].timestamp;
-              const seconds = time % 60;
-              const minutes = ((time - seconds) / 60) % 60;
-              const hours = (time - seconds - minutes * 60) / 60 / 60;
-              ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerTable.workerInfos[id].cmd.split('/').slice(-1)[0]}\n\r`;
-			}
+		  for (const [id, workerInfo] of Object.entries(workerTable.workerInfos)) {
+		    const now = new Date();
+            const time = Math.floor(now.getTime() / 1000) - workerInfo.timestamp;
+            const seconds = time % 60;
+            const minutes = ((time - seconds) / 60) % 60;
+            const hours = (time - seconds - minutes * 60) / 60 / 60;
+            ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerInfo.cmd.split('/').slice(-1)[0]}\n\r`;
 	      }
-          workerTable.receive_callback(ps_data);
+          workerTable.receiveCallback(ps_data);
 		  Atomics.store(parent_lck, 0, 0);
 		  Atomics.notify(parent_lck, 0);
 		  break;
@@ -139,7 +136,7 @@ export const on_worker_message = async function (event, workerTable) {
 	      }
 	      let free_data = `               total        used   available\n\r`;
 	      free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
-	      workerTable.receive_callback(free_data);
+	      workerTable.receiveCallback(free_data);
           Atomics.store(parent_lck, 0, 0);
           Atomics.notify(parent_lck, 0);
 	      break;
@@ -285,7 +282,7 @@ export const on_worker_message = async function (event, workerTable) {
 		            output = output.replaceAll('\n', '\r\n');
           const RED_ANSI = '\u001b[31m';
           const RESET = '\u001b[0m';
-          workerTable.receive_callback(`${RED_ANSI}${output}${RESET}`);
+          workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
           break;
         }
         default: {
