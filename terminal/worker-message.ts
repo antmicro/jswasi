@@ -251,7 +251,7 @@ export const on_worker_message = async function (event, workerTable) {
       let err;
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
-	// TODO: check if path_len is enough
+	    // TODO: check if path_len is enough
         path.set(new TextEncoder().encode(fds[fd].path), 0);
         err = constants.WASI_ESUCCESS;
       } else {
@@ -276,7 +276,7 @@ export const on_worker_message = async function (event, workerTable) {
         case 1: {
           let output = '';
           for (let i = 0; i < content.byteLength; i++) output += String.fromCharCode(content[i]);
-          workerTable.receive_callback(output.replaceAll('\n', '\r\n')); // TODO
+          workerTable.receiveCallback(output.replaceAll('\n', '\r\n'));
           break;
         }
         case 2: {
@@ -315,7 +315,7 @@ export const on_worker_message = async function (event, workerTable) {
       let err;
       switch (fd) {
         case 0: {
-          workerTable.send_buffer_to_worker(len, lck, readlen, readbuf);
+          workerTable.sendBufferToWorker(len, lck, readlen, readbuf);
           break;
         }
         case 1: {

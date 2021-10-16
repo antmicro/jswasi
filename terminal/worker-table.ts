@@ -5,87 +5,43 @@ import { FileOrDir } from './filesystem.js';
 const IS_NODE = typeof self === 'undefined';
 
 class WorkerInfo {
-    public id: number;
-
-    public cmd: string;
-
+    public bufferRequestQueue: { requestedLen: number, lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
+    public shouldEcho = true;
     public timestamp: number;
 
-    public worker: Worker;
-
-    public parent_id: number;
-
-    public parent_lock: Int32Array;
-
-    public buffer_request_queue: { requested_len: number, lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
-
-    public fds;
-
-    public callback;
-
-    public env;
-
-    public shouldEcho = true;
-
-    constructor(id: number, cmd: string, worker: Worker, fds, parent_id: number, parent_lock: Int32Array, callback, env) {
-	  this.id = id;
-      this.cmd = cmd;
-      this.worker = worker;
+    // TODO: add types for fds and env
+    constructor(public id: number, public cmd: string, public worker: Worker, public fds: [], public parentId: number, public parentLock: Int32Array, public callback: (output) => void, public env) {
 	  const now = new Date();
 	  this.timestamp = Math.floor(now.getTime() / 1000);
-      this.fds = fds;
-      this.parent_id = parent_id;
-      this.parent_lock = parent_lock;
-      this.callback = callback;
-      this.env = env;
     }
 }
 
 export class WorkerTable {
-    public readonly terminal;
-
-    public readonly filesystem;
-
-    public readonly receive_callback;
-
-    public readonly script_name: string;
-
     public buffer = '';
-
     public currentWorker = null;
-
     public nextWorkerId = 0;
-
-    public alive: Array<boolean>;
-
+    public alive = new Array<boolean>();
     public workerInfos: Record<number, WorkerInfo> = {};
-
     public compiledModules: Record<string, WebAssembly.Module> = {};
 
-    constructor(sname: string, receive_callback, terminal, filesystem) {
-      this.script_name = sname;
-      this.receive_callback = receive_callback;
-      this.terminal = terminal;
-      this.filesystem = filesystem;
-	    this.alive = new Array<boolean>();
-    }
+    constructor(private readonly scriptName: string, private readonly receiveCallback, public readonly terminal, public readonly filesystem) {}
 
-    async spawnWorker(parent_id: number, parent_lock: Int32Array, callback, command, fds, args, env): Promise<number> {
+    async spawnWorker(parentId: number, parentLock: Int32Array, kernelCallback, command, fds, args, env): Promise<number> {
       const id = this.nextWorkerId;
-      if (parent_lock != null || parent_id == null) {
+      if (parentLock != null || parentId == null) {
           this.currentWorker = id;
       }
       this.nextWorkerId += 1;
-      let private_data = {};
-      if (!IS_NODE) private_data = { type: 'module' };
+      let privateData = {};
+      if (!IS_NODE) privateData = { type: 'module' };
 	    this.alive.push(true);
-      const worker = new Worker(this.script_name, private_data);
-      this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parent_id, parent_lock, callback, env);
+      const worker = new Worker(this.scriptName, privateData);
+      this.workerInfos[id] = new WorkerInfo(id, command, worker, fds, parentId, parentLock, kernelCallback, env);
       if (!IS_NODE) {
-        worker.onmessage = (event) => callback(event, this);
+        worker.onmessage = (event) => kernelCallback(event, this);
       } else {
         // @ts-ignore
-        worker.on('message', (event) => callback(event, this));
+        worker.on('message', (event) => kernelCallback(event, this));
       }
 
       // save compiled module to cache
@@ -98,28 +54,24 @@ export class WorkerTable {
           return;
         }
         const file = await binary.entry._handle.getFile();
-        const buffer_source = await file.arrayBuffer();
-        this.compiledModules[command] = await WebAssembly.compile(buffer_source);
+        const bufferSource = await file.arrayBuffer();
+        this.compiledModules[command] = await WebAssembly.compile(bufferSource);
       }
 
       // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
-	    this.workerInfos[id].worker.postMessage(['start', this.compiledModules[command], id, args, env]);
+	  this.workerInfos[id].worker.postMessage(['start', this.compiledModules[command], id, args, env]);
       return id;
     }
 
-    postMessage(id: number, message) {
-	    this.workerInfos[id].worker.postMessage(message);
-    }
-
-    terminateWorker(id: number, exit_no: number = 0) {
+    terminateWorker(id: number, exitNo: number = 0) {
       const worker = this.workerInfos[id];
       worker.worker.terminate();
       // notify parent that they can resume operation
       this.alive[id] = false;
-      if (id != 0 && worker.parent_lock != null) {
-        Atomics.store(worker.parent_lock, 0, exit_no);
-        Atomics.notify(worker.parent_lock, 0);
-        this.currentWorker = worker.parent_id;
+      if (id != 0 && worker.parentLock != null) {
+        Atomics.store(worker.parentLock, 0, exitNo);
+        Atomics.notify(worker.parentLock, 0);
+        this.currentWorker = worker.parentId;
       }
       // remove worker from workers array
       delete this.workerInfos[id];
@@ -133,43 +85,43 @@ export class WorkerTable {
       }
     }
 
-    sendEndOfFile(id: number, lock_value) {
+    sendEndOfFile(id: number, lockValue: number) {
       const worker = this.workerInfos[id];
-      if (worker.buffer_request_queue.length !== 0) {
-        const { lck } = worker.buffer_request_queue[0];
-        Atomics.store(lck, 0, lock_value);
+      if (worker.bufferRequestQueue.length !== 0) {
+        const { lck } = worker.bufferRequestQueue[0];
+        Atomics.store(lck, 0, lockValue);
         Atomics.notify(lck, 0);
       }
     }
 
-    push_to_buffer(data: string) {
+    pushToBuffer(data: string) {
       this.buffer += data;
 
       // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
       // now that buffer was filled, look if there are pending buffer requests from current foreground worker
       if (this.currentWorker != null) {
-        while (this.workerInfos[this.currentWorker].buffer_request_queue.length !== 0 && this.buffer.length !== 0) {
+        while (this.workerInfos[this.currentWorker].bufferRequestQueue.length !== 0 && this.buffer.length !== 0) {
           const {
-            requested_len,
+            requestedLen,
             lck,
             len,
             sbuf,
-          } = this.workerInfos[this.currentWorker].buffer_request_queue.shift();
-          this.send_buffer_to_worker(requested_len, lck, len, sbuf);
+          } = this.workerInfos[this.currentWorker].bufferRequestQueue.shift();
+          this.sendBufferToWorker(requestedLen, lck, len, sbuf);
         }
       }
     }
 
-    send_buffer_to_worker(requested_len: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
+    sendBufferToWorker(requestedLen: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
       // if the request can't be processed straight away, push it to queue for later
       if (this.buffer.length == 0) {
-        this.workerInfos[this.currentWorker].buffer_request_queue.push({
-          requested_len, lck, len: readlen, sbuf: buf,
+        this.workerInfos[this.currentWorker].bufferRequestQueue.push({
+          requestedLen, lck, len: readlen, sbuf: buf,
         });
         return;
       }
 
-      readlen[0] = (this.buffer.length > requested_len) ? requested_len : this.buffer.length;
+      readlen[0] = (this.buffer.length > requestedLen) ? requestedLen : this.buffer.length;
       for (let j = 0; j < readlen[0]; j++) {
         buf[j] = this.buffer.charCodeAt(j);
       }

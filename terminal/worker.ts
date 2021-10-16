@@ -484,7 +484,8 @@ function WASI() {
 
   // used solely in path_readlink
   function special_parse(fullcmd: string) {
-    const [cmd, args_string, env_string] = fullcmd.split('\x1b\x1b');
+    const [cmd, args_string, env_string, background] = fullcmd.split('\x1b\x1b');
+    const isJob = background === "true";
     if (cmd == 'spawn') {
       // reparse args
       const args = args_string.split('\x1b');

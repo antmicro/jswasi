@@ -124,7 +124,6 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
   const workerTable = new WorkerTable(
     'worker.js',
     // receive_callback
-    // @ts-ignore
     (output) => {
       terminal.io.print(output);
       if (window.stdout_attached != undefined && window.stdout_attached) {
@@ -161,7 +160,7 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       }
     } else {
       // regular characters
-      workerTable.push_to_buffer(data);
+      workerTable.pushToBuffer(data);
 	  if (window.stdout_attached) {
         window.buffer += data;
       }
@@ -187,7 +186,7 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
 
     const copyEntry = async (entry, path) => {
       if (entry.kind === 'directory') {
-        // TODO: create directory in VFS, expand path and fill directory contents
+        // create directory in VFS, expand path and fill directory contents
         const dir = (await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.Directory)).entry;
         await dir._handle.getDirectoryHandle(entry.name, {create: true});
         for await (const [name, handle] of entry.entries()) {
