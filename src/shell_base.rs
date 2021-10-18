@@ -129,22 +129,24 @@ impl Shell {
 
             // prompt for input
             if self.pwd.substring(0, env::var("HOME")?.len()) == env::var("HOME")? {
-                display_path.push('~');
-                display_path.push_str(self.pwd.substring(env::var("HOME")?.len(), 4096));
+                display_path.push_str(&format!(
+                    "~{}",
+                    self.pwd.substring(env::var("HOME")?.len(), 4096)
+                ));
             } else {
                 display_path.push_str(&self.pwd);
             }
             print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
             io::stdout().flush()?;
 
-            let mut c = [0];
+            let mut c1 = [0];
             let mut escaped = false;
             let mut history_entry_to_display: i32 = -1;
             // read line
             loop {
-                io::stdin().read_exact(&mut c)?;
+                io::stdin().read_exact(&mut c1)?;
                 if escaped {
-                    match c[0] {
+                    match c1[0] {
                         0x5b => {
                             let mut c2 = [0];
                             io::stdin().read_exact(&mut c2)?;
@@ -307,10 +309,10 @@ impl Shell {
                         }
                     }
                 } else {
-                    if c[0] != 0x1b {
+                    if c1[0] != 0x1b {
                         history_entry_to_display = -1;
                     }
-                    match c[0] {
+                    match c1[0] {
                         // enter
                         10 => {
                             input = input.trim().to_string();
@@ -349,7 +351,7 @@ impl Shell {
                         }
                         // regular characters
                         _ => {
-                            input.insert(cursor_position, c[0] as char);
+                            input.insert(cursor_position, c1[0] as char);
                             // echo
                             print!(
                                 "{}{}",

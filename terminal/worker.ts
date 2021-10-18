@@ -548,13 +548,11 @@ function WASI() {
         view.setUint32(buffer_used_ptr, buffer_len, true);
         return constants.WASI_ESUCCESS;
       }
-      const result_s = special_parse(path.slice(1));
-      const result = ENCODER.encode(`${result_s}\0`);
+      const result = ENCODER.encode(`${special_parse(path.slice(1))}\0`);
       let count = result.byteLength;
       if (count > 1024) count = 1024;
       view8.set(result.slice(0, count), buffer_ptr);
       view.setUint32(buffer_used_ptr, count, true);
-      worker_console_log(`wrote ${count} bytes for now, full result is '${result_s}'`);
       return constants.WASI_ESUCCESS;
     }
     return constants.WASI_EBADF;
