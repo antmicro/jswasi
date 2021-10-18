@@ -86,7 +86,7 @@ export const on_worker_message = async function (event, workerTable) {
       break;
     }
     case 'spawn': {
-      let [fullpath, args, env, sbuf] = data;
+      let [fullpath, args, env, sbuf, isJob] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
@@ -155,7 +155,7 @@ export const on_worker_message = async function (event, workerTable) {
         }
 	    case '/usr/bin/nohup':
         default: {
-          let background = false;
+          let background = isJob;
 	      if (fullpath == "/usr/bin/nohup") {
 	        args = args.splice(1);
 	        fullpath = args[0];
@@ -163,17 +163,18 @@ export const on_worker_message = async function (event, workerTable) {
             args.splice(0, 0, fullpath.split('/').pop());
 	        background = true;
 	      }
-          const parent_fds = workerTable.workerInfos[worker_id].fds;
+          const { fds } = workerTable.workerInfos[worker_id];
           const id = await workerTable.spawnWorker(
             worker_id,
             background ? null : parent_lck,
             on_worker_message,
             fullpath,
-            parent_fds,
+            fds,
             args,
             env,
+            isJob,
           );
-	      let new_worker_name = fullpath.substr(fullpath.lastIndexOf('/') + 1);
+	      let new_worker_name = fullpath.split("/").slice(-1)[0];
 	      if (env['DEBUG'] == "1") {
             console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
 	      }

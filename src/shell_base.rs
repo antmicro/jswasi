@@ -488,7 +488,7 @@ impl Shell {
                             "set_env",
                             &["OLDPWD", env::current_dir()?.to_str().unwrap()],
                             env,
-                            false,
+                            background,
                         )?;
                         #[cfg(not(target_os = "wasi"))]
                         let pwd_path = fs::canonicalize(path)?;
@@ -497,7 +497,7 @@ impl Shell {
                             "set_env",
                             &["PWD", path.to_str().unwrap()],
                             env,
-                            false,
+                            background,
                         )?);
                         self.pwd = String::from(pwd_path.to_str().unwrap());
                         env::set_var("PWD", &self.pwd);
@@ -521,7 +521,7 @@ impl Shell {
                         self.vars.remove(arg);
                         if env::var(&arg).is_ok() {
                             env::remove_var(&arg);
-                            syscall("set_env", &[arg], env, false)?;
+                            syscall("set_env", &[arg], env, background)?;
                         }
                     }
                 }
@@ -541,14 +541,14 @@ impl Shell {
                     for arg in args.iter().skip(1) {
                         if args[0] == "-x" {
                             if let Some((key, value)) = arg.split_once("=") {
-                                syscall("set_env", &[key, value], env, false)?;
+                                syscall("set_env", &[key, value], env, background)?;
                             }
                         } else if let Some((key, value)) = arg.split_once("=") {
-                            syscall("set_env", &[key], env, false)?;
+                            syscall("set_env", &[key], env, background)?;
                             self.vars.insert(key.to_string(), value.to_string());
                         } else {
                             let value = env::var(arg)?;
-                            syscall("set_env", &[arg], env, false)?;
+                            syscall("set_env", &[arg], env, background)?;
                             self.vars.insert(arg.clone(), value.clone());
                         }
                     }
@@ -571,13 +571,13 @@ impl Shell {
                     if let Some((key, value)) = arg.split_once("=") {
                         self.vars.remove(key);
                         env::set_var(&key, &value);
-                        syscall("set_env", &[key, value], env, false)?;
+                        syscall("set_env", &[key, value], env, background)?;
                     } else if let Some(value) = self.vars.remove(arg) {
                         env::set_var(&arg, &value);
-                        syscall("set_env", &[arg, &value], env, false)?;
+                        syscall("set_env", &[arg, &value], env, background)?;
                     } else {
                         env::set_var(&arg, "");
-                        syscall("set_env", &[arg, ""], env, false)?;
+                        syscall("set_env", &[arg, ""], env, background)?;
                     }
                 }
             }
@@ -700,7 +700,7 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, false)?;
+                syscall("spawn", &args_[..], env, background)?;
             }
             // no input
             "" => {}
@@ -750,7 +750,7 @@ impl Shell {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        let _result = syscall("spawn", &args_[..], env, false)?;
+                        let _result = syscall("spawn", &args_[..], env, background)?;
                     }
                     Err(reason) => println!("{}", reason),
                 }

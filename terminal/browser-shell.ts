@@ -235,6 +235,7 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       LANG: 'en_US.UTF-8',
       USER: 'ant',
     },
+    false,
   );
 }
 

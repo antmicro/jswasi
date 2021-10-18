@@ -494,7 +494,7 @@ function WASI() {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
       lck[0] = -1;
-      worker_send(['spawn', [args[0], args.slice(1), extended_env, sbuf]]);
+      worker_send(['spawn', [args[0], args.slice(1), extended_env, sbuf, isJob]]);
       // wait for child process to finish
       Atomics.wait(lck, 0, -1);
       const err = Atomics.load(lck, 0);

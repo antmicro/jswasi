@@ -25,7 +25,7 @@ export class WorkerTable {
 
     constructor(private readonly scriptName: string, private readonly receiveCallback, public readonly terminal, public readonly filesystem) {}
 
-    async spawnWorker(parentId: number, parentLock: Int32Array, kernelCallback, command, fds, args, env): Promise<number> {
+    async spawnWorker(parentId: number, parentLock: Int32Array, kernelCallback, command, fds, args, env, isJob: boolean): Promise<number> {
       const id = this.nextWorkerId;
       if (parentLock != null || parentId == null) {
           this.currentWorker = id;
