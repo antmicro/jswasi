@@ -5,7 +5,7 @@ import { FileOrDir } from './filesystem.js';
 const IS_NODE = typeof self === 'undefined';
 
 class WorkerInfo {
-    public bufferRequestQueue: { requestedLen: number, lck: Int32Array, len: Int32Array, sbuf: Uint8Array }[] = [];
+    public bufferRequestQueue: { requestedLen: number, lck: Int32Array, readlen: Int32Array, sbuf: Uint8Array }[] = [];
     public shouldEcho = true;
     public timestamp: number;
 
@@ -101,10 +101,10 @@ export class WorkerTable {
           const {
             requestedLen,
             lck,
-            len,
+            readlen,
             sbuf,
           } = this.workerInfos[this.currentWorker].bufferRequestQueue.shift();
-          this.sendBufferToWorker(this.currentWorker, requestedLen, lck, len, sbuf);
+          this.sendBufferToWorker(this.currentWorker, requestedLen, lck, readlen, sbuf);
         }
       }
     }
@@ -113,7 +113,7 @@ export class WorkerTable {
       // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
       if (this.buffer.length == 0 || workerId != this.currentWorker) {
         this.workerInfos[workerId].bufferRequestQueue.push({
-          requestedLen, lck, len: readlen, sbuf: buf,
+          requestedLen, lck, readlen, sbuf: buf,
         });
         return;
       }
