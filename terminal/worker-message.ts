@@ -313,7 +313,7 @@ export const on_worker_message = async function (event, workerTable) {
       let err;
       switch (fd) {
         case 0: {
-          workerTable.sendBufferToWorker(len, lck, readlen, readbuf);
+          workerTable.sendBufferToWorker(worker_id, len, lck, readlen, readbuf);
           break;
         }
         case 1: {

@@ -104,15 +104,15 @@ export class WorkerTable {
             len,
             sbuf,
           } = this.workerInfos[this.currentWorker].bufferRequestQueue.shift();
-          this.sendBufferToWorker(requestedLen, lck, len, sbuf);
+          this.sendBufferToWorker(this.currentWorker, requestedLen, lck, len, sbuf);
         }
       }
     }
 
-    sendBufferToWorker(requestedLen: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
-      // if the request can't be processed straight away, push it to queue for later
-      if (this.buffer.length == 0) {
-        this.workerInfos[this.currentWorker].bufferRequestQueue.push({
+    sendBufferToWorker(workerId: number, requestedLen: number, lck: Int32Array, readlen: Int32Array, buf: Uint8Array) {
+      // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
+      if (this.buffer.length == 0 || workerId != this.currentWorker) {
+        this.workerInfos[workerId].bufferRequestQueue.push({
           requestedLen, lck, len: readlen, sbuf: buf,
         });
         return;
