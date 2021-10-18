@@ -103,10 +103,17 @@ impl Shell {
                 .collect();
         }
 
-        let mut shell_history = OpenOptions::new()
+        let mut shell_history = match OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&history_path)?;
+            .open(&history_path)
+        {
+            Ok(file) => Some(file),
+            Err(error) => {
+                eprintln!("Unable to open file for storing shell history: {}", error);
+                None
+            }
+        };
 
         let mut cursor_position = 0;
 
@@ -405,17 +412,33 @@ impl Shell {
                 }
             }
 
-            // don't push !commands and duplicate commands
-            if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
-                self.history.push(input.clone());
-                // this breaks on WASM runtimes where you can't access HOME dir
-                let _ = writeln!(shell_history, "{}", &input);
+            // only write to file is successfully created
+            if let Some(ref mut shell_history) = shell_history {
+                // don't push !commands and duplicate commands
+                if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
+                    self.history.push(input.clone());
+                    writeln!(shell_history, "{}", &input)?;
+                }
             }
 
             if let Err(error) = self.handle_input(&input) {
                 println!("{:#?}", error);
             };
         }
+    }
+
+    fn handle_input(&mut self, input: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let lex = Lexer::new(input.chars());
+        let parser = DefaultParser::new(lex);
+        for cmd in parser {
+            match cmd {
+                Ok(cmd) => interpret(self, &cmd),
+                Err(e) => {
+                    println!("{:?}", e);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn execute_command(
@@ -730,20 +753,6 @@ impl Shell {
                         let _result = syscall("spawn", &args_[..], env, false)?;
                     }
                     Err(reason) => println!("{}", reason),
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_input(&mut self, input: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let lex = Lexer::new(input.chars());
-        let parser = DefaultParser::new(lex);
-        for cmd in parser {
-            match cmd {
-                Ok(cmd) => interpret(self, &cmd),
-                Err(e) => {
-                    println!("{:?}", e);
                 }
             }
         }

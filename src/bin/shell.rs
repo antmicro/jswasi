@@ -5,9 +5,6 @@ use std::path::PathBuf;
 
 use shell::Shell;
 
-#[cfg(not(target_os = "wasi"))]
-use std::process::Command;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {
         let mut path = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
