@@ -72,6 +72,14 @@ export async function initFs(anchor: HTMLElement) {
   const tmp = await root.getDirectoryHandle('tmp', { create: true });
   const home = await root.getDirectoryHandle('home', { create: true });
   const ant = await home.getDirectoryHandle('ant', { create: true });
+  
+  const shellrc = await ant.getFileHandle('.shellrc', { create: true });
+  if ((await shellrc.getFile()).size === 0) {
+    const w = await shellrc.createWritable();
+    await w.write({ type: 'write', position: 0, data: 'RUST_BACKTRACE=full\nDEBUG=false\n'});
+    await w.close();
+  }
+
   const etc = await root.getDirectoryHandle('etc', { create: true });
 
   const usr = await root.getDirectoryHandle('usr', { create: true });
@@ -226,8 +234,6 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
     [null, null, null, await root_dir.open(), await pwd_dir.open(), await root_dir.open()],
     ['shell'],
     {
-      RUST_BACKTRACE: 'full',
-      DEBUG: 'false',
       PATH: '/usr/bin:/usr/local/bin',
       PWD: '/home/ant',
       OLDPWD: '/home/ant',

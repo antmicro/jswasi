@@ -95,14 +95,12 @@ impl Shell {
                 format!("{}/.shell_history", env::var("PWD")?)
             }
         };
-
         if PathBuf::from(&history_path).exists() {
             self.history = fs::read_to_string(&history_path)?
                 .lines()
                 .map(str::to_string)
                 .collect();
         }
-
         let mut shell_history = match OpenOptions::new()
             .create(true)
             .append(true)
@@ -114,6 +112,17 @@ impl Shell {
                 None
             }
         };
+
+        let shellrc_path = {
+            if PathBuf::from(env::var("HOME")?).exists() {
+                format!("{}/.shellrc", env::var("HOME")?)
+            } else {
+                format!("{}/.shellrc", env::var("PWD")?)
+            }
+        };
+        if PathBuf::from(&shellrc_path).exists() {
+            self.run_script(shellrc_path)?;
+        }
 
         let mut cursor_position = 0;
 
@@ -581,6 +590,13 @@ impl Shell {
                         env::set_var(&arg, "");
                         syscall("set_env", &[arg, ""], env, background)?;
                     }
+                }
+            }
+            "source" => {
+                if let Some(filename) = args.get(0) {
+                    self.run_script(filename)?;
+                } else {
+                    println!("source: help: source <filename>");
                 }
             }
             "write" => {
