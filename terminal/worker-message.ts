@@ -94,10 +94,12 @@ export const on_worker_message = async function (event, workerTable) {
 	      let ps_data = '  PID TTY          TIME CMD\n\r';
 		  for (const [id, workerInfo] of Object.entries(workerTable.workerInfos)) {
 		    const now = new Date();
+            // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognised)
             const time = Math.floor(now.getTime() / 1000) - workerInfo.timestamp;
             const seconds = time % 60;
             const minutes = ((time - seconds) / 60) % 60;
             const hours = (time - seconds - minutes * 60) / 60 / 60;
+            // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognised)
             ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerInfo.cmd.split('/').slice(-1)[0]}\n\r`;
 	      }
           workerTable.receiveCallback(ps_data);

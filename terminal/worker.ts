@@ -1,13 +1,14 @@
 // NODE// import * as fs from "fs";
 // NODE// import { parentPort } from "worker_threads";
 import * as constants from './constants.js';
-import { realpath } from './utils.js';
+import * as utils from './utils.js';
 
 type ptr = number;
 
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
+const CPUTIME_START = utils.hrtime();
 
 let started: boolean;
 let mod: string;
@@ -515,9 +516,9 @@ function WASI() {
       } else {
           env[args[0]] = args[1];
           if (args[0] == 'PWD') {
-            env[args[0]] = realpath(env[args[0]]);
+            env[args[0]] = utils.realpath(env[args[0]]);
             lck[0] = -1;
-            worker_send(['chdir', [realpath(env[args[0]]), sbuf]]);
+            worker_send(['chdir', [utils.realpath(env[args[0]]), sbuf]]);
           }
           worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
           return env[args[0]];
@@ -735,8 +736,106 @@ function WASI() {
     return constants.WASI_ESUCCESS;
   };
 
-  function poll_oneoff() {
-    placeholder();
+  function poll_oneoff(
+    sin: number,
+    sout: number,
+    nsubscriptions: number,
+    nevents: number
+  ) {
+    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+
+    let eventc = 0;
+    let waitEnd = 0;
+    for (let i = 0; i < nsubscriptions; i += 1) {
+      const userdata = view.getBigUint64(sin, true);
+      sin += 8;
+      const eventType = view.getUint8(sin);
+      sin += 1;
+      switch (eventType) {
+        case constants.WASI_EVENTTYPE_CLOCK: {
+          sin += 7; // padding
+          const identifier = view.getBigUint64(sin, true);
+          sin += 8;
+          const clockid = view.getUint32(sin, true);
+          sin += 4;
+          sin += 4; // padding
+          const timestamp = view.getBigUint64(sin, true);
+          sin += 8;
+          const precision = view.getBigUint64(sin, true);
+          sin += 8;
+          const subclockflags = view.getUint16(sin, true);
+          sin += 2;
+          sin += 6; // padding
+
+          const absolute = subclockflags === 1;
+
+          const now = (clockId: number) => {
+            switch (clockId) {
+              case constants.WASI_CLOCK_MONOTONIC:
+                return utils.hrtime();
+              case constants.WASI_CLOCK_REALTIME:
+                return utils.msToNs(Date.now());
+              case constants.WASI_CLOCK_PROCESS_CPUTIME_ID:
+              case constants.WASI_CLOCK_THREAD_CPUTIME_ID:
+                return utils.hrtime() - CPUTIME_START;
+              default:
+                return null;
+            }
+          };
+
+          let e = constants.WASI_ESUCCESS;
+          const n = BigInt(now(clockid));
+          if (n === null) {
+            e = constants.WASI_EINVAL;
+          } else {
+            const end = absolute ? timestamp : n + timestamp;
+            waitEnd =
+              end > waitEnd ? ((end as unknown) as number) : waitEnd;
+          }
+
+          view.setBigUint64(sout, userdata, true);
+          sout += 8;
+          view.setUint16(sout, e, true); // error
+          sout += 2; // pad offset 2
+          view.setUint8(sout, constants.WASI_EVENTTYPE_CLOCK);
+          sout += 1; // pad offset 3
+          sout += 5; // padding to 8
+
+          eventc += 1;
+
+          break;
+        }
+        case constants.WASI_EVENTTYPE_FD_READ:
+        case constants.WASI_EVENTTYPE_FD_WRITE: {
+          sin += 3; // padding
+          const fd = view.getUint32(sin, true);
+          sin += 4;
+
+          view.setBigUint64(sout, userdata, true);
+          sout += 8;
+          view.setUint16(sout, constants.WASI_ENOSYS, true); // error
+          sout += 2; // pad offset 2
+          view.setUint8(sout, eventType);
+          sout += 1; // pad offset 3
+          sout += 5; // padding to 8
+
+          eventc += 1;
+
+          break;
+        }
+        default:
+          return constants.WASI_EINVAL;
+      }
+    }
+
+    view.setUint32(nevents, eventc, true);
+
+    while (utils.hrtime() < waitEnd) {
+      // nothing
+    }
+
+    return constants.WASI_ESUCCESS;
   }
 
   function path_link() {

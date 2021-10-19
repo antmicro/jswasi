@@ -44,3 +44,31 @@ export function realpath(path): string {
   result_path = result_path.replace('/./', '/');
   return result_path;
 }
+
+export function msToNs(ms: number): BigInt {
+  const msInt = Math.trunc(ms);
+  const decimal = BigInt(Math.round((ms - msInt) * 1000000));
+  const ns = BigInt(msInt) * BigInt(1000000);
+  return ns + decimal;
+}
+
+// FIXME: I don't like these now() calls in utils file
+const baseNow = Math.floor((Date.now() - performance.now()) * 1e-3);
+export function hrtime(previousTimestamp: any=null): [number, number] {
+  // initilaize our variables
+  let clocktime = performance.now() * 1e-3;
+  let seconds = Math.floor(clocktime) + baseNow;
+  let nanoseconds = Math.floor((clocktime % 1) * 1e9);
+
+  // Compare to the prvious timestamp if we have one
+  if (previousTimestamp) {
+    seconds = seconds - previousTimestamp[0];
+    nanoseconds = nanoseconds - previousTimestamp[1];
+    if (nanoseconds < 0) {
+      seconds--;
+      nanoseconds += 1e9;
+    }
+  }
+  // Return our seconds tuple
+  return [seconds, nanoseconds];
+}
