@@ -423,9 +423,9 @@ impl Shell {
                 }
             }
 
-            // only write to file is successfully created
+            // only write to file if it was successfully created
             if let Some(ref mut shell_history) = shell_history {
-                // don't push !commands and duplicate commands
+                // don't push !commands and duplicates of last command
                 if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
                     self.history.push(input.clone());
                     writeln!(shell_history, "{}", &input)?;
@@ -518,7 +518,7 @@ impl Shell {
             }
             "history" => {
                 for (i, history_entry) in self.history.iter().enumerate() {
-                    println!("{}: {}", i, history_entry);
+                    println!("{}: {}", i + 1, history_entry);
                 }
             }
             "unset" => {

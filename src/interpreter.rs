@@ -16,9 +16,11 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
     match &list.first {
         ast::ListableCommand::Single(cmd) => match cmd {
             ast::PipeableCommand::Simple(cmd) => handle_simple_command(shell, cmd, background),
-            any => println!("{:#?}", any),
+            any => println!("ListableCommand yet handled: {:#?}", any),
         },
-        ast::ListableCommand::Pipe(_, _cmds) => println!("{:#?}", _cmds), // TODO: handle pipes
+        ast::ListableCommand::Pipe(_negate, _cmds) => {
+            println!("Pipes not yet handled: {:#?}", _cmds)
+        } // TODO: handle pipes
     }
 
     // TODO: handle list.rest
