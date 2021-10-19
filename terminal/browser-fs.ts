@@ -181,10 +181,6 @@ export class Filesystem {
     }
 }
 
-export class Stdin {
-
-}
-
 abstract class Entry {
     public readonly file_type: number;
 
@@ -431,7 +427,7 @@ export class OpenFile extends File {
       return 0;
     }
 
-    async seek(offset: number, whence: number) {
+    async seek(offset: number, whence: number): Promise<number> {
       if (this.DEBUG) console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
       switch (whence) {
         case constants.WASI_WHENCE_SET: {
@@ -452,10 +448,10 @@ export class OpenFile extends File {
       // await w.write({type: "seek", position: offset});
     }
 
-    async truncate() {
+    async truncate(size: number=0) {
       if (this.DEBUG) console.log(`OpenFile(${this.path}).truncate()`);
       const w = await this._handle.createWritable();
-      await w.write({ type: 'truncate', size: 0 });
+      await w.write({ type: 'truncate', size });
       this._file_pos = 0;
     }
 }

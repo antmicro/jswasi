@@ -29,8 +29,11 @@ const OPTIONAL_BINARIES = {
   '/usr/local/bin/qjs': 'https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm',
   '/usr/local/bin/viu': 'https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm',
   '/usr/local/bin/python': 'https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm',
-  '/usr/local/bin/rg': 'https://registry-cdn.wapm.io/contents/liftm/rg/12.1.1-1/rg.wasm',
+  '/usr/local/bin/grep': 'https://registry-cdn.wapm.io/contents/liftm/rg/12.1.1-1/rg.wasm',
   '/usr/local/bin/realpython': 'https://registry-cdn.wapm.io/contents/_/python/0.1.0/bin/python.wasm',
+  '/usr/local/bin/find': 'https://registry-cdn.wapm.io/contents/liftm/fd/8.2.1-1/fd.wasm',
+  '/usr/local/bin/du': 'https://registry-cdn.wapm.io/contents/liftm/dust-wasi/0.5.4-3/dust.wasm',
+  '/usr/local/bin/llc': 'https://registry-cdn.wapm.io/contents/rapidlua/llc/0.0.4/llc.wasm',
 };
 
 async function fetchFile(dir: Directory, filename: string, address: string, refetch: boolean = true) {
