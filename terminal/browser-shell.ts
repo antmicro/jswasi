@@ -76,7 +76,7 @@ export async function initFs(anchor: HTMLElement) {
   const shellrc = await ant.getFileHandle('.shellrc', { create: true });
   if ((await shellrc.getFile()).size === 0) {
     const w = await shellrc.createWritable();
-    await w.write({ type: 'write', position: 0, data: 'RUST_BACKTRACE=full\nDEBUG=false\n'});
+    await w.write({ type: 'write', position: 0, data: 'export RUST_BACKTRACE=full\nexport DEBUG=false\n'});
     await w.close();
   }
 

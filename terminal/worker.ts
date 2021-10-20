@@ -8,13 +8,13 @@ type ptr = number;
 const IS_NODE = typeof self === 'undefined';
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
-const CPUTIME_START = utils.hrtime();
+const CPUTIME_START = utils.msToNs(performance.now());
 
 let started: boolean;
 let mod: string;
 let myself: number;
 let args: string[];
-let env: {key: string, val: string};
+let env: Record<string, string>;
 
 const onmessage_ = function (e) {
   //worker_console_log('got a message!');
@@ -241,10 +241,11 @@ function WASI() {
     return 1; // TODO!!!!
   }
 
-  function clock_time_get(id, precision, time) {
-    worker_console_log(`clock_time_get(${id}, ${precision}, ${time})`);
-    const buffer = new DataView(moduleInstanceExports.memory.buffer);
-    buffer.setBigUint64(time, BigInt(new Date().getTime()), true);
+  function clock_time_get(clockId, precision, time) {
+    worker_console_log(`clock_time_get(${clockId}, ${precision}, ${time})`);
+    const view = new DataView(moduleInstanceExports.memory.buffer);
+
+    view.setBigUint64(time, utils.now(clockId, CPUTIME_START), true);
     return constants.WASI_ESUCCESS;
   }
 
@@ -737,16 +738,17 @@ function WASI() {
   };
 
   function poll_oneoff(
-    sin: number,
-    sout: number,
+    sin: ptr,
+    sout: ptr,
     nsubscriptions: number,
-    nevents: number
+    nevents: ptr
   ) {
+    worker_console_log(`poll_oneoff(${sin}, ${sout}, ${nsubscriptions}, ${nevents})`);
     const view = new DataView(moduleInstanceExports.memory.buffer);
     const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
 
     let eventc = 0;
-    let waitEnd = 0;
+    let waitEnd = 0n;
     for (let i = 0; i < nsubscriptions; i += 1) {
       const userdata = view.getBigUint64(sin, true);
       sin += 8;
@@ -754,53 +756,32 @@ function WASI() {
       sin += 1;
       switch (eventType) {
         case constants.WASI_EVENTTYPE_CLOCK: {
-          sin += 7; // padding
+          sin += 7;
           const identifier = view.getBigUint64(sin, true);
           sin += 8;
           const clockid = view.getUint32(sin, true);
-          sin += 4;
-          sin += 4; // padding
+          sin += 8;
           const timestamp = view.getBigUint64(sin, true);
           sin += 8;
           const precision = view.getBigUint64(sin, true);
           sin += 8;
           const subclockflags = view.getUint16(sin, true);
-          sin += 2;
-          sin += 6; // padding
+          sin += 8;
 
           const absolute = subclockflags === 1;
+          
+          worker_console_log(`identifier = ${identifier}, clockid = ${clockid}, timestamp = ${timestamp}, precision = ${precision}, absolute = ${absolute}`);
 
-          const now = (clockId: number) => {
-            switch (clockId) {
-              case constants.WASI_CLOCK_MONOTONIC:
-                return utils.hrtime();
-              case constants.WASI_CLOCK_REALTIME:
-                return utils.msToNs(Date.now());
-              case constants.WASI_CLOCK_PROCESS_CPUTIME_ID:
-              case constants.WASI_CLOCK_THREAD_CPUTIME_ID:
-                return utils.hrtime() - CPUTIME_START;
-              default:
-                return null;
-            }
-          };
-
-          let e = constants.WASI_ESUCCESS;
-          const n = BigInt(now(clockid));
-          if (n === null) {
-            e = constants.WASI_EINVAL;
-          } else {
-            const end = absolute ? timestamp : n + timestamp;
-            waitEnd =
-              end > waitEnd ? ((end as unknown) as number) : waitEnd;
-          }
+          const n = utils.now(clockid, CPUTIME_START);
+          const end = absolute ? timestamp : n + timestamp;
+          waitEnd = end > waitEnd ? end : waitEnd;
 
           view.setBigUint64(sout, userdata, true);
           sout += 8;
-          view.setUint16(sout, e, true); // error
+          view.setUint16(sout, constants.WASI_ESUCCESS, true); // error
           sout += 2; // pad offset 2
           view.setUint8(sout, constants.WASI_EVENTTYPE_CLOCK);
-          sout += 1; // pad offset 3
-          sout += 5; // padding to 8
+          sout += 6; // pad offset 3
 
           eventc += 1;
 
@@ -831,7 +812,7 @@ function WASI() {
 
     view.setUint32(nevents, eventc, true);
 
-    while (utils.hrtime() < waitEnd) {
+    while (utils.msToNs(performance.now()) < waitEnd) {
       // nothing
     }
 

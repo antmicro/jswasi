@@ -1,4 +1,4 @@
-import * as constants from './constants';
+import * as constants from './constants.js';
 
 export function arraysEqual(a: any[], b: any[]) {
   if (a === b) return true;
@@ -45,30 +45,24 @@ export function realpath(path): string {
   return result_path;
 }
 
-export function msToNs(ms: number): BigInt {
+export function msToNs(ms: number): bigint {
   const msInt = Math.trunc(ms);
   const decimal = BigInt(Math.round((ms - msInt) * 1000000));
   const ns = BigInt(msInt) * BigInt(1000000);
   return ns + decimal;
 }
 
-// FIXME: I don't like these now() calls in utils file
-const baseNow = Math.floor((Date.now() - performance.now()) * 1e-3);
-export function hrtime(previousTimestamp: any=null): [number, number] {
-  // initilaize our variables
-  let clocktime = performance.now() * 1e-3;
-  let seconds = Math.floor(clocktime) + baseNow;
-  let nanoseconds = Math.floor((clocktime % 1) * 1e9);
-
-  // Compare to the prvious timestamp if we have one
-  if (previousTimestamp) {
-    seconds = seconds - previousTimestamp[0];
-    nanoseconds = nanoseconds - previousTimestamp[1];
-    if (nanoseconds < 0) {
-      seconds--;
-      nanoseconds += 1e9;
-    }
+export function now(clockId: number, cpuTimeStart): bigint {
+  switch (clockId) {
+    case constants.WASI_CLOCK_MONOTONIC:
+      return msToNs(performance.now());
+    case constants.WASI_CLOCK_REALTIME:
+      return msToNs(Date.now());
+    case constants.WASI_CLOCK_PROCESS_CPUTIME_ID:
+    case constants.WASI_CLOCK_THREAD_CPUTIME_ID:
+      return msToNs(performance.now()) - cpuTimeStart;
+    default:
+      // TODO: that a temporary fix as we get clockId = 10^9
+      return msToNs(performance.now()) - cpuTimeStart;
   }
-  // Return our seconds tuple
-  return [seconds, nanoseconds];
-}
+};
