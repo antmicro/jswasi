@@ -61,6 +61,10 @@ export class Stderr implements IO {
 export class OpenedFd implements IO {
   constructor(private openedFile: OpenFile) {}
 
+  get path(): string {
+    return this.openedFile.path;
+  }
+
   async read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     const lck = new Int32Array(sbuf, 0, 1);
     const readlen = new Int32Array(sbuf, 4, 1);

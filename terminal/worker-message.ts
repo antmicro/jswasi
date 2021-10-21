@@ -201,9 +201,6 @@ export const on_worker_message = async function (event, workerTable) {
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
         preopen_type[0] = fds[fd].file_type;
-        if (fds[fd].path == '') if (fd == 3) fds[fd].path = '/';
-        if (fds[fd].path == '') if (fd == 4) fds[fd].path = '.';
-        if (fds[fd].path == '') if (fd == 5) fds[fd].path = '/';
         name_len[0] = fds[fd].path.length;
         err = constants.WASI_ESUCCESS;
       } else {
