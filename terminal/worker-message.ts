@@ -140,7 +140,13 @@ export const on_worker_message = async function (event, workerTable) {
           );
 	      let new_worker_name = fullpath.split("/").slice(-1)[0];
 	      if (env['DEBUG'] == "1") {
-            console.log(`%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+            console.log(
+              `%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`,
+              "background:black; color: white;",
+              "background:black; color:yellow;",
+              "background: black; color:white;",
+              "background:default; color: default;"
+            );
 	      }
 	      if (background) {
             Atomics.store(parent_lck, 0, 0);
