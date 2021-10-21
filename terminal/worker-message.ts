@@ -1,7 +1,7 @@
 import * as constants from './constants.js';
 import * as utils from './utils.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
-import { mount, umount, wget, download } from './browser-shell.js';
+import { mount, umount, wget, download } from './browser-programs.js';
 import { OpenedFd } from './browser-devices.js';
 
 declare global {
