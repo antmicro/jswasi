@@ -45,7 +45,10 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
         .redirects_or_cmd_words
         .iter()
         .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
-            ast::RedirectOrCmdWord::Redirect(_) => None, // TODO: handle redirects
+            ast::RedirectOrCmdWord::Redirect(r) => {
+                println!("{:#?}", r); // TODO: handle redirects
+                Some("".to_string())
+            }
             ast::RedirectOrCmdWord::CmdWord(cmd_word) => handle_top_level_word(shell, &cmd_word.0),
         });
 
@@ -60,7 +63,7 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
             // if it's a global update env, if shell variable update only vars
             if env::var(key).is_ok() {
                 env::set_var(&key, &value);
-                let _ = syscall("set_env", &[key, value], &env, false);
+                let _ = syscall("set_env", &[key, value], &env, false, None, None, None);
             } else {
                 shell.vars.insert(key.clone(), value.clone());
             }
