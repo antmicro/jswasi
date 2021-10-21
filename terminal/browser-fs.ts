@@ -421,8 +421,8 @@ export class OpenFile extends File {
         await w.write({ type: 'write', position: this._file_pos, data: buffer });
 	    await w.close();
         this._file_pos += buffer.byteLength;
-      } catch {
-        console.log('Error: there was an error during writing!');
+      } catch (err) {
+        console.log(`Error during writing: ${err}`);
         return 1;
       }
       return 0;

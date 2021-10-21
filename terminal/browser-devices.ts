@@ -76,8 +76,7 @@ export class OpenedFd implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    // for some reason writable cannot use shared arrays?
-    return await this.openedFile.write(content);
+    return await this.openedFile.write(content.slice(0));
   }
   
   async stat(): Promise<{dev: bigint, ino: bigint, file_type: number, nlink: bigint, size: bigint, atim: bigint, mtim: bigint, ctim: bigint}> {
