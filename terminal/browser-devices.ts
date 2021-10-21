@@ -11,7 +11,7 @@ const RESET = '\u001b[0m';
 
 export interface IO {
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer);
-  write(content: Uint8Array): number;
+  write(content: Uint8Array): Promise<number>;
 }
 
 export class Stdin implements IO {
@@ -24,7 +24,7 @@ export class Stdin implements IO {
     this.workerTable.sendBufferToWorker(workerId, requestedLen, lck, readlen, readbuf);
   }
 
-  write(content: Uint8Array): number {
+  async write(content: Uint8Array): Promise<number> {
     throw "can't write to stdin!";
   }
 }
@@ -36,7 +36,7 @@ export class Stdout implements IO {
     throw "can't read from stdout!";
   }
   
-  write(content: Uint8Array): number {
+  async write(content: Uint8Array): Promise<number> {
     this.workerTable.receiveCallback(DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n'));
     return constants.WASI_ESUCCESS;
   }
@@ -50,7 +50,7 @@ export class Stderr implements IO {
     throw "can't read from stderr!";
   }
   
-  write(content: Uint8Array): number {
+  async write(content: Uint8Array): Promise<number> {
 	const output = DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n');
     this.workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
     return constants.WASI_ESUCCESS;
@@ -58,8 +58,8 @@ export class Stderr implements IO {
 
 }
 
-export class OpenedFd {
-  constructor(private openedFile: OpenFile | OpenDirectory) {}
+export class OpenedFd implements IO {
+  constructor(private openedFile: OpenFile) {}
 
   async read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     const lck = new Int32Array(sbuf, 0, 1);
@@ -83,36 +83,11 @@ export class OpenedFd {
   async stat(): Promise<{dev: bigint, ino: bigint, file_type: number, nlink: bigint, size: bigint, atim: bigint, mtim: bigint, ctim: bigint}> {
     return await this.openedFile.stat();
   }
-  
-  async entries(): Promise<(File | Directory)[]> {
-    return await this.openedFile.entries();
-  }
-
   async lastModified(): Promise<number> {
     return await this.openedFile.lastModified();
   }
 
   async open() {
     return await this.openedFile.open();
-  }
-
-  getEntry(
-    path: string,
-    mode: FileOrDir.File,
-    openFlags?: OpenFlags
-  ): Promise<{err: number, entry: File}>;
-  getEntry(
-    path: string,
-    mode: FileOrDir.Directory,
-    openFlags?: OpenFlags
-  ): Promise<{err: number, entry: Directory}>;
-  getEntry(
-    path: string,
-    mode: FileOrDir,
-    openFlags?: OpenFlags
-  ): Promise<{err: number, entry: File | Directory}>;
-
-  async getEntry(path: string, mode: FileOrDir, oflags: OpenFlags = 0): Promise<{err: number, entry: File | Directory}> {
-    return await this.openedFile.getEntry(path, mode, oflags);
   }
 }

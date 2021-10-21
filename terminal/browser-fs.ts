@@ -1,6 +1,7 @@
 import * as constants from './constants.js';
 import { realpath, parsePath, arraysEqual } from './utils.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
+import { OpenedFd } from './browser-devices.js';
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
@@ -386,7 +387,7 @@ export class File extends Entry {
     }
 
     async open() {
-      return new OpenFile(this.path, this._handle, this.parent, this._filesystem);
+      return new OpenedFd(new OpenFile(this.path, this._handle, this.parent, this._filesystem));
     }
 }
 

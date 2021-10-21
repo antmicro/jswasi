@@ -279,9 +279,6 @@ export const on_worker_message = async function (event, workerTable) {
     }
     case 'fd_read': {
       const [sbuf, fd, len] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const readlen = new Int32Array(sbuf, 4, 1);
-      const readbuf = new Uint8Array(sbuf, 8, len);
 
       const { fds } = workerTable.workerInfos[worker_id];
       await fds[fd].read(worker_id, len, sbuf);
@@ -299,7 +296,7 @@ export const on_worker_message = async function (event, workerTable) {
       if (fds[dir_fd] != undefined) {
         ({ err, entry } = await fds[dir_fd].getEntry(path, FileOrDir.Any, oflags));
         if (err === constants.WASI_ESUCCESS) {
-          fds.push(new OpenedFd(await entry.open()));
+          fds.push(await entry.open());
           opened_fd[0] = fds.length - 1;
         }
       }
