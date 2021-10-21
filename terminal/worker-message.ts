@@ -1,4 +1,5 @@
 import * as constants from './constants.js';
+import * as utils from './utils.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
 import { mount, umount, wget, download } from './browser-shell.js';
 import { OpenedFd } from './browser-devices.js';
@@ -6,17 +7,6 @@ import { OpenedFd } from './browser-devices.js';
 declare global {
   var exit_code: number;
   var alive: boolean;
-}
-
-function human_readable(bytes) {
-  const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
-  let result = bytes;
-  let unit = 0;
-  while ((result >= 1024) && ((unit+1) < units.length)) {
-    result /= 1024;
-    unit += 1;
-  }
-  return `${result.toFixed(1)}${units[unit]}`;
 }
 
 export const on_worker_message = async function (event, workerTable) {
@@ -129,9 +119,9 @@ export const on_worker_message = async function (event, workerTable) {
 	      let used_mem = "";
 	      let avail_mem = "";
 	      if ((args.length > 1) && (args[1] == "-h")) {
-	        total_mem = human_readable(total_mem_raw);
-	        used_mem = human_readable(used_mem_raw);
-	        avail_mem = human_readable(total_mem_raw - used_mem_raw);
+	        total_mem = utils.human_readable(total_mem_raw);
+	        used_mem = utils.human_readable(used_mem_raw);
+	        avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);
 	      } else {
             total_mem = `${Math.round(total_mem_raw / 1024)}`;
 	        used_mem = `${Math.round(used_mem_raw / 1024)}`;

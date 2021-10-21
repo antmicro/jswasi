@@ -66,3 +66,14 @@ export function now(clockId: number, cpuTimeStart): bigint {
       return msToNs(performance.now()) - cpuTimeStart;
   }
 };
+
+export function human_readable(bytes: number): string {
+  const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
+  let result = bytes;
+  let unit = 0;
+  while ((result >= 1024) && ((unit+1) < units.length)) {
+    result /= 1024;
+    unit += 1;
+  }
+  return `${result.toFixed(1)}${units[unit]}`;
+}
