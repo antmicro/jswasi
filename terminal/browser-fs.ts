@@ -205,7 +205,7 @@ abstract class Entry {
     abstract lastModified(): Promise<number>;
 
     // TODO: fill dummy values with something meaningful
-    async stat() {
+    async stat(): Promise<{dev: bigint, ino: bigint, file_type: number, nlink: bigint, size: bigint, atim: bigint, mtim: bigint, ctim: bigint}> {
       if (this._filesystem.DEBUG) console.log(`Entry(this.path="${this.path}").stat()`);
       let lmod = await this.lastModified();
 	    if (!isFinite(lmod)) lmod = 0; // TODO:

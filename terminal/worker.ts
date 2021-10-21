@@ -967,4 +967,8 @@ async function start_wasm() {
   }
 }
 
-(async () => await start_wasm())();
+try {
+  (async () => await start_wasm())();
+} catch (err) {
+  worker_send(['console', `Worker failed: ${err}`]);
+}
