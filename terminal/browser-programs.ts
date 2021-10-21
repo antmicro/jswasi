@@ -1,4 +1,5 @@
 import * as constants from './constants.js';
+import * as utils from './utils.js';
 import { FileOrDir } from './filesystem.js';
 
 import { filesystem, fetchFile } from './browser-shell.js';
@@ -110,5 +111,44 @@ export async function download(workerTable, worker_id, args, env): Promise<numbe
       await stream.pipeTo(writable);
     }
   }
+  return 0;
+}
+
+export async function ps(workerTable, worker_id, args, env): Promise<number> {
+  let ps_data = '  PID TTY          TIME CMD\n\r';
+  for (const [id, workerInfo] of Object.entries(workerTable.workerInfos)) {
+    const now = new Date();
+    // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognised)
+    const time = Math.floor(now.getTime() / 1000) - workerInfo.timestamp;
+    const seconds = time % 60;
+    const minutes = ((time - seconds) / 60) % 60;
+    const hours = (time - seconds - minutes * 60) / 60 / 60;
+    // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognised)
+    ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerInfo.cmd.split('/').slice(-1)[0]}\n\r`;
+  }
+  workerTable.receiveCallback(ps_data);
+  return 0;
+}
+
+export async function free(workerTable, worker_id, args, env): Promise<number> {
+  // @ts-ignore memory is non-standard API available only in Chrome
+  let total_mem_raw = performance.memory.jsHeapSizeLimit; 
+  // @ts-ignore
+  let used_mem_raw = performance.memory.usedJSHeapSize;
+  let total_mem = "";
+  let used_mem = "";
+  let avail_mem = "";
+  if ((args.length > 1) && (args[1] == "-h")) {
+    total_mem = utils.human_readable(total_mem_raw);
+    used_mem = utils.human_readable(used_mem_raw);
+    avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);
+  } else {
+    total_mem = `${Math.round(total_mem_raw / 1024)}`;
+    used_mem = `${Math.round(used_mem_raw / 1024)}`;
+    avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
+  }
+  let free_data = `               total        used   available\n\r`;
+  free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
+  workerTable.receiveCallback(free_data);
   return 0;
 }

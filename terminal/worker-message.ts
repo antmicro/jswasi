@@ -1,7 +1,7 @@
 import * as constants from './constants.js';
 import * as utils from './utils.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
-import { mount, umount, wget, download } from './browser-programs.js';
+import { mount, umount, wget, download, ps, free } from './browser-programs.js';
 import { OpenedFd } from './browser-devices.js';
 
 declare global {
@@ -82,20 +82,9 @@ export const on_worker_message = async function (event, workerTable) {
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
 		case '/usr/bin/ps': {
-	      let ps_data = '  PID TTY          TIME CMD\n\r';
-		  for (const [id, workerInfo] of Object.entries(workerTable.workerInfos)) {
-		    const now = new Date();
-            // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognised)
-            const time = Math.floor(now.getTime() / 1000) - workerInfo.timestamp;
-            const seconds = time % 60;
-            const minutes = ((time - seconds) / 60) % 60;
-            const hours = (time - seconds - minutes * 60) / 60 / 60;
-            // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognised)
-            ps_data += `${(`     ${id}`).slice(-5)} pts/0    ${(`00${hours}`).slice(-2)}:${(`00${minutes}`).slice(-2)}:${(`00${seconds}`).slice(-2)} ${workerInfo.cmd.split('/').slice(-1)[0]}\n\r`;
-	      }
-          workerTable.receiveCallback(ps_data);
-		  Atomics.store(parent_lck, 0, 0);
-		  Atomics.notify(parent_lck, 0);
+          const result = await ps(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, result);
+          Atomics.notify(parent_lck, 0);
 		  break;
         }
         case '/usr/bin/mount': {
@@ -105,44 +94,26 @@ export const on_worker_message = async function (event, workerTable) {
           break;
         }
         case '/usr/bin/umount': {
-          const result = umount(workerTable, worker_id, args, env);
+          const result = await umount(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
           break;
         }
 	    case '/usr/bin/free': {
-          // @ts-ignore memory is non-standard API available only in Chrome
-	      let total_mem_raw = performance.memory.jsHeapSizeLimit; 
-          // @ts-ignore
-          let used_mem_raw = performance.memory.usedJSHeapSize;
-	      let total_mem = "";
-	      let used_mem = "";
-	      let avail_mem = "";
-	      if ((args.length > 1) && (args[1] == "-h")) {
-	        total_mem = utils.human_readable(total_mem_raw);
-	        used_mem = utils.human_readable(used_mem_raw);
-	        avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);
-	      } else {
-            total_mem = `${Math.round(total_mem_raw / 1024)}`;
-	        used_mem = `${Math.round(used_mem_raw / 1024)}`;
-	        avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
-	      }
-	      let free_data = `               total        used   available\n\r`;
-	      free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
-	      workerTable.receiveCallback(free_data);
-          Atomics.store(parent_lck, 0, 0);
+          const result = await free(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
 	      break;
 	    }
         case '/usr/bin/wget': {
-          await wget(workerTable, worker_id, args, env);
-          Atomics.store(parent_lck, 0, 0);
+          const result = await wget(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
           break;
         }
         case '/usr/bin/download': {
-          await download(workerTable, worker_id, args, env);
-          Atomics.store(parent_lck, 0, 0);
+          const result = await download(workerTable, worker_id, args, env);
+          Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
           break;
         }
