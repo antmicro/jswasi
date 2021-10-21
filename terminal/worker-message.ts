@@ -268,40 +268,10 @@ export const on_worker_message = async function (event, workerTable) {
       const lck = new Int32Array(sbuf, 0, 1);
       const content = new Uint8Array(content_);
 
+      const { fds } = workerTable.workerInfos[worker_id];
+      await fds[fd].write(content);
+
       let err;
-      switch (fd) {
-        case 0: {
-          throw "can't write to stdin!";
-        }
-        case 1: {
-          let output = '';
-          for (let i = 0; i < content.byteLength; i++) output += String.fromCharCode(content[i]);
-          workerTable.receiveCallback(output.replaceAll('\n', '\r\n'));
-          break;
-        }
-        case 2: {
-          let output = '';
-          for (let i = 0; i < content.byteLength; i++) output += String.fromCharCode(content[i]);
-		            output = output.replaceAll('\n', '\r\n');
-          const RED_ANSI = '\u001b[31m';
-          const RESET = '\u001b[0m';
-          workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
-          break;
-        }
-        default: {
-          const { fds } = workerTable.workerInfos[worker_id];
-          if (fds[fd] != undefined) {
-            const local_content = new Uint8Array(content.byteLength);
-            local_content.set(content);
-            // for some reason writable cannot use shared arrays?
-            await fds[fd].write(local_content);
-            err = constants.WASI_ESUCCESS;
-          } else {
-            err = constants.WASI_EBADF;
-          }
-          break;
-        }
-      }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
       break;
@@ -312,35 +282,9 @@ export const on_worker_message = async function (event, workerTable) {
       const readlen = new Int32Array(sbuf, 4, 1);
       const readbuf = new Uint8Array(sbuf, 8, len);
 
-      let err;
-      switch (fd) {
-        case 0: {
-          workerTable.sendBufferToWorker(worker_id, len, lck, readlen, readbuf);
-          break;
-        }
-        case 1: {
-          throw "can't read from stdout!";
-        }
-        case 2: {
-          throw "can't read from stderr!";
-        }
-        default: {
-          const { fds } = workerTable.workerInfos[worker_id];
-          if (fds[fd] != undefined) {
-            let data;
-            [data, err] = await fds[fd].read(len);
-            if (err === 0) {
-              readbuf.set(data);
-              readlen[0] = data.byteLength;
-            }
-          } else {
-            err = constants.WASI_EBADF;
-          }
-          Atomics.store(lck, 0, err);
-          Atomics.notify(lck, 0);
-          break;
-        }
-      }
+      const { fds } = workerTable.workerInfos[worker_id];
+      await fds[fd].read(worker_id, len, lck, readlen, readbuf);
+      
       break;
     }
     case 'path_open': {

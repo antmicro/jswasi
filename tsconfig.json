@@ -4,7 +4,8 @@
     "module": "esnext",
     "outDir": "output",
     "removeComments": false,
-    "watch": false
+    "watch": false,
+    "noImplicitAny": false
   },
   "include": ["terminal/**/*"]
 }

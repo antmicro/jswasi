@@ -23,7 +23,7 @@ export class WorkerTable {
     public workerInfos: Record<number, WorkerInfo> = {};
     public compiledModules: Record<string, WebAssembly.Module> = {};
 
-    constructor(private readonly scriptName: string, private readonly receiveCallback, public readonly terminal, public readonly filesystem) {}
+    constructor(private readonly scriptName: string, public readonly receiveCallback, public readonly terminal, public readonly filesystem) {}
 
     async spawnWorker(parentId: number, parentLock: Int32Array, kernelCallback, command, fds, args, env, isJob: boolean): Promise<number> {
       const id = this.nextWorkerId;

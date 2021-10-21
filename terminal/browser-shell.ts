@@ -4,6 +4,7 @@ import { on_worker_message } from './worker-message.js';
 
 import { FileOrDir, OpenFlags } from './filesystem.js';
 import { Filesystem, Directory } from './browser-fs.js';
+import { Stdin, Stdout, Stderr, OpenedFd } from './browser-devices.js';
 
 declare global {
     var stdout_attached: boolean;
@@ -76,7 +77,7 @@ export async function initFs(anchor: HTMLElement) {
   const shellrc = await ant.getFileHandle('.shellrc', { create: true });
   if ((await shellrc.getFile()).size === 0) {
     const w = await shellrc.createWritable();
-    await w.write({ type: 'write', position: 0, data: 'export RUST_BACKTRACE=full\nexport DEBUG=false\n'});
+    await w.write({ type: 'write', position: 0, data: 'export RUST_BACKTRACE=full\nexport DEBUG=1\n'});
     await w.close();
   }
 
@@ -230,8 +231,15 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
     null, // parent_lock
     on_worker_message,
     '/usr/bin/shell',
-    // stdin, stderr, stdout, root, pwd, TODO: why must fds[5] be present for ls to work, and what should it be
-    [null, null, null, await root_dir.open(), await pwd_dir.open(), await root_dir.open()],
+    [
+        new Stdin(workerTable),
+        new Stdout(workerTable),
+        new Stderr(workerTable),
+        await root_dir.open(),
+        await pwd_dir.open(),
+        // TODO: why must fds[5] be present for ls to work, and what should it be
+        await root_dir.open(),
+    ],
     ['shell'],
     {
       PATH: '/usr/bin:/usr/local/bin',
