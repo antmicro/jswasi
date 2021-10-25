@@ -451,8 +451,9 @@ export class OpenFile extends File {
 
     async truncate(size: number=0) {
       if (this.DEBUG) console.log(`OpenFile(${this.path}).truncate()`);
-      const w = await this._handle.createWritable();
-      await w.write({ type: 'truncate', size });
+      const writable = await this._handle.createWritable();
+      await writable.write({ type: 'truncate', size: 0 });
+      await writable.close();
       this._file_pos = 0;
     }
 }

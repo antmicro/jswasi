@@ -133,8 +133,10 @@ export const on_worker_message = async function (event, workerTable) {
             const rootDir = await workerTable.filesystem.getRootDirectory();
             const { err, entry } = await rootDir.getEntry(path, FileOrDir.File, OpenFlags.Create);
             childFds[fd] = await entry.open();
-            if (mode === "append") {
-                childFds[fd].seek(0, constants.WASI_WHENCE_END);
+            if (mode === "write") {
+              await childFds[fd].truncate();
+            } else if (mode === "append") {
+              await childFds[fd].seek(0, constants.WASI_WHENCE_END);
             }
           }
           const id = await workerTable.spawnWorker(
