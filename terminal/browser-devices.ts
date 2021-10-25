@@ -93,4 +93,8 @@ export class OpenedFd implements IO {
   async open() {
     return await this.openedFile.open();
   }
+
+  async seek(offset: number, whence: number): Promise<number> {
+    return await this.openedFile.seek(offset, whence);
+  }
 }
