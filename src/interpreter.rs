@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::path::PathBuf;
 
 use conch_parser::ast;
 
@@ -85,7 +86,13 @@ fn handle_redirect_type(
     match redirect_type {
         ast::Redirect::Write(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(1);
-            if let Some(filename) = handle_top_level_word(shell, &top_level_word) {
+            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+                if !filename.starts_with('/') {
+                    filename = PathBuf::from(&shell.pwd)
+                        .join(&filename)
+                        .display()
+                        .to_string()
+                }
                 Some((file_descriptor, filename, "write".to_string()))
             } else {
                 None
@@ -93,7 +100,13 @@ fn handle_redirect_type(
         }
         ast::Redirect::Append(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(1);
-            if let Some(filename) = handle_top_level_word(shell, &top_level_word) {
+            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+                if !filename.starts_with('/') {
+                    filename = PathBuf::from(&shell.pwd)
+                        .join(&filename)
+                        .display()
+                        .to_string()
+                }
                 Some((file_descriptor, filename, "append".to_string()))
             } else {
                 None
