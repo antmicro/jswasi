@@ -112,7 +112,20 @@ fn handle_redirect_type(
                 None
             }
         }
-        ast::Redirect::Read(file_descriptor, top_level_word) => None,
+        ast::Redirect::Read(file_descriptor, top_level_word) => {
+            let file_descriptor = file_descriptor.unwrap_or(0);
+            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+                if !filename.starts_with('/') {
+                    filename = PathBuf::from(&shell.pwd)
+                        .join(&filename)
+                        .display()
+                        .to_string()
+                }
+                Some((file_descriptor, filename, "read".to_string()))
+            } else {
+                None
+            }
+        }
         any => {
             println!("Redirect not yet handled: {:?}", any);
             None

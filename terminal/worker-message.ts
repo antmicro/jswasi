@@ -127,6 +127,7 @@ export const on_worker_message = async function (event, workerTable) {
             args.splice(0, 0, fullpath.split('/').pop());
 	        background = true;
 	      }
+          // TODO: is shallow copy enough, or should we deepcopy?
           const childFds = workerTable.workerInfos[worker_id].fds.slice(0);
           for (const [fd, path, mode] of redirects) {
             const rootDir = await workerTable.filesystem.getRootDirectory();
