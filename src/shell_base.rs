@@ -23,9 +23,7 @@ pub fn syscall(
     args: &[&str],
     envs: &HashMap<String, String>,
     background: bool,
-    stdin: Option<&str>,
-    stdout: Option<&str>,
-    stderr: Option<&str>,
+    redirects: &[(u16, String, String)],
 ) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
     let result = fs::read_link(format!(
@@ -39,9 +37,11 @@ pub fn syscall(
                 .collect::<Vec<_>>()
                 .join("\x1b"),
             &format!("{}", background),
-            stdin.unwrap_or_default(),
-            stdout.unwrap_or_default(),
-            stderr.unwrap_or_default(),
+            &redirects
+                .iter()
+                .map(|(fd, filename, operation)| format!("{} {} {}", fd, filename, operation))
+                .collect::<Vec<_>>()
+                .join("\x1b"),
         ]
         .join("\x1b\x1b")
     ))?;
@@ -91,7 +91,7 @@ impl Shell {
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // disable echoing on hterm side (ignore Error that will arise on platforms other than web
-        let _ = syscall("set_echo", &["0"], &HashMap::new(), false, None, None, None);
+        let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD")?)?;
@@ -466,6 +466,7 @@ impl Shell {
         args: &mut Vec<String>,
         env: &HashMap<String, String>,
         background: bool,
+        redirects: &[(u16, String, String)],
     ) -> Result<(), Box<dyn std::error::Error>> {
         match command {
             // built in commands
@@ -508,9 +509,7 @@ impl Shell {
                             &["OLDPWD", env::current_dir()?.to_str().unwrap()],
                             env,
                             background,
-                            None,
-                            None,
-                            None,
+                            &[],
                         )?;
                         #[cfg(not(target_os = "wasi"))]
                         let pwd_path = fs::canonicalize(path)?;
@@ -520,9 +519,7 @@ impl Shell {
                             &["PWD", path.to_str().unwrap()],
                             env,
                             background,
-                            None,
-                            None,
-                            None,
+                            &[],
                         )?);
                         self.pwd = String::from(pwd_path.to_str().unwrap());
                         env::set_var("PWD", &self.pwd);
@@ -546,7 +543,7 @@ impl Shell {
                         self.vars.remove(arg);
                         if env::var(&arg).is_ok() {
                             env::remove_var(&arg);
-                            syscall("set_env", &[arg], env, background, None, None, None)?;
+                            syscall("set_env", &[arg], env, background, &[])?;
                         }
                     }
                 }
@@ -566,22 +563,14 @@ impl Shell {
                     for arg in args.iter().skip(1) {
                         if args[0] == "-x" {
                             if let Some((key, value)) = arg.split_once("=") {
-                                syscall(
-                                    "set_env",
-                                    &[key, value],
-                                    env,
-                                    background,
-                                    None,
-                                    None,
-                                    None,
-                                )?;
+                                syscall("set_env", &[key, value], env, background, &[])?;
                             }
                         } else if let Some((key, value)) = arg.split_once("=") {
-                            syscall("set_env", &[key], env, background, None, None, None)?;
+                            syscall("set_env", &[key], env, background, &[])?;
                             self.vars.insert(key.to_string(), value.to_string());
                         } else {
                             let value = env::var(arg)?;
-                            syscall("set_env", &[arg], env, background, None, None, None)?;
+                            syscall("set_env", &[arg], env, background, &[])?;
                             self.vars.insert(arg.clone(), value.clone());
                         }
                     }
@@ -604,13 +593,13 @@ impl Shell {
                     if let Some((key, value)) = arg.split_once("=") {
                         self.vars.remove(key);
                         env::set_var(&key, &value);
-                        syscall("set_env", &[key, value], env, background, None, None, None)?;
+                        syscall("set_env", &[key, value], env, background, &[])?;
                     } else if let Some(value) = self.vars.remove(arg) {
                         env::set_var(&arg, &value);
-                        syscall("set_env", &[arg, &value], env, background, None, None, None)?;
+                        syscall("set_env", &[arg, &value], env, background, &[])?;
                     } else {
                         env::set_var(&arg, "");
-                        syscall("set_env", &[arg, ""], env, background, None, None, None)?;
+                        syscall("set_env", &[arg, ""], env, background, &[])?;
                     }
                 }
             }
@@ -740,7 +729,7 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, background, None, None, None)?;
+                syscall("spawn", &args_[..], env, background, redirects)?;
             }
             // no input
             "" => {}
@@ -790,8 +779,7 @@ impl Shell {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        let _result =
-                            syscall("spawn", &args_[..], env, background, None, None, None)?;
+                        let _result = syscall("spawn", &args_[..], env, background, redirects)?;
                     }
                     Err(reason) => println!("{}", reason),
                 }

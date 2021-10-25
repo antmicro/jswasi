@@ -1,6 +1,7 @@
-use conch_parser::ast;
 use std::collections::HashMap;
 use std::env;
+
+use conch_parser::ast;
 
 use crate::shell_base::{syscall, Shell};
 
@@ -16,7 +17,7 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
     match &list.first {
         ast::ListableCommand::Single(cmd) => match cmd {
             ast::PipeableCommand::Simple(cmd) => handle_simple_command(shell, cmd, background),
-            any => println!("ListableCommand yet handled: {:#?}", any),
+            any => println!("ListableCommand not yet handled: {:#?}", any),
         },
         ast::ListableCommand::Pipe(_negate, _cmds) => {
             println!("Pipes not yet handled: {:#?}", _cmds)
@@ -41,20 +42,26 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
             _ => None,
         })
         .collect::<HashMap<_, _>>();
-    let mut words = cmd
-        .redirects_or_cmd_words
-        .iter()
-        .filter_map(|redirect_or_cmd_word| match redirect_or_cmd_word {
-            ast::RedirectOrCmdWord::Redirect(r) => {
-                println!("{:#?}", r); // TODO: handle redirects
-                Some("".to_string())
-            }
-            ast::RedirectOrCmdWord::CmdWord(cmd_word) => handle_top_level_word(shell, &cmd_word.0),
-        });
 
-    if let Some(command) = words.next() {
-        let mut args = words.collect::<Vec<_>>();
-        match shell.execute_command(&command, &mut args, &env, background) {
+    let mut args = Vec::new();
+    let mut redirects = Vec::new();
+    for redirect_or_cmd_word in &cmd.redirects_or_cmd_words {
+        match redirect_or_cmd_word {
+            ast::RedirectOrCmdWord::Redirect(redirect_type) => {
+                if let Some(redirect) = handle_redirect_type(shell, &redirect_type) {
+                    redirects.push(redirect);
+                }
+            }
+            ast::RedirectOrCmdWord::CmdWord(cmd_word) => {
+                if let Some(arg) = handle_top_level_word(shell, &cmd_word.0) {
+                    args.push(arg);
+                }
+            }
+        }
+    }
+
+    if !args.is_empty() {
+        match shell.execute_command(&args.remove(0), &mut args, &env, background, &redirects) {
             Ok(result) => result,
             Err(error) => println!("shell error: {:?}", error),
         }
@@ -63,10 +70,39 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
             // if it's a global update env, if shell variable update only vars
             if env::var(key).is_ok() {
                 env::set_var(&key, &value);
-                let _ = syscall("set_env", &[key, value], &env, false, None, None, None);
+                let _ = syscall("set_env", &[key, value], &env, false, &redirects);
             } else {
                 shell.vars.insert(key.clone(), value.clone());
             }
+        }
+    }
+}
+
+fn handle_redirect_type(
+    shell: &Shell,
+    redirect_type: &ast::Redirect<ast::TopLevelWord<String>>,
+) -> Option<(u16, String, String)> {
+    match redirect_type {
+        ast::Redirect::Write(file_descriptor, top_level_word) => {
+            let file_descriptor = file_descriptor.unwrap_or(1);
+            if let Some(filename) = handle_top_level_word(shell, &top_level_word) {
+                Some((file_descriptor, filename, "write".to_string()))
+            } else {
+                None
+            }
+        }
+        ast::Redirect::Append(file_descriptor, top_level_word) => {
+            let file_descriptor = file_descriptor.unwrap_or(1);
+            if let Some(filename) = handle_top_level_word(shell, &top_level_word) {
+                Some((file_descriptor, filename, "append".to_string()))
+            } else {
+                None
+            }
+        }
+        ast::Redirect::Read(file_descriptor, top_level_word) => None,
+        any => {
+            println!("Redirect not yet handled: {:?}", any);
+            None
         }
     }
 }

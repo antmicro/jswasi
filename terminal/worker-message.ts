@@ -52,7 +52,7 @@ export const on_worker_message = async function (event, workerTable) {
 
       const rootDir = await workerTable.filesystem.getRootDirectory();
       const { err, entry } = await rootDir.getEntry(pwd, FileOrDir.Directory);
-      const open_pwd = entry.open();
+      const open_pwd = await entry.open();
       open_pwd.path = '.';
       fds[4] = open_pwd;
 
@@ -77,7 +77,7 @@ export const on_worker_message = async function (event, workerTable) {
       break;
     }
     case 'spawn': {
-      let [fullpath, args, env, sbuf, isJob] = data;
+      let [fullpath, args, env, sbuf, isJob, redirects] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
@@ -127,13 +127,18 @@ export const on_worker_message = async function (event, workerTable) {
             args.splice(0, 0, fullpath.split('/').pop());
 	        background = true;
 	      }
-          const { fds } = workerTable.workerInfos[worker_id];
+          const childFds = workerTable.workerInfos[worker_id].fds.slice(0);
+          for (const [fd, path, mode] of redirects) {
+            const rootDir = await workerTable.filesystem.getRootDirectory();
+            const { err, entry } = await rootDir.getEntry(path, FileOrDir.File, OpenFlags.Create);
+            childFds[fd] = await entry.open();
+          }
           const id = await workerTable.spawnWorker(
             worker_id,
             background ? null : parent_lck,
             on_worker_message,
             fullpath,
-            fds,
+            childFds,
             args,
             env,
             isJob,
