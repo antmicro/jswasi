@@ -90,8 +90,8 @@ export class OpenedFd implements IO {
     return await this.openedFile.lastModified();
   }
 
-  async open() {
-    return await this.openedFile.open();
+  open(): OpenedFd {
+    return this.openedFile.open();
   }
 
   async seek(offset: number, whence: number): Promise<number> {

@@ -246,7 +246,7 @@ export class Directory extends Entry {
       // return Math.max(...dates);
     }
 
-    open() {
+    open(): OpenDirectory {
       return new OpenDirectory(this.path, this._handle, this.parent, this._filesystem);
     }
 
@@ -386,7 +386,8 @@ export class File extends Entry {
       return file.lastModified;
     }
 
-    async open() {
+    // TODO: remove OpenedFd dependency, add wrapper for OpenedFdDirectory
+    open(): OpenedFd {
       return new OpenedFd(new OpenFile(this.path, this._handle, this.parent, this._filesystem));
     }
 }
