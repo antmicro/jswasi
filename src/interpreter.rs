@@ -16,19 +16,74 @@ pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
 
 fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) {
     match &list.first {
-        ast::ListableCommand::Single(cmd) => match cmd {
-            ast::PipeableCommand::Simple(cmd) => handle_simple_command(shell, cmd, background),
-            any => println!("ListableCommand not yet handled: {:#?}", any),
-        },
-        ast::ListableCommand::Pipe(_negate, _cmds) => {
-            println!("Pipes not yet handled: {:#?}", _cmds)
-        } // TODO: handle pipes
+        ast::ListableCommand::Single(cmd) => {
+            handle_pipeable_command(shell, cmd, background, &mut Vec::new())
+        }
+        ast::ListableCommand::Pipe(negate, cmds) => handle_pipe(shell, *negate, cmds, background),
     }
 
     // TODO: handle list.rest
 }
 
-fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, background: bool) {
+fn handle_pipe(
+    shell: &mut Shell,
+    negate: bool,
+    cmds: &Vec<ast::DefaultPipeableCommand>,
+    background: bool,
+) {
+    handle_pipeable_command(
+        shell,
+        &cmds[0],
+        background,
+        // TODO: name of the virtual file should be uniquely generated
+        // TODO: add virtual mode that won't create files but in-memory strings
+        &mut vec![(1u16, "/tmp/pipe0.txt".to_string(), "write".to_string())],
+    );
+
+    for (i, cmd) in cmds.iter().enumerate().skip(1).take(cmds.len() - 2) {
+        handle_pipeable_command(
+            shell,
+            cmd,
+            background,
+            &mut vec![
+                (0u16, format!("/tmp/pipe{}.txt", i - 1), "read".to_string()),
+                (1u16, format!("/tmp/pipe{}.txt", i), "write".to_string()),
+            ],
+        );
+    }
+
+    handle_pipeable_command(
+        shell,
+        &cmds.last().unwrap(),
+        background,
+        &mut vec![(
+            0u16,
+            format!("/tmp/pipe{}.txt", cmds.len() - 2),
+            "read".to_string(),
+        )],
+    );
+}
+
+fn handle_pipeable_command(
+    shell: &mut Shell,
+    cmd: &ast::DefaultPipeableCommand,
+    background: bool,
+    redirects: &mut Vec<(u16, String, String)>,
+) {
+    match cmd {
+        ast::PipeableCommand::Simple(cmd) => {
+            handle_simple_command(shell, cmd, background, redirects)
+        }
+        any => println!("PipeableCommand not yet handled: {:#?}", any),
+    }
+}
+
+fn handle_simple_command(
+    shell: &mut Shell,
+    cmd: &ast::DefaultSimpleCommand,
+    background: bool,
+    redirects: &mut Vec<(u16, String, String)>,
+) {
     let env = cmd
         .redirects_or_env_vars
         .iter()
@@ -45,7 +100,6 @@ fn handle_simple_command(shell: &mut Shell, cmd: &ast::DefaultSimpleCommand, bac
         .collect::<HashMap<_, _>>();
 
     let mut args = Vec::new();
-    let mut redirects = Vec::new();
     for redirect_or_cmd_word in &cmd.redirects_or_cmd_words {
         match redirect_or_cmd_word {
             ast::RedirectOrCmdWord::Redirect(redirect_type) => {
