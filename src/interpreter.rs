@@ -37,7 +37,7 @@ fn handle_pipe(
         background,
         // TODO: name of the virtual file should be uniquely generated
         // TODO: add virtual mode that won't create files but in-memory strings
-        &mut vec![(1u16, "/tmp/pipe0.txt".to_string(), "write".to_string())],
+        &mut vec![(1u16, "/proc/pipe0.txt".to_string(), "write".to_string())],
     );
 
     for (i, cmd) in cmds.iter().enumerate().skip(1).take(cmds.len() - 2) {
@@ -46,8 +46,8 @@ fn handle_pipe(
             cmd,
             background,
             &mut vec![
-                (0u16, format!("/tmp/pipe{}.txt", i - 1), "read".to_string()),
-                (1u16, format!("/tmp/pipe{}.txt", i), "write".to_string()),
+                (0u16, format!("/proc/pipe{}.txt", i - 1), "read".to_string()),
+                (1u16, format!("/proc/pipe{}.txt", i), "write".to_string()),
             ],
         );
     }
@@ -58,7 +58,7 @@ fn handle_pipe(
         background,
         &mut vec![(
             0u16,
-            format!("/tmp/pipe{}.txt", cmds.len() - 2),
+            format!("/proc/pipe{}.txt", cmds.len() - 2),
             "read".to_string(),
         )],
     );

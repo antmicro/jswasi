@@ -71,6 +71,8 @@ async function initFs(anchor: HTMLElement) {
   // setup filesystem
   const root = await navigator.storage.getDirectory();
   const tmp = await root.getDirectoryHandle('tmp', { create: true });
+  // TODO: this will be a in-memory vfs in the future
+  const proc = await root.getDirectoryHandle('proc', { create: true });
   const home = await root.getDirectoryHandle('home', { create: true });
   const ant = await home.getDirectoryHandle('ant', { create: true });
   

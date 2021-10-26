@@ -722,7 +722,7 @@ impl Shell {
                 }
             }
             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
-            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" => {
+            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" | "wc" => {
                 args.insert(0, command.to_string());
                 #[cfg(target_os = "wasi")]
                 args.insert(0, String::from("/usr/bin/coreutils"));
