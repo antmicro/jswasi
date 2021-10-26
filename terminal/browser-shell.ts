@@ -124,7 +124,12 @@ export const filesystem = new Filesystem();
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDropedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behaviour
-export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: string, entryName: string) => void = null) {
+export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: string, entryName: string) => void = null): Promise<void> {
+  if (!navigator.storage.getDirectory) {
+    anchor.innerHTML = 'Your browser doesn\'t support File System Access API yet.<br/>We recommend using Chrome for the time being.'
+    return;
+  }
+
   anchor.innerHTML = 'Fetching binaries, this should only happen once.';
   await initFs(anchor);
   anchor.innerHTML = '';
@@ -157,8 +162,9 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
 
   const io = terminal.io.push();
 
-  io.onVTKeystroke = io.sendString = (data) => {
+  const onTerminalInput = (data: string): void => {
     let code = data.charCodeAt(0);
+    console.log(code, data);
 
     if (code === 13) {
       code = 10;
@@ -187,6 +193,8 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       }
 	}
   };
+  io.onVTKeystroke = onTerminalInput;
+  io.sendString = onTerminalInput;
 
   // TODO: maybe save all output and rewrite it on adjusted size?
   io.onTerminalResize = (columns, rows) => {};
