@@ -5,7 +5,9 @@
     "outDir": "output",
     "removeComments": false,
     "watch": false,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "skipLibCheck": true
   },
-  "include": ["terminal/**/*"]
+  "include": ["terminal/*"],
+  "exclude": ["node_modules", "output"]
 }
