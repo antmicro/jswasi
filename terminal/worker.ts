@@ -17,7 +17,7 @@ let args: string[];
 let env: Record<string, string>;
 
 const onmessage_ = function (e) {
-  //worker_console_log('got a message!');
+  // worker_console_log('got a message!');
   if (!started) {
     if (e.data[0] === 'start') {
       started = true;
@@ -53,7 +53,7 @@ function worker_send(msg) {
 
 function worker_console_log(msg) {
   // you can control debug logs dynamically based on DEBUG env variable
-  if (env['DEBUG'] && !(env['DEBUG'] === '0' || env['DEBUG'] === 'false' || env['DEBUG'] === '')) {
+  if (env.DEBUG && !(env.DEBUG === '0' || env.DEBUG === 'false' || env.DEBUG === '')) {
     worker_send(['console', msg]);
   }
 }
@@ -165,9 +165,9 @@ function WASI() {
 
     view.setUint8(buf, file_type[0]);
     if (fd <= 2) {
-        view.setUint32(buf + 2, constants.WASI_FDFLAG_APPEND, true);
+      view.setUint32(buf + 2, constants.WASI_FDFLAG_APPEND, true);
     } else {
-        view.setUint32(buf + 2, 0, true);
+      view.setUint32(buf + 2, 0, true);
     }
     view.setBigUint64(buf + 8, rights_base[0], true);
     view.setBigUint64(buf + 16, rights_inheriting[0], true);
@@ -197,14 +197,14 @@ function WASI() {
       written += iov.byteLength;
     });
 
-	// TODO: this might potentially cause stack overflow if bufferBytes is large, we should definitely write in chunks
+    // TODO: this might potentially cause stack overflow if bufferBytes is large, we should definitely write in chunks
     // const content = String.fromCharCode(...bufferBytes);
     const content = new SharedArrayBuffer(written);
-	const content_view = new Uint8Array(content);
-	for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
+    const content_view = new Uint8Array(content);
+    for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
     const sbuf = new SharedArrayBuffer(4);
     const lck = new Int32Array(sbuf, 0, 1);
-	lck[0] = -1;
+    lck[0] = -1;
     worker_send(['fd_write', [sbuf, fd, content]]);
     Atomics.wait(lck, 0, -1);
 
@@ -214,7 +214,7 @@ function WASI() {
       view.setUint32(nwritten, written, true);
     } else {
 	  worker_console_log('fd_write ERROR!.');
-	}
+    }
     return err;
   }
 
@@ -487,15 +487,15 @@ function WASI() {
   // used solely in path_readlink
   function special_parse(fullcmd: string) {
     const [cmd, args_string, env_string, background, redirects_string] = fullcmd.split('\x1b\x1b');
-    const isJob = background === "true";
+    const isJob = background === 'true';
     if (cmd == 'spawn') {
       // reparse args
       const args = args_string.split('\x1b');
       const new_env = Object.fromEntries(env_string.split('\x1b').map((kv) => kv.split('=')));
-      const extended_env = {...env, ...new_env};
-      const redirects = redirects_string.split('\x1b').filter(s => s.length).map(redirect => {
-          const [fd, path, mode] = redirect.split(" ");
-          return [parseInt(fd), path, mode];
+      const extended_env = { ...env, ...new_env };
+      const redirects = redirects_string.split('\x1b').filter((s) => s.length).map((redirect) => {
+        const [fd, path, mode] = redirect.split(' ');
+        return [parseInt(fd), path, mode];
       });
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
@@ -509,28 +509,28 @@ function WASI() {
       }
       return '';
     }
-    else if (cmd == 'set_env') {
+    if (cmd == 'set_env') {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
-      
+
       const args = args_string.split('\x1b');
       worker_send(['set_env', [args, sbuf]]);
       if (args.length == 1) {
         delete env[args[0]];
 	    return '';
-      } else {
-          env[args[0]] = args[1];
-          if (args[0] == 'PWD') {
-            env[args[0]] = utils.realpath(env[args[0]]);
-            lck[0] = -1;
-            worker_send(['chdir', [utils.realpath(env[args[0]]), sbuf]]);
-          }
-          worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
-          return env[args[0]];
-        }
+      }
+      env[args[0]] = args[1];
+      if (args[0] == 'PWD') {
+        env[args[0]] = utils.realpath(env[args[0]]);
+        lck[0] = -1;
+        worker_send(['chdir', [utils.realpath(env[args[0]]), sbuf]]);
+      }
+      worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
+      return env[args[0]];
+
       Atomics.wait(lck, 0, -1);
     }
-    else if (cmd === 'set_echo') {
+    if (cmd === 'set_echo') {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
       worker_send(['set_echo', [args_string, sbuf]]);
@@ -745,7 +745,7 @@ function WASI() {
     sin: ptr,
     sout: ptr,
     nsubscriptions: number,
-    nevents: ptr
+    nevents: ptr,
   ) {
     worker_console_log(`poll_oneoff(${sin}, ${sout}, ${nsubscriptions}, ${nevents})`);
     const view = new DataView(moduleInstanceExports.memory.buffer);
@@ -773,7 +773,7 @@ function WASI() {
           sin += 8;
 
           const absolute = subclockflags === 1;
-          
+
           worker_console_log(`identifier = ${identifier}, clockid = ${clockid}, timestamp = ${timestamp}, precision = ${precision}, absolute = ${absolute}`);
 
           const n = utils.now(clockid, CPUTIME_START);
@@ -891,7 +891,6 @@ function WASI() {
 }
 
 async function importWasmModule(moduleName, wasiCallbacksConstructor) {
-
   const wasiCallbacks = wasiCallbacksConstructor();
   const moduleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
@@ -944,7 +943,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
 
 async function start_wasm() {
   if (started && mod != '') {
-    worker_console_log(`Loading a module`);
+    worker_console_log('Loading a module');
     try {
       if (IS_NODE) {
         // @ts-ignore

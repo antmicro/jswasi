@@ -1,7 +1,9 @@
 import * as constants from './constants.js';
 import { WorkerTable } from './worker-table.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
-import { File, Directory, OpenFile, OpenDirectory } from './browser-fs.js';
+import {
+  File, Directory, OpenFile, OpenDirectory,
+} from './browser-fs.js';
 
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -16,7 +18,7 @@ export interface IO {
 
 export class Stdin implements IO {
   constructor(private workerTable: WorkerTable) {}
-  
+
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     const lck = new Int32Array(sbuf, 0, 1);
     const readlen = new Int32Array(sbuf, 4, 1);
@@ -35,12 +37,11 @@ export class Stdout implements IO {
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     throw "can't read from stdout!";
   }
-  
+
   async write(content: Uint8Array): Promise<number> {
     this.workerTable.receiveCallback(DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n'));
     return constants.WASI_ESUCCESS;
   }
-
 }
 
 export class Stderr implements IO {
@@ -49,13 +50,12 @@ export class Stderr implements IO {
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     throw "can't read from stderr!";
   }
-  
+
   async write(content: Uint8Array): Promise<number> {
-	const output = DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n');
+    const output = DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n');
     this.workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
     return constants.WASI_ESUCCESS;
   }
-
 }
 
 export class OpenedFd implements IO {
@@ -82,10 +82,11 @@ export class OpenedFd implements IO {
   async write(content: Uint8Array): Promise<number> {
     return await this.openedFile.write(content.slice(0));
   }
-  
+
   async stat(): Promise<{dev: bigint, ino: bigint, file_type: number, nlink: bigint, size: bigint, atim: bigint, mtim: bigint, ctim: bigint}> {
     return await this.openedFile.stat();
   }
+
   async lastModified(): Promise<number> {
     return await this.openedFile.lastModified();
   }
@@ -98,7 +99,7 @@ export class OpenedFd implements IO {
     return await this.openedFile.seek(offset, whence);
   }
 
-  async truncate(size: number=0) {
+  async truncate(size: number = 0) {
     await this.openedFile.truncate(size);
   }
 }

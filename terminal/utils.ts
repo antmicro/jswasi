@@ -65,13 +65,13 @@ export function now(clockId: number, cpuTimeStart): bigint {
       // TODO: that a temporary fix as we get clockId = 10^9
       return msToNs(performance.now()) - cpuTimeStart;
   }
-};
+}
 
 export function human_readable(bytes: number): string {
   const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
   let result = bytes;
   let unit = 0;
-  while ((result >= 1024) && ((unit+1) < units.length)) {
+  while ((result >= 1024) && ((unit + 1) < units.length)) {
     result /= 1024;
     unit += 1;
   }

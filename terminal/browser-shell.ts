@@ -4,7 +4,9 @@ import { on_worker_message } from './worker-message.js';
 
 import { FileOrDir, OpenFlags } from './filesystem.js';
 import { Filesystem, Directory } from './browser-fs.js';
-import { Stdin, Stdout, Stderr, OpenedFd } from './browser-devices.js';
+import {
+  Stdin, Stdout, Stderr, OpenedFd,
+} from './browser-devices.js';
 
 declare global {
     var stdout_attached: boolean;
@@ -75,11 +77,11 @@ async function initFs(anchor: HTMLElement) {
   const proc = await root.getDirectoryHandle('proc', { create: true });
   const home = await root.getDirectoryHandle('home', { create: true });
   const ant = await home.getDirectoryHandle('ant', { create: true });
-  
+
   const shellrc = await ant.getFileHandle('.shellrc', { create: true });
   if ((await shellrc.getFile()).size === 0) {
     const w = await shellrc.createWritable();
-    await w.write({ type: 'write', position: 0, data: 'export RUST_BACKTRACE=full\nexport DEBUG=0\n'});
+    await w.write({ type: 'write', position: 0, data: 'export RUST_BACKTRACE=full\nexport DEBUG=0\n' });
     await w.close();
   }
 
@@ -126,7 +128,7 @@ export const filesystem = new Filesystem();
 // you can use it to customize the behaviour
 export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: string, entryName: string) => void = null): Promise<void> {
   if (!navigator.storage.getDirectory) {
-    anchor.innerHTML = 'Your browser doesn\'t support File System Access API yet.<br/>We recommend using Chrome for the time being.'
+    anchor.innerHTML = 'Your browser doesn\'t support File System Access API yet.<br/>We recommend using Chrome for the time being.';
     return;
   }
 
@@ -157,7 +159,7 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
   terminal.installKeyboard();
 
   terminal.keyboard.bindings.addBindings({
-      "Ctrl-R": "PASS",
+    'Ctrl-R': 'PASS',
   });
 
   const io = terminal.io.push();
@@ -185,12 +187,12 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       }
     }
 
-	if ((code === 10) || code >= 32) {
+    if ((code === 10) || code >= 32) {
       // echo
       if (workerTable.workerInfos[workerTable.currentWorker].shouldEcho) {
         terminal.io.print(code === 10 ? '\r\n' : data);
       }
-	}
+    }
   };
   io.onVTKeystroke = onTerminalInput;
   io.sendString = onTerminalInput;
@@ -209,14 +211,14 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       if (entry.kind === 'directory') {
         // create directory in VFS, expand path and fill directory contents
         const dir = (await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.Directory)).entry;
-        await dir._handle.getDirectoryHandle(entry.name, {create: true});
+        await dir._handle.getDirectoryHandle(entry.name, { create: true });
         for await (const [name, handle] of entry.entries()) {
           await copyEntry(handle, `${path}/${entry.name}`);
         }
       } else {
         // create VFS file, open dragged file as stream and pipe it to VFS file
         const dir = (await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.Directory)).entry;
-        const handle = await dir._handle.getFileHandle(entry.name, {create: true});
+        const handle = await dir._handle.getFileHandle(entry.name, { create: true });
         const writable = await handle.createWritable();
         const stream = (await entry.getFile()).stream();
         await stream.pipeTo(writable);
@@ -224,7 +226,7 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
       }
     };
 
-    const pwd = workerTable.workerInfos[workerTable.currentWorker].env['PWD'];
+    const pwd = workerTable.workerInfos[workerTable.currentWorker].env.PWD;
     for (const item of e.dataTransfer.items) {
       if (item.kind === 'file') {
         const entry = await item.getAsFileSystemHandle();
@@ -241,13 +243,13 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
     on_worker_message,
     '/usr/bin/shell',
     [
-        new Stdin(workerTable),
-        new Stdout(workerTable),
-        new Stderr(workerTable),
-        await root_dir.open(),
-        await pwd_dir.open(),
-        // TODO: why must fds[5] be present for ls to work, and what should it be
-        await root_dir.open(),
+      new Stdin(workerTable),
+      new Stdout(workerTable),
+      new Stderr(workerTable),
+      await root_dir.open(),
+      await pwd_dir.open(),
+      // TODO: why must fds[5] be present for ls to work, and what should it be
+      await root_dir.open(),
     ],
     ['shell'],
     {

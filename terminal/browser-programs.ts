@@ -89,12 +89,11 @@ export async function download(workerTable, worker_id, args, env): Promise<numbe
     return 1;
   }
   for (let path of args.slice(1)) {
-
     if (!path.startsWith('/')) {
       path = `${env.PWD === '/' ? '' : env.PWD}/${path}`;
     }
 
-    const {err, entry} = await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.File);
+    const { err, entry } = await (await filesystem.getRootDirectory()).getEntry(path, FileOrDir.File);
     if (err !== constants.WASI_ESUCCESS) {
       workerTable.terminal.io.println(`download: no such file: ${path}`);
     } else {
@@ -102,7 +101,7 @@ export async function download(workerTable, worker_id, args, env): Promise<numbe
       let local_handle;
       try {
         // @ts-ignore 'suggestedName' does not exist in type 'SaveFilePickerOptions' (it does)
-        local_handle = await window.showSaveFilePicker({ suggestedName: path.split("/").slice(-1)[0] });
+        local_handle = await window.showSaveFilePicker({ suggestedName: path.split('/').slice(-1)[0] });
       } catch (e) {
         workerTable.terminal.io.println('download: unable to save file locally');
         return 1; // TODO: what would be a proper error here?
@@ -132,23 +131,23 @@ export async function ps(workerTable, worker_id, args, env): Promise<number> {
 
 export async function free(workerTable, worker_id, args, env): Promise<number> {
   // @ts-ignore memory is non-standard API available only in Chrome
-  let total_mem_raw = performance.memory.jsHeapSizeLimit; 
+  const total_mem_raw = performance.memory.jsHeapSizeLimit;
   // @ts-ignore
-  let used_mem_raw = performance.memory.usedJSHeapSize;
-  let total_mem = "";
-  let used_mem = "";
-  let avail_mem = "";
-  if ((args.length > 1) && (args[1] == "-h")) {
+  const used_mem_raw = performance.memory.usedJSHeapSize;
+  let total_mem = '';
+  let used_mem = '';
+  let avail_mem = '';
+  if ((args.length > 1) && (args[1] == '-h')) {
     total_mem = utils.human_readable(total_mem_raw);
     used_mem = utils.human_readable(used_mem_raw);
     avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);
   } else {
     total_mem = `${Math.round(total_mem_raw / 1024)}`;
     used_mem = `${Math.round(used_mem_raw / 1024)}`;
-    avail_mem = `${Math.round((total_mem_raw-used_mem_raw) / 1024)}`;
+    avail_mem = `${Math.round((total_mem_raw - used_mem_raw) / 1024)}`;
   }
-  let free_data = `               total        used   available\n\r`;
-  free_data    += `Mem:      ${("          " + total_mem).slice(-10)}  ${("          " + used_mem).slice(-10)}  ${("          " + avail_mem).slice(-10)}\n\r`;
+  let free_data = '               total        used   available\n\r';
+  free_data += `Mem:      ${(`          ${total_mem}`).slice(-10)}  ${(`          ${used_mem}`).slice(-10)}  ${(`          ${avail_mem}`).slice(-10)}\n\r`;
   workerTable.receiveCallback(free_data);
   return 0;
 }

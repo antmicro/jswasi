@@ -6,7 +6,9 @@ const IS_NODE = typeof self === 'undefined';
 
 class WorkerInfo {
     public bufferRequestQueue: { requestedLen: number, lck: Int32Array, readlen: Int32Array, sbuf: Uint8Array }[] = [];
+
     public shouldEcho = true;
+
     public timestamp: number;
 
     // TODO: add types for fds and env
@@ -18,9 +20,13 @@ class WorkerInfo {
 
 export class WorkerTable {
     public buffer = '';
+
     public currentWorker = null;
+
     public nextWorkerId = 0;
+
     public workerInfos: Record<number, WorkerInfo> = {};
+
     public compiledModules: Record<string, WebAssembly.Module> = {};
 
     constructor(private readonly scriptName: string, public readonly receiveCallback, public readonly terminal, public readonly filesystem) {}
@@ -28,7 +34,7 @@ export class WorkerTable {
     async spawnWorker(parentId: number, parentLock: Int32Array, kernelCallback, command, fds, args, env, isJob: boolean): Promise<number> {
       const id = this.nextWorkerId;
       if (parentLock != null || parentId == null) {
-          this.currentWorker = id;
+        this.currentWorker = id;
       }
       this.nextWorkerId += 1;
       let privateData = {};

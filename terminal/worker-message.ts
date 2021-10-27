@@ -1,7 +1,9 @@
 import * as constants from './constants.js';
 import * as utils from './utils.js';
 import { FileOrDir, OpenFlags } from './filesystem.js';
-import { mount, umount, wget, download, ps, free } from './browser-programs.js';
+import {
+  mount, umount, wget, download, ps, free,
+} from './browser-programs.js';
 import { OpenedFd } from './browser-devices.js';
 
 declare global {
@@ -30,14 +32,14 @@ export const on_worker_message = async function (event, workerTable) {
       break;
     }
     case 'console': {
-      console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+      console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c ${data}`, 'background:black; color: white;', 'background:black; color:yellow;', 'background: black; color:white;', 'background:default; color: default;');
       break;
     }
     case 'exit': {
-	  const dbg = workerTable.workerInfos[worker_id].env["DEBUG"] == "1";
+	  const dbg = workerTable.workerInfos[worker_id].env.DEBUG == '1';
       workerTable.terminateWorker(worker_id, data);
 	  if (dbg) {
-	    console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, "background:black; color: white;", "background:black; color:yellow;", "background: black; color:white;", "background:default; color: default;");
+	    console.log(`%c [dbg (%c${worker_name}:${worker_id}%c)] %c exited with result code ${data}`, 'background:black; color: white;', 'background:black; color:yellow;', 'background: black; color:white;', 'background:default; color: default;');
 	  }
 	  if (worker_id == 0) {
         window.alive = false;
@@ -81,7 +83,7 @@ export const on_worker_message = async function (event, workerTable) {
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split('/').pop());
       switch (fullpath) {
-		case '/usr/bin/ps': {
+        case '/usr/bin/ps': {
           const result = await ps(workerTable, worker_id, args, env);
           Atomics.store(parent_lck, 0, result);
           Atomics.notify(parent_lck, 0);
@@ -120,7 +122,7 @@ export const on_worker_message = async function (event, workerTable) {
 	    case '/usr/bin/nohup':
         default: {
           let background = isJob;
-	      if (fullpath == "/usr/bin/nohup") {
+	      if (fullpath == '/usr/bin/nohup') {
 	        args = args.splice(1);
 	        fullpath = args[0];
 	        args = args.splice(1);
@@ -133,9 +135,9 @@ export const on_worker_message = async function (event, workerTable) {
             const rootDir = await workerTable.filesystem.getRootDirectory();
             const { err, entry } = await rootDir.getEntry(path, FileOrDir.File, OpenFlags.Create);
             childFds[fd] = await entry.open();
-            if (mode === "write") {
+            if (mode === 'write') {
               await childFds[fd].truncate();
-            } else if (mode === "append") {
+            } else if (mode === 'append') {
               await childFds[fd].seek(0, constants.WASI_WHENCE_END);
             }
           }
@@ -149,14 +151,14 @@ export const on_worker_message = async function (event, workerTable) {
             env,
             isJob,
           );
-	      let new_worker_name = fullpath.split("/").slice(-1)[0];
-	      if (env['DEBUG'] == "1") {
+	      const new_worker_name = fullpath.split('/').slice(-1)[0];
+	      if (env.DEBUG == '1') {
             console.log(
               `%c [dbg (%c${new_worker_name}:${id}%c)] %c spawned by ${worker_name}:${worker_id}`,
-              "background:black; color: white;",
-              "background:black; color:yellow;",
-              "background: black; color:white;",
-              "background:default; color: default;"
+              'background:black; color: white;',
+              'background:black; color:yellow;',
+              'background: black; color:white;',
+              'background:default; color: default;',
             );
 	      }
 	      if (background) {
@@ -257,7 +259,7 @@ export const on_worker_message = async function (event, workerTable) {
 
       const { fds } = workerTable.workerInfos[worker_id];
       await fds[fd].read(worker_id, len, sbuf);
-      
+
       break;
     }
     case 'path_open': {
@@ -488,7 +490,7 @@ export const on_worker_message = async function (event, workerTable) {
       const { fds } = workerTable.workerInfos[worker_id];
       if (fds[fd] != undefined) {
         file_type[0] = fds[fd].file_type;
-	/*
+        /*
         rights_base[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
 	if (file_type[0] == constants.WASI_FILETYPE_DIRECTORY) {
 		rights_base[0] |= constants.WASI_RIGHT_FD_READDIR;
@@ -502,7 +504,6 @@ export const on_worker_message = async function (event, workerTable) {
         rights_base[0] = BigInt(0xFFFFFFFF);
         rights_inheriting[0] = BigInt(0xFFFFFFFF);
 
-	
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

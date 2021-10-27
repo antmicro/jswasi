@@ -5,6 +5,7 @@ import { OpenedFd } from './browser-devices.js';
 
 export class Filesystem {
     mounts: {parts: string[], name: string, dir: Directory}[] = [];
+
     DEBUG: boolean = false;
 
     _rootDir: Directory;
@@ -32,7 +33,7 @@ export class Filesystem {
 	  const root = await navigator.storage.getDirectory();
 	  let components = null;
 	  try {
-      components = await root.resolve(dir._handle);
+        components = await root.resolve(dir._handle);
 	  } catch {
 	      if (this.DEBUG) console.log('There was an error in root.resolve...');
 	  }
@@ -321,7 +322,7 @@ export class Directory extends Entry {
           const entry = await this._filesystem.getDirectory(parent, name, { create });
           return { err: constants.WASI_ESUCCESS, entry };
         } catch (err) {
-          //console.log(`we got an error '${err.name}' during getting dir '${name}' in parent '${parent?.path}'`);
+          // console.log(`we got an error '${err.name}' during getting dir '${name}' in parent '${parent?.path}'`);
           if (err.name === 'TypeMismatchError' || err.name === 'TypeError') {
             return { err: constants.WASI_ENOTDIR, entry: null };
           } if (err.name === 'NotFoundError') {
@@ -398,6 +399,7 @@ export class OpenFile extends File {
     public readonly file_type: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
     private _file_pos: number = 0;
+
     private DEBUG: boolean = false;
 
     async read(len: number): Promise<[Uint8Array, number]> {
@@ -450,7 +452,7 @@ export class OpenFile extends File {
       // await w.write({type: "seek", position: offset});
     }
 
-    async truncate(size: number=0) {
+    async truncate(size: number = 0) {
       if (this.DEBUG) console.log(`OpenFile(${this.path}).truncate()`);
       const writable = await this._handle.createWritable();
       await writable.write({ type: 'truncate', size: 0 });
