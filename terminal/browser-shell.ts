@@ -164,7 +164,6 @@ export async function init(anchor: HTMLElement, notifyDropedFileSaved: (path: st
 
   const onTerminalInput = (data: string): void => {
     let code = data.charCodeAt(0);
-    console.log(code, data);
 
     if (code === 13) {
       code = 10;
