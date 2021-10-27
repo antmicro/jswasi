@@ -1,32 +1,35 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
+  <head>
+    <meta charset="utf-8" />
     <title>Antmicro's WASM shell</title>
-</head>
-<body>
-<script type="module">
-    import { init } from "./browser-shell.js";
-    window.buffer = "";
-    window.alive = true;
-    window.exit_code = 0;
-    window.stdout_read_data = function() {
-       if (window.stdout_attached != undefined) if (window.stdout_attached && buffer.length > 0) {
-           let tmp = window.buffer;
-	   window.buffer = "";
-	   return tmp;
-       }
-       return null;
-    }
-    const script = document.createElement("script");
-    script.type = "text/javascript";
-    script.src = "./hterm_all.js";
-    script.onload = async () => {
-      await lib.init();
-      await init(document.querySelector("#terminal"), (path, entryName) => console.log(`[added droped file as '${path}/${entryName}`));
-    };
-document.body.appendChild(script);
-</script>
-<div id="terminal"></div>
-</body>
+  </head>
+  <body>
+    <script type="module">
+      import { init } from "./browser-shell.js";
+      window.buffer = "";
+      window.alive = true;
+      window.exit_code = 0;
+      window.stdout_read_data = function () {
+        if (window.stdout_attached != undefined)
+          if (window.stdout_attached && buffer.length > 0) {
+            let tmp = window.buffer;
+            window.buffer = "";
+            return tmp;
+          }
+        return null;
+      };
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "./hterm_all.js";
+      script.onload = async () => {
+        await lib.init();
+        await init(document.querySelector("#terminal"), (path, entryName) =>
+          console.log(`[added droped file as '${path}/${entryName}`)
+        );
+      };
+      document.body.appendChild(script);
+    </script>
+    <div id="terminal"></div>
+  </body>
 </html>

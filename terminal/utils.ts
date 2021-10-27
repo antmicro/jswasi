@@ -1,4 +1,4 @@
-import * as constants from './constants.js';
+import * as constants from "./constants.js";
 
 export function arraysEqual(a: any[], b: any[]) {
   if (a === b) return true;
@@ -12,36 +12,36 @@ export function arraysEqual(a: any[], b: any[]) {
   return true;
 }
 
-export function parsePath(path: string): {parts: string[], name: string} {
-  const parts = path.split('/').filter((part) => part !== '');
+export function parsePath(path: string): { parts: string[]; name: string } {
+  const parts = path.split("/").filter((part) => part !== "");
   const name = parts.pop();
   return { parts, name };
 }
 
 export function realpath(path): string {
   const result = [];
-  let result_path = '';
+  let result_path = "";
   let tmp_path = path;
-  let part = '';
+  let part = "";
   let level = 0;
-  const root_path = (path[0] == '/');
-  while (tmp_path != '') {
-    if (tmp_path.indexOf('/') != -1) {
-      part = tmp_path.substr(0, tmp_path.indexOf('/'));
+  const root_path = path[0] == "/";
+  while (tmp_path != "") {
+    if (tmp_path.indexOf("/") != -1) {
+      part = tmp_path.substr(0, tmp_path.indexOf("/"));
     } else part = tmp_path;
     tmp_path = tmp_path.substr(part.length + 1);
-    if (part == '..') {
+    if (part == "..") {
       if (level > 0) level -= 1;
-    } else if (part == '.') {
+    } else if (part == ".") {
       continue;
     } else {
       result[level] = part;
       level++;
     }
   }
-  result_path = result.slice(0, level).join('/');
-  if (root_path) if (result_path == '') return '/';
-  result_path = result_path.replace('/./', '/');
+  result_path = result.slice(0, level).join("/");
+  if (root_path) if (result_path == "") return "/";
+  result_path = result_path.replace("/./", "/");
   return result_path;
 }
 
@@ -68,10 +68,10 @@ export function now(clockId: number, cpuTimeStart): bigint {
 }
 
 export function human_readable(bytes: number): string {
-  const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB'];
+  const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;
   let unit = 0;
-  while ((result >= 1024) && ((unit + 1) < units.length)) {
+  while (result >= 1024 && unit + 1 < units.length) {
     result /= 1024;
     unit += 1;
   }

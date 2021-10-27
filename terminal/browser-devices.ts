@@ -1,15 +1,13 @@
-import * as constants from './constants.js';
-import { WorkerTable } from './worker-table.js';
-import { FileOrDir, OpenFlags } from './filesystem.js';
-import {
-  File, Directory, OpenFile, OpenDirectory,
-} from './browser-fs.js';
+import * as constants from "./constants.js";
+import { WorkerTable } from "./worker-table.js";
+import { FileOrDir, OpenFlags } from "./filesystem.js";
+import { File, Directory, OpenFile, OpenDirectory } from "./browser-fs.js";
 
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 
-const RED_ANSI = '\u001b[31m';
-const RESET = '\u001b[0m';
+const RED_ANSI = "\u001b[31m";
+const RESET = "\u001b[0m";
 
 export interface IO {
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer);
@@ -23,7 +21,13 @@ export class Stdin implements IO {
     const lck = new Int32Array(sbuf, 0, 1);
     const readlen = new Int32Array(sbuf, 4, 1);
     const readbuf = new Uint8Array(sbuf, 8, requestedLen);
-    this.workerTable.sendBufferToWorker(workerId, requestedLen, lck, readlen, readbuf);
+    this.workerTable.sendBufferToWorker(
+      workerId,
+      requestedLen,
+      lck,
+      readlen,
+      readbuf
+    );
   }
 
   async write(content: Uint8Array): Promise<number> {
@@ -39,7 +43,9 @@ export class Stdout implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    this.workerTable.receiveCallback(DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n'));
+    this.workerTable.receiveCallback(
+      DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n")
+    );
     return constants.WASI_ESUCCESS;
   }
 }
@@ -52,7 +58,7 @@ export class Stderr implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    const output = DECODER.decode(content.slice(0)).replaceAll('\n', '\r\n');
+    const output = DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n");
     this.workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
     return constants.WASI_ESUCCESS;
   }
@@ -83,7 +89,16 @@ export class OpenedFd implements IO {
     return await this.openedFile.write(content.slice(0));
   }
 
-  async stat(): Promise<{dev: bigint, ino: bigint, file_type: number, nlink: bigint, size: bigint, atim: bigint, mtim: bigint, ctim: bigint}> {
+  async stat(): Promise<{
+    dev: bigint;
+    ino: bigint;
+    file_type: number;
+    nlink: bigint;
+    size: bigint;
+    atim: bigint;
+    mtim: bigint;
+    ctim: bigint;
+  }> {
     return await this.openedFile.stat();
   }
 

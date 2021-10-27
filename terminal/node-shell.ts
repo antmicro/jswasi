@@ -1,10 +1,10 @@
-import { Worker } from 'worker_threads';
+import { Worker } from "worker_threads";
 
-import * as constants from './constants.js';
+import * as constants from "./constants.js";
 // @ts-ignore
-import { WorkerTable } from './worker-table.mjs';
-import { OpenFile, OpenDirectory } from './node-fs.js';
-import { on_worker_message } from './worker-message.js';
+import { WorkerTable } from "./worker-table.mjs";
+import { OpenFile, OpenDirectory } from "./node-fs.js";
+import { on_worker_message } from "./worker-message.js";
 
 const debug = true;
 
@@ -17,22 +17,33 @@ function receive_callback(output) {
 }
 
 if (process.argv.length < 3) {
-  console.log('Not enough arguments');
+  console.log("Not enough arguments");
   process.exit(1);
 }
 
-const workerTable = new WorkerTable('./worker.mjs', receive_callback, new OpenDirectory('/', null), true);
+const workerTable = new WorkerTable(
+  "./worker.mjs",
+  receive_callback,
+  new OpenDirectory("/", null),
+  true
+);
 
 workerTable.spawnWorker(
   null, // parent_id
   null, // parent_lock
-  on_worker_message,
+  on_worker_message
 );
-workerTable.postMessage(0, ['start', process.argv[2], 0, process.argv.slice(2), {
-  RUST_BACKTRACE: 'full',
-  PATH: '/usr/bin:/usr/local/bin',
-  PWD: '/',
-}]);
+workerTable.postMessage(0, [
+  "start",
+  process.argv[2],
+  0,
+  process.argv.slice(2),
+  {
+    RUST_BACKTRACE: "full",
+    PATH: "/usr/bin:/usr/local/bin",
+    PWD: "/",
+  },
+]);
 
 function uart_loop() {
   if (workerTable.currentWorker == null) return;

@@ -1,2 +1,10 @@
-output
+.idea/
+.vs/
+
+/target
+pkg/
+
 node_modules
+
+output
+terminal/hterm_all.js
