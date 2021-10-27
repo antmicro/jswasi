@@ -4,16 +4,21 @@
     "typescript": "^4.3.5"
   },
   "devDependencies": {
-    "puppeteer": "^10.4.0",
+    "@types/expect-puppeteer": "^4.4.7",
+    "@types/jest-environment-puppeteer": "^4.4.1",
     "@types/node": "^16.6.0",
+    "@types/puppeteer": "^5.4.4",
     "@types/wicg-file-system-access": "^2020.9.2",
     "@typescript-eslint/eslint-plugin": "^4.32.0",
     "@typescript-eslint/parser": "^4.32.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.24.2"
+    "eslint-plugin-import": "^2.24.2",
+    "jest": "^27.3.1",
+    "jest-puppeteer": "^6.0.0",
+    "puppeteer": "^10.4.0"
   },
   "scripts": {
-      "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts"
   }
 }
