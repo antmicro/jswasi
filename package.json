@@ -21,6 +21,7 @@
     "puppeteer": "^10.4.0"
   },
   "scripts": {
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   }
 }
