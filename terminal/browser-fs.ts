@@ -84,7 +84,6 @@ export class Filesystem {
     absolute_path: string,
     mounted_handle: FileSystemDirectoryHandle
   ): Promise<number> {
-    // TODO: for now path must be absolute, refactor this when adding relative paths support for mount
     const { parts, name } = parsePath(absolute_path);
     const rootDir = await this.getRootDirectory();
     const parent = await rootDir.getEntry(parts.join("/"), FileOrDir.Directory);
@@ -105,7 +104,6 @@ export class Filesystem {
   }
 
   removeMount(absolute_path: string) {
-    // TODO: for now path must be absolute
     const { parts: del_parts, name: del_name } = parsePath(absolute_path);
     for (let i = 0; i < this.mounts.length; i++) {
       const { parts, name } = this.mounts[i];
