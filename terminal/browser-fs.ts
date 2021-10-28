@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { realpath, parsePath, arraysEqual } from "./utils.js";
+import { parsePath, arraysEqual } from "./utils.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenedFd } from "./browser-devices.js";
 
