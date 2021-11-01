@@ -23,5 +23,8 @@
   "scripts": {
     "lint": "eslint . --ext .ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "jest": {
+    "preset": "jest-puppeteer"
   }
 }
