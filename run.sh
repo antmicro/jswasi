@@ -3,7 +3,7 @@
 trap "kill 0" EXIT
 
 cd output
-python3 ../custom_server.py &
+python3 ../custom_server.py $1 &
 cd ..
 tsc --watch
 

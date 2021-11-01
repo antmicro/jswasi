@@ -4,6 +4,7 @@
 # Copyright (c) 2021 Antmicro <www.anmticro.com>
 #
 
+import sys
 from http import server
 import base64
 import urllib.request
@@ -31,7 +32,10 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    port = 8000
+    try:
+        port = int(sys.argv[1])
+    except:
+        port = 8000
     httpd = None;
     while (httpd == None):
         try:
