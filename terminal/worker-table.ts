@@ -2,8 +2,6 @@
 import * as constants from "./constants.js";
 import { FileOrDir } from "./filesystem.js";
 
-const IS_NODE = typeof self === "undefined";
-
 class WorkerInfo {
   public bufferRequestQueue: {
     requestedLen: number;
@@ -66,8 +64,7 @@ export class WorkerTable {
     }
     this.nextWorkerId += 1;
     let privateData = {};
-    if (!IS_NODE) privateData = { type: "module" };
-    const worker = new Worker(this.scriptName, privateData);
+    const worker = new Worker(this.scriptName, { type: "module" });
     this.workerInfos[id] = new WorkerInfo(
       id,
       command,
@@ -78,12 +75,7 @@ export class WorkerTable {
       kernelCallback,
       env
     );
-    if (!IS_NODE) {
-      worker.onmessage = (event) => kernelCallback(event, this);
-    } else {
-      // @ts-ignore
-      worker.on("message", (event) => kernelCallback(event, this));
-    }
+    worker.onmessage = (event) => kernelCallback(event, this);
 
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)

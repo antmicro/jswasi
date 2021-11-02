@@ -1,11 +1,8 @@
-// NODE// import * as fs from "fs";
-// NODE// import { parentPort } from "worker_threads";
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 
 type ptr = number;
 
-const IS_NODE = typeof self === "undefined";
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const CPUTIME_START = utils.msToNs(performance.now());
@@ -16,7 +13,7 @@ let myself: number;
 let args: string[];
 let env: Record<string, string>;
 
-const onmessage_ = function (e) {
+onmessage = (e) => {
   // worker_console_log('got a message!');
   if (!started) {
     if (e.data[0] === "start") {
@@ -29,26 +26,10 @@ const onmessage_ = function (e) {
   }
 };
 
-if (IS_NODE) {
-  // @ts-ignore
-  parentPort.once("message", (message) => {
-    const msg = { data: message };
-    onmessage_(msg);
-  });
-} else {
-  onmessage = onmessage_;
-}
-
 function worker_send(msg) {
-  if (IS_NODE) {
-    const msg_ = { data: [myself, ...msg] };
-    // @ts-ignore
-    parentPort.postMessage(msg_);
-  } else {
     const msg_ = [myself, ...msg];
     // @ts-ignore
-    postMessage(msg_);
-  }
+    postMessage([myself, ...msg]);
 }
 
 function worker_console_log(msg) {
@@ -62,17 +43,9 @@ function worker_console_log(msg) {
 }
 
 function do_exit(exit_code: number) {
-  if (IS_NODE) {
-    const buf = new SharedArrayBuffer(4); // lock
-    const lck = new Int32Array(buf, 0, 1);
-    lck[0] = -1;
-    worker_send(["exit", exit_code]); // never return
-    Atomics.wait(lck, 0, -1);
-  } else {
-    worker_console_log("calling close()");
-    worker_send(["exit", exit_code]);
-    close();
-  }
+  worker_console_log("calling close()");
+  worker_send(["exit", exit_code]);
+  close();
 }
 
 function WASI() {
@@ -245,11 +218,7 @@ function WASI() {
     worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
     const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
     const numbers = new Uint8Array(buf_len);
-    if (IS_NODE) {
-      // TODO
-    } else {
-      self.crypto.getRandomValues(numbers);
-    }
+    self.crypto.getRandomValues(numbers);
     view8.set(numbers, buf_addr);
     return constants.WASI_ESUCCESS;
   }
@@ -1030,30 +999,6 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       worker_send(["stderr", `${e.stack}\n`]);
       do_exit(255);
     }
-  } else if (IS_NODE) {
-    // @ts-ignore
-    const buffer = fs.readFileSync(moduleName, null);
-    const module = await WebAssembly.compile(buffer);
-
-    let instance = null;
-    try {
-      instance = await WebAssembly.instantiate(module, moduleImports);
-    } catch (e) {
-      worker_console_log(`error: ${e}`);
-      worker_send(["stderr", `${e.stack}\n`]);
-      do_exit(255);
-      return;
-    }
-
-    wasiCallbacks.setModuleInstance(instance);
-    try {
-      instance.exports._start();
-      do_exit(0);
-    } catch (e) {
-      worker_console_log(`error: ${e}`);
-      worker_send(["stderr", `${e.stack}\n`]);
-      do_exit(255);
-    }
   } else {
     worker_console_log("WebAssembly.instantiate is not supported");
   }
@@ -1063,17 +1008,6 @@ async function start_wasm() {
   if (started && mod != "") {
     worker_console_log("Loading a module");
     try {
-      if (IS_NODE) {
-        // @ts-ignore
-        if (!fs.existsSync(mod)) {
-          worker_console_log(`File ${mod} not found!`);
-          worker_send(["stderr", `File ${mod} not found!`]);
-          started = false;
-          mod = "";
-          do_exit(255);
-          return;
-        }
-      }
       await importWasmModule(mod, WASI);
     } catch (err) {
       worker_console_log(`Failed instantiating WASM module: ${err}`);
