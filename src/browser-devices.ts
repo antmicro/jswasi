@@ -1,6 +1,13 @@
 import * as constants from "./constants.js";
 import { WorkerTable } from "./worker-table.js";
-import { FileOrDir, OpenFlags, File, Directory, OpenFile, OpenDirectory } from "./browser-fs.js";
+import {
+  FileOrDir,
+  OpenFlags,
+  File,
+  Directory,
+  OpenFile,
+  OpenDirectory,
+} from "./browser-fs.js";
 
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
@@ -25,6 +32,7 @@ export interface IO {
 
 export class Stdin implements IO {
   file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   constructor(private workerTable: WorkerTable) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {

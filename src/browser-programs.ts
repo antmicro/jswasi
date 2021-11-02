@@ -24,9 +24,10 @@ export async function mount(
     case 2: {
       let path = args[1];
       if (path === "/") {
-        workerTable.terminal.io.println(`mount: cannot mount at root directory`);
+        workerTable.terminal.io.println(
+          `mount: cannot mount at root directory`
+        );
         return 1;
-
       }
       // handle relative path
       if (!path.startsWith("/")) {

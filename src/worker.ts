@@ -26,9 +26,9 @@ onmessage = (e) => {
 };
 
 function worker_send(msg) {
-    const msg_ = [myself, ...msg];
-    // @ts-ignore
-    postMessage([myself, ...msg]);
+  const msg_ = [myself, ...msg];
+  // @ts-ignore
+  postMessage([myself, ...msg]);
 }
 
 function worker_console_log(msg) {

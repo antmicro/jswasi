@@ -61,7 +61,6 @@ export class WorkerTable {
       this.currentWorker = id;
     }
     this.nextWorkerId += 1;
-    let privateData = {};
     const worker = new Worker(this.scriptName, { type: "module" });
     this.workerInfos[id] = new WorkerInfo(
       id,
