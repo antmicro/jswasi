@@ -1,10 +1,9 @@
 .idea/
 .vs/
 
-/target
-pkg/
+shell/target
 
 node_modules
 
-output
-terminal/hterm_all.js
+dist
+hterm_all.js

@@ -3,7 +3,7 @@ use std::env;
 use clap::{App, Arg};
 use std::path::PathBuf;
 
-use shell::Shell;
+use wash::Shell;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {

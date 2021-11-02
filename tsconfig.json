@@ -2,12 +2,12 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "outDir": "output",
+    "outDir": "dist",
     "removeComments": false,
     "watch": false,
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["terminal/*"],
-  "exclude": ["node_modules", "output"]
+  "include": ["src/*"],
+  "exclude": ["node_modules", "dist"]
 }
