@@ -25,7 +25,8 @@
     "dev": "./run.sh",
     "lint": "eslint . --ext .ts",
     "pretest": "cd output; python3 ../custom_server.py 4000 &",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "record": "node ci/grab-screencast.js; rm -r ci/images; rm ci/images.txt"
   },
   "jest": {
     "preset": "jest-puppeteer"
