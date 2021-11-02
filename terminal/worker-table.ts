@@ -1,6 +1,6 @@
-// NODE// import { Worker } from 'worker_threads';
 import * as constants from "./constants.js";
-import { FileOrDir } from "./filesystem.js";
+import { FileOrDir, Filesystem } from "./browser-fs.js";
+import { IO } from "./browser-devices.js";
 
 class WorkerInfo {
   public bufferRequestQueue: {
@@ -14,19 +14,17 @@ class WorkerInfo {
 
   public timestamp: number;
 
-  // TODO: add types for fds and env
   constructor(
     public id: number,
     public cmd: string,
     public worker: Worker,
-    public fds: [],
+    public fds: IO[],
     public parentId: number,
     public parentLock: Int32Array,
     public callback: (output) => void,
-    public env
+    public env: Record<string, string>
   ) {
-    const now = new Date();
-    this.timestamp = Math.floor(now.getTime() / 1000);
+    this.timestamp = Math.floor(new Date().getTime() / 1000);
   }
 }
 
@@ -45,7 +43,7 @@ export class WorkerTable {
     private readonly scriptName: string,
     public readonly receiveCallback,
     public readonly terminal,
-    public readonly filesystem
+    public readonly filesystem: Filesystem
   ) {}
 
   async spawnWorker(

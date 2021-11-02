@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FileOrDir, OpenFlags } from "./filesystem.js";
+import { FileOrDir, OpenFlags } from "./browser-fs.js";
 import { mount, umount, wget, download, ps, free } from "./browser-programs.js";
 import { OpenedFd } from "./browser-devices.js";
 

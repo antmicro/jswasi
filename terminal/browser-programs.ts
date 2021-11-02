@@ -1,7 +1,6 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FileOrDir } from "./filesystem.js";
-
+import { FileOrDir } from "./browser-fs.js";
 import { filesystem, fetchFile } from "./browser-shell.js";
 
 export async function mount(

@@ -1,7 +1,6 @@
 import * as constants from "./constants.js";
 import { WorkerTable } from "./worker-table.js";
-import { FileOrDir, OpenFlags } from "./filesystem.js";
-import { File, Directory, OpenFile, OpenDirectory } from "./browser-fs.js";
+import { FileOrDir, OpenFlags, File, Directory, OpenFile, OpenDirectory } from "./browser-fs.js";
 
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();

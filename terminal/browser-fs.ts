@@ -1,7 +1,19 @@
 import * as constants from "./constants.js";
 import { parsePath, arraysEqual } from "./utils.js";
-import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { OpenedFd } from "./browser-devices.js";
+
+export const enum FileOrDir {
+  File = 1,
+  Directory = 2,
+  Any = 3,
+}
+
+export const enum OpenFlags {
+  Create = 1, // constants.WASI_O_CREAT,
+  Directory = 2, // constants.WASI_O_DIRECTORY,
+  Exclusive = 4, // constants.WASI_O_EXCL,
+  Truncate = 8, // constants.WASI_O_TRUNC,
+}
 
 export class Filesystem {
   mounts: { parts: string[]; name: string; dir: Directory }[] = [];

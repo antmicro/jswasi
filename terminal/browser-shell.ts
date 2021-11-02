@@ -1,9 +1,7 @@
 import * as constants from "./constants.js";
 import { WorkerTable } from "./worker-table.js";
 import { on_worker_message } from "./worker-message.js";
-
-import { FileOrDir, OpenFlags } from "./filesystem.js";
-import { Filesystem, Directory } from "./browser-fs.js";
+import { FileOrDir, OpenFlags, Filesystem, Directory } from "./browser-fs.js";
 import { Stdin, Stdout, Stderr, OpenedFd } from "./browser-devices.js";
 
 declare global {

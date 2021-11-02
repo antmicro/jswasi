@@ -14,7 +14,6 @@ let args: string[];
 let env: Record<string, string>;
 
 onmessage = (e) => {
-  // worker_console_log('got a message!');
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
