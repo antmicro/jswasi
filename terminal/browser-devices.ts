@@ -12,9 +12,20 @@ const RESET = "\u001b[0m";
 export interface IO {
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer);
   write(content: Uint8Array): Promise<number>;
+  stat(): Promise<{
+    dev: bigint;
+    ino: bigint;
+    file_type: number;
+    nlink: bigint;
+    size: bigint;
+    atim: bigint;
+    mtim: bigint;
+    ctim: bigint;
+  }>;
 }
 
 export class Stdin implements IO {
+  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
   constructor(private workerTable: WorkerTable) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
@@ -33,9 +44,34 @@ export class Stdin implements IO {
   async write(content: Uint8Array): Promise<number> {
     throw "can't write to stdin!";
   }
+
+  // TODO: fill dummy values with something meaningful
+  async stat(): Promise<{
+    dev: bigint;
+    ino: bigint;
+    file_type: number;
+    nlink: bigint;
+    size: bigint;
+    atim: bigint;
+    mtim: bigint;
+    ctim: bigint;
+  }> {
+    return {
+      dev: 0n,
+      ino: 0n,
+      file_type: this.file_type,
+      nlink: 0n,
+      size: 0n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
+  }
 }
 
 export class Stdout implements IO {
+  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   constructor(private workerTable: WorkerTable) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
@@ -48,9 +84,34 @@ export class Stdout implements IO {
     );
     return constants.WASI_ESUCCESS;
   }
+
+  // TODO: fill dummy values with something meaningful
+  async stat(): Promise<{
+    dev: bigint;
+    ino: bigint;
+    file_type: number;
+    nlink: bigint;
+    size: bigint;
+    atim: bigint;
+    mtim: bigint;
+    ctim: bigint;
+  }> {
+    return {
+      dev: 0n,
+      ino: 0n,
+      file_type: this.file_type,
+      nlink: 0n,
+      size: 0n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
+  }
 }
 
 export class Stderr implements IO {
+  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   constructor(private workerTable: WorkerTable) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
@@ -61,6 +122,29 @@ export class Stderr implements IO {
     const output = DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n");
     this.workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
     return constants.WASI_ESUCCESS;
+  }
+
+  // TODO: fill dummy values with something meaningful
+  async stat(): Promise<{
+    dev: bigint;
+    ino: bigint;
+    file_type: number;
+    nlink: bigint;
+    size: bigint;
+    atim: bigint;
+    mtim: bigint;
+    ctim: bigint;
+  }> {
+    return {
+      dev: 0n,
+      ino: 0n,
+      file_type: this.file_type,
+      nlink: 0n,
+      size: 0n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
   }
 }
 
