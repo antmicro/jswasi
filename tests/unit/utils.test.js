@@ -1,4 +1,4 @@
-import * as utils from "../../output/utils.js";
+import * as utils from "../../dist/utils.js";
 
 test("parsePath on regular path", () => {
   expect(utils.parsePath("/usr/bin/shell")).toStrictEqual({

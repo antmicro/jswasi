@@ -57,10 +57,10 @@ export class WorkerTable {
     isJob: boolean
   ): Promise<number> {
     const id = this.nextWorkerId;
+    this.nextWorkerId += 1;
     if (parentLock != null || parentId == null) {
       this.currentWorker = id;
     }
-    this.nextWorkerId += 1;
     const worker = new Worker(this.scriptName, { type: "module" });
     this.workerInfos[id] = new WorkerInfo(
       id,
