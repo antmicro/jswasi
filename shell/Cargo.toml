@@ -1,5 +1,5 @@
 [package]
-name = "shell"
+name = "wash"
 version = "0.1.0"
 authors = ["Tomasz Karwowski <tkarwowski@internships.antmicro.com", "Peter Gielda <pgielda@antmicro.com"]
 edition = "2018"
