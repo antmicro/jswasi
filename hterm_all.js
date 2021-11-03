@@ -230,7 +230,7 @@ lib.array.concatTyped = function (...arrays) {
   for (const array of arrays) {
     resultLength += array.length;
   }
-  const result = new arrays[0].ProcessManager(resultLength);
+  const result = new arrays[0].constructor(resultLength);
   let pos = 0;
   for (const array of arrays) {
     result.set(array, pos);

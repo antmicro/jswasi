@@ -1,8 +1,8 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./browser-fs.js";
 import { mount, umount, wget, download, ps, free } from "./browser-programs.js";
-import { ProcessManager } from "./process-manager";
-import { filesystem } from "./browser-shell";
+import { ProcessManager } from "./process-manager.js";
+import { filesystem } from "./browser-shell.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
