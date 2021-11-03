@@ -18,7 +18,7 @@ export function parsePath(path: string): { parts: string[]; name: string } {
   return { parts, name };
 }
 
-export function realpath(path): string {
+export function realpath(path: string): string {
   const result = [];
   let result_path = "";
   let tmp_path = path;
@@ -33,7 +33,7 @@ export function realpath(path): string {
     if (part == "..") {
       if (level > 0) level -= 1;
     } else if (part == ".") {
-      continue;
+      // do nothing
     } else {
       result[level] = part;
       level++;
@@ -52,7 +52,7 @@ export function msToNs(ms: number): bigint {
   return ns + decimal;
 }
 
-export function now(clockId: number, cpuTimeStart): bigint {
+export function now(clockId: number, cpuTimeStart: bigint): bigint {
   switch (clockId) {
     case constants.WASI_CLOCK_MONOTONIC:
       return msToNs(performance.now());

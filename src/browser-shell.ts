@@ -231,7 +231,7 @@ export async function init(
   io.sendString = onTerminalInput;
 
   // TODO: maybe save all output and rewrite it on adjusted size?
-  io.onTerminalResize = (columns, rows) => {};
+  io.onTerminalResize = (columns: number, rows: number) => {};
 
   // drag and drop support (save dragged files and folders to current directoru)
   // hterm creates iframe child of provided anchor, we assume there's only one of those
@@ -241,7 +241,7 @@ export async function init(
   terminalContentWindow.addEventListener("drop", async (e) => {
     e.preventDefault();
 
-    const copyEntry = async (entry, path) => {
+    const copyEntry = async (entry: FileSystemDirectoryHandle | FileSystemFileHandle, path: string) => {
       const dir = (
           await filesystem.rootDir.getEntry(path, FileOrDir.Directory)
       ).entry;

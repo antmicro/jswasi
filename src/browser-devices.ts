@@ -11,7 +11,7 @@ const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export interface IO {
-  read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer);
+  read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer): void;
   write(content: Uint8Array): Promise<number>;
   stat(): Promise<{
     dev: bigint;

@@ -11,7 +11,7 @@
       window.alive = true;
       window.exit_code = 0;
       window.stdout_read_data = function () {
-        if (window.stdout_attached != undefined)
+        if (window.stdout_attached !== undefined)
           if (window.stdout_attached && buffer.length > 0) {
             let tmp = window.buffer;
             window.buffer = "";
@@ -25,7 +25,7 @@
       script.onload = async () => {
         await lib.init();
         await init(document.querySelector("#terminal"), (path, entryName) =>
-          console.log(`[added droped file as '${path}/${entryName}`)
+          console.log(`[added dropped file as '${path}/${entryName}`)
         );
       };
       document.body.appendChild(script);

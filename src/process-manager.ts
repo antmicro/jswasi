@@ -1,6 +1,5 @@
 import * as constants from "./constants.js";
 import { FileOrDir, Filesystem } from "./browser-fs.js";
-import { IO } from "./browser-devices.js";
 
 type BufferRequestQueue = {
   requestedLen: number;
@@ -18,14 +17,14 @@ class ProcessInfo {
   public timestamp: number;
 
   constructor(
-    public id: number,
-    public cmd: string,
-    public worker: Worker,
-    public fds: IO[],
-    public parentId: number,
-    public parentLock: Int32Array,
-    public callback: (output) => void,
-    public env: Record<string, string>
+      public id: number,
+      public cmd: string,
+      public worker: Worker,
+      public fds: any[], // TODO: add FileDescriptor wrapper class
+      public parentId: number,
+      public parentLock: Int32Array,
+      public callback: (event: MessageEvent, processManager: ProcessManager) => Promise<void>,
+      public env: Record<string, string>
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
   }
@@ -34,7 +33,7 @@ class ProcessInfo {
 export class ProcessManager {
   public buffer = "";
 
-  public currentProcess = null;
+  public currentProcess: number = null;
 
   public nextProcessId = 0;
 
@@ -44,19 +43,19 @@ export class ProcessManager {
 
   constructor(
       private readonly scriptName: string,
-      public readonly terminalOutputCallback: (output) => void,
-      public readonly terminal,
+      public readonly terminalOutputCallback: (output: string) => void,
+      public readonly terminal: any, // TODO: should we declare HTerminal stump or even import the real thing?
       public readonly filesystem: Filesystem
   ) {}
 
   async spawnProcess(
     parentId: number,
     parentLock: Int32Array,
-    syscallCallback,
-    command,
-    fds,
-    args,
-    env,
+    syscallCallback: (event: MessageEvent, processManager: ProcessManager) => Promise<void>,
+    command: string,
+    fds: any[], // TODO
+    args: string[],
+    env: Record<string, string>,
     isJob: boolean
   ): Promise<number> {
     const id = this.nextProcessId;

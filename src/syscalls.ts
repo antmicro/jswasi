@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-export const syscallCallback = async function (event, processManager: ProcessManager) {
+export const syscallCallback = async function (event: MessageEvent, processManager: ProcessManager): Promise<void> {
   const [process_id, action, data] = event.data;
   const full_command = processManager.processInfos[process_id].cmd;
   const process_name = full_command.substr(full_command.lastIndexOf("/") + 1);

@@ -3,6 +3,57 @@ import * as utils from "./utils.js";
 
 type ptr = number;
 
+// TODO: set the proper types for each callback
+type WASICallbacks = {
+  setModuleInstance: any,
+  environ_sizes_get: any,
+  args_sizes_get: any,
+  fd_prestat_get: any,
+  fd_fdstat_get: any,
+  fd_filestat_get: any,
+  fd_read: any,
+  fd_write: any,
+  fd_prestat_dir_name: any,
+  environ_get: any,
+  args_get: any,
+  poll_oneoff: any,
+  proc_exit: any,
+  fd_close: any,
+  fd_seek: any,
+  random_get: any,
+  clock_time_get: any,
+  fd_readdir: any,
+  path_create_directory: any,
+  path_filestat_get: any,
+  path_link: any,
+  path_open: any,
+  path_readlink: any,
+  path_remove_directory: any,
+  path_rename: any,
+  path_unlink_file: any,
+  sched_yield: any,
+  fd_datasync: any,
+  fd_filestat_set_size: any,
+  fd_sync: any,
+  path_symlink: any,
+  clock_res_get: any,
+  fd_advise: any,
+  fd_allocate: any,
+  fd_fdstat_set_flags: any,
+  fd_fdstat_set_rights: any,
+  fd_tell: any,
+  fd_filestat_set_times: any,
+  fd_pread: any,
+  fd_advice: any,
+  fd_pwrite: any,
+  fd_renumber: any,
+  path_filestat_set_times: any,
+  proc_raise: any,
+  sock_recv: any,
+  sock_send: any,
+  sock_shutdown: any,
+};
+
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 const CPUTIME_START = utils.msToNs(performance.now());
@@ -25,12 +76,13 @@ onmessage = (e) => {
   }
 };
 
-function send_to_kernel(msg) {
+// TODO: add class for msg sent to kernel
+function send_to_kernel(msg: any) {
   // @ts-ignore
   postMessage([myself, ...msg]);
 }
 
-function worker_console_log(msg) {
+function worker_console_log(msg: any) {
   // you can control debug logs dynamically based on DEBUG env variable
   if (
     env.DEBUG &&
@@ -46,10 +98,10 @@ function do_exit(exit_code: number) {
   close();
 }
 
-function WASI() {
-  let moduleInstanceExports = null;
+function WASI(): WASICallbacks {
+  let moduleInstanceExports: WebAssembly.Exports = null;
 
-  function setModuleInstance(instance) {
+  function setModuleInstance(instance: WebAssembly.Instance) {
     moduleInstanceExports = instance.exports;
   }
 
@@ -60,7 +112,7 @@ function WASI() {
       )}, 0x${environ_size.toString(16)})`
     );
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const environ_count_ = Object.keys(env).length;
     view.setUint32(environ_count, environ_count_, true);
@@ -79,8 +131,8 @@ function WASI() {
       `environ_get(${environ.toString(16)}, ${environ_buf.toString(16)})`
     );
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     Object.entries(env).forEach(([key, val], i) => {
       // set pointer address to beginning of next key value pair
@@ -100,7 +152,7 @@ function WASI() {
       `args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`
     );
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     view.setUint32(argc, args.length, true);
     view.setUint32(
@@ -115,8 +167,8 @@ function WASI() {
   function args_get(argv: ptr, argv_buf: ptr) {
     worker_console_log(`args_get(${argv}, 0x${argv_buf.toString(16)})`);
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     args.forEach((arg, i) => {
       // set pointer address to beginning of next key value pair
@@ -134,7 +186,7 @@ function WASI() {
   function fd_fdstat_get(fd: number, buf: ptr) {
     worker_console_log(`fd_fdstat_get(${fd}, 0x${buf.toString(16)})`);
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + 20); // lock, filetype, rights base, rights inheriting
     const lck = new Int32Array(sbuf, 0, 1);
@@ -167,17 +219,17 @@ function WASI() {
 
   function fd_write(fd: number, iovs: ptr, iovs_len: number, nwritten: ptr) {
     worker_console_log(`fd_write(${fd}, ${iovs}, ${iovs_len}, ${nwritten})`);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     let written = 0;
-    const bufferBytes = [];
+    const bufferBytes: number[] = [];
 
     const buffers = Array.from({ length: iovs_len }, (_, i) => {
       const ptr = iovs + i * 8;
       const buf = view.getUint32(ptr, true);
       const bufLen = view.getUint32(ptr + 4, true);
 
-      return new Uint8Array(moduleInstanceExports.memory.buffer, buf, bufLen);
+      return new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer, buf, bufLen);
     });
     buffers.forEach((iov: Uint8Array) => {
       for (let b = 0; b < iov.byteLength; b++) {
@@ -212,9 +264,9 @@ function WASI() {
     do_exit(exit_code);
   }
 
-  function random_get(buf_addr, buf_len) {
+  function random_get(buf_addr: ptr, buf_len: number) {
     worker_console_log(`random_get(${buf_addr}, ${buf_len})`);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
     const numbers = new Uint8Array(buf_len);
     self.crypto.getRandomValues(numbers);
     view8.set(numbers, buf_addr);
@@ -226,9 +278,9 @@ function WASI() {
     return 1; // TODO!!!!
   }
 
-  function clock_time_get(clockId, precision, time) {
+  function clock_time_get(clockId: number, precision: number, time: ptr) {
     worker_console_log(`clock_time_get(${clockId}, ${precision}, ${time})`);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     view.setBigUint64(time, utils.now(clockId, CPUTIME_START), true);
     return constants.WASI_ESUCCESS;
@@ -246,25 +298,22 @@ function WASI() {
     return Atomics.load(lck, 0);
   }
 
-  function fd_advice(a, b, c, d) {
-    worker_console_log("fd_advice");
-    return 1; // TODO!!!!
+  function fd_advice() {
+    return placeholder();
   }
 
-  function fd_allocate(a, b, c) {
-    worker_console_log("fd_allocate");
-    return 1; // TODO!!!!
+  function fd_allocate() {
+    return placeholder();
   }
 
-  function fd_fdstat_set_rights(a, b, c) {
-    worker_console_log("fd_fdstat_set_rights");
-    return 1; // TODO!!!!
+  function fd_fdstat_set_rights() {
+    return placeholder();
   }
 
-  function fd_filestat_get(fd, buf) {
+  function fd_filestat_get(fd: number, buf: ptr) {
     worker_console_log(`fd_filestat_get(${fd}, 0x${buf.toString(16)})`);
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
     const lck = new Int32Array(sbuf, 0, 1);
@@ -304,8 +353,8 @@ function WASI() {
   function fd_read(fd: number, iovs: ptr, iovs_len: number, nread: ptr) {
     if (fd > 2)
       worker_console_log(`fd_read(${fd}, ${iovs}, ${iovs_len}, ${nread})`);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     let read = 0;
     for (let i = 0; i < iovs_len; i++) {
@@ -347,8 +396,8 @@ function WASI() {
       `fd_readdir(${fd}, ${buf}, ${buf_len}, ${cookie}, ${bufused})`
     );
 
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + 4 + buf_len); // lock, buf_used, buf
     const lck = new Int32Array(sbuf, 0, 1);
@@ -377,7 +426,7 @@ function WASI() {
     new_offset: ptr
   ) {
     worker_console_log(`fd_seek(${fd}, ${offset}, ${whence}, ${new_offset})`);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
     const lck = new Int32Array(sbuf, 0, 1);
@@ -398,8 +447,8 @@ function WASI() {
   }
 
   function path_create_directory(fd: number, path_ptr: ptr, path_len: number) {
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
@@ -425,8 +474,8 @@ function WASI() {
     path_len: number,
     buf: ptr
   ) {
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
@@ -489,8 +538,8 @@ function WASI() {
         16
       )})`
     );
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
     worker_console_log(`path_open: path = ${path}`);
@@ -601,8 +650,8 @@ function WASI() {
     worker_console_log(
       `path_readlink(${fd}, ${path_ptr}, ${path_len}, ${buffer_ptr}, ${buffer_len}, ${buffer_used_ptr})`
     );
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
     worker_console_log(
       `path is ${path}, buffer_len = ${buffer_len}, fd = ${fd}`
@@ -628,7 +677,7 @@ function WASI() {
       `path_remove_directory(${fd}, ${path_ptr}, ${path_len})`
     );
 
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
@@ -651,7 +700,7 @@ function WASI() {
   function path_unlink_file(fd: number, path_ptr: ptr, path_len: number) {
     worker_console_log(`path_unlink_file(${fd}, ${path_ptr}, ${path_len})`);
 
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
@@ -673,7 +722,7 @@ function WASI() {
 
   function fd_prestat_get(fd: number, buf: ptr) {
     worker_console_log(`fd_prestat_get(${fd}, 0x${buf.toString(16)})`);
-    const view = new DataView(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
     const lck = new Int32Array(sbuf, 0, 1);
@@ -697,11 +746,11 @@ function WASI() {
     return err;
   }
 
-  function fd_prestat_dir_name(fd: number, path_ptr, path_len: number) {
+  function fd_prestat_dir_name(fd: number, path_ptr: ptr, path_len: number) {
     worker_console_log(
       `fd_prestat_dir_name(${fd}, 0x${path_ptr.toString(16)}, ${path_len})`
     );
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path
     const lck = new Int32Array(sbuf, 0, 1);
@@ -749,7 +798,7 @@ function WASI() {
         16
       )}, ${path_len}, ${fd}, 0x${newpath_ptr.toString(16)}, ${newpath_len})`
     );
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
     const newpath = DECODER.decode(
@@ -770,58 +819,6 @@ function WASI() {
     return err;
   }
 
-  function fd_fdstat_set_flags(a, b) {
-    worker_console_log(`fd_fdstat_set_flags(${a}, ${b})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function fd_pwrite(a, b, c, d, e) {
-    worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function fd_renumber(a, b) {
-    worker_console_log(`fd_renumber(${a}, ${b})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function fd_tell(a, b) {
-    worker_console_log(`fd_tell(${a}, ${b})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function path_filestat_set_times(a, b, c, d, e, f, g) {
-    worker_console_log(`fd_pwrite(${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function proc_raise(a) {
-    worker_console_log(`proc_raise(${a})`);
-    return constants.WASI_ESUCCESS;
-  }
-
-  function sock_recv(a, b, c, d, e, f) {
-    worker_console_log("sock_recv");
-    return 1; // TODO
-  }
-
-  function sock_send(a, b, c, d, e) {
-    worker_console_log("sock_send");
-    return 1; // TODO
-  }
-
-  function sock_shutdown(a, b) {
-    worker_console_log("sock_shutdown");
-    return 1; // TODO
-  }
-
-  const placeholder = function () {
-    worker_console_log(
-      `> Entering stub ${new Error().stack.split("\n")[2].trim().split(" ")[1]}`
-    );
-    return constants.WASI_ESUCCESS;
-  };
-
   function poll_oneoff(
     sin: ptr,
     sout: ptr,
@@ -831,8 +828,8 @@ function WASI() {
     worker_console_log(
       `poll_oneoff(${sin}, ${sout}, ${nsubscriptions}, ${nevents})`
     );
-    const view = new DataView(moduleInstanceExports.memory.buffer);
-    const view8 = new Uint8Array(moduleInstanceExports.memory.buffer);
+    const view = new DataView((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
+    const view8 = new Uint8Array((moduleInstanceExports.memory as WebAssembly.Memory).buffer);
 
     let eventc = 0;
     let waitEnd = 0n;
@@ -908,20 +905,63 @@ function WASI() {
     return constants.WASI_ESUCCESS;
   }
 
+  const placeholder = function () {
+    worker_console_log(
+        `> Entering stub ${new Error().stack.split("\n")[2].trim().split(" ")[1]}`
+    );
+    return constants.WASI_ESUCCESS;
+  };
+
+  function fd_fdstat_set_flags() {
+    return placeholder();
+  }
+
+  function fd_pwrite() {
+    return placeholder();
+  }
+
+  function fd_renumber() {
+    return placeholder();
+  }
+
+  function fd_tell() {
+    return placeholder();
+  }
+
+  function path_filestat_set_times() {
+    return placeholder();
+  }
+
+  function proc_raise() {
+    return placeholder();
+  }
+
+  function sock_recv() {
+    return placeholder();
+  }
+
+  function sock_send() {
+    return placeholder();
+  }
+
+  function sock_shutdown() {
+    return placeholder();
+  }
+
   function path_link() {
-    placeholder();
+    return placeholder();
   }
 
   function fd_advise() {
-    placeholder();
+    return placeholder();
   }
 
   function fd_filestat_set_times() {
-    placeholder();
+    return placeholder();
   }
 
   function fd_pread() {
-    placeholder();
+    return placeholder();
   }
 
   return {
@@ -975,7 +1015,7 @@ function WASI() {
   };
 }
 
-async function importWasmModule(moduleName, wasiCallbacksConstructor) {
+async function importWasmModule(module: WebAssembly.Module, wasiCallbacksConstructor: () => WASICallbacks) {
   const wasiCallbacks = wasiCallbacksConstructor();
   const moduleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
@@ -985,7 +1025,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
   if (WebAssembly.instantiate) {
     worker_console_log("WebAssembly.instantiate");
 
-    const instance = await WebAssembly.instantiate(mod, moduleImports);
+    const instance = await WebAssembly.instantiate(module, moduleImports);
 
     wasiCallbacks.setModuleInstance(instance);
     try {
