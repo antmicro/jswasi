@@ -20,17 +20,10 @@ export class Filesystem {
 
   mounts: { parts: string[]; name: string; dir: Directory }[] = [];
 
-  _rootDir: Directory;
+  public readonly rootDir: Directory;
 
-  async getRootDirectory(): Promise<Directory> {
-    if (!this._rootDir) {
-      const root = await navigator.storage.getDirectory();
-      const rootDir = new Directory("", root, null, this);
-      // root parent is the root itself
-      rootDir.parent = rootDir;
-      this._rootDir = rootDir;
-    }
-    return this._rootDir;
+  constructor(public rootHandle: FileSystemDirectoryHandle) {
+    this.rootDir = new Directory("", rootHandle, null, this);
   }
 
   async getDirectory(
@@ -43,7 +36,7 @@ export class Filesystem {
       dir.path === "" &&
       (name === "." || name === ".." || name === "" || name === "/")
     )
-      return await this.getRootDirectory();
+      return this.rootDir;
     if (name === ".") {
       return dir;
     }
@@ -83,8 +76,7 @@ export class Filesystem {
     absolute_path: string,
     mode: FileOrDir = FileOrDir.Any
   ): Promise<boolean> {
-    const rootDir = await this.getRootDirectory();
-    const { err } = await rootDir.getEntry(
+    const { err } = await this.rootDir.getEntry(
       absolute_path,
       FileOrDir.Directory,
       0
@@ -97,8 +89,7 @@ export class Filesystem {
     mounted_handle: FileSystemDirectoryHandle
   ): Promise<number> {
     const { parts, name } = parsePath(absolute_path);
-    const rootDir = await this.getRootDirectory();
-    const parent = await rootDir.getEntry(parts.join("/"), FileOrDir.Directory);
+    const parent = await this.rootDir.getEntry(parts.join("/"), FileOrDir.Directory);
     const dir = new Directory(name, mounted_handle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
@@ -132,7 +123,7 @@ export class Filesystem {
     if (this.DEBUG) console.log(`resolveAbsolute(${path})`);
 
     const { parts, name } = parsePath(path);
-    let dir = await this.getRootDirectory();
+    let dir = this.rootDir;
 
     try {
       for (const part of parts) {
@@ -167,7 +158,7 @@ export class Filesystem {
       (path === "." || path === ".." || path === "" || path === "/")
     )
       return { err: constants.WASI_ESUCCESS, name: "", parent: dir };
-    if (path.startsWith("/")) dir = await this.getRootDirectory();
+    if (path.startsWith("/")) dir = this.rootDir;
 
     const { parts, name } = parsePath(path);
 

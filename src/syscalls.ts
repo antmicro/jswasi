@@ -2,6 +2,7 @@ import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./browser-fs.js";
 import { mount, umount, wget, download, ps, free } from "./browser-programs.js";
 import {ProcessManager} from "./process-manager";
+import {filesystem} from "./browser-shell";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -62,8 +63,7 @@ export const syscallCallback = async function (event, processManager: ProcessMan
       const lock = new Int32Array(sbuf, 0, 1);
       const { fds } = processManager.processInfos[process_id];
 
-      const rootDir = await processManager.filesystem.getRootDirectory();
-      const { entry } = await rootDir.getEntry(pwd, FileOrDir.Directory);
+      const { entry } = await filesystem.rootDir.getEntry(pwd, FileOrDir.Directory);
       const open_pwd = await entry.open();
       open_pwd.path = ".";
       fds[4] = open_pwd;
@@ -145,8 +145,7 @@ export const syscallCallback = async function (event, processManager: ProcessMan
           // TODO: is shallow copy enough, or should we deepcopy?
           const childFds = processManager.processInfos[process_id].fds.slice(0);
           for (const [fd, path, mode] of redirects) {
-            const rootDir = await processManager.filesystem.getRootDirectory();
-            const { entry } = await rootDir.getEntry(
+            const { entry } = await filesystem.rootDir.getEntry(
               path,
               FileOrDir.File,
               OpenFlags.Create

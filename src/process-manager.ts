@@ -80,8 +80,7 @@ export class ProcessManager {
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     if (!this.compiledModules[command]) {
-      const rootDir = await this.filesystem.getRootDirectory();
-      const binary = await rootDir.getEntry(command, FileOrDir.File);
+      const binary = await this.filesystem.rootDir.getEntry(command, FileOrDir.File);
       if (binary.entry === null) {
         console.warn(`No such binary: ${command}`);
         return;

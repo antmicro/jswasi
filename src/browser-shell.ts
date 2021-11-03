@@ -129,15 +129,14 @@ async function initFs(anchor: HTMLElement) {
   const local = await usr.getDirectoryHandle("local", { create: true });
   const local_bin = await local.getDirectoryHandle("bin", { create: true });
 
-  const rootDir = await filesystem.getRootDirectory();
   const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(
-    ([filename, address]) => fetchFile(rootDir, filename, address, true)
+    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, true)
   );
   const necessary_promises = Object.entries(NECESSARY_BINARIES).map(
-    ([filename, address]) => fetchFile(rootDir, filename, address, false)
+    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, false)
   );
   const optional_promises = Object.entries(OPTIONAL_BINARIES).map(
-    ([filename, address]) => fetchFile(rootDir, filename, address, false)
+    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, false)
   );
 
   anchor.innerHTML += "<br/>" + "Starting download of mandatory";
@@ -152,7 +151,7 @@ async function initFs(anchor: HTMLElement) {
 }
 
 // things that are global and should be shared between all tab instances
-export const filesystem = new Filesystem();
+export const filesystem = new Filesystem(await navigator.storage.getDirectory());
 
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
@@ -176,7 +175,6 @@ export async function init(
   // @ts-ignore
   const terminal = new hterm.Terminal();
 
-  const root_dir = await filesystem.getRootDirectory();
   const workerTable = new ProcessManager(
     "worker.js",
     // receive_callback
@@ -244,24 +242,17 @@ export async function init(
     e.preventDefault();
 
     const copyEntry = async (entry, path) => {
+      const dir = (
+          await filesystem.rootDir.getEntry(path, FileOrDir.Directory)
+      ).entry;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
-        const dir = (
-          await (
-            await filesystem.getRootDirectory()
-          ).getEntry(path, FileOrDir.Directory)
-        ).entry;
         await dir._handle.getDirectoryHandle(entry.name, { create: true });
         for await (const [name, handle] of entry.entries()) {
           await copyEntry(handle, `${path}/${entry.name}`);
         }
       } else {
         // create VFS file, open dragged file as stream and pipe it to VFS file
-        const dir = (
-          await (
-            await filesystem.getRootDirectory()
-          ).getEntry(path, FileOrDir.Directory)
-        ).entry;
         const handle = await dir._handle.getFileHandle(entry.name, {
           create: true,
         });
@@ -281,7 +272,7 @@ export async function init(
     }
   });
 
-  const pwd_dir = (await root_dir.getEntry("/home/ant", FileOrDir.Directory))
+  const pwd_dir = (await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory))
     .entry;
   pwd_dir.path = ".";
   await workerTable.spawnProcess(
@@ -293,10 +284,10 @@ export async function init(
       new Stdin(workerTable),
       new Stdout(workerTable),
       new Stderr(workerTable),
-      await root_dir.open(),
+      await filesystem.rootDir.open(),
       await pwd_dir.open(),
       // TODO: why must fds[5] be present for ls to work, and what should it be
-      await root_dir.open(),
+      await filesystem.rootDir.open(),
     ],
     ["shell"],
     {
