@@ -5,7 +5,7 @@ export function arraysEqual(a: any[], b: any[]) {
   if (a == null || b == null) return false;
   if (a.length !== b.length) return false;
 
-  for (let i = 0; i < a.length; ++i) {
+  for (let i = 0; i < a.length; i += 1) {
     if (a[i] !== b[i]) return false;
   }
 
@@ -24,23 +24,23 @@ export function realpath(path: string): string {
   let tmp_path = path;
   let part = "";
   let level = 0;
-  const root_path = path[0] == "/";
-  while (tmp_path != "") {
-    if (tmp_path.indexOf("/") != -1) {
+  const root_path = path[0] === "/";
+  while (tmp_path !== "") {
+    if (tmp_path.indexOf("/") !== -1) {
       part = tmp_path.substr(0, tmp_path.indexOf("/"));
     } else part = tmp_path;
     tmp_path = tmp_path.substr(part.length + 1);
-    if (part == "..") {
+    if (part === "..") {
       if (level > 0) level -= 1;
-    } else if (part == ".") {
+    } else if (part === ".") {
       // do nothing
     } else {
       result[level] = part;
-      level++;
+      level += 1;
     }
   }
   result_path = result.slice(0, level).join("/");
-  if (root_path) if (result_path == "") return "/";
+  if (root_path) if (result_path === "") return "/";
   result_path = result_path.replace("/./", "/");
   return result_path;
 }

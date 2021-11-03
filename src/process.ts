@@ -241,9 +241,9 @@ function WASI(): WASICallbacks {
     const bufferBytes: number[] = [];
 
     const buffers = Array.from({ length: iovs_len }, (_, i) => {
-      const ptr = iovs + i * 8;
-      const buf = view.getUint32(ptr, true);
-      const bufLen = view.getUint32(ptr + 4, true);
+      const ptr_pos = iovs + i * 8;
+      const buf = view.getUint32(ptr_pos, true);
+      const bufLen = view.getUint32(ptr_pos + 4, true);
 
       return new Uint8Array(
         (moduleInstanceExports.memory as WebAssembly.Memory).buffer,
@@ -252,7 +252,7 @@ function WASI(): WASICallbacks {
       );
     });
     buffers.forEach((iov: Uint8Array) => {
-      for (let b = 0; b < iov.byteLength; b++) {
+      for (let b = 0; b < iov.byteLength; b += 1) {
         bufferBytes.push(iov[b]);
       }
       written += iov.byteLength;
@@ -262,7 +262,7 @@ function WASI(): WASICallbacks {
     // const content = String.fromCharCode(...bufferBytes);
     const content = new SharedArrayBuffer(written);
     const content_view = new Uint8Array(content);
-    for (let i = 0; i < written; i++) content_view[i] = bufferBytes[i]; // TODO
+    for (let i = 0; i < written; i += 1) content_view[i] = bufferBytes[i]; // TODO
     const sbuf = new SharedArrayBuffer(4);
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
@@ -290,7 +290,7 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
     const numbers = new Uint8Array(buf_len);
-    self.crypto.getRandomValues(numbers);
+    crypto.getRandomValues(numbers);
     view8.set(numbers, buf_addr);
     return constants.WASI_ESUCCESS;
   }
@@ -320,18 +320,6 @@ function WASI(): WASICallbacks {
     Atomics.wait(lck, 0, -1);
 
     return Atomics.load(lck, 0);
-  }
-
-  function fd_advice() {
-    return placeholder();
-  }
-
-  function fd_allocate() {
-    return placeholder();
-  }
-
-  function fd_fdstat_set_rights() {
-    return placeholder();
   }
 
   function fd_filestat_get(fd: number, buf: ptr) {
@@ -387,7 +375,7 @@ function WASI(): WASICallbacks {
     );
 
     let read = 0;
-    for (let i = 0; i < iovs_len; i++) {
+    for (let i = 0; i < iovs_len; i += 1) {
       const addr = view.getUint32(iovs + 8 * i, true);
       const len = view.getUint32(iovs + 8 * i + 4, true);
 
@@ -483,9 +471,6 @@ function WASI(): WASICallbacks {
   }
 
   function path_create_directory(fd: number, path_ptr: ptr, path_len: number) {
-    const view = new DataView(
-      (moduleInstanceExports.memory as WebAssembly.Memory).buffer
-    );
     const view8 = new Uint8Array(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
@@ -625,7 +610,7 @@ function WASI(): WASICallbacks {
     const [cmd, args_string, env_string, background, redirects_string] =
       fullcmd.split("\x1b\x1b");
     const isJob = background === "true";
-    if (cmd == "spawn") {
+    if (cmd === "spawn") {
       // reparse args
       const args = args_string.split("\x1b");
       const new_env = Object.fromEntries(
@@ -637,7 +622,7 @@ function WASI(): WASICallbacks {
         .filter((s) => s.length)
         .map((redirect) => {
           const [fd, path, mode] = redirect.split(" ");
-          return [parseInt(fd), path, mode];
+          return [parseInt(fd, 10), path, mode];
         });
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
@@ -649,31 +634,29 @@ function WASI(): WASICallbacks {
       // wait for child process to finish
       Atomics.wait(lck, 0, -1);
       const err = Atomics.load(lck, 0);
-      if (err != constants.WASI_ESUCCESS) {
+      if (err !== constants.WASI_ESUCCESS) {
         worker_console_log(`error: spawned process returned ${err}`);
       }
       return "";
     }
-    if (cmd == "set_env") {
+    if (cmd === "set_env") {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
 
       const args = args_string.split("\x1b");
       send_to_kernel(["set_env", [args, sbuf]]);
-      if (args.length == 1) {
+      if (args.length === 1) {
         delete env[args[0]];
         return "";
       }
       env[args[0]] = args[1];
-      if (args[0] == "PWD") {
+      if (args[0] === "PWD") {
         env[args[0]] = utils.realpath(env[args[0]]);
         lck[0] = -1;
         send_to_kernel(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
       }
       worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
       return env[args[0]];
-
-      Atomics.wait(lck, 0, -1);
     }
     if (cmd === "set_echo") {
       const sbuf = new SharedArrayBuffer(4);
@@ -708,7 +691,7 @@ function WASI(): WASICallbacks {
     worker_console_log(
       `path is ${path}, buffer_len = ${buffer_len}, fd = ${fd}`
     );
-    if (path[0] == "!") {
+    if (path[0] === "!") {
       if (buffer_len < 1024) {
         // we need enough buffer to execute the function only once
         view.setUint32(buffer_used_ptr, buffer_len, true);
@@ -893,9 +876,6 @@ function WASI(): WASICallbacks {
     const view = new DataView(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports.memory as WebAssembly.Memory).buffer
-    );
 
     let eventc = 0;
     let waitEnd = 0n;
@@ -942,7 +922,7 @@ function WASI(): WASICallbacks {
         case constants.WASI_EVENTTYPE_FD_READ:
         case constants.WASI_EVENTTYPE_FD_WRITE: {
           sin += 3; // padding
-          const fd = view.getUint32(sin, true);
+          view.getUint32(sin, true);
           sin += 4;
 
           view.setBigUint64(sout, userdata, true);
@@ -971,12 +951,24 @@ function WASI(): WASICallbacks {
     return constants.WASI_ESUCCESS;
   }
 
-  const placeholder = function () {
+  const placeholder = () => {
     worker_console_log(
       `> Entering stub ${new Error().stack.split("\n")[2].trim().split(" ")[1]}`
     );
     return constants.WASI_ESUCCESS;
   };
+
+  function fd_advice() {
+    return placeholder();
+  }
+
+  function fd_allocate() {
+    return placeholder();
+  }
+
+  function fd_fdstat_set_rights() {
+    return placeholder();
+  }
 
   function fd_fdstat_set_flags() {
     return placeholder();
@@ -1099,7 +1091,7 @@ async function importWasmModule(
     wasiCallbacks.setModuleInstance(instance);
     try {
       // @ts-ignore
-      instance.exports._start();
+      instance.exports.main();
       do_exit(0);
     } catch (e) {
       worker_console_log(`error: ${e}`);
@@ -1112,7 +1104,7 @@ async function importWasmModule(
 }
 
 async function start_wasm() {
-  if (started && mod != "") {
+  if (started && mod) {
     worker_console_log("Loading a module");
     try {
       await importWasmModule(mod, WASI);

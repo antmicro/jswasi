@@ -112,7 +112,7 @@ export class ProcessManager {
     const process = this.processInfos[id];
     process.worker.terminate();
     // notify parent that they can resume operation
-    if (id != 0 && process.parentLock != null) {
+    if (id !== 0 && process.parentLock != null) {
       Atomics.store(process.parentLock, 0, exitNo);
       Atomics.notify(process.parentLock, 0);
       this.currentProcess = process.parentId;
@@ -168,26 +168,24 @@ export class ProcessManager {
     lck: Int32Array,
     readlen: Int32Array,
     buf: Uint8Array
-  ) {
+  ): void {
     // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
-    if (this.buffer.length == 0 || workerId != this.currentProcess) {
+    if (this.buffer.length === 0 || workerId !== this.currentProcess) {
       this.processInfos[workerId].bufferRequestQueue.push({
         requestedLen,
         lck,
         readlen,
         sbuf: buf,
       });
-      return;
+    } else {
+      readlen[0] =
+        this.buffer.length > requestedLen ? requestedLen : this.buffer.length;
+      for (let j = 0; j < readlen[0]; j += 1) {
+        buf[j] = this.buffer.charCodeAt(j);
+      }
+      this.buffer = this.buffer.slice(readlen[0]);
+      Atomics.store(lck, 0, constants.WASI_ESUCCESS);
+      Atomics.notify(lck, 0);
     }
-
-    readlen[0] =
-      this.buffer.length > requestedLen ? requestedLen : this.buffer.length;
-    for (let j = 0; j < readlen[0]; j++) {
-      buf[j] = this.buffer.charCodeAt(j);
-    }
-    this.buffer = this.buffer.slice(readlen[0]);
-    Atomics.store(lck, 0, constants.WASI_ESUCCESS);
-    Atomics.notify(lck, 0);
-    return 1;
   }
 }

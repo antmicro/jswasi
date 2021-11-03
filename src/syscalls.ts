@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-export const syscallCallback = async function (
+export async function syscallCallback(
   event: MessageEvent,
   processManager: ProcessManager
 ): Promise<void> {
@@ -44,7 +44,7 @@ export const syscallCallback = async function (
       break;
     }
     case "exit": {
-      const dbg = processManager.processInfos[process_id].env.DEBUG == "1";
+      const dbg = processManager.processInfos[process_id].env.DEBUG === "1";
       processManager.terminateProcess(process_id, data);
       if (dbg) {
         console.log(
@@ -55,7 +55,7 @@ export const syscallCallback = async function (
           "background:default; color: default;"
         );
       }
-      if (process_id == 0) {
+      if (process_id === 0) {
         window.alive = false;
         window.exit_code = data;
       }
@@ -141,7 +141,7 @@ export const syscallCallback = async function (
         case "/usr/bin/nohup":
         default: {
           let background = isJob;
-          if (fullpath == "/usr/bin/nohup") {
+          if (fullpath === "/usr/bin/nohup") {
             args = args.splice(1);
             fullpath = args[0];
             args = args.splice(1);
@@ -174,7 +174,7 @@ export const syscallCallback = async function (
             isJob
           );
           const new_process_name = fullpath.split("/").slice(-1)[0];
-          if (env.DEBUG == "1") {
+          if (env.DEBUG === "1") {
             console.log(
               `%c [dbg (%c${new_process_name}:${id}%c)] %c spawned by ${process_name}:${process_id}`,
               "background:black; color: white;",
@@ -201,7 +201,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         preopen_type[0] = fds[fd].file_type;
         name_len[0] = fds[fd].path.length;
         err = constants.WASI_ESUCCESS;
@@ -221,7 +221,7 @@ export const syscallCallback = async function (
       let err;
       let entry;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         const linkpath = `${newpath}.link`;
         console.log(`We should symlink ${newpath} --> ${path} [dir fd=${fd}]`);
         ({ err, entry } = await fds[fd].getEntry(
@@ -229,12 +229,9 @@ export const syscallCallback = async function (
           FileOrDir.File,
           1 | 4
         ));
-        if (err == constants.WASI_ESUCCESS) {
+        if (err === constants.WASI_ESUCCESS) {
           const file = await entry.open();
-          //    let databuf = new ArrayBuffer(path.length);
-          const data = new Uint8Array(path.length);
-          data.set(new TextEncoder().encode(path), 0);
-          await file.write(data);
+          await file.write(new TextEncoder().encode(path));
         }
       } else {
         err = constants.WASI_EBADF;
@@ -252,7 +249,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         path.set(new TextEncoder().encode(fds[fd].path), 0);
         err = constants.WASI_ESUCCESS;
       } else {
@@ -300,7 +297,7 @@ export const syscallCallback = async function (
       let err;
       let entry;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[dir_fd] != undefined) {
+      if (fds[dir_fd] !== undefined) {
         ({ err, entry } = await fds[dir_fd].getEntry(
           path,
           FileOrDir.Any,
@@ -341,7 +338,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         const stat = await fds[fd].stat();
         buf.setBigUint64(0, stat.dev, true);
         buf.setBigUint64(8, stat.ino, true);
@@ -368,9 +365,9 @@ export const syscallCallback = async function (
       let err;
       let entry;
 
-      if (path[0] != "!") {
+      if (path[0] !== "!") {
         const { fds } = processManager.processInfos[process_id];
-        if (fds[fd] != undefined) {
+        if (fds[fd] !== undefined) {
           ({ err, entry } = await fds[fd].getEntry(path, FileOrDir.Any));
           if (err === constants.WASI_ESUCCESS) {
             const stat = await entry.stat();
@@ -409,7 +406,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         file_pos[0] = BigInt(await fds[fd].seek(Number(offset), whence));
         err = constants.WASI_ESUCCESS;
       } else {
@@ -429,9 +426,9 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         const entries = await fds[fd].entries();
-        for (let i = Number(cookie); i < entries.length; i++) {
+        for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
           const namebuf = new TextEncoder().encode(entry.path);
 
@@ -475,7 +472,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         ({ err } = fds[fd].deleteEntry(path, { recursive: false }));
       }
 
@@ -489,7 +486,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         ({ err } = fds[fd].deleteEntry(path, { recursive: true }));
       }
 
@@ -503,7 +500,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         err = await fds[fd].getEntry(
           path,
           FileOrDir.Directory,
@@ -526,7 +523,7 @@ export const syscallCallback = async function (
 
       let err;
       const { fds } = processManager.processInfos[process_id];
-      if (fds[fd] != undefined) {
+      if (fds[fd] !== undefined) {
         file_type[0] = fds[fd].file_type;
         // TODO: analyze this
         /*
@@ -550,5 +547,8 @@ export const syscallCallback = async function (
       Atomics.notify(lck, 0);
       break;
     }
+    default: {
+      throw new Error(`Unhandled syscall: ${action}`);
+    }
   }
-};
+}
