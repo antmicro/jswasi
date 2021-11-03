@@ -130,13 +130,16 @@ async function initFs(anchor: HTMLElement) {
   const local_bin = await local.getDirectoryHandle("bin", { create: true });
 
   const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(
-    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, true)
+    ([filename, address]) =>
+      fetchFile(filesystem.rootDir, filename, address, true)
   );
   const necessary_promises = Object.entries(NECESSARY_BINARIES).map(
-    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, false)
+    ([filename, address]) =>
+      fetchFile(filesystem.rootDir, filename, address, false)
   );
   const optional_promises = Object.entries(OPTIONAL_BINARIES).map(
-    ([filename, address]) => fetchFile(filesystem.rootDir, filename, address, false)
+    ([filename, address]) =>
+      fetchFile(filesystem.rootDir, filename, address, false)
   );
 
   anchor.innerHTML += "<br/>" + "Starting download of mandatory";
@@ -151,7 +154,9 @@ async function initFs(anchor: HTMLElement) {
 }
 
 // things that are global and should be shared between all tab instances
-export const filesystem = new Filesystem(await navigator.storage.getDirectory());
+export const filesystem = new Filesystem(
+  await navigator.storage.getDirectory()
+);
 
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
@@ -241,10 +246,12 @@ export async function init(
   terminalContentWindow.addEventListener("drop", async (e) => {
     e.preventDefault();
 
-    const copyEntry = async (entry: FileSystemDirectoryHandle | FileSystemFileHandle, path: string) => {
-      const dir = (
-          await filesystem.rootDir.getEntry(path, FileOrDir.Directory)
-      ).entry;
+    const copyEntry = async (
+      entry: FileSystemDirectoryHandle | FileSystemFileHandle,
+      path: string
+    ) => {
+      const dir = (await filesystem.rootDir.getEntry(path, FileOrDir.Directory))
+        .entry;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
         await dir._handle.getDirectoryHandle(entry.name, { create: true });
@@ -272,8 +279,9 @@ export async function init(
     }
   });
 
-  const pwd_dir = (await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory))
-    .entry;
+  const pwd_dir = (
+    await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)
+  ).entry;
   pwd_dir.path = ".";
   await workerTable.spawnProcess(
     null, // parent_id

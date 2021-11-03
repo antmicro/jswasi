@@ -2,9 +2,14 @@ import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 import { FileOrDir } from "./browser-fs.js";
 import { filesystem, fetchFile } from "./browser-shell.js";
-import {ProcessManager} from "./process-manager";
+import { ProcessManager } from "./process-manager";
 
-export async function mount(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): Promise<number> {
+export async function mount(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
   console.log(`mount(${process_id}, ${args})`);
 
   switch (args.length) {
@@ -56,7 +61,12 @@ export async function mount(processManager: ProcessManager, process_id: number, 
   }
 }
 
-export function umount(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): number {
+export function umount(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): number {
   let path = args[1];
   // handle relative path
   if (!path.startsWith("/")) {
@@ -72,7 +82,12 @@ export function umount(processManager: ProcessManager, process_id: number, args:
   return 0;
 }
 
-export async function wget(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): Promise<number> {
+export async function wget(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
   let path: string;
   let address: string;
   if (args.length == 2) {
@@ -93,7 +108,12 @@ export async function wget(processManager: ProcessManager, process_id: number, a
   return 0;
 }
 
-export async function download(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): Promise<number> {
+export async function download(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
   if (args.length === 1) {
     processManager.terminal.io.println(
       "download: help: download <address> [<path>]"
@@ -131,7 +151,12 @@ export async function download(processManager: ProcessManager, process_id: numbe
   return 0;
 }
 
-export async function ps(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): Promise<number> {
+export async function ps(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
   let ps_data = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
     const now = new Date();
@@ -151,7 +176,12 @@ export async function ps(processManager: ProcessManager, process_id: number, arg
   return 0;
 }
 
-export async function free(processManager: ProcessManager, process_id: number, args: string[], env: Record<string, string>): Promise<number> {
+export async function free(
+  processManager: ProcessManager,
+  process_id: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
   // @ts-ignore memory is non-standard API available only in Chrome
   const total_mem_raw = performance.memory.jsHeapSizeLimit;
   // @ts-ignore

@@ -1,8 +1,8 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./browser-fs.js";
 import { mount, umount, wget, download, ps, free } from "./browser-programs.js";
-import {ProcessManager} from "./process-manager";
-import {filesystem} from "./browser-shell";
+import { ProcessManager } from "./process-manager";
+import { filesystem } from "./browser-shell";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -14,7 +14,10 @@ declare global {
   }
 }
 
-export const syscallCallback = async function (event: MessageEvent, processManager: ProcessManager): Promise<void> {
+export const syscallCallback = async function (
+  event: MessageEvent,
+  processManager: ProcessManager
+): Promise<void> {
   const [process_id, action, data] = event.data;
   const full_command = processManager.processInfos[process_id].cmd;
   const process_name = full_command.substr(full_command.lastIndexOf("/") + 1);
@@ -63,7 +66,10 @@ export const syscallCallback = async function (event: MessageEvent, processManag
       const lock = new Int32Array(sbuf, 0, 1);
       const { fds } = processManager.processInfos[process_id];
 
-      const { entry } = await filesystem.rootDir.getEntry(pwd, FileOrDir.Directory);
+      const { entry } = await filesystem.rootDir.getEntry(
+        pwd,
+        FileOrDir.Directory
+      );
       const open_pwd = await entry.open();
       open_pwd.path = ".";
       fds[4] = open_pwd;

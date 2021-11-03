@@ -89,7 +89,10 @@ export class Filesystem {
     mounted_handle: FileSystemDirectoryHandle
   ): Promise<number> {
     const { parts, name } = parsePath(absolute_path);
-    const parent = await this.rootDir.getEntry(parts.join("/"), FileOrDir.Directory);
+    const parent = await this.rootDir.getEntry(
+      parts.join("/"),
+      FileOrDir.Directory
+    );
     const dir = new Directory(name, mounted_handle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
@@ -450,7 +453,10 @@ export class Directory extends Entry {
 export class OpenDirectory extends Directory {
   public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
-  async deleteEntry(path: string, options = { recursive: false }): Promise<{ err: number }> {
+  async deleteEntry(
+    path: string,
+    options = { recursive: false }
+  ): Promise<{ err: number }> {
     console.log(`OpenDirectory(${this.path}).deleteEntry(${path}, ${options})`);
     const { err, name, parent } = await this._filesystem.getParent(this, path);
     await parent._handle.removeEntry(name, options);

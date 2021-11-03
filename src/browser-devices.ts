@@ -1,10 +1,7 @@
 import * as constants from "./constants.js";
 import { ProcessManager } from "./process-manager.js";
-import {
-  OpenFile,
-} from "./browser-fs.js";
+import { OpenFile } from "./browser-fs.js";
 
-const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder();
 
 const RED_ANSI = "\u001b[31m";

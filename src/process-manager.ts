@@ -8,7 +8,6 @@ type BufferRequestQueue = {
   sbuf: Uint8Array;
 }[];
 
-
 class ProcessInfo {
   public bufferRequestQueue: BufferRequestQueue = [];
 
@@ -17,14 +16,17 @@ class ProcessInfo {
   public timestamp: number;
 
   constructor(
-      public id: number,
-      public cmd: string,
-      public worker: Worker,
-      public fds: any[], // TODO: add FileDescriptor wrapper class
-      public parentId: number,
-      public parentLock: Int32Array,
-      public callback: (event: MessageEvent, processManager: ProcessManager) => Promise<void>,
-      public env: Record<string, string>
+    public id: number,
+    public cmd: string,
+    public worker: Worker,
+    public fds: any[], // TODO: add FileDescriptor wrapper class
+    public parentId: number,
+    public parentLock: Int32Array,
+    public callback: (
+      event: MessageEvent,
+      processManager: ProcessManager
+    ) => Promise<void>,
+    public env: Record<string, string>
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
   }
@@ -42,16 +44,19 @@ export class ProcessManager {
   public compiledModules: Record<string, WebAssembly.Module> = {};
 
   constructor(
-      private readonly scriptName: string,
-      public readonly terminalOutputCallback: (output: string) => void,
-      public readonly terminal: any, // TODO: should we declare HTerminal stump or even import the real thing?
-      public readonly filesystem: Filesystem
+    private readonly scriptName: string,
+    public readonly terminalOutputCallback: (output: string) => void,
+    public readonly terminal: any, // TODO: should we declare HTerminal stump or even import the real thing?
+    public readonly filesystem: Filesystem
   ) {}
 
   async spawnProcess(
     parentId: number,
     parentLock: Int32Array,
-    syscallCallback: (event: MessageEvent, processManager: ProcessManager) => Promise<void>,
+    syscallCallback: (
+      event: MessageEvent,
+      processManager: ProcessManager
+    ) => Promise<void>,
     command: string,
     fds: any[], // TODO
     args: string[],
@@ -79,7 +84,10 @@ export class ProcessManager {
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     if (!this.compiledModules[command]) {
-      const binary = await this.filesystem.rootDir.getEntry(command, FileOrDir.File);
+      const binary = await this.filesystem.rootDir.getEntry(
+        command,
+        FileOrDir.File
+      );
       if (binary.entry === null) {
         console.warn(`No such binary: ${command}`);
         return;
@@ -137,7 +145,8 @@ export class ProcessManager {
     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
     if (this.currentProcess != null) {
       while (
-        this.processInfos[this.currentProcess].bufferRequestQueue.length !== 0 &&
+        this.processInfos[this.currentProcess].bufferRequestQueue.length !==
+          0 &&
         this.buffer.length !== 0
       ) {
         const { requestedLen, lck, readlen, sbuf } =
