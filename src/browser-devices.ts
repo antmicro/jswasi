@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { WorkerTable } from "./worker-table.js";
+import { ProcessManager } from "./process-manager.js";
 import {
   FileOrDir,
   OpenFlags,
@@ -31,9 +31,9 @@ export interface IO {
 }
 
 export class Stdin implements IO {
-  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
-  constructor(private workerTable: WorkerTable) {}
+  constructor(private workerTable: ProcessManager) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     const lck = new Int32Array(sbuf, 0, 1);
@@ -77,9 +77,9 @@ export class Stdin implements IO {
 }
 
 export class Stdout implements IO {
-  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
-  constructor(private workerTable: WorkerTable) {}
+  constructor(private workerTable: ProcessManager) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     throw "can't read from stdout!";
@@ -117,9 +117,9 @@ export class Stdout implements IO {
 }
 
 export class Stderr implements IO {
-  file_type: constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
-  constructor(private workerTable: WorkerTable) {}
+  constructor(private workerTable: ProcessManager) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     throw "can't read from stderr!";
