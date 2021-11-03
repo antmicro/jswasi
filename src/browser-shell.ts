@@ -1,12 +1,14 @@
 import * as constants from "./constants.js";
-import { WorkerTable } from "./worker-table.js";
-import { on_worker_message } from "./worker-message.js";
+import { ProcessManager } from "./process-manager.js";
+import { syscallCallback } from "./syscalls.js";
 import { FileOrDir, OpenFlags, Filesystem, Directory } from "./browser-fs.js";
 import { Stdin, Stdout, Stderr, OpenedFd } from "./browser-devices.js";
 
 declare global {
-  var stdout_attached: boolean;
-  var buffer: string;
+  interface Window {
+    stdout_attached: boolean;
+    buffer: string;
+  }
 }
 
 const ALWAYS_FETCH_BINARIES = {
@@ -153,11 +155,11 @@ async function initFs(anchor: HTMLElement) {
 export const filesystem = new Filesystem();
 
 // anchor is any HTMLElement that will be used to initialize hterm
-// notifyDropedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
+// notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behaviour
 export async function init(
   anchor: HTMLElement,
-  notifyDropedFileSaved: (path: string, entryName: string) => void = null
+  notifyDroppedFileSaved: (path: string, entryName: string) => void = null
 ): Promise<void> {
   if (!navigator.storage.getDirectory) {
     anchor.innerHTML =
@@ -175,7 +177,7 @@ export async function init(
   const terminal = new hterm.Terminal();
 
   const root_dir = await filesystem.getRootDirectory();
-  const workerTable = new WorkerTable(
+  const workerTable = new ProcessManager(
     "worker.js",
     // receive_callback
     (output) => {
@@ -208,9 +210,9 @@ export async function init(
     if (code === 3 || code === 4 || code === 81) {
       // control characters
       if (code === 3) {
-        workerTable.sendSigInt(workerTable.currentWorker);
+        workerTable.sendSigInt(workerTable.currentProcess);
       } else if (code === 4) {
-        workerTable.sendEndOfFile(workerTable.currentWorker, -1);
+        workerTable.sendEndOfFile(workerTable.currentProcess, -1);
       }
     } else {
       // regular characters
@@ -222,7 +224,7 @@ export async function init(
 
     if (code === 10 || code >= 32) {
       // echo
-      if (workerTable.workerInfos[workerTable.currentWorker].shouldEcho) {
+      if (workerTable.processInfos[workerTable.currentProcess].shouldEcho) {
         terminal.io.print(code === 10 ? "\r\n" : data);
       }
     }
@@ -266,11 +268,11 @@ export async function init(
         const writable = await handle.createWritable();
         const stream = (await entry.getFile()).stream();
         await stream.pipeTo(writable);
-        if (notifyDropedFileSaved) notifyDropedFileSaved(path, entry.name);
+        if (notifyDroppedFileSaved) notifyDroppedFileSaved(path, entry.name);
       }
     };
 
-    const pwd = workerTable.workerInfos[workerTable.currentWorker].env.PWD;
+    const pwd = workerTable.processInfos[workerTable.currentProcess].env.PWD;
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {
         const entry = await item.getAsFileSystemHandle();
@@ -282,10 +284,10 @@ export async function init(
   const pwd_dir = (await root_dir.getEntry("/home/ant", FileOrDir.Directory))
     .entry;
   pwd_dir.path = ".";
-  await workerTable.spawnWorker(
+  await workerTable.spawnProcess(
     null, // parent_id
     null, // parent_lock
-    on_worker_message,
+    syscallCallback,
     "/usr/bin/shell",
     [
       new Stdin(workerTable),

@@ -16,9 +16,9 @@ export const enum OpenFlags {
 }
 
 export class Filesystem {
-  mounts: { parts: string[]; name: string; dir: Directory }[] = [];
-
   DEBUG: boolean = false;
+
+  mounts: { parts: string[]; name: string; dir: Directory }[] = [];
 
   _rootDir: Directory;
 
@@ -459,7 +459,7 @@ export class Directory extends Entry {
 export class OpenDirectory extends Directory {
   public readonly file_type: number = constants.WASI_PREOPENTYPE_DIR;
 
-  async deleteEntry(path: string, options): Promise<{ err: number }> {
+  async deleteEntry(path: string, options = { recursive: false }): Promise<{ err: number }> {
     console.log(`OpenDirectory(${this.path}).deleteEntry(${path}, ${options})`);
     const { err, name, parent } = await this._filesystem.getParent(this, path);
     await parent._handle.removeEntry(name, options);

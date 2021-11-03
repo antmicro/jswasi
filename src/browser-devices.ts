@@ -1,12 +1,7 @@
 import * as constants from "./constants.js";
 import { ProcessManager } from "./process-manager.js";
 import {
-  FileOrDir,
-  OpenFlags,
-  File,
-  Directory,
   OpenFile,
-  OpenDirectory,
 } from "./browser-fs.js";
 
 const ENCODER = new TextEncoder();
@@ -39,7 +34,7 @@ export class Stdin implements IO {
     const lck = new Int32Array(sbuf, 0, 1);
     const readlen = new Int32Array(sbuf, 4, 1);
     const readbuf = new Uint8Array(sbuf, 8, requestedLen);
-    this.workerTable.sendBufferToWorker(
+    this.workerTable.sendBufferToProcess(
       workerId,
       requestedLen,
       lck,
@@ -86,7 +81,7 @@ export class Stdout implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    this.workerTable.receiveCallback(
+    this.workerTable.terminalOutputCallback(
       DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n")
     );
     return constants.WASI_ESUCCESS;
@@ -127,7 +122,7 @@ export class Stderr implements IO {
 
   async write(content: Uint8Array): Promise<number> {
     const output = DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n");
-    this.workerTable.receiveCallback(`${RED_ANSI}${output}${RESET}`);
+    this.workerTable.terminalOutputCallback(`${RED_ANSI}${output}${RESET}`);
     return constants.WASI_ESUCCESS;
   }
 

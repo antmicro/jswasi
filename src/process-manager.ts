@@ -2,13 +2,16 @@ import * as constants from "./constants.js";
 import { FileOrDir, Filesystem } from "./browser-fs.js";
 import { IO } from "./browser-devices.js";
 
-class WorkerInfo {
-  public bufferRequestQueue: {
-    requestedLen: number;
-    lck: Int32Array;
-    readlen: Int32Array;
-    sbuf: Uint8Array;
-  }[] = [];
+type BufferRequestQueue = {
+  requestedLen: number;
+  lck: Int32Array;
+  readlen: Int32Array;
+  sbuf: Uint8Array;
+}[];
+
+
+class ProcessInfo {
+  public bufferRequestQueue: BufferRequestQueue = [];
 
   public shouldEcho = true;
 
@@ -28,51 +31,51 @@ class WorkerInfo {
   }
 }
 
-export class WorkerTable {
+export class ProcessManager {
   public buffer = "";
 
-  public currentWorker = null;
+  public currentProcess = null;
 
-  public nextWorkerId = 0;
+  public nextProcessId = 0;
 
-  public workerInfos: Record<number, WorkerInfo> = {};
+  public processInfos: Record<number, ProcessInfo> = {};
 
   public compiledModules: Record<string, WebAssembly.Module> = {};
 
   constructor(
-    private readonly scriptName: string,
-    public readonly receiveCallback,
-    public readonly terminal,
-    public readonly filesystem: Filesystem
+      private readonly scriptName: string,
+      public readonly terminalOutputCallback: (output) => void,
+      public readonly terminal,
+      public readonly filesystem: Filesystem
   ) {}
 
-  async spawnWorker(
+  async spawnProcess(
     parentId: number,
     parentLock: Int32Array,
-    kernelCallback,
+    syscallCallback,
     command,
     fds,
     args,
     env,
     isJob: boolean
   ): Promise<number> {
-    const id = this.nextWorkerId;
-    this.nextWorkerId += 1;
+    const id = this.nextProcessId;
+    this.nextProcessId += 1;
     if (parentLock != null || parentId == null) {
-      this.currentWorker = id;
+      this.currentProcess = id;
     }
     const worker = new Worker(this.scriptName, { type: "module" });
-    this.workerInfos[id] = new WorkerInfo(
+    this.processInfos[id] = new ProcessInfo(
       id,
       command,
       worker,
       fds,
       parentId,
       parentLock,
-      kernelCallback,
+      syscallCallback,
       env
     );
-    worker.onmessage = (event) => kernelCallback(event, this);
+    worker.onmessage = (event) => syscallCallback(event, this);
 
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
@@ -89,7 +92,7 @@ export class WorkerTable {
     }
 
     // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
-    this.workerInfos[id].worker.postMessage([
+    this.processInfos[id].worker.postMessage([
       "start",
       this.compiledModules[command],
       id,
@@ -99,29 +102,29 @@ export class WorkerTable {
     return id;
   }
 
-  terminateWorker(id: number, exitNo: number = 0) {
-    const worker = this.workerInfos[id];
-    worker.worker.terminate();
+  terminateProcess(id: number, exitNo: number = 0) {
+    const process = this.processInfos[id];
+    process.worker.terminate();
     // notify parent that they can resume operation
-    if (id != 0 && worker.parentLock != null) {
-      Atomics.store(worker.parentLock, 0, exitNo);
-      Atomics.notify(worker.parentLock, 0);
-      this.currentWorker = worker.parentId;
+    if (id != 0 && process.parentLock != null) {
+      Atomics.store(process.parentLock, 0, exitNo);
+      Atomics.notify(process.parentLock, 0);
+      this.currentProcess = process.parentId;
     }
-    // remove worker from workers array
-    delete this.workerInfos[id];
+    // remove process from process array
+    delete this.processInfos[id];
   }
 
   sendSigInt(id: number) {
-    if (this.currentWorker === 0) {
-      console.log("Ctrl-C sent to WORKER 0");
+    if (this.currentProcess === 0) {
+      console.log("Ctrl-C sent to PROCESS 0");
     } else {
-      this.terminateWorker(id);
+      this.terminateProcess(id);
     }
   }
 
   sendEndOfFile(id: number, lockValue: number) {
-    const worker = this.workerInfos[id];
+    const worker = this.processInfos[id];
     if (worker.bufferRequestQueue.length !== 0) {
       const { lck } = worker.bufferRequestQueue[0];
       Atomics.store(lck, 0, lockValue);
@@ -132,17 +135,17 @@ export class WorkerTable {
   pushToBuffer(data: string) {
     this.buffer += data;
 
-    // each worker has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
+    // each process has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-    if (this.currentWorker != null) {
+    if (this.currentProcess != null) {
       while (
-        this.workerInfos[this.currentWorker].bufferRequestQueue.length !== 0 &&
+        this.processInfos[this.currentProcess].bufferRequestQueue.length !== 0 &&
         this.buffer.length !== 0
       ) {
         const { requestedLen, lck, readlen, sbuf } =
-          this.workerInfos[this.currentWorker].bufferRequestQueue.shift();
-        this.sendBufferToWorker(
-          this.currentWorker,
+          this.processInfos[this.currentProcess].bufferRequestQueue.shift();
+        this.sendBufferToProcess(
+          this.currentProcess,
           requestedLen,
           lck,
           readlen,
@@ -152,7 +155,7 @@ export class WorkerTable {
     }
   }
 
-  sendBufferToWorker(
+  sendBufferToProcess(
     workerId: number,
     requestedLen: number,
     lck: Int32Array,
@@ -160,8 +163,8 @@ export class WorkerTable {
     buf: Uint8Array
   ) {
     // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
-    if (this.buffer.length == 0 || workerId != this.currentWorker) {
-      this.workerInfos[workerId].bufferRequestQueue.push({
+    if (this.buffer.length == 0 || workerId != this.currentProcess) {
+      this.processInfos[workerId].bufferRequestQueue.push({
         requestedLen,
         lck,
         readlen,

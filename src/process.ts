@@ -25,8 +25,7 @@ onmessage = (e) => {
   }
 };
 
-function worker_send(msg) {
-  const msg_ = [myself, ...msg];
+function send_to_kernel(msg) {
   // @ts-ignore
   postMessage([myself, ...msg]);
 }
@@ -37,13 +36,13 @@ function worker_console_log(msg) {
     env.DEBUG &&
     !(env.DEBUG === "0" || env.DEBUG === "false" || env.DEBUG === "")
   ) {
-    worker_send(["console", msg]);
+    send_to_kernel(["console", msg]);
   }
 }
 
 function do_exit(exit_code: number) {
   worker_console_log("calling close()");
-  worker_send(["exit", exit_code]);
+  send_to_kernel(["exit", exit_code]);
   close();
 }
 
@@ -144,7 +143,7 @@ function WASI() {
     const rights_base = new BigUint64Array(sbuf, 8, 1);
     const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
 
-    worker_send(["fd_fdstat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_fdstat_get", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -195,7 +194,7 @@ function WASI() {
     const sbuf = new SharedArrayBuffer(4);
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
-    worker_send(["fd_write", [sbuf, fd, content]]);
+    send_to_kernel(["fd_write", [sbuf, fd, content]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -241,7 +240,7 @@ function WASI() {
     const sbuf = new SharedArrayBuffer(4);
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
-    worker_send(["fd_close", [sbuf, fd]]);
+    send_to_kernel(["fd_close", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);
 
     return Atomics.load(lck, 0);
@@ -272,7 +271,7 @@ function WASI() {
     lck[0] = -1;
     const statbuf = new DataView(sbuf, 4);
 
-    worker_send(["fd_filestat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_filestat_get", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -320,7 +319,7 @@ function WASI() {
       const readlen = new Int32Array(sbuf, 4, 1);
       const readbuf = new Uint8Array(sbuf, 8, len);
 
-      worker_send(["fd_read", [sbuf, fd, len]]);
+      send_to_kernel(["fd_read", [sbuf, fd, len]]);
       Atomics.wait(lck, 0, -1);
 
       const err = Atomics.load(lck, 0);
@@ -357,7 +356,7 @@ function WASI() {
     const buf_used = new Uint32Array(sbuf, 4, 1);
     const databuf = new Uint8Array(sbuf, 8);
 
-    worker_send(["fd_readdir", [sbuf, fd, cookie, buf_len]]);
+    send_to_kernel(["fd_readdir", [sbuf, fd, cookie, buf_len]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -385,7 +384,7 @@ function WASI() {
     lck[0] = -1;
     const file_pos = new BigUint64Array(sbuf, 8, 1);
 
-    worker_send(["fd_seek", [sbuf, fd, offset, whence]]);
+    send_to_kernel(["fd_seek", [sbuf, fd, offset, whence]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -412,7 +411,7 @@ function WASI() {
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
 
-    worker_send(["path_create_directory", [sbuf, fd, path]]);
+    send_to_kernel(["path_create_directory", [sbuf, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -442,7 +441,7 @@ function WASI() {
     lck[0] = -1;
     const statbuf = new DataView(sbuf, 4);
 
-    worker_send(["path_filestat_get", [sbuf, fd, path, flags]]);
+    send_to_kernel(["path_filestat_get", [sbuf, fd, path, flags]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -500,7 +499,7 @@ function WASI() {
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
     const opened_fd = new Int32Array(sbuf, 4, 1);
-    worker_send([
+    send_to_kernel([
       "path_open",
       [
         sbuf,
@@ -546,7 +545,7 @@ function WASI() {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
       lck[0] = -1;
-      worker_send([
+      send_to_kernel([
         "spawn",
         [args[0], args.slice(1), extended_env, sbuf, isJob, redirects],
       ]);
@@ -563,7 +562,7 @@ function WASI() {
       const lck = new Int32Array(sbuf, 0, 1);
 
       const args = args_string.split("\x1b");
-      worker_send(["set_env", [args, sbuf]]);
+      send_to_kernel(["set_env", [args, sbuf]]);
       if (args.length == 1) {
         delete env[args[0]];
         return "";
@@ -572,7 +571,7 @@ function WASI() {
       if (args[0] == "PWD") {
         env[args[0]] = utils.realpath(env[args[0]]);
         lck[0] = -1;
-        worker_send(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
+        send_to_kernel(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
       }
       worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
       return env[args[0]];
@@ -582,7 +581,7 @@ function WASI() {
     if (cmd === "set_echo") {
       const sbuf = new SharedArrayBuffer(4);
       const lck = new Int32Array(sbuf, 0, 1);
-      worker_send(["set_echo", [args_string, sbuf]]);
+      send_to_kernel(["set_echo", [args_string, sbuf]]);
       Atomics.wait(lck, 0, -1);
       return "";
     }
@@ -637,7 +636,7 @@ function WASI() {
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
 
-    worker_send(["path_remove_directory", [sbuf, fd, path]]);
+    send_to_kernel(["path_remove_directory", [sbuf, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -660,7 +659,7 @@ function WASI() {
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
 
-    worker_send(["path_unlink_file", [sbuf, fd, path]]);
+    send_to_kernel(["path_unlink_file", [sbuf, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -682,7 +681,7 @@ function WASI() {
     const name_len = new Int32Array(sbuf, 4, 1);
     const preopen_type = new Uint8Array(sbuf, 8, 1);
 
-    worker_send(["fd_prestat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_prestat_get", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -709,7 +708,7 @@ function WASI() {
     lck[0] = -1;
     const path = new Uint8Array(sbuf, 4, path_len);
 
-    worker_send(["fd_prestat_dir_name", [sbuf, fd, path_len]]);
+    send_to_kernel(["fd_prestat_dir_name", [sbuf, fd, path_len]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -762,7 +761,7 @@ function WASI() {
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
 
-    worker_send(["path_symlink", [sbuf, path, fd, newpath]]);
+    send_to_kernel(["path_symlink", [sbuf, path, fd, newpath]]);
 
     Atomics.wait(lck, 0, -1);
 
@@ -995,7 +994,7 @@ async function importWasmModule(moduleName, wasiCallbacksConstructor) {
       do_exit(0);
     } catch (e) {
       worker_console_log(`error: ${e}`);
-      worker_send(["stderr", `${e.stack}\n`]);
+      send_to_kernel(["stderr", `${e.stack}\n`]);
       do_exit(255);
     }
   } else {
@@ -1010,7 +1009,7 @@ async function start_wasm() {
       await importWasmModule(mod, WASI);
     } catch (err) {
       worker_console_log(`Failed instantiating WASM module: ${err}`);
-      worker_send(["stderr", `Failed instantiating WASM module: ${err}`]);
+      send_to_kernel(["stderr", `Failed instantiating WASM module: ${err}`]);
       do_exit(255);
     }
     worker_console_log("done.");
@@ -1024,5 +1023,5 @@ async function start_wasm() {
 try {
   (async () => await start_wasm())();
 } catch (err) {
-  worker_send(["console", `Worker failed: ${err}`]);
+  send_to_kernel(["console", `Worker failed: ${err}`]);
 }
