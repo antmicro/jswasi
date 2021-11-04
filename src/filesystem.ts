@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import { parsePath, arraysEqual } from "./utils.js";
-import { OpenedFd } from "./browser-devices.js";
+import { OpenedFd } from "./devices.js";
 
 export const enum FileOrDir {
   File = 1,

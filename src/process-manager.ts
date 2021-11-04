@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { FileOrDir, Filesystem } from "./browser-fs.js";
+import { FileOrDir, Filesystem } from "./filesystem.js";
 
 type BufferRequestQueue = {
   requestedLen: number;

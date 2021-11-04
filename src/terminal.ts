@@ -1,8 +1,8 @@
 import * as constants from "./constants.js";
 import { ProcessManager } from "./process-manager.js";
 import { syscallCallback } from "./syscalls.js";
-import { FileOrDir, OpenFlags, Filesystem, Directory } from "./browser-fs.js";
-import { Stdin, Stdout, Stderr, OpenedFd } from "./browser-devices.js";
+import { FileOrDir, OpenFlags, Filesystem, Directory } from "./filesystem.js";
+import { Stdin, Stdout, Stderr, OpenedFd } from "./devices.js";
 
 declare global {
   interface Window {

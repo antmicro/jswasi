@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import { ProcessManager } from "./process-manager.js";
-import { OpenFile } from "./browser-fs.js";
+import { OpenFile } from "./filesystem.js";
 
 const DECODER = new TextDecoder();
 
