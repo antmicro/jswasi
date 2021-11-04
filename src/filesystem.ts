@@ -462,6 +462,10 @@ export class OpenDirectory extends Directory {
     await parent._handle.removeEntry(name, options);
     return { err: constants.WASI_ESUCCESS };
   }
+
+  async close() {
+    // TODO: what would that mean to close a directory?
+  }
 }
 
 export class File extends Entry {

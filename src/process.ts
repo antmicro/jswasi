@@ -1091,7 +1091,7 @@ async function importWasmModule(
     wasiCallbacks.setModuleInstance(instance);
     try {
       // @ts-ignore
-      instance.exports.main();
+      instance.exports._start();
       do_exit(0);
     } catch (e) {
       worker_console_log(`error: ${e}`);
