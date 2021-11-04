@@ -1,9 +1,19 @@
 use std::env;
+use std::io;
+use std::io::Read;
+use std::path::PathBuf;
+use std::os::raw::c_int;
 
 use clap::{App, Arg};
-use std::path::PathBuf;
 
 use wash::Shell;
+
+extern "C" {
+    fn isatty(fd: c_int) -> c_int;
+}
+
+const STDIN: c_int = 0;
+const STDOUT: c_int = 1;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {
@@ -49,6 +59,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
     } else {
-        shell.run_interpreter()
+        let is_tty = {
+            let stdin_is_tty = unsafe { isatty(STDIN) } == 1;
+            let stdout_is_tty = unsafe { isatty(STDOUT) } == 1;
+            stdin_is_tty && stdout_is_tty
+        };
+        if is_tty {
+            shell.run_interpreter()
+        } else {
+            println!("a pipe!");
+            let mut input = String::new();
+            let stdin = io::stdin();
+            stdin.lock().read_to_string(&mut input)?;
+            shell.run_command(&input)
+        }
     }
 }

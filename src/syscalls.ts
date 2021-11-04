@@ -78,6 +78,26 @@ export async function syscallCallback(
       Atomics.notify(lock, 0);
       break;
     }
+    case "isatty": {
+      const [sbuf, fd] = data;
+      const lck = new Int32Array(sbuf, 0, 1);
+
+      let err;
+      const { fds } = processManager.processInfos[process_id];
+      if (fds[fd] !== undefined) {
+        err = await fds[fd].getEntry(
+          path,
+          FileOrDir.Directory,
+          OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive
+        );
+      } else {
+        err = constants.WASI_EBADF;
+      }
+
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
     case "set_env": {
       const [[key, value], sbuf] = data;
       const lock = new Int32Array(sbuf, 0, 1);

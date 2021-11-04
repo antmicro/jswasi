@@ -1,18 +1,24 @@
 [package]
-name = "wash"
-version = "0.1.0"
 authors = ["Tomasz Karwowski <tkarwowski@internships.antmicro.com", "Peter Gielda <pgielda@antmicro.com"]
 edition = "2018"
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"
-
+name = "wash"
+version = "0.1.0"
 [dependencies]
-rand = "0.8.4"
-conch-parser = "0.1.1"
-substring = "1.4.5"
-sha-1 = "0.9.8"
 clap = "3.0.0-beta.4"
-zip = {version = "0.5.13", default-features = false, deflate = true }
-iterm2 = { git = "https://github.com/Noskcaj19/iterm2" }
+conch-parser = "0.1.1"
+libc = "*"
+rand = "0.8.4"
+sha-1 = "0.9.8"
+substring = "1.4.5"
+
+[dependencies.iterm2]
+git = "https://github.com/Noskcaj19/iterm2"
+
+[dependencies.zip]
+default-features = false
+deflate = true
+version = "0.5.13"
+
+[profile]
+[profile.release]
+opt-level = "s"
