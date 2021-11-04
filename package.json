@@ -21,12 +21,12 @@
     "puppeteer": "^10.4.0"
   },
   "scripts": {
-    "build": "cd shell && make release && cd .. && tsc",
+    "build": "./setup all",
     "start": "cd dist && python3 ../custom_server.py",
-    "dev": "./run.sh",
+    "dev": "./setup.sh run",
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
-    "pretest": "cd dist && python3 ../custom_server.py 4000 &",
+    "pretest": "./setup.sh run 4000 &",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "record": "node ci/grab-screencast.js && rm -r ci/images && rm ci/images.txt"
   },
