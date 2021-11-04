@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
-use std::io::{Read, Write};
+use std::io::{Read, Write, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -161,7 +161,12 @@ impl Shell {
             let mut history_entry_to_display: i32 = -1;
             // read line
             loop {
-                io::stdin().read_exact(&mut c1)?;
+                // this is to handle EOF when piping to shell
+                match io::stdin().read_exact(&mut c1) {
+                    Ok(()) => {},
+                    Err(e) if e.kind() == ErrorKind::UnexpectedEof => exit(0),
+                    Err(e) => eprintln!("{}", e),
+                }
                 if escaped {
                     match c1[0] {
                         0x5b => {
