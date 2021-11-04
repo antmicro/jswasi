@@ -180,8 +180,8 @@ export async function init(
   // @ts-ignore
   const terminal = new hterm.Terminal();
 
-  const workerTable = new ProcessManager(
-    "worker.js",
+  const processManager = new ProcessManager(
+    "process.js",
     // receive_callback
     (output) => {
       terminal.io.print(output);
@@ -213,13 +213,13 @@ export async function init(
     if (code === 3 || code === 4 || code === 81) {
       // control characters
       if (code === 3) {
-        workerTable.sendSigInt(workerTable.currentProcess);
+        processManager.sendSigInt(processManager.currentProcess);
       } else if (code === 4) {
-        workerTable.sendEndOfFile(workerTable.currentProcess, -1);
+        processManager.sendEndOfFile(processManager.currentProcess, -1);
       }
     } else {
       // regular characters
-      workerTable.pushToBuffer(data);
+      processManager.pushToBuffer(data);
       if (window.stdout_attached) {
         window.buffer += data;
       }
@@ -227,7 +227,7 @@ export async function init(
 
     if (code === 10 || code >= 32) {
       // echo
-      if (workerTable.processInfos[workerTable.currentProcess].shouldEcho) {
+      if (processManager.processInfos[processManager.currentProcess].shouldEcho) {
         terminal.io.print(code === 10 ? "\r\n" : data);
       }
     }
@@ -238,7 +238,7 @@ export async function init(
   // TODO: maybe save all output and rewrite it on adjusted size?
   io.onTerminalResize = (columns: number, rows: number) => {};
 
-  // drag and drop support (save dragged files and folders to current directoru)
+  // drag and drop support (save dragged files and folders to current directory)
   // hterm creates iframe child of provided anchor, we assume there's only one of those
   const terminalContentWindow =
     anchor.getElementsByTagName("iframe")[0].contentWindow;
@@ -270,7 +270,7 @@ export async function init(
       }
     };
 
-    const pwd = workerTable.processInfos[workerTable.currentProcess].env.PWD;
+    const pwd = processManager.processInfos[processManager.currentProcess].env.PWD;
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {
         const entry = await item.getAsFileSystemHandle();
@@ -283,15 +283,15 @@ export async function init(
     await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)
   ).entry;
   pwd_dir.path = ".";
-  await workerTable.spawnProcess(
+  await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
     syscallCallback,
     "/usr/bin/shell",
     [
-      new Stdin(workerTable),
-      new Stdout(workerTable),
-      new Stderr(workerTable),
+      new Stdin(processManager),
+      new Stdout(processManager),
+      new Stderr(processManager),
       await filesystem.rootDir.open(),
       await pwd_dir.open(),
       // TODO: why must fds[5] be present for ls to work, and what should it be
