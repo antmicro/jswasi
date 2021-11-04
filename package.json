@@ -22,13 +22,13 @@
   },
   "scripts": {
     "build": "cd shell && make release && cd .. && tsc",
-    "start": "cd dist; python3 ../custom_server.py",
+    "start": "cd dist && python3 ../custom_server.py",
     "dev": "./run.sh",
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
-    "pretest": "cd dist; python3 ../custom_server.py 4000 &",
+    "pretest": "cd dist && python3 ../custom_server.py 4000 &",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "record": "node ci/grab-screencast.js; rm -r ci/images; rm ci/images.txt"
+    "record": "node ci/grab-screencast.js && rm -r ci/images && rm ci/images.txt"
   },
   "jest": {
     "preset": "jest-puppeteer"

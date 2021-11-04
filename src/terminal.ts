@@ -48,6 +48,11 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/rapidlua/llc/0.0.4/llc.wasm",
 };
 
+// things that are global and should be shared between all tab instances
+export const filesystem = new Filesystem(
+  await navigator.storage.getDirectory()
+);
+
 export async function fetchFile(
   dir: Directory,
   filename: string,
@@ -152,11 +157,6 @@ async function initFs(anchor: HTMLElement) {
   //       it can say that command is not found or just fail at instantiation
   Promise.all(optional_promises);
 }
-
-// things that are global and should be shared between all tab instances
-export const filesystem = new Filesystem(
-  await navigator.storage.getDirectory()
-);
 
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
