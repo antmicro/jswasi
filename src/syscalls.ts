@@ -320,7 +320,7 @@ export async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[process_id];
       if (fds[fd] !== undefined) {
-        // TODO: actually close file
+        fds[fd].close();
         fds[fd] = undefined;
         err = constants.WASI_ESUCCESS;
       } else {

@@ -530,6 +530,10 @@ export class OpenFile extends File {
     return 0;
   }
 
+  async close() {
+    // TODO: add implementation when reworking OpenFile
+  }
+
   async seek(offset: number, whence: number): Promise<number> {
     if (this.DEBUG)
       console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
