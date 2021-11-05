@@ -48,8 +48,8 @@ pub fn syscall(
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
-            std::process::Command::new(command)
-                .args(args)
+            std::process::Command::new(args[0])
+                .args(&args[1..])
                 .envs(envs)
                 .spawn().unwrap()
                 .wait().unwrap();
