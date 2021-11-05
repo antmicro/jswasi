@@ -49,9 +49,10 @@ const OPTIONAL_BINARIES = {
 };
 
 // things that are global and should be shared between all tab instances
-export const filesystem = new Filesystem(
-  await navigator.storage.getDirectory()
-);
+export let filesystem: Filesystem;
+// TODO: node (in ci/grab-screencast.js) doesn't accept top level await
+//   it can potentially be fixed by making the script an ESModule
+navigator.storage.getDirectory().then(rootHandle => filesystem = new Filesystem(rootHandle));
 
 export async function fetchFile(
   dir: Directory,
@@ -110,7 +111,7 @@ async function initFs(anchor: HTMLElement) {
     await w.write({
       type: "write",
       position: 0,
-      data: "export RUST_BACKTRACE=full\nexport DEBUG=0\n",
+      data: "export RUST_BACKTRACE=full\nexport DEBUG=1\n",
     });
     await w.close();
   }
