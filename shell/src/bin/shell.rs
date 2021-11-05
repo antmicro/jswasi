@@ -17,32 +17,18 @@ extern "C" {
 const STDIN: c_int = 0;
 const STDOUT: c_int = 1;
 
-fn is_tty() -> Result<bool, Box<dyn std::error::Error>> {
+fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "wasi"))]
-    let result = {
-        let stdin_is_tty = unsafe { isatty(STDIN) } == 1;
-        let stdout_is_tty = unsafe { isatty(STDOUT) } == 1;
-        stdin_is_tty && stdout_is_tty
-    };
+    let is_tty = unsafe { isatty(fd) } == 1;
     #[cfg(target_os = "wasi")]
-    let result = {
-        let stdin_is_tty = syscall(
-            "isatty",
-            &[&STDIN.to_string()],
-            &HashMap::new(),
-            false,
-            &[],
-        )? == "1";
-        let stdout_is_tty = syscall(
-            "isatty",
-            &[&STDOUT.to_string()],
-            &HashMap::new(),
-            false,
-            &[],
-        )? == "1";
-        stdin_is_tty && stdout_is_tty
-    };
-    Ok(result)
+    let is_tty = syscall(
+        "isatty",
+        &[&fd.to_string()],
+        &HashMap::new(),
+        false,
+        &[],
+    ).unwrap() == "1";
+    Ok(is_tty)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -80,8 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if env::var("HOME").is_err() {
         env::set_var("HOME", "/");
     }
-    let pwd = env::var("PWD")?;
-    env::set_current_dir(&pwd)?;
+    let pwd = env::var("PWD").unwrap();
+    env::set_current_dir(&pwd).unwrap();
     let mut shell = Shell::new(&pwd);
 
     if let Some(command) = matches.value_of("command") {
@@ -89,12 +75,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
     } else {
-        if is_tty()? {
+        if is_fd_tty(STDIN).unwrap() {
             shell.run_interpreter()
         } else {
             let mut input = String::new();
             let stdin = io::stdin();
-            stdin.lock().read_to_string(&mut input)?;
+            stdin.lock().read_to_string(&mut input).unwrap();
             shell.run_command(&input)
         }
     }

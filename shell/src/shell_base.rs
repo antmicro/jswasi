@@ -44,15 +44,15 @@ pub fn syscall(
                 .join("\x1b"),
         ]
         .join("\x1b\x1b")
-    ))?;
+    )).unwrap();
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
             std::process::Command::new(command)
                 .args(args)
                 .envs(envs)
-                .spawn()?
-                .wait()?;
+                .spawn().unwrap()
+                .wait().unwrap();
         }
         PathBuf::from("")
     };
@@ -86,7 +86,7 @@ impl Shell {
         &mut self,
         script_name: impl Into<PathBuf>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.handle_input(&fs::read_to_string(script_name.into())?)
+        self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -94,17 +94,17 @@ impl Shell {
         let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
-        env::set_current_dir(env::var("PWD")?)?;
+        env::set_current_dir(env::var("PWD").unwrap()).unwrap();
 
         let history_path = {
-            if PathBuf::from(env::var("HOME")?).exists() {
-                format!("{}/.shell_history", env::var("HOME")?)
+            if PathBuf::from(env::var("HOME").unwrap()).exists() {
+                format!("{}/.shell_history", env::var("HOME").unwrap())
             } else {
-                format!("{}/.shell_history", env::var("PWD")?)
+                format!("{}/.shell_history", env::var("PWD").unwrap())
             }
         };
         if PathBuf::from(&history_path).exists() {
-            self.history = fs::read_to_string(&history_path)?
+            self.history = fs::read_to_string(&history_path).unwrap()
                 .lines()
                 .map(str::to_string)
                 .collect();
@@ -122,21 +122,21 @@ impl Shell {
         };
 
         let shellrc_path = {
-            if PathBuf::from(env::var("HOME")?).exists() {
-                format!("{}/.shellrc", env::var("HOME")?)
+            if PathBuf::from(env::var("HOME").unwrap()).exists() {
+                format!("{}/.shellrc", env::var("HOME").unwrap())
             } else {
-                format!("{}/.shellrc", env::var("PWD")?)
+                format!("{}/.shellrc", env::var("PWD").unwrap())
             }
         };
         if PathBuf::from(&shellrc_path).exists() {
-            self.run_script(shellrc_path)?;
+            self.run_script(shellrc_path).unwrap();
         }
 
         let mut cursor_position = 0;
 
         let motd_path = PathBuf::from("/etc/motd");
         if motd_path.exists() {
-            println!("{}", fs::read_to_string(motd_path)?);
+            println!("{}", fs::read_to_string(motd_path).unwrap());
         }
 
         loop {
@@ -145,16 +145,16 @@ impl Shell {
             let mut display_path = String::new();
 
             // prompt for input
-            if self.pwd.substring(0, env::var("HOME")?.len()) == env::var("HOME")? {
+            if self.pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap() {
                 display_path.push_str(&format!(
                     "~{}",
-                    self.pwd.substring(env::var("HOME")?.len(), 4096)
+                    self.pwd.substring(env::var("HOME").unwrap().len(), 4096)
                 ));
             } else {
                 display_path.push_str(&self.pwd);
             }
             print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
-            io::stdout().flush()?;
+            io::stdout().flush().unwrap();
 
             let mut c1 = [0];
             let mut escaped = false;
@@ -164,18 +164,17 @@ impl Shell {
                 // this is to handle EOF when piping to shell
                 match io::stdin().read_exact(&mut c1) {
                     Ok(()) => {},
-                    Err(e) if e.kind() == ErrorKind::UnexpectedEof => exit(0),
-                    Err(e) => eprintln!("{}", e),
+                    Err(_) => exit(0),
                 }
                 if escaped {
                     match c1[0] {
                         0x5b => {
                             let mut c2 = [0];
-                            io::stdin().read_exact(&mut c2)?;
+                            io::stdin().read_exact(&mut c2).unwrap();
                             match c2[0] {
                                 0x32 | 0x33 | 0x35 | 0x36 => {
                                     let mut c3 = [0];
-                                    io::stdin().read_exact(&mut c3)?;
+                                    io::stdin().read_exact(&mut c3).unwrap();
                                     match [c2[0], c3[0]] {
                                         [0x35, 0x7e] => {
                                             println!("TODO: PAGE UP");
@@ -221,8 +220,8 @@ impl Shell {
                                             println!("TODO: SHIFT + DELETE");
                                             let mut c4 = [0];
                                             // TWO MORE! TODO: improve!
-                                            io::stdin().read_exact(&mut c4)?;
-                                            io::stdin().read_exact(&mut c4)?;
+                                            io::stdin().read_exact(&mut c4).unwrap();
+                                            io::stdin().read_exact(&mut c4).unwrap();
                                             escaped = false;
                                         }
                                         _ => {
@@ -384,7 +383,7 @@ impl Shell {
                         }
                     }
                 }
-                io::stdout().flush()?;
+                io::stdout().flush().unwrap();
             }
 
             // handle line
@@ -441,7 +440,7 @@ impl Shell {
                 // don't push !commands and duplicates of last command
                 if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
                     self.history.push(input.clone());
-                    writeln!(shell_history, "{}", &input)?;
+                    writeln!(shell_history, "{}", &input).unwrap();
                 }
             }
 
@@ -483,17 +482,17 @@ impl Shell {
                     if args.is_empty() {
                         0
                     } else {
-                        args[0].parse()?
+                        args[0].parse().unwrap()
                     }
                 };
                 exit(exit_code);
             }
-            "pwd" => println!("{}", env::current_dir()?.display()),
+            "pwd" => println!("{}", env::current_dir().unwrap().display()),
             "cd" => {
                 let path = if args.is_empty() {
-                    PathBuf::from(env::var("HOME")?)
+                    PathBuf::from(env::var("HOME").unwrap())
                 } else if args[0] == "-" {
-                    PathBuf::from(env::var("OLDPWD")?)
+                    PathBuf::from(env::var("OLDPWD").unwrap())
                 } else if args[0].starts_with('/') {
                     PathBuf::from(&args[0])
                 } else {
@@ -508,16 +507,16 @@ impl Shell {
                     if metadata.unwrap().is_file() {
                         println!("cd: {}: Not a directory", path.display());
                     } else {
-                        env::set_var("OLDPWD", env::current_dir()?.to_str().unwrap());
+                        env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap());
                         syscall(
                             "set_env",
-                            &["OLDPWD", env::current_dir()?.to_str().unwrap()],
+                            &["OLDPWD", env::current_dir().unwrap().to_str().unwrap()],
                             env,
                             background,
                             &[],
-                        )?;
+                        ).unwrap();
                         #[cfg(not(target_os = "wasi"))]
-                        let pwd_path = fs::canonicalize(path)?;
+                        let pwd_path = fs::canonicalize(path).unwrap();
                         #[cfg(target_os = "wasi")]
                         let pwd_path = PathBuf::from(syscall(
                             "set_env",
@@ -525,10 +524,10 @@ impl Shell {
                             env,
                             background,
                             &[],
-                        )?);
+                        ).unwrap());
                         self.pwd = String::from(pwd_path.to_str().unwrap());
                         env::set_var("PWD", &self.pwd);
-                        env::set_current_dir(&pwd_path)?;
+                        env::set_current_dir(&pwd_path).unwrap();
                     }
                 }
             }
@@ -548,7 +547,7 @@ impl Shell {
                         self.vars.remove(arg);
                         if env::var(&arg).is_ok() {
                             env::remove_var(&arg);
-                            syscall("set_env", &[arg], env, background, &[])?;
+                            syscall("set_env", &[arg], env, background, &[]).unwrap();
                         }
                     }
                 }
@@ -568,14 +567,14 @@ impl Shell {
                     for arg in args.iter().skip(1) {
                         if args[0] == "-x" {
                             if let Some((key, value)) = arg.split_once("=") {
-                                syscall("set_env", &[key, value], env, background, &[])?;
+                                syscall("set_env", &[key, value], env, background, &[]).unwrap();
                             }
                         } else if let Some((key, value)) = arg.split_once("=") {
-                            syscall("set_env", &[key], env, background, &[])?;
+                            syscall("set_env", &[key], env, background, &[]).unwrap();
                             self.vars.insert(key.to_string(), value.to_string());
                         } else {
-                            let value = env::var(arg)?;
-                            syscall("set_env", &[arg], env, background, &[])?;
+                            let value = env::var(arg).unwrap();
+                            syscall("set_env", &[arg], env, background, &[]).unwrap();
                             self.vars.insert(arg.clone(), value.clone());
                         }
                     }
@@ -598,19 +597,19 @@ impl Shell {
                     if let Some((key, value)) = arg.split_once("=") {
                         self.vars.remove(key);
                         env::set_var(&key, &value);
-                        syscall("set_env", &[key, value], env, background, &[])?;
+                        syscall("set_env", &[key, value], env, background, &[]).unwrap();
                     } else if let Some(value) = self.vars.remove(arg) {
                         env::set_var(&arg, &value);
-                        syscall("set_env", &[arg, &value], env, background, &[])?;
+                        syscall("set_env", &[arg, &value], env, background, &[]).unwrap();
                     } else {
                         env::set_var(&arg, "");
-                        syscall("set_env", &[arg, ""], env, background, &[])?;
+                        syscall("set_env", &[arg, ""], env, background, &[]).unwrap();
                     }
                 }
             }
             "source" => {
                 if let Some(filename) = args.get(0) {
-                    self.run_script(filename)?;
+                    self.run_script(filename).unwrap();
                 } else {
                     println!("source: help: source <filename>");
                 }
@@ -632,34 +631,34 @@ impl Shell {
                     println!("usage: imgcat <IMAGE>");
                 } else {
                     // TODO: find out why it breaks the order of prompt
-                    iterm2::File::read(&args[0])?
+                    iterm2::File::read(&args[0]).unwrap()
                         .width(iterm2::Dimension::Auto)
                         .height(iterm2::Dimension::Auto)
                         .preserve_aspect_ratio(true)
-                        .show()?;
+                        .show().unwrap();
                 }
             }
             "unzip" => {
                 if let Some(filepath) = &args.get(0) {
-                    let file = fs::File::open(&PathBuf::from(filepath))?;
-                    let mut archive = zip::ZipArchive::new(file)?;
+                    let file = fs::File::open(&PathBuf::from(filepath)).unwrap();
+                    let mut archive = zip::ZipArchive::new(file).unwrap();
                     for i in 0..archive.len() {
-                        let mut file = archive.by_index(i)?;
+                        let mut file = archive.by_index(i).unwrap();
                         let outpath = file.enclosed_name().to_owned().unwrap();
                         if file.name().ends_with('/') {
                             println!("creating dir {}", outpath.display());
-                            fs::create_dir_all(&outpath)?;
+                            fs::create_dir_all(&outpath).unwrap();
                             continue;
                         }
                         if let Some(parent) = outpath.parent() {
                             if !parent.exists() {
                                 println!("creating dir {}", parent.display());
-                                fs::create_dir_all(&parent)?;
+                                fs::create_dir_all(&parent).unwrap();
                             }
                         }
                         println!("decompressing {}", file.enclosed_name().unwrap().display());
-                        let mut outfile = fs::File::create(&outpath)?;
-                        io::copy(&mut file, &mut outfile)?;
+                        let mut outfile = fs::File::create(&outpath).unwrap();
+                        io::copy(&mut file, &mut outfile).unwrap();
                         println!(
                             "decompressing {} done.",
                             file.enclosed_name().unwrap().display()
@@ -734,7 +733,7 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, background, redirects)?;
+                syscall("spawn", &args_[..], env, background, redirects).unwrap();
             }
             // no input
             "" => {}
@@ -784,7 +783,7 @@ impl Shell {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        let _result = syscall("spawn", &args_[..], env, background, redirects)?;
+                        let _result = syscall("spawn", &args_[..], env, background, redirects).unwrap();
                     }
                     Err(reason) => println!("{}", reason),
                 }
