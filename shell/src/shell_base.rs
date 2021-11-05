@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -22,8 +22,8 @@ pub fn syscall(
     command: &str,
     args: &[&str],
     envs: &HashMap<String, String>,
-    background: bool,
-    redirects: &[(u16, String, String)],
+    #[allow(unused_variables)] background: bool,
+    #[allow(unused_variables)] redirects: &[(u16, String, String)],
 ) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
     let result = fs::read_link(format!(
@@ -67,14 +67,16 @@ pub fn syscall(
 }
 
 pub struct Shell {
+    pub should_echo: bool,
     pub pwd: String,
     pub history: Vec<String>,
     pub vars: HashMap<String, String>,
 }
 
 impl Shell {
-    pub fn new(pwd: &str) -> Self {
+    pub fn new(should_echo: bool, pwd: &str) -> Self {
         Shell {
+            should_echo,
             pwd: pwd.to_string(),
             history: Vec::new(),
             vars: HashMap::new(),
@@ -83,14 +85,23 @@ impl Shell {
 
     fn parse_prompt_string(&self) -> String {
         env::var("PS1")
-            .unwrap_or("\\u@\\h:\\w$ ".to_string())
-            .replace("\\u", &env::var("USER").unwrap_or("user".to_string()))
+            .unwrap_or_else(|_| "\\u@\\h:\\w$ ".to_string())
+            .replace(
+                "\\u",
+                &env::var("USER").unwrap_or_else(|_| "user".to_string()),
+            )
             .replace(
                 "\\h",
-                &env::var("HOSTNAME").unwrap_or("hostname".to_string()),
+                &env::var("HOSTNAME").unwrap_or_else(|_| "hostname".to_string()),
             )
             // FIXME: should only replace if it starts with HOME
             .replace("\\w", &self.pwd.replace(&env::var("HOME").unwrap(), "~"))
+    }
+
+    fn echo(&self, output: &str) {
+        if self.should_echo {
+            print!("{}", output);
+        }
     }
 
     pub fn run_command(&mut self, command: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -196,27 +207,23 @@ impl Shell {
                                         // delete key
                                         [0x33, 0x7e] => {
                                             if input.len() - cursor_position > 0 {
-                                                print!(
-                                                    "{}",
-                                                    " ".repeat(input.len() - cursor_position + 1)
+                                                self.echo(
+                                                    &" ".repeat(input.len() - cursor_position + 1),
                                                 );
                                                 input.remove(cursor_position);
-                                                print!(
-                                                    "{}",
-                                                    format!("{}", 8 as char)
-                                                        .repeat(input.len() - cursor_position + 2)
+                                                self.echo(
+                                                    &format!("{}", 8 as char)
+                                                        .repeat(input.len() - cursor_position + 2),
                                                 );
-                                                print!(
-                                                    "{}",
-                                                    input
+                                                self.echo(
+                                                    &input
                                                         .chars()
                                                         .skip(cursor_position)
                                                         .collect::<String>(),
                                                 );
-                                                print!(
-                                                    "{}",
-                                                    format!("{}", 8 as char)
-                                                        .repeat(input.len() - cursor_position)
+                                                self.echo(
+                                                    &format!("{}", 8 as char)
+                                                        .repeat(input.len() - cursor_position),
                                                 );
                                             }
                                             escaped = false;
@@ -250,18 +257,19 @@ impl Shell {
                                         }
                                         // bring cursor to the end so that clearing later starts from
                                         // proper position
-                                        print!(
-                                            "{}",
-                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        self.echo(
+                                            &input
+                                                .chars()
+                                                .skip(cursor_position)
+                                                .collect::<String>(),
                                         );
                                         for _ in 0..input.len() {
-                                            print!("{} {}", 8 as char, 8 as char);
-                                            // '\b \b', clear left of cursor
+                                            self.echo(&format!("{} {}", 8 as char, 8 as char));
                                         }
                                         input =
                                             self.history[history_entry_to_display as usize].clone();
                                         cursor_position = input.len();
-                                        print!("{}", input);
+                                        self.echo(&input);
                                     }
                                     escaped = false;
                                 }
@@ -270,12 +278,14 @@ impl Shell {
                                     if history_entry_to_display != -1 {
                                         // bring cursor to the end so that clearing later starts from
                                         // proper position
-                                        print!(
-                                            "{}",
-                                            input.chars().skip(cursor_position).collect::<String>(),
+                                        self.echo(
+                                            &input
+                                                .chars()
+                                                .skip(cursor_position)
+                                                .collect::<String>(),
                                         );
                                         for _ in 0..input.len() {
-                                            print!("{} {}", 8 as char, 8 as char);
+                                            self.echo(&format!("{} {}", 8 as char, 8 as char));
                                             // '\b \b', clear left of cursor
                                         }
                                         if self.history.len() - 1
@@ -289,14 +299,20 @@ impl Shell {
                                             history_entry_to_display = -1;
                                         }
                                         cursor_position = input.len();
-                                        print!("{}", input);
+                                        self.echo(&input);
                                     }
                                     escaped = false;
                                 }
                                 // right arrow
                                 0x43 => {
                                     if cursor_position < input.len() {
-                                        print!("{}", input.chars().nth(cursor_position).unwrap());
+                                        self.echo(
+                                            &input
+                                                .chars()
+                                                .nth(cursor_position)
+                                                .unwrap()
+                                                .to_string(),
+                                        );
                                         cursor_position += 1;
                                     }
                                     escaped = false;
@@ -304,23 +320,22 @@ impl Shell {
                                 // left arrow
                                 0x44 => {
                                     if cursor_position > 0 {
-                                        print!("{}", 8 as char);
+                                        self.echo(&format!("{}", 8 as char));
                                         cursor_position -= 1;
                                     }
                                     escaped = false;
                                 }
                                 // end key
                                 0x46 => {
-                                    print!(
-                                        "{}",
-                                        input.chars().skip(cursor_position).collect::<String>(),
+                                    self.echo(
+                                        &input.chars().skip(cursor_position).collect::<String>(),
                                     );
                                     cursor_position = input.len();
                                     escaped = false;
                                 }
                                 // home key
                                 0x48 => {
-                                    print!("{}", format!("{}", 8 as char).repeat(cursor_position));
+                                    self.echo(&format!("{}", 8 as char).repeat(cursor_position));
                                     cursor_position = 0;
                                     escaped = false;
                                 }
@@ -342,29 +357,24 @@ impl Shell {
                         // enter
                         10 => {
                             input = input.trim().to_string();
-                            println!();
+                            self.echo("\n");
                             cursor_position = 0;
                             break;
                         }
                         // backspace
                         127 => {
                             if !input.is_empty() && cursor_position > 0 {
-                                print!("{}", 8 as char);
-                                print!("{}", " ".repeat(input.len() - cursor_position + 1));
+                                self.echo(&format!("{}", 8 as char));
+                                self.echo(&" ".repeat(input.len() - cursor_position + 1));
                                 input.remove(cursor_position - 1);
                                 cursor_position -= 1;
-                                print!(
-                                    "{}",
-                                    format!("{}", 8 as char)
-                                        .repeat(input.len() - cursor_position + 1)
+                                self.echo(
+                                    &format!("{}", 8 as char)
+                                        .repeat(input.len() - cursor_position + 1),
                                 );
-                                print!(
-                                    "{}",
-                                    input.chars().skip(cursor_position).collect::<String>(),
-                                );
-                                print!(
-                                    "{}",
-                                    format!("{}", 8 as char).repeat(input.len() - cursor_position)
+                                self.echo(&input.chars().skip(cursor_position).collect::<String>());
+                                self.echo(
+                                    &format!("{}", 8 as char).repeat(input.len() - cursor_position),
                                 );
                             }
                         }
@@ -379,11 +389,11 @@ impl Shell {
                         _ => {
                             input.insert(cursor_position, c1[0] as char);
                             // echo
-                            print!(
+                            self.echo(&format!(
                                 "{}{}",
                                 input.chars().skip(cursor_position).collect::<String>(),
-                                format!("{}", 8 as char).repeat(input.len() - cursor_position - 1)
-                            );
+                                format!("{}", 8 as char).repeat(input.len() - cursor_position - 1),
+                            ));
                             cursor_position += 1;
                         }
                     }

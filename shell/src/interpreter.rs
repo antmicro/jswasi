@@ -27,8 +27,9 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
 
 fn handle_pipe(
     shell: &mut Shell,
-    negate: bool,
-    cmds: &Vec<ast::DefaultPipeableCommand>,
+    // TODO: handle negate
+    _negate: bool,
+    cmds: &[ast::DefaultPipeableCommand],
     background: bool,
 ) {
     handle_pipeable_command(
@@ -54,7 +55,7 @@ fn handle_pipe(
 
     handle_pipeable_command(
         shell,
-        &cmds.last().unwrap(),
+        cmds.last().unwrap(),
         background,
         &mut vec![(
             0u16,
@@ -103,7 +104,7 @@ fn handle_simple_command(
     for redirect_or_cmd_word in &cmd.redirects_or_cmd_words {
         match redirect_or_cmd_word {
             ast::RedirectOrCmdWord::Redirect(redirect_type) => {
-                if let Some(redirect) = handle_redirect_type(shell, &redirect_type) {
+                if let Some(redirect) = handle_redirect_type(shell, redirect_type) {
                     redirects.push(redirect);
                 }
             }
@@ -116,7 +117,7 @@ fn handle_simple_command(
     }
 
     if !args.is_empty() {
-        match shell.execute_command(&args.remove(0), &mut args, &env, background, &redirects) {
+        match shell.execute_command(&args.remove(0), &mut args, &env, background, redirects) {
             Ok(result) => result,
             Err(error) => println!("shell error: {:?}", error),
         }
@@ -125,7 +126,7 @@ fn handle_simple_command(
             // if it's a global update env, if shell variable update only vars
             if env::var(key).is_ok() {
                 env::set_var(&key, &value);
-                let _ = syscall("set_env", &[key, value], &env, false, &redirects);
+                let _ = syscall("set_env", &[key, value], &env, false, redirects);
             } else {
                 shell.vars.insert(key.clone(), value.clone());
             }
@@ -140,7 +141,7 @@ fn handle_redirect_type(
     match redirect_type {
         ast::Redirect::Write(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(1);
-            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+            if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
                         .join(&filename)
@@ -154,7 +155,7 @@ fn handle_redirect_type(
         }
         ast::Redirect::Append(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(1);
-            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+            if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
                         .join(&filename)
@@ -168,7 +169,7 @@ fn handle_redirect_type(
         }
         ast::Redirect::Read(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(0);
-            if let Some(mut filename) = handle_top_level_word(shell, &top_level_word) {
+            if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
                         .join(&filename)

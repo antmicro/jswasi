@@ -1,13 +1,16 @@
+#[cfg(target_os = "wasi")]
+use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::Read;
-use std::path::PathBuf;
 use std::os::raw::c_int;
-use std::collections::HashMap;
+use std::path::PathBuf;
 
 use clap::{App, Arg};
 
-use wash::{syscall, Shell};
+#[cfg(target_os = "wasi")]
+use wash::syscall;
+use wash::Shell;
 
 #[cfg(not(target_os = "wasi"))]
 extern "C" {
@@ -20,13 +23,7 @@ fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "wasi"))]
     let is_tty = unsafe { isatty(fd) } == 1;
     #[cfg(target_os = "wasi")]
-    let is_tty = syscall(
-        "isatty",
-        &[&fd.to_string()],
-        &HashMap::new(),
-        false,
-        &[],
-    ).unwrap() == "1";
+    let is_tty = syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[]).unwrap() == "1";
     Ok(is_tty)
 }
 
@@ -67,20 +64,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let pwd = env::var("PWD").unwrap();
     env::set_current_dir(&pwd).unwrap();
-    let mut shell = Shell::new(&pwd);
+
+    #[cfg(target_os = "wasi")]
+    let should_echo = true;
+    #[cfg(not(target_os = "wasi"))]
+    let should_echo = false;
+
+    let mut shell = Shell::new(should_echo, &pwd);
 
     if let Some(command) = matches.value_of("command") {
         shell.run_command(command)
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
+    } else if is_fd_tty(STDIN).unwrap() {
+        shell.run_interpreter()
     } else {
-        if is_fd_tty(STDIN).unwrap() {
-            shell.run_interpreter()
-        } else {
-            let mut input = String::new();
-            let stdin = io::stdin();
-            stdin.lock().read_to_string(&mut input).unwrap();
-            shell.run_command(&input)
-        }
+        let mut input = String::new();
+        let stdin = io::stdin();
+        stdin.lock().read_to_string(&mut input).unwrap();
+        shell.run_command(&input)
     }
 }
