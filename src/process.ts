@@ -631,60 +631,75 @@ function WASI(): WASICallbacks {
     const [cmd, args_string, env_string, background, redirects_string] =
       fullcmd.split("\x1b\x1b");
     const isJob = background === "true";
-    if (cmd === "spawn") {
-      // reparse args
-      const args = args_string.split("\x1b");
-      const new_env = Object.fromEntries(
-        env_string.split("\x1b").map((kv) => kv.split("="))
-      );
-      const extended_env = { ...env, ...new_env };
-      const redirects = redirects_string
-        .split("\x1b")
-        .filter((s) => s.length)
-        .map((redirect) => {
-          const [fd, path, mode] = redirect.split(" ");
-          return [parseInt(fd, 10), path, mode];
-        });
-      const sbuf = new SharedArrayBuffer(4);
-      const lck = new Int32Array(sbuf, 0, 1);
-      lck[0] = -1;
-      send_to_kernel([
-        "spawn",
-        [args[0], args.slice(1), extended_env, sbuf, isJob, redirects],
-      ]);
-      // wait for child process to finish
-      Atomics.wait(lck, 0, -1);
-      const err = Atomics.load(lck, 0);
-      if (err !== constants.WASI_ESUCCESS) {
-        worker_console_log(`error: spawned process returned ${err}`);
-      }
-      return "";
-    }
-    if (cmd === "set_env") {
-      const sbuf = new SharedArrayBuffer(4);
-      const lck = new Int32Array(sbuf, 0, 1);
-
-      const args = args_string.split("\x1b");
-      send_to_kernel(["set_env", [args, sbuf]]);
-      if (args.length === 1) {
-        delete env[args[0]];
+    switch (cmd) {
+      case "spawn": {
+        // reparse args
+        const args = args_string.split("\x1b");
+        const new_env = Object.fromEntries(
+          env_string.split("\x1b").map((kv) => kv.split("="))
+        );
+        const extended_env = { ...env, ...new_env };
+        const redirects = redirects_string
+          .split("\x1b")
+          .filter((s) => s.length)
+          .map((redirect) => {
+            const [fd, path, mode] = redirect.split(" ");
+            return [parseInt(fd, 10), path, mode];
+          });
+        const sbuf = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        send_to_kernel([
+          "spawn",
+          [args[0], args.slice(1), extended_env, sbuf, isJob, redirects],
+        ]);
+        // wait for child process to finish
+        Atomics.wait(lck, 0, -1);
+        const err = Atomics.load(lck, 0);
+        if (err !== constants.WASI_ESUCCESS) {
+          worker_console_log(`error: spawned process returned ${err}`);
+        }
         return "";
       }
-      env[args[0]] = args[1];
-      if (args[0] === "PWD") {
-        env[args[0]] = utils.realpath(env[args[0]]);
+      case "set_env": {
+        const sbuf = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
-        send_to_kernel(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
+
+        const args = args_string.split("\x1b");
+        send_to_kernel(["set_env", [args, sbuf]]);
+        if (args.length === 1) {
+          delete env[args[0]];
+          return "";
+        }
+        env[args[0]] = args[1];
+        if (args[0] === "PWD") {
+          env[args[0]] = utils.realpath(env[args[0]]);
+          lck[0] = -1;
+          send_to_kernel(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
+        }
+        worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
+        return env[args[0]];
       }
-      worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
-      return env[args[0]];
-    }
-    if (cmd === "set_echo") {
-      const sbuf = new SharedArrayBuffer(4);
-      const lck = new Int32Array(sbuf, 0, 1);
-      send_to_kernel(["set_echo", [args_string, sbuf]]);
-      Atomics.wait(lck, 0, -1);
-      return "";
+      case "set_echo": {
+        const sbuf = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        send_to_kernel(["set_echo", [args_string, sbuf]]);
+        Atomics.wait(lck, 0, -1);
+        return "";
+      }
+      case "isatty": {
+        const sbuf = new SharedArrayBuffer(8);
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const isatty = new Int32Array(sbuf, 4, 1);
+            isatty[0] = -3;
+        const fd = parseInt(args_string, 10);
+        send_to_kernel(["isatty", [sbuf, fd]]);
+        Atomics.wait(lck, 0, -1);
+        return isatty[0].toString();
+      }
     }
 
     worker_console_log(`Special command ${cmd} not found.`);

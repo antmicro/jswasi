@@ -3,17 +3,47 @@ use std::io;
 use std::io::Read;
 use std::path::PathBuf;
 use std::os::raw::c_int;
+use std::collections::HashMap;
 
 use clap::{App, Arg};
 
-use wash::Shell;
+use wash::{syscall, Shell};
 
+#[cfg(not(target_os = "wasi"))]
 extern "C" {
     fn isatty(fd: c_int) -> c_int;
 }
 
 const STDIN: c_int = 0;
 const STDOUT: c_int = 1;
+
+fn is_tty() -> Result<bool, Box<dyn std::error::Error>> {
+    #[cfg(not(target_os = "wasi"))]
+    let result = {
+        let stdin_is_tty = unsafe { isatty(STDIN) } == 1;
+        let stdout_is_tty = unsafe { isatty(STDOUT) } == 1;
+        stdin_is_tty && stdout_is_tty
+    };
+    #[cfg(target_os = "wasi")]
+    let result = {
+        let stdin_is_tty = syscall(
+            "isatty",
+            &[&STDIN.to_string()],
+            &HashMap::new(),
+            false,
+            &[],
+        )? == "1";
+        let stdout_is_tty = syscall(
+            "isatty",
+            &[&STDOUT.to_string()],
+            &HashMap::new(),
+            false,
+            &[],
+        )? == "1";
+        stdin_is_tty && stdout_is_tty
+    };
+    Ok(result)
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = {
@@ -59,12 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
     } else {
-        let is_tty = {
-            let stdin_is_tty = unsafe { isatty(STDIN) } == 1;
-            let stdout_is_tty = unsafe { isatty(STDOUT) } == 1;
-            stdin_is_tty && stdout_is_tty
-        };
-        if is_tty {
+        if is_tty()? {
             shell.run_interpreter()
         } else {
             let mut input = String::new();
