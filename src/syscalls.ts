@@ -81,7 +81,7 @@ export async function syscallCallback(
     case "isatty": {
       const [sbuf, fd] = data;
       const lck = new Int32Array(sbuf, 0, 1);
-      const isatty = new Uint8Array(sbuf, 4, 1);
+      const isatty = new Int32Array(sbuf, 4, 1);
 
       let err;
       const { fds } = processManager.processInfos[process_id];

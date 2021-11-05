@@ -111,13 +111,13 @@ function WASI(): WASICallbacks {
     moduleInstanceExports = instance.exports;
   }
 
-  function isatty(fd: number) {
+  function isatty(fd: number): number {
     worker_console_log(`isatty(${fd}`);
 
     const sbuf = new SharedArrayBuffer(4 + 4); // lock, isatty
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
-    const isatty = new Uint8Array(sbuf, 4, 1);
+    const isatty = new Int32Array(sbuf, 4, 1);
 
     send_to_kernel(["isatty", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);

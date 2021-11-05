@@ -3,10 +3,10 @@ authors = ["Tomasz Karwowski <tkarwowski@internships.antmicro.com", "Peter Gield
 edition = "2018"
 name = "wash"
 version = "0.1.0"
+
 [dependencies]
 clap = "3.0.0-beta.4"
 conch-parser = "0.1.1"
-libc = "*"
 rand = "0.8.4"
 sha-1 = "0.9.8"
 substring = "1.4.5"
