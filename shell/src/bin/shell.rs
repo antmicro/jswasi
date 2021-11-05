@@ -15,7 +15,6 @@ extern "C" {
 }
 
 const STDIN: c_int = 0;
-const STDOUT: c_int = 1;
 
 fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "wasi"))]

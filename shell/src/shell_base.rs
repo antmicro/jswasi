@@ -153,7 +153,7 @@ impl Shell {
             } else {
                 display_path.push_str(&self.pwd);
             }
-            print!("\x1b[1;34mant@webshell \x1b[1;33m{}$ \x1b[0m", display_path);
+            print!("\x1b[1;34m{}@webshell \x1b[1;33m{}$ \x1b[0m", env::var("USER").unwrap(), display_path);
             io::stdout().flush().unwrap();
 
             let mut c1 = [0];
