@@ -308,6 +308,8 @@ export async function init(
       SHELL: "/usr/bin/shell",
       LANG: "en_US.UTF-8",
       USER: "ant",
+      HOSTNAME: "browser",
+      PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
     },
     false
   );

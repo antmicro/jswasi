@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
-use std::io::{Read, Write, ErrorKind};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -44,15 +44,18 @@ pub fn syscall(
                 .join("\x1b"),
         ]
         .join("\x1b\x1b")
-    )).unwrap();
+    ))
+    .unwrap();
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
             std::process::Command::new(args[0])
                 .args(&args[1..])
                 .envs(envs)
-                .spawn().unwrap()
-                .wait().unwrap();
+                .spawn()
+                .unwrap()
+                .wait()
+                .unwrap();
         }
         PathBuf::from("")
     };
@@ -76,6 +79,18 @@ impl Shell {
             history: Vec::new(),
             vars: HashMap::new(),
         }
+    }
+
+    fn parse_prompt_string(&self) -> String {
+        env::var("PS1")
+            .unwrap_or("\\u@\\h:\\w$ ".to_string())
+            .replace("\\u", &env::var("USER").unwrap_or("user".to_string()))
+            .replace(
+                "\\h",
+                &env::var("HOSTNAME").unwrap_or("hostname".to_string()),
+            )
+            // FIXME: should only replace if it starts with HOME
+            .replace("\\w", &self.pwd.replace(&env::var("HOME").unwrap(), "~"))
     }
 
     pub fn run_command(&mut self, command: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -104,7 +119,8 @@ impl Shell {
             }
         };
         if PathBuf::from(&history_path).exists() {
-            self.history = fs::read_to_string(&history_path).unwrap()
+            self.history = fs::read_to_string(&history_path)
+                .unwrap()
                 .lines()
                 .map(str::to_string)
                 .collect();
@@ -142,18 +158,7 @@ impl Shell {
         loop {
             let mut input = String::new();
             let mut input_stash = String::new();
-            let mut display_path = String::new();
-
-            // prompt for input
-            if self.pwd.substring(0, env::var("HOME").unwrap().len()) == env::var("HOME").unwrap() {
-                display_path.push_str(&format!(
-                    "~{}",
-                    self.pwd.substring(env::var("HOME").unwrap().len(), 4096)
-                ));
-            } else {
-                display_path.push_str(&self.pwd);
-            }
-            print!("\x1b[1;34m{}@webshell \x1b[1;33m{}$ \x1b[0m", env::var("USER").unwrap(), display_path);
+            print!("{}", self.parse_prompt_string());
             io::stdout().flush().unwrap();
 
             let mut c1 = [0];
@@ -163,7 +168,7 @@ impl Shell {
             loop {
                 // this is to handle EOF when piping to shell
                 match io::stdin().read_exact(&mut c1) {
-                    Ok(()) => {},
+                    Ok(()) => {}
                     Err(_) => exit(0),
                 }
                 if escaped {
@@ -514,17 +519,21 @@ impl Shell {
                             env,
                             background,
                             &[],
-                        ).unwrap();
+                        )
+                        .unwrap();
                         #[cfg(not(target_os = "wasi"))]
                         let pwd_path = fs::canonicalize(path).unwrap();
                         #[cfg(target_os = "wasi")]
-                        let pwd_path = PathBuf::from(syscall(
-                            "set_env",
-                            &["PWD", path.to_str().unwrap()],
-                            env,
-                            background,
-                            &[],
-                        ).unwrap());
+                        let pwd_path = PathBuf::from(
+                            syscall(
+                                "set_env",
+                                &["PWD", path.to_str().unwrap()],
+                                env,
+                                background,
+                                &[],
+                            )
+                            .unwrap(),
+                        );
                         self.pwd = String::from(pwd_path.to_str().unwrap());
                         env::set_var("PWD", &self.pwd);
                         env::set_current_dir(&pwd_path).unwrap();
@@ -631,11 +640,13 @@ impl Shell {
                     println!("usage: imgcat <IMAGE>");
                 } else {
                     // TODO: find out why it breaks the order of prompt
-                    iterm2::File::read(&args[0]).unwrap()
+                    iterm2::File::read(&args[0])
+                        .unwrap()
                         .width(iterm2::Dimension::Auto)
                         .height(iterm2::Dimension::Auto)
                         .preserve_aspect_ratio(true)
-                        .show().unwrap();
+                        .show()
+                        .unwrap();
                 }
             }
             "unzip" => {
@@ -783,7 +794,8 @@ impl Shell {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        let _result = syscall("spawn", &args_[..], env, background, redirects).unwrap();
+                        let _result =
+                            syscall("spawn", &args_[..], env, background, redirects).unwrap();
                     }
                     Err(reason) => println!("{}", reason),
                 }
