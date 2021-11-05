@@ -9,7 +9,7 @@ type WASICallbacks = {
   setModuleInstance: any;
 
   // custom syscalls
-  isatty: (fd: number): number;
+  isatty: (fd: number) => number;
 
   // official syscalls
   environ_sizes_get: any;
@@ -111,25 +111,19 @@ function WASI(): WASICallbacks {
     moduleInstanceExports = instance.exports;
   }
 
-  function is_atty(fd: number, isatty: ptr) {
+  function isatty(fd: number) {
     worker_console_log(`isatty(${fd}`);
-    
-    const view = new DataView(
-      (moduleInstanceExports.memory as WebAssembly.Memory).buffer
-    );
 
     const sbuf = new SharedArrayBuffer(4 + 4); // lock, isatty
     const lck = new Int32Array(sbuf, 0, 1);
     lck[0] = -1;
-    const isatty_ = new Uint8Array(sbuf, 4, 1);
+    const isatty = new Uint8Array(sbuf, 4, 1);
 
     send_to_kernel(["isatty", [sbuf, fd]]);
     Atomics.wait(lck, 0, -1);
 
-    view.setUint32(isatty, isatty_[0], true);
-
     const err = Atomics.load(lck, 0);
-    return err;
+    return isatty[0];
   }
 
   function environ_sizes_get(environ_count: ptr, environ_size: ptr) {
@@ -1051,6 +1045,9 @@ function WASI(): WASICallbacks {
 
   return {
     setModuleInstance,
+
+    isatty,
+
     environ_sizes_get,
     args_sizes_get,
     fd_prestat_get,

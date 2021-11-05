@@ -8,6 +8,8 @@ const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export interface IO {
+  file_type: number;
+  isatty: boolean;
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer): void;
   write(content: Uint8Array): Promise<number>;
   stat(): Promise<{
@@ -24,6 +26,7 @@ export interface IO {
 
 export class Stdin implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -70,6 +73,7 @@ export class Stdin implements IO {
 
 export class Stdout implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -110,6 +114,7 @@ export class Stdout implements IO {
 
 export class Stderr implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -148,7 +153,13 @@ export class Stderr implements IO {
 }
 
 export class OpenedFd implements IO {
+  isatty = false;
+  
   constructor(private openedFile: OpenFile) {}
+
+  get file_type(): number {
+    return this.openedFile.file_type;
+  }
 
   get path(): string {
     return this.openedFile.path;

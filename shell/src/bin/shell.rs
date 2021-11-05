@@ -62,6 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let is_tty = {
             let stdin_is_tty = unsafe { isatty(STDIN) } == 1;
             let stdout_is_tty = unsafe { isatty(STDOUT) } == 1;
+            dbg!(stdin_is_tty, stdout_is_tty);
             stdin_is_tty && stdout_is_tty
         };
         if is_tty {
