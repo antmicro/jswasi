@@ -32,9 +32,9 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    try:
+    if len(sys.argv) > 1:
         port = int(sys.argv[1])
-    except:
+    else:
         port = 8000
     httpd = None;
     while (httpd == None):

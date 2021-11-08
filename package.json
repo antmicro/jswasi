@@ -21,11 +21,11 @@
     "puppeteer": "^10.4.0"
   },
   "scripts": {
-    "build": "./setup.sh all",
-    "start": "./setup.sh run",
+    "build": "./setup.sh build",
+    "start": "./setup.sh start",
     "dev": "./setup.sh dev",
 
-    "pretest": "./setup.sh run &",
+    "pretest": "./setup.sh start 4000 &",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
 
     "lint": "eslint . --ext .ts",
