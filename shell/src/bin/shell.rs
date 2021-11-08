@@ -23,7 +23,7 @@ fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "wasi"))]
     let is_tty = unsafe { isatty(fd) } == 1;
     #[cfg(target_os = "wasi")]
-    let is_tty = syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[]).unwrap() == "1";
+    let is_tty = syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[])? == "1";
     Ok(is_tty)
 }
 
@@ -76,7 +76,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         shell.run_command(command)
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
-    } else if is_fd_tty(STDIN).unwrap() {
+    // is_fd_tty will fail in WASI runtimes (wasmtime/wasmer/wasiwasm), just run interpreter then
+    } else if is_fd_tty(STDIN).unwrap_or(true) {
         shell.run_interpreter()
     } else {
         let mut input = String::new();

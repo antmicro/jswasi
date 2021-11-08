@@ -22,7 +22,7 @@ pub fn syscall(
     command: &str,
     args: &[&str],
     envs: &HashMap<String, String>,
-    #[allow(unused_variables)] background: bool,
+    background: bool,
     #[allow(unused_variables)] redirects: &[(u16, String, String)],
 ) -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
@@ -44,18 +44,19 @@ pub fn syscall(
                 .join("\x1b"),
         ]
         .join("\x1b\x1b")
-    ))
-    .unwrap();
+    ))?;
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
-            std::process::Command::new(args[0])
+            let mut spawned = std::process::Command::new(args[0])
                 .args(&args[1..])
                 .envs(envs)
-                .spawn()
-                .unwrap()
-                .wait()
-                .unwrap();
+                .spawn()?;
+            // TODO: add redirects
+            // TODO: return exit status from function
+            if !background {
+                spawned.wait()?;
+            }
         }
         PathBuf::from("")
     };
