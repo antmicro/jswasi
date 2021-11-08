@@ -265,6 +265,7 @@ fn handle_simple_word<'a>(shell: &'a Shell, word: &'a ast::DefaultSimpleWord) ->
                     env::var(key).ok()
                 }
             }
+            ast::Parameter::Question => Some(shell.last_exit_status.to_string()),
             any => Some(format!("{:?}", any)),
         },
         any => Some(format!("{:?}", any)),
