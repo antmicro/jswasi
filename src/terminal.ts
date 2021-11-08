@@ -52,7 +52,9 @@ const OPTIONAL_BINARIES = {
 export let filesystem: Filesystem;
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
-navigator.storage.getDirectory().then(rootHandle => filesystem = new Filesystem(rootHandle));
+navigator.storage
+  .getDirectory()
+  .then((rootHandle) => (filesystem = new Filesystem(rootHandle)));
 
 export async function fetchFile(
   dir: Directory,
@@ -228,7 +230,9 @@ export async function init(
 
     if (code === 10 || code >= 32) {
       // echo
-      if (processManager.processInfos[processManager.currentProcess].shouldEcho) {
+      if (
+        processManager.processInfos[processManager.currentProcess].shouldEcho
+      ) {
         terminal.io.print(code === 10 ? "\r\n" : data);
       }
     }
@@ -271,7 +275,8 @@ export async function init(
       }
     };
 
-    const pwd = processManager.processInfos[processManager.currentProcess].env.PWD;
+    const pwd =
+      processManager.processInfos[processManager.currentProcess].env.PWD;
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {
         const entry = await item.getAsFileSystemHandle();

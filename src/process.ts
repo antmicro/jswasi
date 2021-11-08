@@ -694,7 +694,7 @@ function WASI(): WASICallbacks {
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
         const isatty = new Int32Array(sbuf, 4, 1);
-            isatty[0] = -3;
+        isatty[0] = -3;
         const fd = parseInt(args_string, 10);
         send_to_kernel(["isatty", [sbuf, fd]]);
         Atomics.wait(lck, 0, -1);

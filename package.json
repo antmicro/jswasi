@@ -15,6 +15,7 @@
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.24.2",
+    "husky": "^7.0.4",
     "jest": "^27.3.1",
     "jest-puppeteer": "^6.0.0",
     "prettier": "2.4.1",
@@ -24,14 +25,13 @@
     "build": "./setup.sh build",
     "start": "./setup.sh start",
     "dev": "./setup.sh dev",
-
     "pretest": "./setup.sh start 4000 &",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
-
-    "record": "node ci/grab-screencast.js && rm -r ci/images && rm ci/images.txt"
+    "prettier-check": "npx prettier . --check",
+    "record": "node ci/grab-screencast.js && rm -r ci/images && rm ci/images.txt",
+    "prepare": "husky install"
   },
   "jest": {
     "preset": "jest-puppeteer"

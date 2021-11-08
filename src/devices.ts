@@ -26,6 +26,7 @@ export interface IO {
 
 export class Stdin implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
@@ -73,6 +74,7 @@ export class Stdin implements IO {
 
 export class Stdout implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
@@ -114,6 +116,7 @@ export class Stdout implements IO {
 
 export class Stderr implements IO {
   file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
@@ -154,7 +157,7 @@ export class Stderr implements IO {
 
 export class OpenedFd implements IO {
   isatty = false;
-  
+
   constructor(private openedFile: OpenFile) {}
 
   get file_type(): number {
