@@ -17,6 +17,11 @@ use crate::interpreter::interpret;
 
 use std::collections::HashMap;
 
+pub struct SyscallResult {
+    pub exit_status: i32,
+    pub output: String,
+}
+
 // communicate with the worker thread
 pub fn syscall(
     command: &str,
@@ -24,27 +29,46 @@ pub fn syscall(
     envs: &HashMap<String, String>,
     background: bool,
     #[allow(unused_variables)] redirects: &[(u16, String, String)],
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<SyscallResult, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
-    let result = fs::read_link(format!(
-        "/!{}",
-        [
-            command,
-            &args.join("\x1b"),
-            &envs
-                .iter()
-                .map(|(key, val)| format!("{}={}", key, val))
-                .collect::<Vec<_>>()
-                .join("\x1b"),
-            &format!("{}", background),
-            &redirects
-                .iter()
-                .map(|(fd, filename, operation)| format!("{} {} {}", fd, filename, operation))
-                .collect::<Vec<_>>()
-                .join("\x1b"),
-        ]
-        .join("\x1b\x1b")
-    ))?;
+    let result = {
+        let result = fs::read_link(format!(
+            "/!{}",
+            [
+                command,
+                &args.join("\x1b"),
+                &envs
+                    .iter()
+                    .map(|(key, val)| format!("{}={}", key, val))
+                    .collect::<Vec<_>>()
+                    .join("\x1b"),
+                &format!("{}", background),
+                &redirects
+                    .iter()
+                    .map(|(fd, filename, operation)| format!("{} {} {}", fd, filename, operation))
+                    .collect::<Vec<_>>()
+                    .join("\x1b"),
+            ]
+            .join("\x1b\x1b")
+        ))?
+        .to_str()
+        .unwrap()
+        .trim_matches(char::from(0))
+        .to_string();
+        if !background {
+            let (exit_status, output) = result.split_once("\x1b").unwrap();
+            let exit_status = exit_status.parse::<i32>().unwrap();
+            SyscallResult {
+                exit_status,
+                output: output.to_string(),
+            }
+        } else {
+            SyscallResult {
+                exit_status: 0,
+                output: "".to_string(),
+            }
+        }
+    };
     #[cfg(not(target_os = "wasi"))]
     let result = {
         if command == "spawn" {
@@ -55,16 +79,25 @@ pub fn syscall(
             // TODO: add redirects
             // TODO: return exit status from function
             if !background {
-                spawned.wait()?;
+                let exit_status = spawned.wait()?.code().unwrap();
+                SyscallResult {
+                    exit_status,
+                    output: "".to_string(),
+                }
+            } else {
+                SyscallResult {
+                    exit_status: 0,
+                    output: "".to_string(),
+                }
+            }
+        } else {
+            SyscallResult {
+                exit_status: 0,
+                output: "".to_string(),
             }
         }
-        PathBuf::from("")
     };
-    Ok(result
-        .to_str()
-        .unwrap()
-        .trim_matches(char::from(0))
-        .to_string())
+    Ok(result)
 }
 
 pub struct Shell {
@@ -543,7 +576,8 @@ impl Shell {
                                 background,
                                 &[],
                             )
-                            .unwrap(),
+                            .unwrap()
+                            .output,
                         );
                         self.pwd = String::from(pwd_path.to_str().unwrap());
                         env::set_var("PWD", &self.pwd);

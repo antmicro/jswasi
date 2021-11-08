@@ -21,10 +21,9 @@ const STDIN: c_int = 0;
 
 fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "wasi"))]
-    let is_tty = unsafe { isatty(fd) } == 1;
+    return Ok(unsafe { isatty(fd) } == 1);
     #[cfg(target_os = "wasi")]
-    let is_tty = syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[])? == "1";
-    Ok(is_tty)
+    return Ok(syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[])?.output == "1");
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
