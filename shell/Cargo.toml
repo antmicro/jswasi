@@ -16,7 +16,6 @@ git = "https://github.com/Noskcaj19/iterm2"
 
 [dependencies.zip]
 default-features = false
-deflate = true
 version = "0.5.13"
 
 [profile]

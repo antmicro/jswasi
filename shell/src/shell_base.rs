@@ -17,6 +17,10 @@ use crate::interpreter::interpret;
 
 use std::collections::HashMap;
 
+pub const EXIT_SUCCESS: i32 = 0;
+pub const EXIT_FAILURE: i32 = 1;
+pub const EXIT_CMD_NOT_FOUND: i32 = 127;
+
 pub struct SyscallResult {
     pub exit_status: i32,
     pub output: String,
@@ -513,6 +517,7 @@ impl Shell {
         Ok(())
     }
 
+    // TODO: return exit status code
     pub fn execute_command(
         &mut self,
         command: &str,
@@ -520,11 +525,12 @@ impl Shell {
         env: &HashMap<String, String>,
         background: bool,
         redirects: &[(u16, String, String)],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<i32, Box<dyn std::error::Error>> {
         match command {
             // built in commands
             "clear" => {
                 print!("\x1b[2J\x1b[H");
+                Ok(EXIT_SUCCESS)
             }
             "exit" => {
                 let exit_code: i32 = {
@@ -536,7 +542,10 @@ impl Shell {
                 };
                 exit(exit_code);
             }
-            "pwd" => println!("{}", env::current_dir().unwrap().display()),
+            "pwd" => {
+                println!("{}", env::current_dir().unwrap().display());
+                Ok(EXIT_SUCCESS)
+            }
             "cd" => {
                 let path = if args.is_empty() {
                     PathBuf::from(env::var("HOME").unwrap())
@@ -551,37 +560,42 @@ impl Shell {
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
                     println!("cd: {}: No such file or directory", path.display());
+                    Ok(EXIT_FAILURE)
                 } else {
-                    let metadata = fs::metadata(&path);
-                    if metadata.unwrap().is_file() {
+                    let metadata = fs::metadata(&path).unwrap();
+                    if metadata.is_file() {
                         println!("cd: {}: Not a directory", path.display());
+                        Ok(EXIT_FAILURE)
                     } else {
-                        env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap());
-                        syscall(
-                            "set_env",
-                            &["OLDPWD", env::current_dir().unwrap().to_str().unwrap()],
-                            env,
-                            background,
-                            &[],
-                        )
-                        .unwrap();
-                        #[cfg(not(target_os = "wasi"))]
-                        let pwd_path = fs::canonicalize(path).unwrap();
+                        // TODO: for both targets, chain the commands and exit early if previous
+                        // step fails
                         #[cfg(target_os = "wasi")]
-                        let pwd_path = PathBuf::from(
+                        {
                             syscall(
                                 "set_env",
-                                &["PWD", path.to_str().unwrap()],
+                                &["OLDPWD", env::current_dir().unwrap().to_str().unwrap()],
                                 env,
                                 background,
                                 &[],
                             )
-                            .unwrap()
-                            .output,
-                        );
-                        self.pwd = String::from(pwd_path.to_str().unwrap());
-                        env::set_var("PWD", &self.pwd);
-                        env::set_current_dir(&pwd_path).unwrap();
+                            .unwrap();
+                            let pwd =
+                                syscall("chdir", &[path.to_str().unwrap()], env, background, &[])
+                                    .unwrap()
+                                    .output;
+                            syscall("set_env", &["PWD", &pwd], env, background, &[]).unwrap();
+                            self.pwd = PathBuf::from(&pwd).display().to_string();
+                            Ok(EXIT_SUCCESS)
+                        }
+                        #[cfg(not(target_os = "wasi"))]
+                        {
+                            env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap());
+                            let pwd_path = fs::canonicalize(path).unwrap();
+                            self.pwd = String::from(pwd_path.to_str().unwrap());
+                            env::set_var("PWD", &self.pwd);
+                            env::set_current_dir(&pwd_path).unwrap();
+                            Ok(EXIT_SUCCESS)
+                        }
                     }
                 }
             }
@@ -589,10 +603,12 @@ impl Shell {
                 for (i, history_entry) in self.history.iter().enumerate() {
                     println!("{}: {}", i + 1, history_entry);
                 }
+                Ok(EXIT_SUCCESS)
             }
             "unset" => {
                 if args.is_empty() {
                     println!("unset: help: unset <VAR> [<VAR>] ...");
+                    return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
                     if arg == "PWD" || arg == "HOME" {
@@ -605,6 +621,7 @@ impl Shell {
                         }
                     }
                 }
+                Ok(EXIT_SUCCESS)
             }
             "declare" => {
                 if args.is_empty() {
@@ -639,6 +656,7 @@ impl Shell {
                         }
                     }
                 }
+                Ok(EXIT_SUCCESS)
             }
             "export" => {
                 // export creates an env value if A=B notation is used, or just
@@ -646,6 +664,7 @@ impl Shell {
                 // export on unexisting local var exports empty variable.
                 if args.is_empty() {
                     println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                    return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
                     if let Some((key, value)) = arg.split_once("=") {
@@ -660,22 +679,27 @@ impl Shell {
                         syscall("set_env", &[arg, ""], env, background, &[]).unwrap();
                     }
                 }
+                Ok(EXIT_SUCCESS)
             }
             "source" => {
                 if let Some(filename) = args.get(0) {
                     self.run_script(filename).unwrap();
+                    Ok(EXIT_SUCCESS)
                 } else {
                     println!("source: help: source <filename>");
+                    Ok(EXIT_FAILURE)
                 }
             }
             "write" => {
                 if args.len() < 2 {
                     println!("write: help: write <filename> <contents>");
+                    Ok(EXIT_FAILURE)
                 } else {
                     match fs::write(args.remove(0), args.join(" ")) {
-                        Ok(_) => {}
+                        Ok(_) => Ok(EXIT_SUCCESS),
                         Err(error) => {
-                            println!("write: failed to write to file: {}", error)
+                            println!("write: failed to write to file: {}", error);
+                            Ok(EXIT_FAILURE)
                         }
                     }
                 }
@@ -683,6 +707,7 @@ impl Shell {
             "imgcat" => {
                 if args.is_empty() {
                     println!("usage: imgcat <IMAGE>");
+                    Ok(EXIT_FAILURE)
                 } else {
                     // TODO: find out why it breaks the order of prompt
                     iterm2::File::read(&args[0])
@@ -692,6 +717,7 @@ impl Shell {
                         .preserve_aspect_ratio(true)
                         .show()
                         .unwrap();
+                    Ok(EXIT_SUCCESS)
                 }
             }
             "unzip" => {
@@ -720,8 +746,10 @@ impl Shell {
                             file.enclosed_name().unwrap().display()
                         );
                     }
+                    Ok(EXIT_SUCCESS)
                 } else {
                     println!("unzip: missing operand");
+                    Ok(EXIT_FAILURE)
                 }
             }
             "sleep" => {
@@ -729,16 +757,20 @@ impl Shell {
                 if let Some(sec_str) = &args.get(0) {
                     if let Ok(sec) = sec_str.parse() {
                         thread::sleep(Duration::new(sec, 0));
+                        Ok(EXIT_SUCCESS)
                     } else {
                         println!("sleep: invalid time interval `{}`", sec_str);
+                        Ok(EXIT_FAILURE)
                     }
                 } else {
                     println!("sleep: missing operand");
+                    Ok(EXIT_FAILURE)
                 }
             }
             "hexdump" => {
                 if args.is_empty() {
                     println!("hexdump: help: hexump <filename>");
+                    Ok(EXIT_FAILURE)
                 } else {
                     let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
                         println!("hexdump: error: file not found.");
@@ -779,6 +811,7 @@ impl Shell {
                             println!("|");
                         }
                     }
+                    Ok(EXIT_SUCCESS)
                 }
             }
             "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
@@ -789,10 +822,10 @@ impl Shell {
                 #[cfg(not(target_os = "wasi"))]
                 args.insert(0, String::from("/bin/busybox"));
                 let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                syscall("spawn", &args_[..], env, background, redirects).unwrap();
+                Ok(syscall("spawn", &args_[..], env, background, redirects)
+                    .unwrap()
+                    .exit_status)
             }
-            // no input
-            "" => {}
             // external commands or command not found
             _ => {
                 let fullpath = if command.starts_with('/') {
@@ -839,13 +872,16 @@ impl Shell {
                     Ok(path) => {
                         args.insert(0, path.display().to_string());
                         let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        let _result =
-                            syscall("spawn", &args_[..], env, background, redirects).unwrap();
+                        Ok(syscall("spawn", &args_[..], env, background, redirects)
+                            .unwrap()
+                            .exit_status)
                     }
-                    Err(reason) => println!("{}", reason),
+                    Err(reason) => {
+                        println!("{}", reason);
+                        Ok(EXIT_FAILURE)
+                    }
                 }
             }
         }
-        Ok(())
     }
 }

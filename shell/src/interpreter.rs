@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use conch_parser::ast;
 
-use crate::shell_base::{syscall, Shell};
+use crate::shell_base::{syscall, Shell, EXIT_FAILURE, EXIT_SUCCESS};
 
 pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
     // println!("{:#?}", cmd);
@@ -73,9 +73,11 @@ fn handle_pipeable_command(
 ) {
     match cmd {
         ast::PipeableCommand::Simple(cmd) => {
-            handle_simple_command(shell, cmd, background, redirects)
+            handle_simple_command(shell, cmd, background, redirects);
         }
-        any => println!("PipeableCommand not yet handled: {:#?}", any),
+        any => {
+            println!("PipeableCommand not yet handled: {:#?}", any);
+        }
     }
 }
 
@@ -84,7 +86,7 @@ fn handle_simple_command(
     cmd: &ast::DefaultSimpleCommand,
     background: bool,
     redirects: &mut Vec<(u16, String, String)>,
-) {
+) -> i32 {
     let env = cmd
         .redirects_or_env_vars
         .iter()
@@ -119,7 +121,10 @@ fn handle_simple_command(
     if !args.is_empty() {
         match shell.execute_command(&args.remove(0), &mut args, &env, background, redirects) {
             Ok(result) => result,
-            Err(error) => println!("shell error: {:?}", error),
+            Err(error) => {
+                println!("shell error: {:?}", error);
+                EXIT_FAILURE
+            }
         }
     } else {
         for (key, value) in env.iter() {
@@ -131,6 +136,7 @@ fn handle_simple_command(
                 shell.vars.insert(key.clone(), value.clone());
             }
         }
+        EXIT_SUCCESS
     }
 }
 

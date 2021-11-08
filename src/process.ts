@@ -662,6 +662,17 @@ function WASI(): WASICallbacks {
         }
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
+      case "chdir": {
+        const sbuf = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sbuf, 0, 1);
+        lck[0] = -1;
+        const dir = utils.realpath(args_string);
+        send_to_kernel(["chdir", [dir, sbuf]]);
+        Atomics.wait(lck, 0, -1);
+        const err = Atomics.load(lck, 0);
+
+        return `${err}\x1b${dir}`;
+      }
       case "set_env": {
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
@@ -669,25 +680,27 @@ function WASI(): WASICallbacks {
 
         const args = args_string.split("\x1b");
         send_to_kernel(["set_env", [args, sbuf]]);
-        if (args.length === 1) {
-          delete env[args[0]];
-          return `${constants.EXIT_SUCCESS}\x1b`;
+        Atomics.wait(lck, 0, -1);
+        const err = Atomics.load(lck, 0);
+
+        if (err === constants.WASI_ESUCCESS) {
+          if (args.length === 1) {
+            delete env[args[0]];
+          } else {
+            env[args[0]] = args[1];
+          }
         }
-        env[args[0]] = args[1];
-        if (args[0] === "PWD") {
-          env[args[0]] = utils.realpath(env[args[0]]);
-          lck[0] = -1;
-          send_to_kernel(["chdir", [utils.realpath(env[args[0]]), sbuf]]);
-        }
-        worker_console_log(`set ${args[0]} to ${env[args[0]]}`);
-        return `${constants.EXIT_SUCCESS}\x1b${env[args[0]]}`;
+
+        return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "set_echo": {
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
+
         send_to_kernel(["set_echo", [args_string, sbuf]]);
         Atomics.wait(lck, 0, -1);
+
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "isatty": {
