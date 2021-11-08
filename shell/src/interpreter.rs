@@ -15,14 +15,41 @@ pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
 }
 
 fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) {
-    match &list.first {
+    let mut status_code = match &list.first {
         ast::ListableCommand::Single(cmd) => {
             handle_pipeable_command(shell, cmd, background, &mut Vec::new())
         }
         ast::ListableCommand::Pipe(negate, cmds) => handle_pipe(shell, *negate, cmds, background),
-    }
+    };
 
     // TODO: handle list.rest
+    // if shell.last_exit_status && list.rest == And()
+    // else if !shell.last_exit_status && list.rest == Or()
+    for next_cmd in &list.rest {
+        match (status_code, next_cmd) {
+            (0, ast::AndOr::And(cmd)) => {
+                status_code = match &cmd {
+                    ast::ListableCommand::Single(cmd) => {
+                        handle_pipeable_command(shell, cmd, background, &mut Vec::new())
+                    }
+                    ast::ListableCommand::Pipe(negate, cmds) => {
+                        handle_pipe(shell, *negate, cmds, background)
+                    }
+                }
+            }
+            (x, ast::AndOr::Or(cmd)) if x != 0 => {
+                status_code = match &cmd {
+                    ast::ListableCommand::Single(cmd) => {
+                        handle_pipeable_command(shell, cmd, background, &mut Vec::new())
+                    }
+                    ast::ListableCommand::Pipe(negate, cmds) => {
+                        handle_pipe(shell, *negate, cmds, background)
+                    }
+                }
+            }
+            (_, _) => {}
+        }
+    }
 }
 
 fn handle_pipe(
@@ -31,7 +58,7 @@ fn handle_pipe(
     _negate: bool,
     cmds: &[ast::DefaultPipeableCommand],
     background: bool,
-) {
+) -> i32 {
     handle_pipeable_command(
         shell,
         &cmds[0],
@@ -62,7 +89,7 @@ fn handle_pipe(
             format!("/proc/pipe{}.txt", cmds.len() - 2),
             "read".to_string(),
         )],
-    );
+    )
 }
 
 fn handle_pipeable_command(
@@ -70,13 +97,14 @@ fn handle_pipeable_command(
     cmd: &ast::DefaultPipeableCommand,
     background: bool,
     redirects: &mut Vec<(u16, String, String)>,
-) {
+) -> i32 {
     match cmd {
         ast::PipeableCommand::Simple(cmd) => {
-            handle_simple_command(shell, cmd, background, redirects);
+            handle_simple_command(shell, cmd, background, redirects)
         }
         any => {
             println!("PipeableCommand not yet handled: {:#?}", any);
+            EXIT_FAILURE
         }
     }
 }

@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
+pub const EXIT_CRITICAL_FAILURE: i32 = 2;
 pub const EXIT_CMD_NOT_FOUND: i32 = 127;
 
 pub struct SyscallResult {
@@ -105,10 +106,11 @@ pub fn syscall(
 }
 
 pub struct Shell {
-    pub should_echo: bool,
     pub pwd: String,
     pub history: Vec<String>,
     pub vars: HashMap<String, String>,
+    pub should_echo: bool,
+    pub last_exit_status: i32,
 }
 
 impl Shell {
@@ -118,6 +120,7 @@ impl Shell {
             pwd: pwd.to_string(),
             history: Vec::new(),
             vars: HashMap::new(),
+            last_exit_status: 0,
         }
     }
 
@@ -526,7 +529,7 @@ impl Shell {
         background: bool,
         redirects: &[(u16, String, String)],
     ) -> Result<i32, Box<dyn std::error::Error>> {
-        match command {
+        let result: Result<i32, Box<dyn std::error::Error>> = match command {
             // built in commands
             "clear" => {
                 print!("\x1b[2J\x1b[H");
@@ -882,6 +885,12 @@ impl Shell {
                     }
                 }
             }
-        }
+        };
+        self.last_exit_status = if let Ok(exit_status) = result {
+            exit_status
+        } else {
+            EXIT_CRITICAL_FAILURE
+        };
+        Ok(self.last_exit_status)
     }
 }
