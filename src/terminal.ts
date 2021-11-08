@@ -298,7 +298,7 @@ export async function init(
       // TODO: why must fds[5] be present for ls to work, and what should it be
       await filesystem.rootDir.open(),
     ],
-    ["shell"],
+    ["/usr/bin/shell"],
     {
       PATH: "/usr/bin:/usr/local/bin",
       PWD: "/home/ant",
