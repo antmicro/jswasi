@@ -404,6 +404,8 @@ impl Shell {
         }
     }
 
+    /// Expands input line with history expansion.
+    /// Returns `None` if the event designator was not found
     fn history_expantion(&mut self, input: &str) -> Option<String> {
         let mut processed = String::new();
         if let Some(last_command) = self.history.last() {
@@ -472,8 +474,9 @@ impl Shell {
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.should_echo {
-            // disable echoing on hterm side (ignore Error that will arise on platforms other than web
-            syscall("set_echo", &["0"], &HashMap::new(), false, &[]).unwrap();
+            // disable echoing on hterm side (ignore Error that will arise on wasi runtimes other
+            // than ours (wasmer/wasitime)
+            let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
         }
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
