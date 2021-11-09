@@ -1,5 +1,4 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-npm run prettier-check
-# npm run lint 
+npx lint-staged
