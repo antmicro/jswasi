@@ -562,16 +562,17 @@ impl Shell {
 
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
-                    println!("cd: {}: No such file or directory", path.display());
+                    eprintln!("cd: {}: No such file or directory", path.display());
                     Ok(EXIT_FAILURE)
                 } else {
                     let metadata = fs::metadata(&path).unwrap();
                     if metadata.is_file() {
-                        println!("cd: {}: Not a directory", path.display());
+                        eprintln!("cd: {}: Not a directory", path.display());
                         Ok(EXIT_FAILURE)
                     } else {
                         // TODO: for both targets, chain the commands and exit early if previous
                         // step fails
+                        env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap());
                         #[cfg(target_os = "wasi")]
                         {
                             syscall(
@@ -588,17 +589,18 @@ impl Shell {
                                     .output;
                             syscall("set_env", &["PWD", &pwd], env, background, &[]).unwrap();
                             self.pwd = PathBuf::from(&pwd).display().to_string();
-                            Ok(EXIT_SUCCESS)
                         }
                         #[cfg(not(target_os = "wasi"))]
                         {
-                            env::set_var("OLDPWD", env::current_dir().unwrap().to_str().unwrap());
-                            let pwd_path = fs::canonicalize(path).unwrap();
-                            self.pwd = String::from(pwd_path.to_str().unwrap());
-                            env::set_var("PWD", &self.pwd);
-                            env::set_current_dir(&pwd_path).unwrap();
-                            Ok(EXIT_SUCCESS)
+                            self.pwd = fs::canonicalize(path)
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_string();
                         }
+                        env::set_var("PWD", &self.pwd);
+                        env::set_current_dir(&self.pwd).unwrap();
+                        Ok(EXIT_SUCCESS)
                     }
                 }
             }
@@ -610,7 +612,7 @@ impl Shell {
             }
             "unset" => {
                 if args.is_empty() {
-                    println!("unset: help: unset <VAR> [<VAR>] ...");
+                    eprintln!("unset: help: unset <VAR> [<VAR>] ...");
                     return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
@@ -666,7 +668,7 @@ impl Shell {
                 // copies a local var to env if no "=" is used.
                 // export on unexisting local var exports empty variable.
                 if args.is_empty() {
-                    println!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                    eprintln!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                     return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
@@ -689,19 +691,21 @@ impl Shell {
                     self.run_script(filename).unwrap();
                     Ok(EXIT_SUCCESS)
                 } else {
-                    println!("source: help: source <filename>");
+                    eprintln!("source: help: source <filename>");
                     Ok(EXIT_FAILURE)
                 }
             }
             "write" => {
                 if args.len() < 2 {
-                    println!("write: help: write <filename> <contents>");
+                    eprintln!("write: help: write <filename> <contents>");
                     Ok(EXIT_FAILURE)
                 } else {
-                    match fs::write(args.remove(0), args.join(" ")) {
+                    let filename = args.remove(0);
+                    let content = args.join(" ");
+                    match fs::write(&filename, &content) {
                         Ok(_) => Ok(EXIT_SUCCESS),
                         Err(error) => {
-                            println!("write: failed to write to file: {}", error);
+                            eprintln!("write: failed to write to file '{}': {}", filename, error);
                             Ok(EXIT_FAILURE)
                         }
                     }
@@ -709,7 +713,7 @@ impl Shell {
             }
             "imgcat" => {
                 if args.is_empty() {
-                    println!("usage: imgcat <IMAGE>");
+                    eprintln!("usage: imgcat <IMAGE>");
                     Ok(EXIT_FAILURE)
                 } else {
                     // TODO: find out why it breaks the order of prompt
@@ -751,7 +755,7 @@ impl Shell {
                     }
                     Ok(EXIT_SUCCESS)
                 } else {
-                    println!("unzip: missing operand");
+                    eprintln!("unzip: missing operand");
                     Ok(EXIT_FAILURE)
                 }
             }
@@ -762,17 +766,17 @@ impl Shell {
                         thread::sleep(Duration::new(sec, 0));
                         Ok(EXIT_SUCCESS)
                     } else {
-                        println!("sleep: invalid time interval `{}`", sec_str);
+                        eprintln!("sleep: invalid time interval `{}`", sec_str);
                         Ok(EXIT_FAILURE)
                     }
                 } else {
-                    println!("sleep: missing operand");
+                    eprintln!("sleep: missing operand");
                     Ok(EXIT_FAILURE)
                 }
             }
             "hexdump" => {
                 if args.is_empty() {
-                    println!("hexdump: help: hexump <filename>");
+                    eprintln!("hexdump: help: hexump <filename>");
                     Ok(EXIT_FAILURE)
                 } else {
                     let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
@@ -880,7 +884,7 @@ impl Shell {
                             .exit_status)
                     }
                     Err(reason) => {
-                        println!("{}", reason);
+                        eprintln!("{}", reason);
                         Ok(EXIT_FAILURE)
                     }
                 }
