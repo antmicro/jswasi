@@ -82,7 +82,6 @@ pub fn syscall(
                 .envs(envs)
                 .spawn()?;
             // TODO: add redirects
-            // TODO: return exit status from function
             if !background {
                 let exit_status = spawned.wait()?.code().unwrap();
                 SyscallResult {
@@ -126,7 +125,7 @@ impl Shell {
 
     fn parse_prompt_string(&self) -> String {
         env::var("PS1")
-            .unwrap_or_else(|_| "\\u@\\h:\\w$ ".to_string())
+            .unwrap_or_else(|_| "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ".to_string())
             .replace(
                 "\\u",
                 &env::var("USER").unwrap_or_else(|_| "user".to_string()),
@@ -164,8 +163,10 @@ impl Shell {
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // disable echoing on hterm side (ignore Error that will arise on platforms other than web
-        let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
+        if self.should_echo {
+            // disable echoing on hterm side (ignore Error that will arise on platforms other than web
+            syscall("set_echo", &["0"], &HashMap::new(), false, &[]).unwrap();
+        }
 
         // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
         env::set_current_dir(env::var("PWD").unwrap()).unwrap();

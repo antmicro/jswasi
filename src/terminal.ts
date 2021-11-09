@@ -54,7 +54,10 @@ export let filesystem: Filesystem;
 //   it can potentially be fixed by making the script an ESModule
 navigator.storage
   .getDirectory()
-  .then((rootHandle) => (filesystem = new Filesystem(rootHandle)));
+  .then(
+    (rootHandle: FileSystemDirectoryHandle) =>
+      (filesystem = new Filesystem(rootHandle))
+  );
 
 export async function fetchFile(
   dir: Directory,

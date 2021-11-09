@@ -709,8 +709,10 @@ function WASI(): WASICallbacks {
         lck[0] = -1;
         const isatty = new Int32Array(sbuf, 4, 1);
         const fd = parseInt(args_string, 10);
+
         send_to_kernel(["isatty", [sbuf, fd]]);
         Atomics.wait(lck, 0, -1);
+
         return `${constants.EXIT_SUCCESS}\x1b${isatty[0]}`;
       }
     }
