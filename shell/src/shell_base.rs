@@ -106,7 +106,7 @@ pub fn syscall(
 }
 
 pub struct Shell {
-    pub pwd: String,
+    pub pwd: PathBuf,
     pub history: Vec<String>,
     pub vars: HashMap<String, String>,
     pub should_echo: bool,
@@ -117,7 +117,7 @@ impl Shell {
     pub fn new(should_echo: bool, pwd: &str) -> Self {
         Shell {
             should_echo,
-            pwd: pwd.to_string(),
+            pwd: PathBuf::from(pwd),
             history: Vec::new(),
             vars: HashMap::new(),
             last_exit_status: 0,
@@ -136,7 +136,14 @@ impl Shell {
                 &env::var("HOSTNAME").unwrap_or_else(|_| "hostname".to_string()),
             )
             // FIXME: should only replace if it starts with HOME
-            .replace("\\w", &self.pwd.replace(&env::var("HOME").unwrap(), "~"))
+            .replace(
+                "\\w",
+                &self
+                    .pwd
+                    .display()
+                    .to_string()
+                    .replace(&env::var("HOME").unwrap(), "~"),
+            )
     }
 
     fn echo(&self, output: &str) {
@@ -588,15 +595,11 @@ impl Shell {
                                     .unwrap()
                                     .output;
                             syscall("set_env", &["PWD", &pwd], env, background, &[]).unwrap();
-                            self.pwd = PathBuf::from(&pwd).display().to_string();
+                            self.pwd = PathBuf::from(&pwd);
                         }
                         #[cfg(not(target_os = "wasi"))]
                         {
-                            self.pwd = fs::canonicalize(path)
-                                .unwrap()
-                                .to_str()
-                                .unwrap()
-                                .to_string();
+                            self.pwd = fs::canonicalize(path).unwrap();
                         }
                         env::set_var("PWD", &self.pwd);
                         env::set_current_dir(&self.pwd).unwrap();
