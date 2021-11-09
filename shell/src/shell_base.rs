@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -105,8 +105,10 @@ pub fn syscall(
 }
 
 pub struct Shell {
+    // TODO: check which pubs are actually neccessary
     pub pwd: PathBuf,
     pub history: Vec<String>,
+    history_file: Option<File>,
     pub vars: HashMap<String, String>,
     pub should_echo: bool,
     pub last_exit_status: i32,
@@ -119,6 +121,7 @@ impl Shell {
             should_echo,
             pwd: PathBuf::from(pwd),
             history: Vec::new(),
+            history_file: None,
             vars: HashMap::new(),
             last_exit_status: 0,
             cursor_position: 0,
@@ -164,7 +167,10 @@ impl Shell {
         self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
     }
 
-    fn get_line(&mut self) -> String {
+    /// Builds a line from standard input.
+    /// Returns `None` if the line would be empty
+    // TODO: maybe wrap in one more loop and only return when non-empty line is produced?
+    fn get_line(&mut self) -> Option<String> {
         let mut input = String::new();
         let mut input_stash = String::new();
 
@@ -351,7 +357,8 @@ impl Shell {
                     10 => {
                         self.echo("\n");
                         self.cursor_position = 0;
-                        return input.trim().to_string();
+                        input = input.trim().to_string();
+                        return if input.is_empty() { None } else { Some(input) };
                     }
                     // backspace
                     127 => {
@@ -397,6 +404,72 @@ impl Shell {
         }
     }
 
+    fn history_expantion(&mut self, input: &str) -> Option<String> {
+        let mut processed = String::new();
+        if let Some(last_command) = self.history.last() {
+            processed = input.replace("!!", last_command);
+        }
+        // for eg. "!12", "!-2"
+        lazy_static! {
+            static ref NUMBER_RE: Regex = Regex::new(r"!(-?\d+)").unwrap();
+        }
+        // for each match
+        for captures in NUMBER_RE.captures_iter(input) {
+            // get matched number
+            let full_match = captures.get(0).unwrap().as_str();
+            let group_match = captures.get(1).unwrap().as_str();
+            let history_number = group_match.parse::<i32>().unwrap();
+            let history_number = if history_number < 0 {
+                (self.history.len() as i32 + history_number) as usize
+            } else {
+                (history_number - 1) as usize
+            };
+            // get that entry from history (if it exitst)
+            if let Some(history_cmd) = self.history.get(history_number) {
+                // replace the match with the entry from history
+                processed = input.replace(full_match, history_cmd);
+            } else {
+                eprintln!("{}: event not found", full_match);
+                return None;
+            }
+        }
+
+        // $ for eg. "!ls", "!.setup.sh" "!wasm2"
+        lazy_static! {
+            static ref STRING_RE: Regex = Regex::new(r"!([^\d]+\w+)").unwrap();
+        }
+        // for each match
+        for captures in STRING_RE.captures_iter(&input.clone()) {
+            let full_match = captures.get(0).unwrap().as_str();
+            let group_match = captures.get(1).unwrap().as_str();
+
+            // find history entry starting with the match
+            if let Some(history_cmd) = self
+                .history
+                .iter()
+                .rev()
+                .find(|entry| entry.starts_with(group_match))
+            {
+                // replace the match with the entry from history
+                processed = input.replace(full_match, history_cmd);
+            } else {
+                eprintln!("{}: event not found", full_match);
+                return None;
+            }
+        }
+
+        // don't push duplicates of last command to history
+        if Some(&processed) != self.history.last() {
+            self.history.push(input.to_string());
+            // only write to file if it was successfully created
+            if let Some(ref mut history_file) = self.history_file {
+                writeln!(history_file, "{}", &input).unwrap();
+            }
+        }
+
+        Some(processed)
+    }
+
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.should_echo {
             // disable echoing on hterm side (ignore Error that will arise on platforms other than web
@@ -420,7 +493,7 @@ impl Shell {
                 .map(str::to_string)
                 .collect();
         }
-        let mut shell_history = match OpenOptions::new()
+        self.history_file = match OpenOptions::new()
             .create(true)
             .append(true)
             .open(&history_path)
@@ -452,89 +525,14 @@ impl Shell {
         loop {
             print!("{}", self.parse_prompt_string());
             io::stdout().flush().unwrap();
-            let mut input = self.get_line();
+            let mut input = match self.get_line() {
+                Some(line) => line,
+                None => continue,
+            };
 
-            // nothing to parse, skip early
-            if input.is_empty() {
-                continue;
-            }
-
-            let mut skip = false;
-            // $ !!
-            if let Some(last_command) = self.history.last() {
-                lazy_static! {
-                    static ref LAST_COMMAND_RE: Regex = Regex::new(r"!!").unwrap();
-                }
-                input = LAST_COMMAND_RE
-                    .replace_all(&input, last_command)
-                    .to_string();
-            }
-            // for eg. "!12", "!-2"
-            lazy_static! {
-                static ref NUMBER_RE: Regex = Regex::new(r"!(-?\d+)").unwrap();
-            }
-            // for each match
-            for captures in NUMBER_RE.captures_iter(&input.clone()) {
-                // get matched number
-                let full_match = captures.get(0).unwrap().as_str();
-                let group_match = captures.get(1).unwrap().as_str();
-                let history_number = group_match.parse::<i32>().unwrap();
-                let history_number = if history_number < 0 {
-                    (self.history.len() as i32 + history_number) as usize
-                } else {
-                    (history_number - 1) as usize
-                };
-                // get that entry from history (if it exitst)
-                if let Some(history_cmd) = self.history.get(history_number) {
-                    // replace the match with the entry from history
-                    input = input.replace(full_match, history_cmd);
-                } else {
-                    eprintln!("{}: event not found", full_match);
-                    // TODO: should continue out of two loops
-                    skip = true;
-                    continue;
-                }
-            }
-
-            // $ for eg. "!ls", "!.setup.sh" "!wasm2"
-            lazy_static! {
-                static ref STRING_RE: Regex = Regex::new(r"!([^\d]+\w+)").unwrap();
-            }
-            // for each match
-            for captures in STRING_RE.captures_iter(&input.clone()) {
-                let full_match = captures.get(0).unwrap().as_str();
-                let group_match = captures.get(1).unwrap().as_str();
-
-                // find history entry starting with the match
-                if let Some(history_cmd) = self
-                    .history
-                    .iter()
-                    .rev()
-                    .find(|entry| entry.starts_with(group_match))
-                {
-                    // replace the match with the entry from history
-                    input = input.replace(full_match, history_cmd);
-                } else {
-                    eprintln!("{}: event not found", full_match);
-                    // TODO: should continue out of two loops
-                    skip = true;
-                    continue;
-                }
-            }
-
-            dbg!(&input);
-
-            if skip {
-                continue;
-            }
-
-            if Some(&input) != self.history.last() {
-                // don't push duplicates of last command to history
-                self.history.push(input.clone());
-                // only write to file if it was successfully created
-                if let Some(ref mut shell_history) = shell_history {
-                    writeln!(shell_history, "{}", &input).unwrap();
-                }
+            match self.history_expantion(&input) {
+                Some(expanded) => input = expanded,
+                None => continue,
             }
 
             if let Err(error) = self.handle_input(&input) {
@@ -557,7 +555,6 @@ impl Shell {
         Ok(())
     }
 
-    // TODO: return exit status code
     pub fn execute_command(
         &mut self,
         command: &str,

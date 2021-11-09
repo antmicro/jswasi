@@ -90,7 +90,7 @@ fn handle_pipe(
 
     // if ! was present at the begining of the pipe, return logical negation of last command status
     if negate {
-        !(exit_status == 0) as i32
+        (exit_status != 0) as i32
     } else {
         exit_status
     }
