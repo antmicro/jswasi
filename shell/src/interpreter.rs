@@ -52,7 +52,7 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
 fn handle_pipe(
     shell: &mut Shell,
     // TODO: handle negate
-    _negate: bool,
+    negate: bool,
     cmds: &[ast::DefaultPipeableCommand],
     background: bool,
 ) -> i32 {
@@ -77,7 +77,7 @@ fn handle_pipe(
         );
     }
 
-    handle_pipeable_command(
+    let exit_status = handle_pipeable_command(
         shell,
         cmds.last().unwrap(),
         background,
@@ -86,7 +86,14 @@ fn handle_pipe(
             format!("/proc/pipe{}.txt", cmds.len() - 2),
             "read".to_string(),
         )],
-    )
+    );
+
+    // if ! was present at the begining of the pipe, return logical negation of last command status
+    if negate {
+        !(exit_status == 0) as i32
+    } else {
+        exit_status
+    }
 }
 
 fn handle_pipeable_command(
