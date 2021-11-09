@@ -22,9 +22,6 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
         ast::ListableCommand::Pipe(negate, cmds) => handle_pipe(shell, *negate, cmds, background),
     };
 
-    // TODO: handle list.rest
-    // if shell.last_exit_status && list.rest == And()
-    // else if !shell.last_exit_status && list.rest == Or()
     for next_cmd in &list.rest {
         match (status_code, next_cmd) {
             (0, ast::AndOr::And(cmd)) => {

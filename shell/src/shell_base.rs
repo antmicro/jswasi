@@ -110,6 +110,7 @@ pub struct Shell {
     pub vars: HashMap<String, String>,
     pub should_echo: bool,
     pub last_exit_status: i32,
+    cursor_position: usize,
 }
 
 impl Shell {
@@ -120,6 +121,7 @@ impl Shell {
             history: Vec::new(),
             vars: HashMap::new(),
             last_exit_status: 0,
+            cursor_position: 0,
         }
     }
 
@@ -160,6 +162,239 @@ impl Shell {
         script_name: impl Into<PathBuf>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
+    }
+
+    fn get_line(&mut self) -> String {
+        let mut input = String::new();
+        let mut input_stash = String::new();
+
+        let mut c1 = [0];
+        let mut escaped = false;
+        let mut history_entry_to_display: i32 = -1;
+
+        loop {
+            // this is to handle EOF when piping to shell
+            match io::stdin().read_exact(&mut c1) {
+                Ok(()) => {}
+                Err(_) => exit(0),
+            }
+            if escaped {
+                match c1[0] {
+                    0x5b => {
+                        let mut c2 = [0];
+                        io::stdin().read_exact(&mut c2).unwrap();
+                        match c2[0] {
+                            0x32 | 0x33 | 0x35 | 0x36 => {
+                                let mut c3 = [0];
+                                io::stdin().read_exact(&mut c3).unwrap();
+                                match [c2[0], c3[0]] {
+                                    [0x35, 0x7e] => {
+                                        println!("TODO: PAGE UP");
+                                        escaped = false;
+                                    }
+                                    [0x36, 0x7e] => {
+                                        println!("TODO: PAGE DOWN");
+                                        escaped = false;
+                                    }
+                                    [0x32, 0x7e] => {
+                                        println!("TODO: INSERT");
+                                        escaped = false;
+                                    }
+                                    // delete key
+                                    [0x33, 0x7e] => {
+                                        if input.len() - self.cursor_position > 0 {
+                                            self.echo(
+                                                &" ".repeat(input.len() - self.cursor_position + 1),
+                                            );
+                                            input.remove(self.cursor_position);
+                                            self.echo(
+                                                &format!("{}", 8 as char)
+                                                    .repeat(input.len() - self.cursor_position + 2),
+                                            );
+                                            self.echo(
+                                                &input
+                                                    .chars()
+                                                    .skip(self.cursor_position)
+                                                    .collect::<String>(),
+                                            );
+                                            self.echo(
+                                                &format!("{}", 8 as char)
+                                                    .repeat(input.len() - self.cursor_position),
+                                            );
+                                        }
+                                        escaped = false;
+                                    }
+                                    [0x33, 0x3b] => {
+                                        println!("TODO: SHIFT + DELETE");
+                                        let mut c4 = [0];
+                                        // TWO MORE! TODO: improve!
+                                        io::stdin().read_exact(&mut c4).unwrap();
+                                        io::stdin().read_exact(&mut c4).unwrap();
+                                        escaped = false;
+                                    }
+                                    _ => {
+                                        println!(
+                                            "TODO: [ + 0x{:02x} + 0x{:02x}",
+                                            c2[0] as u8, c3[0] as u8
+                                        );
+                                        escaped = false;
+                                    }
+                                }
+                            }
+                            // up arrow
+                            0x41 => {
+                                if !self.history.is_empty() && history_entry_to_display != 0 {
+                                    if history_entry_to_display == -1 {
+                                        history_entry_to_display = (self.history.len() - 1) as i32;
+                                        input_stash = input.clone();
+                                    } else if history_entry_to_display > 0 {
+                                        history_entry_to_display -= 1;
+                                    }
+                                    // bring cursor to the end so that clearing later starts from
+                                    // proper position
+                                    self.echo(
+                                        &input
+                                            .chars()
+                                            .skip(self.cursor_position)
+                                            .collect::<String>(),
+                                    );
+                                    for _ in 0..input.len() {
+                                        self.echo(&format!("{} {}", 8 as char, 8 as char));
+                                    }
+                                    input = self.history[history_entry_to_display as usize].clone();
+                                    self.cursor_position = input.len();
+                                    self.echo(&input);
+                                }
+                                escaped = false;
+                            }
+                            // down arrow
+                            0x42 => {
+                                if history_entry_to_display != -1 {
+                                    // bring cursor to the end so that clearing later starts from
+                                    // proper position
+                                    self.echo(
+                                        &input
+                                            .chars()
+                                            .skip(self.cursor_position)
+                                            .collect::<String>(),
+                                    );
+                                    for _ in 0..input.len() {
+                                        self.echo(&format!("{} {}", 8 as char, 8 as char));
+                                        // '\b \b', clear left of cursor
+                                    }
+                                    if self.history.len() - 1 > (history_entry_to_display as usize)
+                                    {
+                                        history_entry_to_display += 1;
+                                        input =
+                                            self.history[history_entry_to_display as usize].clone();
+                                    } else {
+                                        input = input_stash.clone();
+                                        history_entry_to_display = -1;
+                                    }
+                                    self.cursor_position = input.len();
+                                    self.echo(&input);
+                                }
+                                escaped = false;
+                            }
+                            // right arrow
+                            0x43 => {
+                                if self.cursor_position < input.len() {
+                                    self.echo(
+                                        &input
+                                            .chars()
+                                            .nth(self.cursor_position)
+                                            .unwrap()
+                                            .to_string(),
+                                    );
+                                    self.cursor_position += 1;
+                                }
+                                escaped = false;
+                            }
+                            // left arrow
+                            0x44 => {
+                                if self.cursor_position > 0 {
+                                    self.echo(&format!("{}", 8 as char));
+                                    self.cursor_position -= 1;
+                                }
+                                escaped = false;
+                            }
+                            // end key
+                            0x46 => {
+                                self.echo(
+                                    &input.chars().skip(self.cursor_position).collect::<String>(),
+                                );
+                                self.cursor_position = input.len();
+                                escaped = false;
+                            }
+                            // home key
+                            0x48 => {
+                                self.echo(&format!("{}", 8 as char).repeat(self.cursor_position));
+                                self.cursor_position = 0;
+                                escaped = false;
+                            }
+                            _ => {
+                                println!("WE HAVE UNKNOWN CONTROL CODE '[' + {}", c2[0] as u8);
+                                escaped = false;
+                            }
+                        }
+                    }
+                    _ => {
+                        escaped = false;
+                    }
+                }
+            } else {
+                if c1[0] != 0x1b {
+                    history_entry_to_display = -1;
+                }
+                match c1[0] {
+                    // enter
+                    10 => {
+                        self.echo("\n");
+                        self.cursor_position = 0;
+                        return input.trim().to_string();
+                    }
+                    // backspace
+                    127 => {
+                        if !input.is_empty() && self.cursor_position > 0 {
+                            self.echo(&format!("{}", 8 as char));
+                            self.echo(&" ".repeat(input.len() - self.cursor_position + 1));
+                            input.remove(self.cursor_position - 1);
+                            self.cursor_position -= 1;
+                            self.echo(
+                                &format!("{}", 8 as char)
+                                    .repeat(input.len() - self.cursor_position + 1),
+                            );
+                            self.echo(
+                                &input.chars().skip(self.cursor_position).collect::<String>(),
+                            );
+                            self.echo(
+                                &format!("{}", 8 as char)
+                                    .repeat(input.len() - self.cursor_position),
+                            );
+                        }
+                    }
+                    // control codes
+                    code if code < 32 => {
+                        if code == 0x1b {
+                            escaped = true;
+                        }
+                        // ignore rest for now
+                    }
+                    // regular characters
+                    _ => {
+                        input.insert(self.cursor_position, c1[0] as char);
+                        // echo
+                        self.echo(&format!(
+                            "{}{}",
+                            input.chars().skip(self.cursor_position).collect::<String>(),
+                            format!("{}", 8 as char).repeat(input.len() - self.cursor_position - 1),
+                        ));
+                        self.cursor_position += 1;
+                    }
+                }
+            }
+            io::stdout().flush().unwrap();
+        }
     }
 
     pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -208,249 +443,16 @@ impl Shell {
             self.run_script(shellrc_path).unwrap();
         }
 
-        let mut cursor_position = 0;
-
         let motd_path = PathBuf::from("/etc/motd");
         if motd_path.exists() {
             println!("{}", fs::read_to_string(motd_path).unwrap());
         }
 
+        // line loop
         loop {
-            let mut input = String::new();
-            let mut input_stash = String::new();
             print!("{}", self.parse_prompt_string());
             io::stdout().flush().unwrap();
-
-            let mut c1 = [0];
-            let mut escaped = false;
-            let mut history_entry_to_display: i32 = -1;
-            // read line
-            loop {
-                // this is to handle EOF when piping to shell
-                match io::stdin().read_exact(&mut c1) {
-                    Ok(()) => {}
-                    Err(_) => exit(0),
-                }
-                if escaped {
-                    match c1[0] {
-                        0x5b => {
-                            let mut c2 = [0];
-                            io::stdin().read_exact(&mut c2).unwrap();
-                            match c2[0] {
-                                0x32 | 0x33 | 0x35 | 0x36 => {
-                                    let mut c3 = [0];
-                                    io::stdin().read_exact(&mut c3).unwrap();
-                                    match [c2[0], c3[0]] {
-                                        [0x35, 0x7e] => {
-                                            println!("TODO: PAGE UP");
-                                            escaped = false;
-                                        }
-                                        [0x36, 0x7e] => {
-                                            println!("TODO: PAGE DOWN");
-                                            escaped = false;
-                                        }
-                                        [0x32, 0x7e] => {
-                                            println!("TODO: INSERT");
-                                            escaped = false;
-                                        }
-                                        // delete key
-                                        [0x33, 0x7e] => {
-                                            if input.len() - cursor_position > 0 {
-                                                self.echo(
-                                                    &" ".repeat(input.len() - cursor_position + 1),
-                                                );
-                                                input.remove(cursor_position);
-                                                self.echo(
-                                                    &format!("{}", 8 as char)
-                                                        .repeat(input.len() - cursor_position + 2),
-                                                );
-                                                self.echo(
-                                                    &input
-                                                        .chars()
-                                                        .skip(cursor_position)
-                                                        .collect::<String>(),
-                                                );
-                                                self.echo(
-                                                    &format!("{}", 8 as char)
-                                                        .repeat(input.len() - cursor_position),
-                                                );
-                                            }
-                                            escaped = false;
-                                        }
-                                        [0x33, 0x3b] => {
-                                            println!("TODO: SHIFT + DELETE");
-                                            let mut c4 = [0];
-                                            // TWO MORE! TODO: improve!
-                                            io::stdin().read_exact(&mut c4).unwrap();
-                                            io::stdin().read_exact(&mut c4).unwrap();
-                                            escaped = false;
-                                        }
-                                        _ => {
-                                            println!(
-                                                "TODO: [ + 0x{:02x} + 0x{:02x}",
-                                                c2[0] as u8, c3[0] as u8
-                                            );
-                                            escaped = false;
-                                        }
-                                    }
-                                }
-                                // up arrow
-                                0x41 => {
-                                    if !self.history.is_empty() && history_entry_to_display != 0 {
-                                        if history_entry_to_display == -1 {
-                                            history_entry_to_display =
-                                                (self.history.len() - 1) as i32;
-                                            input_stash = input.clone();
-                                        } else if history_entry_to_display > 0 {
-                                            history_entry_to_display -= 1;
-                                        }
-                                        // bring cursor to the end so that clearing later starts from
-                                        // proper position
-                                        self.echo(
-                                            &input
-                                                .chars()
-                                                .skip(cursor_position)
-                                                .collect::<String>(),
-                                        );
-                                        for _ in 0..input.len() {
-                                            self.echo(&format!("{} {}", 8 as char, 8 as char));
-                                        }
-                                        input =
-                                            self.history[history_entry_to_display as usize].clone();
-                                        cursor_position = input.len();
-                                        self.echo(&input);
-                                    }
-                                    escaped = false;
-                                }
-                                // down arrow
-                                0x42 => {
-                                    if history_entry_to_display != -1 {
-                                        // bring cursor to the end so that clearing later starts from
-                                        // proper position
-                                        self.echo(
-                                            &input
-                                                .chars()
-                                                .skip(cursor_position)
-                                                .collect::<String>(),
-                                        );
-                                        for _ in 0..input.len() {
-                                            self.echo(&format!("{} {}", 8 as char, 8 as char));
-                                            // '\b \b', clear left of cursor
-                                        }
-                                        if self.history.len() - 1
-                                            > (history_entry_to_display as usize)
-                                        {
-                                            history_entry_to_display += 1;
-                                            input = self.history[history_entry_to_display as usize]
-                                                .clone();
-                                        } else {
-                                            input = input_stash.clone();
-                                            history_entry_to_display = -1;
-                                        }
-                                        cursor_position = input.len();
-                                        self.echo(&input);
-                                    }
-                                    escaped = false;
-                                }
-                                // right arrow
-                                0x43 => {
-                                    if cursor_position < input.len() {
-                                        self.echo(
-                                            &input
-                                                .chars()
-                                                .nth(cursor_position)
-                                                .unwrap()
-                                                .to_string(),
-                                        );
-                                        cursor_position += 1;
-                                    }
-                                    escaped = false;
-                                }
-                                // left arrow
-                                0x44 => {
-                                    if cursor_position > 0 {
-                                        self.echo(&format!("{}", 8 as char));
-                                        cursor_position -= 1;
-                                    }
-                                    escaped = false;
-                                }
-                                // end key
-                                0x46 => {
-                                    self.echo(
-                                        &input.chars().skip(cursor_position).collect::<String>(),
-                                    );
-                                    cursor_position = input.len();
-                                    escaped = false;
-                                }
-                                // home key
-                                0x48 => {
-                                    self.echo(&format!("{}", 8 as char).repeat(cursor_position));
-                                    cursor_position = 0;
-                                    escaped = false;
-                                }
-                                _ => {
-                                    println!("WE HAVE UNKNOWN CONTROL CODE '[' + {}", c2[0] as u8);
-                                    escaped = false;
-                                }
-                            }
-                        }
-                        _ => {
-                            escaped = false;
-                        }
-                    }
-                } else {
-                    if c1[0] != 0x1b {
-                        history_entry_to_display = -1;
-                    }
-                    match c1[0] {
-                        // enter
-                        10 => {
-                            input = input.trim().to_string();
-                            self.echo("\n");
-                            cursor_position = 0;
-                            break;
-                        }
-                        // backspace
-                        127 => {
-                            if !input.is_empty() && cursor_position > 0 {
-                                self.echo(&format!("{}", 8 as char));
-                                self.echo(&" ".repeat(input.len() - cursor_position + 1));
-                                input.remove(cursor_position - 1);
-                                cursor_position -= 1;
-                                self.echo(
-                                    &format!("{}", 8 as char)
-                                        .repeat(input.len() - cursor_position + 1),
-                                );
-                                self.echo(&input.chars().skip(cursor_position).collect::<String>());
-                                self.echo(
-                                    &format!("{}", 8 as char).repeat(input.len() - cursor_position),
-                                );
-                            }
-                        }
-                        // control codes
-                        code if code < 32 => {
-                            if code == 0x1b {
-                                escaped = true;
-                            }
-                            // ignore rest for now
-                        }
-                        // regular characters
-                        _ => {
-                            input.insert(cursor_position, c1[0] as char);
-                            // echo
-                            self.echo(&format!(
-                                "{}{}",
-                                input.chars().skip(cursor_position).collect::<String>(),
-                                format!("{}", 8 as char).repeat(input.len() - cursor_position - 1),
-                            ));
-                            cursor_position += 1;
-                        }
-                    }
-                }
-                io::stdout().flush().unwrap();
-            }
-
-            // handle line
+            let input = self.get_line();
 
             // TODO: incorporate this into interpreter of parsed input
 
@@ -476,7 +478,7 @@ impl Shell {
                     let mut found = 0;
                     for entry in &self.history {
                         j += 1;
-                        if entry.substring(0, sbstr.len()) == sbstr {
+                        if entry.starts_with(sbstr) {
                             found = j;
                             break;
                         }
@@ -487,7 +489,8 @@ impl Shell {
                     if sbstr.is_empty() {
                         println!("!{}: event not found", sbstr);
                     }
-                    input.clear();
+                    // TODO: check if this can be deleted
+                    // input.clear();
                     continue;
                 } else {
                     let input = format!(
@@ -495,15 +498,15 @@ impl Shell {
                         self.history[history_entry_id - 1],
                         input.strip_prefix(&format!("!{}", sbstr)).unwrap()
                     );
-                    cursor_position = input.len();
+                    self.cursor_position = input.len();
                 }
             }
 
-            // only write to file if it was successfully created
-            if let Some(ref mut shell_history) = shell_history {
-                // don't push !commands and duplicates of last command
-                if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
-                    self.history.push(input.clone());
+            // don't push !commands and duplicates of last command
+            if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
+                self.history.push(input.clone());
+                // only write to file if it was successfully created
+                if let Some(ref mut shell_history) = shell_history {
                     writeln!(shell_history, "{}", &input).unwrap();
                 }
             }
