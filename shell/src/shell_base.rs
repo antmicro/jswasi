@@ -407,9 +407,9 @@ impl Shell {
     /// Expands input line with history expansion.
     /// Returns `None` if the event designator was not found
     fn history_expantion(&mut self, input: &str) -> Option<String> {
-        let mut processed = String::new();
+        let mut processed = input.to_string();
         if let Some(last_command) = self.history.last() {
-            processed = input.replace("!!", last_command);
+            processed = processed.replace("!!", last_command);
         }
         // for eg. "!12", "!-2"
         lazy_static! {
@@ -429,7 +429,7 @@ impl Shell {
             // get that entry from history (if it exitst)
             if let Some(history_cmd) = self.history.get(history_number) {
                 // replace the match with the entry from history
-                processed = input.replace(full_match, history_cmd);
+                processed = processed.replace(full_match, history_cmd);
             } else {
                 eprintln!("{}: event not found", full_match);
                 return None;
@@ -438,10 +438,10 @@ impl Shell {
 
         // $ for eg. "!ls", "!.setup.sh" "!wasm2"
         lazy_static! {
-            static ref STRING_RE: Regex = Regex::new(r"!([^\d]+\w+)").unwrap();
+            static ref STRING_RE: Regex = Regex::new(r"!(\w+)").unwrap();
         }
         // for each match
-        for captures in STRING_RE.captures_iter(&input.clone()) {
+        for captures in STRING_RE.captures_iter(&processed.clone()) {
             let full_match = captures.get(0).unwrap().as_str();
             let group_match = captures.get(1).unwrap().as_str();
 
@@ -453,7 +453,7 @@ impl Shell {
                 .find(|entry| entry.starts_with(group_match))
             {
                 // replace the match with the entry from history
-                processed = input.replace(full_match, history_cmd);
+                processed = processed.replace(full_match, history_cmd);
             } else {
                 eprintln!("{}: event not found", full_match);
                 return None;
@@ -462,10 +462,10 @@ impl Shell {
 
         // don't push duplicates of last command to history
         if Some(&processed) != self.history.last() {
-            self.history.push(input.to_string());
+            self.history.push(processed.clone());
             // only write to file if it was successfully created
             if let Some(ref mut history_file) = self.history_file {
-                writeln!(history_file, "{}", &input).unwrap();
+                writeln!(history_file, "{}", &processed).unwrap();
             }
         }
 
