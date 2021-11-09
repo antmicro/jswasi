@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::OpenOptions;
@@ -7,15 +8,14 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
 use std::time::Duration;
-use substring::Substring;
 
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
 use iterm2;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 use crate::interpreter::interpret;
-
-use std::collections::HashMap;
 
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
@@ -452,58 +452,84 @@ impl Shell {
         loop {
             print!("{}", self.parse_prompt_string());
             io::stdout().flush().unwrap();
-            let input = self.get_line();
+            let mut input = self.get_line();
 
-            // TODO: incorporate this into interpreter of parsed input
-
-            if input.replace(" ", "").is_empty() {
+            // nothing to parse, skip early
+            if input.is_empty() {
                 continue;
             }
 
-            // handle '!' history
-            if input.starts_with('!') {
-                let sbstr = input
-                    .split_whitespace()
-                    .next()
-                    .unwrap()
-                    .substring(1, 64)
-                    .split_whitespace()
-                    .next()
-                    .unwrap();
-                let history_entry_id: usize = sbstr.parse().unwrap_or_else(|_| {
-                    if sbstr.is_empty() {
-                        return 0;
-                    }
-                    let mut j = 0;
-                    let mut found = 0;
-                    for entry in &self.history {
-                        j += 1;
-                        if entry.starts_with(sbstr) {
-                            found = j;
-                            break;
-                        }
-                    }
-                    found
-                });
-                if history_entry_id == 0 || self.history.len() < history_entry_id {
-                    if sbstr.is_empty() {
-                        println!("!{}: event not found", sbstr);
-                    }
-                    // TODO: check if this can be deleted
-                    // input.clear();
-                    continue;
+            let mut skip = false;
+            // $ !!
+            if let Some(last_command) = self.history.last() {
+                lazy_static! {
+                    static ref LAST_COMMAND_RE: Regex = Regex::new(r"!!").unwrap();
+                }
+                input = LAST_COMMAND_RE
+                    .replace_all(&input, last_command)
+                    .to_string();
+            }
+            // for eg. "!12", "!-2"
+            lazy_static! {
+                static ref NUMBER_RE: Regex = Regex::new(r"!(-?\d+)").unwrap();
+            }
+            // for each match
+            for captures in NUMBER_RE.captures_iter(&input.clone()) {
+                // get matched number
+                let full_match = captures.get(0).unwrap().as_str();
+                let group_match = captures.get(1).unwrap().as_str();
+                let history_number = group_match.parse::<i32>().unwrap();
+                let history_number = if history_number < 0 {
+                    (self.history.len() as i32 + history_number) as usize
                 } else {
-                    let input = format!(
-                        "{}{}",
-                        self.history[history_entry_id - 1],
-                        input.strip_prefix(&format!("!{}", sbstr)).unwrap()
-                    );
-                    self.cursor_position = input.len();
+                    (history_number - 1) as usize
+                };
+                // get that entry from history (if it exitst)
+                if let Some(history_cmd) = self.history.get(history_number) {
+                    // replace the match with the entry from history
+                    input = input.replace(full_match, history_cmd);
+                } else {
+                    eprintln!("{}: event not found", full_match);
+                    // TODO: should continue out of two loops
+                    skip = true;
+                    continue;
                 }
             }
 
-            // don't push !commands and duplicates of last command
-            if input.substring(0, 1) != "!" && Some(&input) != self.history.last() {
+            // $ for eg. "!ls", "!.setup.sh" "!wasm2"
+            lazy_static! {
+                static ref STRING_RE: Regex = Regex::new(r"!([^\d]+\w+)").unwrap();
+            }
+            // for each match
+            for captures in STRING_RE.captures_iter(&input.clone()) {
+                let full_match = captures.get(0).unwrap().as_str();
+                let group_match = captures.get(1).unwrap().as_str();
+
+                // find history entry starting with the match
+                if let Some(history_cmd) = self
+                    .history
+                    .iter()
+                    .rev()
+                    .find(|entry| entry.starts_with(group_match))
+                {
+                    // replace the match with the entry from history
+                    input = input.replace(full_match, history_cmd);
+                } else {
+                    eprintln!("{}: event not found", full_match);
+                    // TODO: should continue out of two loops
+                    skip = true;
+                    continue;
+                }
+            }
+
+            dbg!(&input);
+
+            if skip {
+                continue;
+            }
+
+            if Some(&input) != self.history.last() {
+                // don't push duplicates of last command to history
                 self.history.push(input.clone());
                 // only write to file if it was successfully created
                 if let Some(ref mut shell_history) = shell_history {
