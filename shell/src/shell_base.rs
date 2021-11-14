@@ -22,6 +22,10 @@ pub const EXIT_FAILURE: i32 = 1;
 pub const EXIT_CRITICAL_FAILURE: i32 = 2;
 pub const EXIT_CMD_NOT_FOUND: i32 = 127;
 
+pub const STDIN: u16 = 0;
+pub const STDOUT: u16 = 1;
+pub const STDERR: u16 = 2;
+
 pub struct SyscallResult {
     pub exit_status: i32,
     pub output: String,
@@ -86,7 +90,7 @@ pub fn syscall(
             }
         } else {
             SyscallResult {
-                exit_status: 0,
+                exit_status: EXIT_SUCCESS,
                 output: "".to_string(),
             }
         }
@@ -107,13 +111,13 @@ pub fn syscall(
                 }
             } else {
                 SyscallResult {
-                    exit_status: 0,
+                    exit_status: EXIT_SUCCESS,
                     output: "".to_string(),
                 }
             }
         } else {
             SyscallResult {
-                exit_status: 0,
+                exit_status: EXIT_SUCCESS,
                 output: "".to_string(),
             }
         }
@@ -140,7 +144,7 @@ impl Shell {
             history: Vec::new(),
             history_file: None,
             vars: HashMap::new(),
-            last_exit_status: 0,
+            last_exit_status: EXIT_SUCCESS,
             cursor_position: 0,
         }
     }
@@ -199,7 +203,7 @@ impl Shell {
             // this is to handle EOF when piping to shell
             match io::stdin().read_exact(&mut c1) {
                 Ok(()) => {}
-                Err(_) => exit(0),
+                Err(_) => exit(EXIT_SUCCESS),
             }
             if escaped {
                 match c1[0] {
@@ -573,7 +577,7 @@ impl Shell {
             }
         }
         // TODO: pass proper exit status code
-        Ok(0)
+        Ok(EXIT_SUCCESS)
     }
 
     pub fn execute_command(
@@ -593,7 +597,7 @@ impl Shell {
             "exit" => {
                 let exit_code: i32 = {
                     if args.is_empty() {
-                        0
+                        EXIT_SUCCESS
                     } else {
                         args[0].parse().unwrap()
                     }
@@ -939,13 +943,16 @@ impl Shell {
                             args.insert(0, binary_path);
                             let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
                             // TODO: how does this interact with stdin redirects inside the script?
-                            redirects.push(Redirect::Read((0, path.display().to_string())));
+                            redirects.push(Redirect::Read((
+                                STDIN,
+                                path.into_os_string().into_string().unwrap(),
+                            )));
                             Ok(syscall("spawn", &args_[..], env, background, redirects)
                                 .unwrap()
                                 .exit_status)
                         } else {
                             // most likely WASM binary
-                            args.insert(0, path.display().to_string());
+                            args.insert(0, path.into_os_string().into_string().unwrap());
                             let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
                             Ok(syscall("spawn", &args_[..], env, background, redirects)
                                 .unwrap()

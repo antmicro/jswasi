@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use conch_parser::ast;
 
-use crate::shell_base::{syscall, Redirect, Shell, EXIT_FAILURE, EXIT_SUCCESS};
+use crate::shell_base::{syscall, Redirect, Shell, EXIT_FAILURE, EXIT_SUCCESS, STDIN, STDOUT};
 
 pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
     // println!("{:#?}", cmd);
@@ -24,7 +24,7 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
 
     for next_cmd in &list.rest {
         match (status_code, next_cmd) {
-            (0, ast::AndOr::And(cmd)) => {
+            (EXIT_SUCCESS, ast::AndOr::And(cmd)) => {
                 status_code = match &cmd {
                     ast::ListableCommand::Single(cmd) => {
                         handle_pipeable_command(shell, cmd, background, &mut Vec::new())
@@ -34,7 +34,7 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
                     }
                 }
             }
-            (x, ast::AndOr::Or(cmd)) if x != 0 => {
+            (x, ast::AndOr::Or(cmd)) if x != EXIT_SUCCESS => {
                 status_code = match &cmd {
                     ast::ListableCommand::Single(cmd) => {
                         handle_pipeable_command(shell, cmd, background, &mut Vec::new())
@@ -62,7 +62,7 @@ fn handle_pipe(
         background,
         // TODO: name of the virtual file should be uniquely generated
         // TODO: add virtual mode that won't create files but in-memory strings
-        &mut vec![Redirect::Write((1u16, "/proc/pipe0.txt".to_string()))],
+        &mut vec![Redirect::Write((STDOUT, "/proc/pipe0.txt".to_string()))],
     );
 
     for (i, cmd) in cmds.iter().enumerate().skip(1).take(cmds.len() - 2) {
@@ -71,8 +71,8 @@ fn handle_pipe(
             cmd,
             background,
             &mut vec![
-                Redirect::Read((0u16, format!("/proc/pipe{}.txt", i - 1))),
-                Redirect::Write((1u16, format!("/proc/pipe{}.txt", i))),
+                Redirect::Read((STDIN, format!("/proc/pipe{}.txt", i - 1))),
+                Redirect::Write((STDOUT, format!("/proc/pipe{}.txt", i))),
             ],
         );
     }
@@ -82,14 +82,14 @@ fn handle_pipe(
         cmds.last().unwrap(),
         background,
         &mut vec![Redirect::Read((
-            0u16,
+            STDIN,
             format!("/proc/pipe{}.txt", cmds.len() - 2),
         ))],
     );
 
     // if ! was present at the begining of the pipe, return logical negation of last command status
     if negate {
-        (exit_status != 0) as i32
+        (exit_status != EXIT_SUCCESS) as i32
     } else {
         exit_status
     }
@@ -177,7 +177,7 @@ fn handle_redirect_type(
 ) -> Option<Redirect> {
     match redirect_type {
         ast::Redirect::Write(file_descriptor, top_level_word) => {
-            let file_descriptor = file_descriptor.unwrap_or(1);
+            let file_descriptor = file_descriptor.unwrap_or(STDOUT);
             if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
@@ -191,7 +191,7 @@ fn handle_redirect_type(
             }
         }
         ast::Redirect::Append(file_descriptor, top_level_word) => {
-            let file_descriptor = file_descriptor.unwrap_or(1);
+            let file_descriptor = file_descriptor.unwrap_or(STDOUT);
             if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
@@ -205,7 +205,7 @@ fn handle_redirect_type(
             }
         }
         ast::Redirect::Read(file_descriptor, top_level_word) => {
-            let file_descriptor = file_descriptor.unwrap_or(0);
+            let file_descriptor = file_descriptor.unwrap_or(STDIN);
             if let Some(mut filename) = handle_top_level_word(shell, top_level_word) {
                 if !filename.starts_with('/') {
                     filename = PathBuf::from(&shell.pwd)
