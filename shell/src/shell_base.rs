@@ -27,13 +27,30 @@ pub struct SyscallResult {
     pub output: String,
 }
 
+// TODO: use newtype pattern, make u16 an Fd type
+pub enum Redirect {
+    Read((u16, String)),
+    Write((u16, String)),
+    Append((u16, String)),
+}
+
+impl Redirect {
+    fn as_syscall_string(&self) -> String {
+        match self {
+            Self::Read((fd, filename)) => format!("{} {} {}", fd, filename, "read"),
+            Self::Write((fd, filename)) => format!("{} {} {}", fd, filename, "write"),
+            Self::Append((fd, filename)) => format!("{} {} {}", fd, filename, "append"),
+        }
+    }
+}
+
 // communicate with the worker thread
 pub fn syscall(
     command: &str,
     args: &[&str],
     envs: &HashMap<String, String>,
     background: bool,
-    #[allow(unused_variables)] redirects: &[(u16, String, String)],
+    #[allow(unused_variables)] redirects: &[Redirect],
 ) -> Result<SyscallResult, Box<dyn std::error::Error>> {
     #[cfg(target_os = "wasi")]
     let result = {
@@ -45,13 +62,13 @@ pub fn syscall(
                 &envs
                     .iter()
                     .map(|(key, val)| format!("{}={}", key, val))
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<String>>()
                     .join("\x1b"),
                 &format!("{}", background),
                 &redirects
                     .iter()
-                    .map(|(fd, filename, operation)| format!("{} {} {}", fd, filename, operation))
-                    .collect::<Vec<_>>()
+                    .map(|redirect| redirect.as_syscall_string())
+                    .collect::<Vec<String>>()
                     .join("\x1b"),
             ]
             .join("\x1b\x1b")
@@ -565,7 +582,7 @@ impl Shell {
         args: &mut Vec<String>,
         env: &HashMap<String, String>,
         background: bool,
-        redirects: &mut Vec<(u16, String, String)>,
+        redirects: &mut Vec<Redirect>,
     ) -> Result<i32, Box<dyn std::error::Error>> {
         let result: Result<i32, Box<dyn std::error::Error>> = match command {
             // built in commands
@@ -917,12 +934,12 @@ impl Shell {
                             let binary_path = if let Some(path) = line.strip_prefix("#!") {
                                 path.trim().to_string()
                             } else {
-                                env::var("SHELL").unwrap().to_string()
+                                env::var("SHELL").unwrap()
                             };
                             args.insert(0, binary_path);
                             let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                            // TODO: should pipe here, let's make redirects Stdin be the file
-                            redirects.push((0, path.display().to_string(), "read".to_string()));
+                            // TODO: how does this interact with stdin redirects inside the script?
+                            redirects.push(Redirect::Read((0, path.display().to_string())));
                             Ok(syscall("spawn", &args_[..], env, background, redirects)
                                 .unwrap()
                                 .exit_status)

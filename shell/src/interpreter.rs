@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use conch_parser::ast;
 
-use crate::shell_base::{syscall, Shell, EXIT_FAILURE, EXIT_SUCCESS};
+use crate::shell_base::{syscall, Redirect, Shell, EXIT_FAILURE, EXIT_SUCCESS};
 
 pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
     // println!("{:#?}", cmd);
@@ -62,7 +62,7 @@ fn handle_pipe(
         background,
         // TODO: name of the virtual file should be uniquely generated
         // TODO: add virtual mode that won't create files but in-memory strings
-        &mut vec![(1u16, "/proc/pipe0.txt".to_string(), "write".to_string())],
+        &mut vec![Redirect::Write((1u16, "/proc/pipe0.txt".to_string()))],
     );
 
     for (i, cmd) in cmds.iter().enumerate().skip(1).take(cmds.len() - 2) {
@@ -71,8 +71,8 @@ fn handle_pipe(
             cmd,
             background,
             &mut vec![
-                (0u16, format!("/proc/pipe{}.txt", i - 1), "read".to_string()),
-                (1u16, format!("/proc/pipe{}.txt", i), "write".to_string()),
+                Redirect::Read((0u16, format!("/proc/pipe{}.txt", i - 1))),
+                Redirect::Write((1u16, format!("/proc/pipe{}.txt", i))),
             ],
         );
     }
@@ -81,11 +81,10 @@ fn handle_pipe(
         shell,
         cmds.last().unwrap(),
         background,
-        &mut vec![(
+        &mut vec![Redirect::Read((
             0u16,
             format!("/proc/pipe{}.txt", cmds.len() - 2),
-            "read".to_string(),
-        )],
+        ))],
     );
 
     // if ! was present at the begining of the pipe, return logical negation of last command status
@@ -100,7 +99,7 @@ fn handle_pipeable_command(
     shell: &mut Shell,
     cmd: &ast::DefaultPipeableCommand,
     background: bool,
-    redirects: &mut Vec<(u16, String, String)>,
+    redirects: &mut Vec<Redirect>,
 ) -> i32 {
     match cmd {
         ast::PipeableCommand::Simple(cmd) => {
@@ -117,7 +116,7 @@ fn handle_simple_command(
     shell: &mut Shell,
     cmd: &ast::DefaultSimpleCommand,
     background: bool,
-    redirects: &mut Vec<(u16, String, String)>,
+    redirects: &mut Vec<Redirect>,
 ) -> i32 {
     let env = cmd
         .redirects_or_env_vars
@@ -175,7 +174,7 @@ fn handle_simple_command(
 fn handle_redirect_type(
     shell: &Shell,
     redirect_type: &ast::Redirect<ast::TopLevelWord<String>>,
-) -> Option<(u16, String, String)> {
+) -> Option<Redirect> {
     match redirect_type {
         ast::Redirect::Write(file_descriptor, top_level_word) => {
             let file_descriptor = file_descriptor.unwrap_or(1);
@@ -186,7 +185,7 @@ fn handle_redirect_type(
                         .display()
                         .to_string()
                 }
-                Some((file_descriptor, filename, "write".to_string()))
+                Some(Redirect::Write((file_descriptor, filename)))
             } else {
                 None
             }
@@ -200,7 +199,7 @@ fn handle_redirect_type(
                         .display()
                         .to_string()
                 }
-                Some((file_descriptor, filename, "append".to_string()))
+                Some(Redirect::Append((file_descriptor, filename)))
             } else {
                 None
             }
@@ -214,7 +213,7 @@ fn handle_redirect_type(
                         .display()
                         .to_string()
                 }
-                Some((file_descriptor, filename, "read".to_string()))
+                Some(Redirect::Read((file_descriptor, filename)))
             } else {
                 None
             }
