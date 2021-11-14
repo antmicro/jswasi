@@ -5,6 +5,7 @@ use std::io;
 use std::io::Read;
 use std::os::raw::c_int;
 use std::path::PathBuf;
+use std::process;
 
 use clap::{App, Arg};
 
@@ -26,7 +27,7 @@ fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
     return Ok(syscall("isatty", &[&fd.to_string()], &HashMap::new(), false, &[])?.output == "1");
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let name = {
         let mut path = PathBuf::from(env::args().next().unwrap_or_else(|| "shell".to_string()));
         path.set_extension("");
@@ -71,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut shell = Shell::new(should_echo, &pwd);
 
-    if let Some(command) = matches.value_of("command") {
+    let result = if let Some(command) = matches.value_of("command") {
         shell.run_command(command)
     } else if let Some(file) = matches.value_of("FILE") {
         shell.run_script(file)
@@ -83,5 +84,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let stdin = io::stdin();
         stdin.lock().read_to_string(&mut input).unwrap();
         shell.run_command(&input)
-    }
+    };
+
+    let exit_code = match result {
+        Ok(exit_code) => exit_code,
+        Err(e) => {
+            eprintln!("shell: error occured: {}", e);
+            2
+        }
+    };
+
+    process::exit(exit_code);
 }

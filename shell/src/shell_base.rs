@@ -3,7 +3,7 @@ use std::env;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::thread;
@@ -156,14 +156,14 @@ impl Shell {
         }
     }
 
-    pub fn run_command(&mut self, command: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run_command(&mut self, command: &str) -> Result<i32, Box<dyn std::error::Error>> {
         self.handle_input(command)
     }
 
     pub fn run_script(
         &mut self,
         script_name: impl Into<PathBuf>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<i32, Box<dyn std::error::Error>> {
         self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
     }
 
@@ -472,7 +472,7 @@ impl Shell {
         Some(processed)
     }
 
-    pub fn run_interpreter(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run_interpreter(&mut self) -> Result<i32, Box<dyn std::error::Error>> {
         if self.should_echo {
             // disable echoing on hterm side (ignore Error that will arise on wasi runtimes other
             // than ours (wasmer/wasitime)
@@ -544,7 +544,7 @@ impl Shell {
         }
     }
 
-    fn handle_input(&mut self, input: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn handle_input(&mut self, input: &str) -> Result<i32, Box<dyn std::error::Error>> {
         let lex = Lexer::new(input.chars());
         let parser = DefaultParser::new(lex);
         for cmd in parser {
@@ -555,7 +555,8 @@ impl Shell {
                 }
             }
         }
-        Ok(())
+        // TODO: pass proper exit status code
+        Ok(0)
     }
 
     pub fn execute_command(
@@ -564,7 +565,7 @@ impl Shell {
         args: &mut Vec<String>,
         env: &HashMap<String, String>,
         background: bool,
-        redirects: &[(u16, String, String)],
+        redirects: &mut Vec<(u16, String, String)>,
     ) -> Result<i32, Box<dyn std::error::Error>> {
         let result: Result<i32, Box<dyn std::error::Error>> = match command {
             // built in commands
@@ -910,11 +911,29 @@ impl Shell {
 
                 match fullpath {
                     Ok(path) => {
-                        args.insert(0, path.display().to_string());
-                        let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                        Ok(syscall("spawn", &args_[..], env, background, redirects)
-                            .unwrap()
-                            .exit_status)
+                        let file = File::open(&path).unwrap();
+                        if let Some(Ok(line)) = BufReader::new(file).lines().next() {
+                            // file starts with valid UTF-8, most likely a script
+                            let binary_path = if let Some(path) = line.strip_prefix("#!") {
+                                path.trim().to_string()
+                            } else {
+                                env::var("SHELL").unwrap().to_string()
+                            };
+                            args.insert(0, binary_path);
+                            let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                            // TODO: should pipe here, let's make redirects Stdin be the file
+                            redirects.push((0, path.display().to_string(), "read".to_string()));
+                            Ok(syscall("spawn", &args_[..], env, background, redirects)
+                                .unwrap()
+                                .exit_status)
+                        } else {
+                            // most likely WASM binary
+                            args.insert(0, path.display().to_string());
+                            let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+                            Ok(syscall("spawn", &args_[..], env, background, redirects)
+                                .unwrap()
+                                .exit_status)
+                        }
                     }
                     Err(reason) => {
                         eprintln!("{}", reason);
