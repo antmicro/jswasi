@@ -9,6 +9,7 @@ use std::process::exit;
 use std::thread;
 use std::time::Duration;
 
+use color_eyre::Report;
 use conch_parser::lexer::Lexer;
 use conch_parser::parse::DefaultParser;
 use iterm2;
@@ -55,7 +56,7 @@ pub fn syscall(
     envs: &HashMap<String, String>,
     background: bool,
     #[allow(unused_variables)] redirects: &[Redirect],
-) -> Result<SyscallResult, Box<dyn std::error::Error>> {
+) -> Result<SyscallResult, Report> {
     #[cfg(target_os = "wasi")]
     let result = {
         let result = fs::read_link(format!(
@@ -126,7 +127,7 @@ pub fn syscall(
 }
 
 pub struct Shell {
-    // TODO: check which pubs are actually neccessary
+    // TODO: check which pubs are actually necessary
     pub pwd: PathBuf,
     pub history: Vec<String>,
     history_file: Option<File>,
@@ -177,14 +178,11 @@ impl Shell {
         }
     }
 
-    pub fn run_command(&mut self, command: &str) -> Result<i32, Box<dyn std::error::Error>> {
+    pub fn run_command(&mut self, command: &str) -> Result<i32, Report> {
         self.handle_input(command)
     }
 
-    pub fn run_script(
-        &mut self,
-        script_name: impl Into<PathBuf>,
-    ) -> Result<i32, Box<dyn std::error::Error>> {
+    pub fn run_script(&mut self, script_name: impl Into<PathBuf>) -> Result<i32, Report> {
         self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
     }
 
@@ -493,7 +491,7 @@ impl Shell {
         Some(processed)
     }
 
-    pub fn run_interpreter(&mut self) -> Result<i32, Box<dyn std::error::Error>> {
+    pub fn run_interpreter(&mut self) -> Result<i32, Report> {
         if self.should_echo {
             // disable echoing on hterm side (ignore Error that will arise on wasi runtimes other
             // than ours (wasmer/wasitime)
@@ -565,7 +563,7 @@ impl Shell {
         }
     }
 
-    fn handle_input(&mut self, input: &str) -> Result<i32, Box<dyn std::error::Error>> {
+    fn handle_input(&mut self, input: &str) -> Result<i32, Report> {
         let lex = Lexer::new(input.chars());
         let parser = DefaultParser::new(lex);
         for cmd in parser {
@@ -587,8 +585,8 @@ impl Shell {
         env: &HashMap<String, String>,
         background: bool,
         redirects: &mut Vec<Redirect>,
-    ) -> Result<i32, Box<dyn std::error::Error>> {
-        let result: Result<i32, Box<dyn std::error::Error>> = match command {
+    ) -> Result<i32, Report> {
+        let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {
                 print!("\x1b[2J\x1b[H");

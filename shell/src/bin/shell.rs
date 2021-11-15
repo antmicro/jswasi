@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::{App, Arg};
+use color_eyre::Report;
 
 #[cfg(target_os = "wasi")]
 use wash::syscall;
@@ -20,7 +21,7 @@ extern "C" {
 
 const STDIN: c_int = 0;
 
-fn is_fd_tty(fd: i32) -> Result<bool, Box<dyn std::error::Error>> {
+fn is_fd_tty(fd: i32) -> Result<bool, Report> {
     #[cfg(not(target_os = "wasi"))]
     return Ok(unsafe { isatty(fd) } == 1);
     #[cfg(target_os = "wasi")]
