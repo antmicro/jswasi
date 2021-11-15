@@ -578,6 +578,35 @@ impl Shell {
         Ok(EXIT_SUCCESS)
     }
 
+    fn _print(to_fd: u16, redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
+        // TODO: I worry this will slow down output greatly
+        for redirect in redirects {
+            match redirect {
+                Redirect::Write((fd, file)) => {
+                    if *fd == to_fd {
+                        fs::write(file, output)?
+                    }
+                }
+                Redirect::Append((fd, file)) => {
+                    if *fd == to_fd {
+                        let mut file = OpenOptions::new().write(true).append(true).open(file)?;
+                        write!(file, "{}", output)?
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn print(redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
+        Self::_print(STDOUT, redirects, output)
+    }
+
+    fn eprint(redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
+        Self::_print(STDERR, redirects, output)
+    }
+
     pub fn execute_command(
         &mut self,
         command: &str,
@@ -586,6 +615,8 @@ impl Shell {
         background: bool,
         redirects: &mut Vec<Redirect>,
     ) -> Result<i32, Report> {
+        // get list of stdout redirects
+        // get list of stderr redirects
         let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {
