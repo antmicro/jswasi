@@ -17,6 +17,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::interpreter::interpret;
+use crate::output_device::OutputDevice;
 
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
@@ -33,6 +34,7 @@ pub struct SyscallResult {
 }
 
 // TODO: use newtype pattern, make u16 an Fd type
+#[derive(Debug, Clone)]
 pub enum Redirect {
     Read((u16, String)),
     Write((u16, String)),
@@ -578,35 +580,6 @@ impl Shell {
         Ok(EXIT_SUCCESS)
     }
 
-    fn _print(to_fd: u16, redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
-        // TODO: I worry this will slow down output greatly
-        for redirect in redirects {
-            match redirect {
-                Redirect::Write((fd, file)) => {
-                    if *fd == to_fd {
-                        fs::write(file, output)?
-                    }
-                }
-                Redirect::Append((fd, file)) => {
-                    if *fd == to_fd {
-                        let mut file = OpenOptions::new().write(true).append(true).open(file)?;
-                        write!(file, "{}", output)?
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn print(redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
-        Self::_print(STDOUT, redirects, output)
-    }
-
-    fn eprint(redirects: &Vec<Redirect>, output: &str) -> Result<(), Report> {
-        Self::_print(STDERR, redirects, output)
-    }
-
     pub fn execute_command(
         &mut self,
         command: &str,
@@ -615,8 +588,7 @@ impl Shell {
         background: bool,
         redirects: &mut Vec<Redirect>,
     ) -> Result<i32, Report> {
-        // get list of stdout redirects
-        // get list of stderr redirects
+        let mut output_device = OutputDevice::new(redirects);
         let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {
@@ -690,7 +662,7 @@ impl Shell {
             }
             "history" => {
                 for (i, history_entry) in self.history.iter().enumerate() {
-                    println!("{}: {}", i + 1, history_entry);
+                    output_device.println(&format!("{}: {}", i + 1, history_entry));
                 }
                 Ok(EXIT_SUCCESS)
             }
@@ -972,11 +944,12 @@ impl Shell {
                             args.insert(0, binary_path);
                             let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
                             // TODO: how does this interact with stdin redirects inside the script?
+                            let mut redirects = redirects.clone();
                             redirects.push(Redirect::Read((
                                 STDIN,
                                 path.into_os_string().into_string().unwrap(),
                             )));
-                            Ok(syscall("spawn", &args_[..], env, background, redirects)
+                            Ok(syscall("spawn", &args_[..], env, background, &redirects)
                                 .unwrap()
                                 .exit_status)
                         } else {
@@ -995,6 +968,9 @@ impl Shell {
                 }
             }
         };
+
+        output_device.flush()?;
+
         self.last_exit_status = if let Ok(exit_status) = result {
             exit_status
         } else {
