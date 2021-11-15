@@ -176,6 +176,7 @@ impl Shell {
 
     fn echo(&self, output: &str) {
         if self.should_echo {
+            // TODO: should this maybe use OutputDevice too?
             print!("{}", output);
         }
     }
@@ -592,7 +593,7 @@ impl Shell {
         let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {
-                print!("\x1b[2J\x1b[H");
+                output_device.print(&format!("\x1b[2J\x1b[H"));
                 Ok(EXIT_SUCCESS)
             }
             "exit" => {
@@ -606,7 +607,7 @@ impl Shell {
                 exit(exit_code);
             }
             "pwd" => {
-                println!("{}", env::current_dir().unwrap().display());
+                output_device.println(&env::current_dir().unwrap().display().to_string());
                 Ok(EXIT_SUCCESS)
             }
             "cd" => {
@@ -622,12 +623,12 @@ impl Shell {
 
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
-                    eprintln!("cd: {}: No such file or directory", path.display());
+                    output_device.eprintln(&format!("cd: {}: No such file or directory", path.display()));
                     Ok(EXIT_FAILURE)
                 } else {
                     let metadata = fs::metadata(&path).unwrap();
                     if metadata.is_file() {
-                        eprintln!("cd: {}: Not a directory", path.display());
+                        output_device.eprintln(&format!("cd: {}: Not a directory", path.display()));
                         Ok(EXIT_FAILURE)
                     } else {
                         // TODO: for both targets, chain the commands and exit early if previous
@@ -668,12 +669,12 @@ impl Shell {
             }
             "unset" => {
                 if args.is_empty() {
-                    eprintln!("unset: help: unset <VAR> [<VAR>] ...");
+                    output_device.eprintln("unset: help: unset <VAR> [<VAR>] ...");
                     return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
                     if arg == "PWD" || arg == "HOME" {
-                        println!("unset: cannot unset {}", &arg);
+                        output_device.println(&format!("unset: cannot unset {}", &arg));
                     } else {
                         self.vars.remove(arg);
                         if env::var(&arg).is_ok() {
@@ -688,10 +689,10 @@ impl Shell {
                 if args.is_empty() {
                     // TODO: we should join and sort the variables!
                     for (key, value) in self.vars.iter() {
-                        println!("{}={}", key, value);
+                        output_device.println(&format!("{}={}", key, value));
                     }
                     for (key, value) in env::vars() {
-                        println!("{}={}", key, value);
+                        output_device.println(&format!("{}={}", key, value));
                     }
                 } else if args[0] == "-x" || args[0] == "+x" {
                     // if -x is provided declare works as export
@@ -724,7 +725,7 @@ impl Shell {
                 // copies a local var to env if no "=" is used.
                 // export on unexisting local var exports empty variable.
                 if args.is_empty() {
-                    eprintln!("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                    output_device.eprintln("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                     return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
@@ -747,13 +748,13 @@ impl Shell {
                     self.run_script(filename).unwrap();
                     Ok(EXIT_SUCCESS)
                 } else {
-                    eprintln!("source: help: source <filename>");
+                    output_device.eprintln("source: help: source <filename>");
                     Ok(EXIT_FAILURE)
                 }
             }
             "write" => {
                 if args.len() < 2 {
-                    eprintln!("write: help: write <filename> <contents>");
+                    output_device.eprintln("write: help: write <filename> <contents>");
                     Ok(EXIT_FAILURE)
                 } else {
                     let filename = args.remove(0);
@@ -761,7 +762,7 @@ impl Shell {
                     match fs::write(&filename, &content) {
                         Ok(_) => Ok(EXIT_SUCCESS),
                         Err(error) => {
-                            eprintln!("write: failed to write to file '{}': {}", filename, error);
+                            output_device.eprintln(&format!("write: failed to write to file '{}': {}", filename, error));
                             Ok(EXIT_FAILURE)
                         }
                     }
@@ -769,7 +770,7 @@ impl Shell {
             }
             "imgcat" => {
                 if args.is_empty() {
-                    eprintln!("usage: imgcat <IMAGE>");
+                    output_device.eprintln("usage: imgcat <IMAGE>");
                     Ok(EXIT_FAILURE)
                 } else {
                     // TODO: find out why it breaks the order of prompt
@@ -791,17 +792,17 @@ impl Shell {
                         let mut file = archive.by_index(i).unwrap();
                         let outpath = file.enclosed_name().to_owned().unwrap();
                         if file.name().ends_with('/') {
-                            println!("creating dir {}", outpath.display());
+                            output_device.println(&format!("creating dir {}", outpath.display()));
                             fs::create_dir_all(&outpath).unwrap();
                             continue;
                         }
                         if let Some(parent) = outpath.parent() {
                             if !parent.exists() {
-                                println!("creating dir {}", parent.display());
+                                output_device.println(&format!("creating dir {}", parent.display()));
                                 fs::create_dir_all(&parent).unwrap();
                             }
                         }
-                        println!("decompressing {}", file.enclosed_name().unwrap().display());
+                        output_device.println(&format!("decompressing {}", file.enclosed_name().unwrap().display()));
                         let mut outfile = fs::File::create(&outpath).unwrap();
                         io::copy(&mut file, &mut outfile).unwrap();
                         println!(
@@ -811,7 +812,7 @@ impl Shell {
                     }
                     Ok(EXIT_SUCCESS)
                 } else {
-                    eprintln!("unzip: missing operand");
+                    output_device.eprintln("unzip: missing operand");
                     Ok(EXIT_FAILURE)
                 }
             }
@@ -822,21 +823,21 @@ impl Shell {
                         thread::sleep(Duration::new(sec, 0));
                         Ok(EXIT_SUCCESS)
                     } else {
-                        eprintln!("sleep: invalid time interval `{}`", sec_str);
+                        output_device.eprintln(&format!("sleep: invalid time interval `{}`", sec_str));
                         Ok(EXIT_FAILURE)
                     }
                 } else {
-                    eprintln!("sleep: missing operand");
+                    output_device.eprintln("sleep: missing operand");
                     Ok(EXIT_FAILURE)
                 }
             }
             "hexdump" => {
                 if args.is_empty() {
-                    eprintln!("hexdump: help: hexump <filename>");
+                    output_device.eprintln("hexdump: help: hexump <filename>");
                     Ok(EXIT_FAILURE)
                 } else {
                     let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
-                        println!("hexdump: error: file not found.");
+                        output_device.println("hexdump: error: file not found.");
                         return vec![];
                     });
                     let len = contents.len();
@@ -845,33 +846,33 @@ impl Shell {
                         let c = contents[j] as char;
                         v[j % 16] = c;
                         if (j % 16) == 0 {
-                            print!("{:08x} ", j);
+                            output_device.print(&format!("{:08x} ", j));
                         }
                         if (j % 8) == 0 {
-                            print!(" ");
+                            output_device.print(" ");
                         }
-                        print!("{:02x} ", c as u8);
+                        output_device.print(&format!("{:02x} ", c as u8));
                         if (j + 1) == len || (j % 16) == 15 {
                             let mut count = 16;
                             if (j + 1) == len {
                                 count = len % 16;
                                 for _ in 0..(16 - (len % 16)) {
-                                    print!("   ");
+                                    output_device.print("   ");
                                 }
                                 if count < 8 {
-                                    print!(" ");
+                                    output_device.print(" ");
                                 }
                             }
-                            print!(" |");
+                            output_device.print(" |");
                             for c in v.iter_mut().take(count) {
                                 if (0x20..0x7e).contains(&(*c as u8)) {
-                                    print!("{}", *c as char);
+                                    output_device.print(&format!("{}", *c as char));
                                     *c = '.';
                                 } else {
-                                    print!(".");
+                                    output_device.print(".");
                                 }
                             }
-                            println!("|");
+                            output_device.println("|");
                         }
                     }
                     Ok(EXIT_SUCCESS)
@@ -962,7 +963,7 @@ impl Shell {
                         }
                     }
                     Err(reason) => {
-                        eprintln!("{}", reason);
+                        output_device.eprintln(&reason);
                         Ok(EXIT_FAILURE)
                     }
                 }

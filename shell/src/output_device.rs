@@ -4,6 +4,8 @@ use std::io::Write;
 use color_eyre::Report;
 use crate::shell_base::{Redirect, STDERR, STDOUT};
 
+/// Wrapper for stdout/stderr operations from shell builtins
+/// so that they are redirects-aware
 pub struct OutputDevice<'a> {
     redirects: &'a Vec<Redirect>,
     stdout: String,
@@ -11,7 +13,6 @@ pub struct OutputDevice<'a> {
 }
 
 impl<'a> OutputDevice<'a> {
-    #[must_use]
     pub fn new(redirects: &'a Vec<Redirect>) -> Self {
         OutputDevice {
             redirects,
@@ -20,7 +21,7 @@ impl<'a> OutputDevice<'a> {
         }
     }
 
-    #[must_use]
+    // TODO: ensure this gets called, maybe move it to custom Drop implementation
     pub fn flush(&self) -> Result<(), Report> {
         self._flush(STDOUT, &self.stdout)?;
         self._flush(STDERR, &self.stderr)?;
