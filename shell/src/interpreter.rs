@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 use conch_parser::ast;
@@ -51,7 +52,6 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
 
 fn handle_pipe(
     shell: &mut Shell,
-    // TODO: handle negate
     negate: bool,
     cmds: &[ast::DefaultPipeableCommand],
     background: bool,
@@ -86,6 +86,11 @@ fn handle_pipe(
             format!("/proc/pipe{}.txt", cmds.len() - 2),
         ))],
     );
+
+    // TODO: temporary solution before in-memory files get implemented
+    for i in 0..cmds.len() - 1 {
+        fs::remove_file(format!("/proc/pipe{}.txt", i)).unwrap();
+    }
 
     // if ! was present at the begining of the pipe, return logical negation of last command status
     if negate {
