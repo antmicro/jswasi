@@ -28,6 +28,12 @@ pub const STDIN: u16 = 0;
 pub const STDOUT: u16 = 1;
 pub const STDERR: u16 = 2;
 
+enum HistoryExpansion {
+    Expanded(String),
+    EventNotFound(String),
+    Unchanged,
+}
+
 pub struct SyscallResult {
     pub exit_status: i32,
     pub output: String,
@@ -42,6 +48,7 @@ pub enum Redirect {
 }
 
 impl Redirect {
+    #[allow(dead_code)]
     fn as_syscall_string(&self) -> String {
         match self {
             Self::Read((fd, filename)) => format!("{} {} {}", fd, filename, "read"),
@@ -152,6 +159,12 @@ impl Shell {
         }
     }
 
+    fn print_prompt(&mut self, input: &String) {
+        print!("{}{}", self.parse_prompt_string(), input);
+        io::stdout().flush().unwrap();
+        self.cursor_position = input.len();
+    }
+
     fn parse_prompt_string(&self) -> String {
         env::var("PS1")
             .unwrap_or_else(|_| "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ".to_string())
@@ -192,8 +205,7 @@ impl Shell {
     /// Builds a line from standard input.
     /// Returns `None` if the line would be empty
     // TODO: maybe wrap in one more loop and only return when non-empty line is produced?
-    fn get_line(&mut self) -> Option<String> {
-        let mut input = String::new();
+    fn get_line(&mut self, input: &mut String) {
         let mut input_stash = String::new();
 
         let mut c1 = [0];
@@ -289,7 +301,8 @@ impl Shell {
                                     for _ in 0..input.len() {
                                         self.echo(&format!("{} {}", 8 as char, 8 as char));
                                     }
-                                    input = self.history[history_entry_to_display as usize].clone();
+                                    *input =
+                                        self.history[history_entry_to_display as usize].clone();
                                     self.cursor_position = input.len();
                                     self.echo(&input);
                                 }
@@ -313,10 +326,10 @@ impl Shell {
                                     if self.history.len() - 1 > (history_entry_to_display as usize)
                                     {
                                         history_entry_to_display += 1;
-                                        input =
+                                        *input =
                                             self.history[history_entry_to_display as usize].clone();
                                     } else {
-                                        input = input_stash.clone();
+                                        *input = input_stash.clone();
                                         history_entry_to_display = -1;
                                     }
                                     self.cursor_position = input.len();
@@ -379,8 +392,8 @@ impl Shell {
                     10 => {
                         self.echo("\n");
                         self.cursor_position = 0;
-                        input = input.trim().to_string();
-                        return if input.is_empty() { None } else { Some(input) };
+                        *input = input.trim().to_string();
+                        return;
                     }
                     // backspace
                     127 => {
@@ -428,7 +441,7 @@ impl Shell {
 
     /// Expands input line with history expansion.
     /// Returns `None` if the event designator was not found
-    fn history_expantion(&mut self, input: &str) -> Option<String> {
+    fn history_expantion(&mut self, input: &str) -> HistoryExpansion {
         let mut processed = input.to_string();
         if let Some(last_command) = self.history.last() {
             processed = processed.replace("!!", last_command);
@@ -453,8 +466,7 @@ impl Shell {
                 // replace the match with the entry from history
                 processed = processed.replace(full_match, history_cmd);
             } else {
-                eprintln!("{}: event not found", full_match);
-                return None;
+                return HistoryExpansion::EventNotFound(full_match.into());
             }
         }
 
@@ -477,8 +489,7 @@ impl Shell {
                 // replace the match with the entry from history
                 processed = processed.replace(full_match, history_cmd);
             } else {
-                eprintln!("{}: event not found", full_match);
-                return None;
+                return HistoryExpansion::EventNotFound(full_match.into());
             }
         }
 
@@ -491,7 +502,11 @@ impl Shell {
             }
         }
 
-        Some(processed)
+        if input == processed {
+            HistoryExpansion::Unchanged
+        } else {
+            HistoryExpansion::Expanded(processed)
+        }
     }
 
     pub fn run_interpreter(&mut self) -> Result<i32, Report> {
@@ -546,23 +561,31 @@ impl Shell {
             println!("{}", fs::read_to_string(motd_path).unwrap());
         }
 
+        let mut input = String::new();
         // line loop
         loop {
-            print!("{}", self.parse_prompt_string());
-            io::stdout().flush().unwrap();
-            let mut input = match self.get_line() {
-                Some(line) => line,
-                None => continue,
-            };
-
-            match self.history_expantion(&input) {
-                Some(expanded) => input = expanded,
-                None => continue,
+            self.print_prompt(&input);
+            self.get_line(&mut input);
+            if input.is_empty() {
+                continue;
             }
 
-            if let Err(error) = self.handle_input(&input) {
-                println!("{:#?}", error);
-            };
+            match self.history_expantion(&input) {
+                HistoryExpansion::Expanded(expanded) => {
+                    input = expanded;
+                    continue;
+                }
+                HistoryExpansion::EventNotFound(event) => {
+                    eprintln!("{}: event not found", event);
+                }
+                HistoryExpansion::Unchanged => {
+                    if let Err(error) = self.handle_input(&input) {
+                        println!("{:#?}", error);
+                    };
+                }
+            }
+
+            input.clear();
         }
     }
 
@@ -623,7 +646,10 @@ impl Shell {
 
                 // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
-                    output_device.eprintln(&format!("cd: {}: No such file or directory", path.display()));
+                    output_device.eprintln(&format!(
+                        "cd: {}: No such file or directory",
+                        path.display()
+                    ));
                     Ok(EXIT_FAILURE)
                 } else {
                     let metadata = fs::metadata(&path).unwrap();
@@ -725,7 +751,8 @@ impl Shell {
                 // copies a local var to env if no "=" is used.
                 // export on unexisting local var exports empty variable.
                 if args.is_empty() {
-                    output_device.eprintln("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
+                    output_device
+                        .eprintln("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
                     return Ok(EXIT_FAILURE);
                 }
                 for arg in args {
@@ -762,7 +789,10 @@ impl Shell {
                     match fs::write(&filename, &content) {
                         Ok(_) => Ok(EXIT_SUCCESS),
                         Err(error) => {
-                            output_device.eprintln(&format!("write: failed to write to file '{}': {}", filename, error));
+                            output_device.eprintln(&format!(
+                                "write: failed to write to file '{}': {}",
+                                filename, error
+                            ));
                             Ok(EXIT_FAILURE)
                         }
                     }
@@ -798,11 +828,15 @@ impl Shell {
                         }
                         if let Some(parent) = outpath.parent() {
                             if !parent.exists() {
-                                output_device.println(&format!("creating dir {}", parent.display()));
+                                output_device
+                                    .println(&format!("creating dir {}", parent.display()));
                                 fs::create_dir_all(&parent).unwrap();
                             }
                         }
-                        output_device.println(&format!("decompressing {}", file.enclosed_name().unwrap().display()));
+                        output_device.println(&format!(
+                            "decompressing {}",
+                            file.enclosed_name().unwrap().display()
+                        ));
                         let mut outfile = fs::File::create(&outpath).unwrap();
                         io::copy(&mut file, &mut outfile).unwrap();
                         println!(
@@ -823,7 +857,8 @@ impl Shell {
                         thread::sleep(Duration::new(sec, 0));
                         Ok(EXIT_SUCCESS)
                     } else {
-                        output_device.eprintln(&format!("sleep: invalid time interval `{}`", sec_str));
+                        output_device
+                            .eprintln(&format!("sleep: invalid time interval `{}`", sec_str));
                         Ok(EXIT_FAILURE)
                     }
                 } else {
