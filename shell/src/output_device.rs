@@ -25,8 +25,12 @@ impl<'a> OutputDevice<'a> {
 
     // TODO: ensure this gets called, maybe move it to custom Drop implementation
     pub fn flush(&self) -> Result<(), Report> {
-        self._flush(STDOUT, &self.stdout)?;
-        self._flush(STDERR, &self.stderr)?;
+        if !self.stdout.is_empty() {
+            self._flush(STDOUT, &self.stdout)?;
+        }
+        if !self.stderr.is_empty() {
+            self._flush(STDERR, &self.stderr)?;
+        }
         Ok(())
     }
 
