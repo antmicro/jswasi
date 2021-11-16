@@ -111,10 +111,11 @@ pub fn syscall(
             let mut spawned = std::process::Command::new(args[0])
                 .args(&args[1..])
                 .envs(envs)
-                .spawn()?;
+                .spawn()
+                .unwrap();
             // TODO: add redirects
             if !background {
-                let exit_status = spawned.wait()?.code().unwrap();
+                let exit_status = spawned.wait().unwrap().code().unwrap();
                 SyscallResult {
                     exit_status,
                     output: "".to_string(),
@@ -644,7 +645,6 @@ impl Shell {
                     PathBuf::from(&self.pwd).join(&args[0])
                 };
 
-                // simply including this in source breaks shell
                 if !Path::new(&path).exists() {
                     output_device.eprintln(&format!(
                         "cd: {}: No such file or directory",
@@ -932,10 +932,7 @@ impl Shell {
                     if fullpath.is_file() {
                         Ok(fullpath)
                     } else {
-                        Err(format!(
-                            "shell: no such file or directory: {}",
-                            fullpath.display()
-                        ))
+                        Err(format!("{}: no such file or directory", fullpath.display()))
                     }
                 } else if command.starts_with('.') {
                     let path = PathBuf::from(&self.pwd);
@@ -943,10 +940,7 @@ impl Shell {
                     if fullpath.is_file() {
                         Ok(fullpath)
                     } else {
-                        Err(format!(
-                            "shell: no such file or directory: {}",
-                            fullpath.display()
-                        ))
+                        Err(format!("{}: no such file or directory", fullpath.display()))
                     }
                 } else {
                     let mut found = false;
@@ -963,7 +957,7 @@ impl Shell {
                     if found {
                         Ok(fullpath)
                     } else {
-                        Err(format!("command not found: {}", command))
+                        Err(format!("{}: command not found", command))
                     }
                 };
 
@@ -998,7 +992,7 @@ impl Shell {
                         }
                     }
                     Err(reason) => {
-                        output_device.eprintln(&reason);
+                        output_device.eprintln(&format!("shell: {}", &reason));
                         Ok(EXIT_FAILURE)
                     }
                 }
