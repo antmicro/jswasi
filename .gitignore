@@ -7,6 +7,9 @@ shell/Cargo.lock
 node_modules
 package-lock.json
 
+.eslintcache
+
+ci/output.txt
 ci/*.webm
 ci/images.txt
 ci/images

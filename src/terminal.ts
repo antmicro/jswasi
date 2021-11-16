@@ -6,6 +6,7 @@ import { Stdin, Stdout, Stderr, OpenedFd } from "./devices.js";
 
 declare global {
   interface Window {
+    logOutput: boolean;
     stdout_attached: boolean;
     buffer: string;
   }
@@ -191,8 +192,11 @@ export async function init(
     // receive_callback
     (output) => {
       terminal.io.print(output);
-      if (window.stdout_attached != undefined && window.stdout_attached) {
+      if (window.stdout_attached) {
         window.buffer += output;
+      }
+      if (window.logOutput) {
+        console.log(`[OUT] ${output}`);
       }
     },
     terminal,
