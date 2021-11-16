@@ -1,7 +1,9 @@
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+
 use color_eyre::Report;
+
 use crate::shell_base::{Redirect, STDERR, STDOUT};
 
 /// Wrapper for stdout/stderr operations from shell builtins

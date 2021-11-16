@@ -31,16 +31,17 @@
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
     "prettier-check": "npx prettier . --check",
-    "record": "node ci/grab-screencast.js && rm -r ci/images && rm ci/images.txt",
+    "record": "./setup.sh record",
     "prepare": "husky install"
   },
   "lint-staged": {
     "*.ts": [
-        "eslint --cache --fix",
-        "prettier --write",
-        "git add ."
+      "eslint --cache --fix",
+      "prettier --write"
     ],
-    "*.md": "prettier --write"
+    "*.{md,json}": [
+      "prettier --write"
+    ]
   },
   "jest": {
     "preset": "jest-puppeteer"
