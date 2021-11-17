@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import { ProcessManager } from "./process-manager.js";
 import { syscallCallback } from "./syscalls.js";
 import { FileOrDir, OpenFlags, Filesystem, Directory } from "./filesystem.js";
-import { Stdin, Stdout, Stderr, OpenedFd } from "./devices.js";
+import { Stdin, Stdout, Stderr } from "./devices.js";
 
 declare global {
   interface Window {
@@ -55,10 +55,9 @@ export let filesystem: Filesystem;
 //   it can potentially be fixed by making the script an ESModule
 navigator.storage
   .getDirectory()
-  .then(
-    (rootHandle: FileSystemDirectoryHandle) =>
-      (filesystem = new Filesystem(rootHandle))
-  );
+  .then((rootHandle: FileSystemDirectoryHandle) => {
+    filesystem = new Filesystem(rootHandle);
+  });
 
 export async function fetchFile(
   dir: Directory,
@@ -277,6 +276,7 @@ export async function init(
         });
         const writable = await handle.createWritable();
         const stream = (await entry.getFile()).stream();
+        // @ts-ignore pipeTo is still experimental
         await stream.pipeTo(writable);
         if (notifyDroppedFileSaved) notifyDroppedFileSaved(path, entry.name);
       }

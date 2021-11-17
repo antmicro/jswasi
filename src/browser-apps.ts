@@ -145,6 +145,7 @@ export async function download(
         return 1; // TODO: what would be a proper error here?
       }
       const writable = await local_handle.createWritable();
+      // @ts-ignore pipeTo is still experimental
       await stream.pipeTo(writable);
     }
   }
