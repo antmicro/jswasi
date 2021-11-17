@@ -116,7 +116,7 @@ async function initFs(anchor: HTMLElement) {
     await w.write({
       type: "write",
       position: 0,
-      data: "export RUST_BACKTRACE=full\nexport DEBUG=1\n",
+      data: "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6",
     });
     await w.close();
   }
