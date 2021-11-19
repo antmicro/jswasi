@@ -153,6 +153,10 @@ export class Stderr implements IO {
       ctim: 0n,
     };
   }
+
+  async seek(offset: number, whence: number): Promise<number> {
+    return 0; // do nothing
+  }
 }
 
 export class OpenedFd implements IO {

@@ -21,6 +21,7 @@ const NECESSARY_BINARIES = {
   "/usr/bin/coreutils": "resources/coreutils.async.wasm",
   "/usr/bin/tree": "resources/tree.wasm",
   "/usr/bin/purge": "resources/purge.wasm",
+  "/usr/bin/nohup": "resources/nohup.wasm",
 };
 
 const OPTIONAL_BINARIES = {
@@ -135,7 +136,6 @@ async function initFs(anchor: HTMLElement) {
   await bin.getFileHandle("download", { create: true });
   await bin.getFileHandle("ps", { create: true });
   await bin.getFileHandle("free", { create: true });
-  await bin.getFileHandle("nohup", { create: true });
 
   const local = await usr.getDirectoryHandle("local", { create: true });
   const local_bin = await local.getDirectoryHandle("bin", { create: true });

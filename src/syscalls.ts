@@ -156,16 +156,8 @@ export async function syscallCallback(
           Atomics.notify(parent_lck, 0);
           break;
         }
-        case "/usr/bin/nohup":
         default: {
           let background = isJob;
-          if (fullpath === "/usr/bin/nohup") {
-            args = args.splice(1);
-            fullpath = args[0];
-            args = args.splice(1);
-            args.splice(0, 0, fullpath.split("/").pop());
-            background = true;
-          }
           // TODO: is shallow copy enough, or should we deepcopy?
           const childFds = processManager.processInfos[process_id].fds.slice(0);
           for (const [fd, path, mode] of redirects) {
