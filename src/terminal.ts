@@ -276,12 +276,15 @@ export async function init(
 
     const pwd =
       processManager.processInfos[processManager.currentProcess].env.PWD;
+    const entryPromises = [];
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {
-        const entry = await item.getAsFileSystemHandle();
-        await copyEntry(entry, pwd);
+        entryPromises.push(
+          item.getAsFileSystemHandle().then((entry) => copyEntry(entry, pwd))
+        );
       }
     }
+    await Promise.all(entryPromises);
   });
 
   const pwd_dir = (
@@ -297,10 +300,10 @@ export async function init(
       new Stdin(processManager),
       new Stdout(processManager),
       new Stderr(processManager),
-      await filesystem.rootDir.open(),
-      await pwd_dir.open(),
+      filesystem.rootDir.open(),
+      pwd_dir.open(),
       // TODO: why must fds[5] be present for ls to work, and what should it be
-      await filesystem.rootDir.open(),
+      filesystem.rootDir.open(),
     ],
     ["/usr/bin/shell"],
     {

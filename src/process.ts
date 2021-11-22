@@ -74,10 +74,7 @@ onmessage = (e) => {
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
-      mod = e.data[1];
-      myself = e.data[2];
-      args = e.data[3];
-      env = e.data[4];
+      [, mod, myself, args, env] = e.data;
     }
   }
 };
