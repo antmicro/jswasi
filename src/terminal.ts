@@ -101,7 +101,7 @@ export async function fetchFile(
   }
 }
 
-async function initFs(anchor: HTMLElement) {
+async function initFs() {
   // setup filesystem
   const root = await navigator.storage.getDirectory();
   const tmp = await root.getDirectoryHandle("tmp", { create: true });
@@ -172,6 +172,8 @@ export async function init(
       "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
     return;
   }
+
+  await initFs();
 
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
