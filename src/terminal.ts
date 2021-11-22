@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
-import { syscallCallback } from "./syscalls.js";
+import syscallCallback from "./syscalls.js";
 import { FileOrDir, OpenFlags, Filesystem, Directory } from "./filesystem.js";
 import { Stdin, Stdout, Stderr } from "./devices.js";
 
@@ -320,6 +320,7 @@ export async function init(
       USER: "ant",
       HOSTNAME: "browser",
       PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
+      DEBUG: "1",
     },
     false
   );

@@ -67,14 +67,14 @@ const CPUTIME_START = utils.msToNs(performance.now());
 let started: boolean;
 let mod: string;
 let myself: number;
-let args: string[];
+let programArgs: string[];
 let env: Record<string, string>;
 
 onmessage = (e) => {
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
-      [, mod, myself, args, env] = e.data;
+      [, mod, myself, programArgs, env] = e.data;
     }
   }
 };
@@ -180,10 +180,10 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    view.setUint32(argc, args.length, true);
+    view.setUint32(argc, programArgs.length, true);
     view.setUint32(
       argvBufSize,
-      ENCODER.encode(args.join("")).byteLength + args.length,
+      ENCODER.encode(programArgs.join("")).byteLength + programArgs.length,
       true
     );
 
@@ -200,7 +200,7 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    args.forEach((arg, i) => {
+    programArgs.forEach((arg, i) => {
       // set pointer address to beginning of next key value pair
       view.setUint32(argv + i * 4, argv_buf, true);
       // write string describing the argument to WASM memory
@@ -624,31 +624,24 @@ function WASI(): WASICallbacks {
   }
 
   // used solely in path_readlink
-  function special_parse(fullcmd: string): string {
-    const [cmd, args_string, env_string, background, redirects_string] =
-      fullcmd.split("\x1b\x1b");
-    const isJob = background === "true";
-    switch (cmd) {
+  function special_parse(syscallDataJson: string): string {
+    const { command, args, extended_env, background, redirects } =
+      JSON.parse(syscallDataJson);
+    switch (command) {
       case "spawn": {
-        // reparse args
-        const args = args_string.split("\x1b");
-        const new_env = Object.fromEntries(
-          env_string.split("\x1b").map((kv) => kv.split("="))
-        );
-        const extended_env = { ...env, ...new_env };
-        const redirects = redirects_string
-          .split("\x1b")
-          .filter((s) => s.length)
-          .map((redirect) => {
-            const [fd, path, mode] = redirect.split(" ");
-            return [parseInt(fd, 10), path, mode];
-          });
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
         send_to_kernel([
           "spawn",
-          [args[0], args.slice(1), extended_env, sbuf, isJob, redirects],
+          [
+            args[0],
+            args.slice(1),
+            { ...env, ...extended_env },
+            sbuf,
+            background,
+            redirects,
+          ],
         ]);
         // wait for child process to finish
         Atomics.wait(lck, 0, -1);
@@ -663,7 +656,7 @@ function WASI(): WASICallbacks {
         const sbuf = new SharedArrayBuffer(4);
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
-        const dir = utils.realpath(args_string);
+        const dir = utils.realpath(args[0]);
         send_to_kernel(["chdir", [dir, sbuf]]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
@@ -675,7 +668,6 @@ function WASI(): WASICallbacks {
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
 
-        const args = args_string.split("\x1b");
         send_to_kernel(["set_env", [args, sbuf]]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
@@ -684,7 +676,8 @@ function WASI(): WASICallbacks {
           if (args.length === 1) {
             delete env[args[0]];
           } else {
-            env[args[0]] = args[1];
+            const [key, value] = args;
+            env[key] = value;
           }
         }
 
@@ -695,7 +688,7 @@ function WASI(): WASICallbacks {
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
 
-        send_to_kernel(["set_echo", [args_string, sbuf]]);
+        send_to_kernel(["set_echo", [args[0], sbuf]]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b`;
@@ -704,18 +697,19 @@ function WASI(): WASICallbacks {
         const sbuf = new SharedArrayBuffer(8);
         const lck = new Int32Array(sbuf, 0, 1);
         lck[0] = -1;
-        const isatty = new Int32Array(sbuf, 4, 1);
-        const fd = parseInt(args_string, 10);
+        const isattyPtr = new Int32Array(sbuf, 4, 1);
+        const fd = parseInt(args[0], 10);
 
         send_to_kernel(["isatty", [sbuf, fd]]);
         Atomics.wait(lck, 0, -1);
 
-        return `${constants.EXIT_SUCCESS}\x1b${isatty[0]}`;
+        return `${constants.EXIT_SUCCESS}\x1b${isattyPtr[0]}`;
+      }
+      default: {
+        worker_console_log(`Special command ${command} not found.`);
+        throw Error(`Special command '${command} not found.`);
       }
     }
-
-    worker_console_log(`Special command ${cmd} not found.`);
-    return `${constants.EXIT_CMD_NOT_FOUND}\x1b`;
   }
 
   function path_readlink(

@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-export async function syscallCallback(
+export default async function syscallCallback(
   event: MessageEvent,
   processManager: ProcessManager
 ): Promise<void> {
@@ -109,14 +109,14 @@ export async function syscallCallback(
       const [shouldEcho, sbuf] = data;
       const lock = new Int32Array(sbuf, 0, 1);
       // TODO: should this be simply $ECHO env variable?
-      processManager.processInfos[process_id].shouldEcho = data === "1";
+      processManager.processInfos[process_id].shouldEcho = shouldEcho === "1";
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
     }
     case "spawn": {
-      let [fullpath, args, env, sbuf, isJob, redirects] = data;
+      const [fullpath, args, env, sbuf, background, redirects] = data;
       const parent_lck = new Int32Array(sbuf, 0, 1);
       args.splice(0, 0, fullpath.split("/").pop());
       switch (fullpath) {
@@ -157,22 +157,37 @@ export async function syscallCallback(
           break;
         }
         default: {
-          let background = isJob;
-          // TODO: is shallow copy enough, or should we deepcopy?
+          // TODO: is shallow copy enough, or should we deep copy?
           const childFds = processManager.processInfos[process_id].fds.slice(0);
-          for (const [fd, path, mode] of redirects) {
-            const { entry } = await filesystem.rootDir.getEntry(
-              path,
-              FileOrDir.File,
-              OpenFlags.Create
-            );
-            childFds[fd] = await entry.open();
-            if (mode === "write") {
-              await childFds[fd].truncate();
-            } else if (mode === "append") {
-              await childFds[fd].seek(0, constants.WASI_WHENCE_END);
-            }
-          }
+          Promise.all(
+            redirects.map(async (redirect: any) => {
+              let mode: string;
+              let path: string;
+              let fd: number;
+              if ("Read" in redirect) {
+                mode = "read";
+                [fd, path] = redirect.Read;
+              } else if ("Write" in redirect) {
+                mode = "write";
+                [fd, path] = redirect.Write;
+              } else if ("Append" in redirect) {
+                mode = "append";
+                [fd, path] = redirect.Append;
+              }
+              const { entry } = await filesystem.rootDir.getEntry(
+                path,
+                FileOrDir.File,
+                OpenFlags.Create
+              );
+              childFds[fd] = entry.open();
+              const openFile = childFds[fd];
+              if (mode === "write") {
+                await openFile.truncate();
+              } else if (mode === "append") {
+                await openFile.seek(0, constants.WASI_WHENCE_END);
+              }
+            })
+          );
           const id = await processManager.spawnProcess(
             process_id,
             background ? null : parent_lck,
@@ -181,7 +196,7 @@ export async function syscallCallback(
             childFds,
             args,
             env,
-            isJob
+            background
           );
           const new_process_name = fullpath.split("/").slice(-1)[0];
           if (env.DEBUG === "1") {

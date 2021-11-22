@@ -15,6 +15,7 @@ use conch_parser::parse::DefaultParser;
 use iterm2;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::Serialize;
 
 use crate::interpreter::interpret;
 use crate::output_device::OutputDevice;
@@ -40,53 +41,33 @@ pub struct SyscallResult {
 }
 
 // TODO: use newtype pattern, make u16 an Fd type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum Redirect {
     Read((u16, String)),
     Write((u16, String)),
     Append((u16, String)),
 }
 
-impl Redirect {
-    #[cfg(target_os = "wasi")]
-    fn as_syscall_string(&self) -> String {
-        match self {
-            Self::Read((fd, filename)) => format!("{} {} {}", fd, filename, "read"),
-            Self::Write((fd, filename)) => format!("{} {} {}", fd, filename, "write"),
-            Self::Append((fd, filename)) => format!("{} {} {}", fd, filename, "append"),
-        }
-    }
-}
-
 // communicate with the worker thread
 pub fn syscall(
     command: &str,
     args: &[&str],
-    envs: &HashMap<String, String>,
+    env: &HashMap<String, String>,
     background: bool,
     #[allow(unused_variables)] redirects: &[Redirect],
 ) -> Result<SyscallResult, Report> {
     #[cfg(target_os = "wasi")]
     let result = {
-        let result = fs::read_link(format!(
-            "/!{}",
-            [
-                command,
-                &args.join("\x1b"),
-                &envs
-                    .iter()
-                    .map(|(key, val)| format!("{}={}", key, val))
-                    .collect::<Vec<String>>()
-                    .join("\x1b"),
-                &format!("{}", background),
-                &redirects
-                    .iter()
-                    .map(|redirect| redirect.as_syscall_string())
-                    .collect::<Vec<String>>()
-                    .join("\x1b"),
-            ]
-            .join("\x1b\x1b")
-        ))?
+        use serde_json::json;
+
+        let j = json!({
+            "command": command,
+            "args": args,
+            "env": env,
+            "redirects": redirects,
+            "background": background,
+        }).to_string();
+        let result = fs::read_link(format!("/!{}", j))?
         .to_str()
         .unwrap()
         .trim_matches(char::from(0))
@@ -110,7 +91,7 @@ pub fn syscall(
         if command == "spawn" {
             let mut spawned = std::process::Command::new(args[0])
                 .args(&args[1..])
-                .envs(envs)
+                .envs(env)
                 .spawn()
                 .unwrap();
             // TODO: add redirects
@@ -581,7 +562,7 @@ impl Shell {
                 }
                 HistoryExpansion::Unchanged => {
                     if let Err(error) = self.handle_input(&input) {
-                        println!("{:#?}", error);
+                        eprintln!("{:#?}", error);
                     };
                 }
             }
@@ -822,7 +803,8 @@ impl Shell {
                         let mut file = archive.by_index(i).unwrap();
                         let output_path = file.enclosed_name().to_owned().unwrap();
                         if file.name().ends_with('/') {
-                            output_device.println(&format!("creating dir {}", output_path.display()));
+                            output_device
+                                .println(&format!("creating dir {}", output_path.display()));
                             fs::create_dir_all(&output_path).unwrap();
                             continue;
                         }
@@ -932,7 +914,10 @@ impl Shell {
                     if full_path.is_file() {
                         Ok(full_path)
                     } else {
-                        Err(format!("{}: no such file or directory", full_path.display()))
+                        Err(format!(
+                            "{}: no such file or directory",
+                            full_path.display()
+                        ))
                     }
                 } else if command.starts_with('.') {
                     let path = PathBuf::from(&self.pwd);
@@ -940,7 +925,10 @@ impl Shell {
                     if full_path.is_file() {
                         Ok(full_path)
                     } else {
-                        Err(format!("{}: no such file or directory", full_path.display()))
+                        Err(format!(
+                            "{}: no such file or directory",
+                            full_path.display()
+                        ))
                     }
                 } else {
                     let mut found = false;
