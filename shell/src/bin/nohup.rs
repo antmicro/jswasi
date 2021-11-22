@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // TODO: rework this abomination
                 .collect::<Vec<_>>()
                 .iter()
-                .map(move |x| &x as &str)
+                .map(move |x| x as &str)
                 .collect::<Vec<_>>(),
             &HashMap::new(),
             true,

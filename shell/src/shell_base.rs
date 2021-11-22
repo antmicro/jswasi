@@ -29,6 +29,8 @@ pub const STDIN: u16 = 0;
 pub const STDOUT: u16 = 1;
 pub const STDERR: u16 = 2;
 
+const CLEAR_ESCAPE_CODE: &str = "\x1b[2J\x1b[H";
+
 enum HistoryExpansion {
     Expanded(String),
     EventNotFound(String),
@@ -66,12 +68,13 @@ pub fn syscall(
             "env": env,
             "redirects": redirects,
             "background": background,
-        }).to_string();
-        let result = fs::read_link(format!("/!{}", j))?
-        .to_str()
-        .unwrap()
-        .trim_matches(char::from(0))
+        })
         .to_string();
+        let result = fs::read_link(format!("/!{}", j))?
+            .to_str()
+            .unwrap()
+            .trim_matches(char::from(0))
+            .to_string();
         if !background {
             let (exit_status, output) = result.split_once("\x1b").unwrap();
             let exit_status = exit_status.parse::<i32>().unwrap();
@@ -141,7 +144,7 @@ impl Shell {
         }
     }
 
-    fn print_prompt(&mut self, input: &String) {
+    fn print_prompt(&mut self, input: &str) {
         print!("{}{}", self.parse_prompt_string(), input);
         io::stdout().flush().unwrap();
         self.cursor_position = input.len();
@@ -286,7 +289,7 @@ impl Shell {
                                     *input =
                                         self.history[history_entry_to_display as usize].clone();
                                     self.cursor_position = input.len();
-                                    self.echo(&input);
+                                    self.echo(input);
                                 }
                                 escaped = false;
                             }
@@ -315,7 +318,7 @@ impl Shell {
                                         history_entry_to_display = -1;
                                     }
                                     self.cursor_position = input.len();
-                                    self.echo(&input);
+                                    self.echo(input);
                                 }
                                 escaped = false;
                             }
@@ -598,7 +601,7 @@ impl Shell {
         let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {
-                output_device.print(&format!("\x1b[2J\x1b[H"));
+                output_device.print(CLEAR_ESCAPE_CODE);
                 Ok(EXIT_SUCCESS)
             }
             "exit" => {

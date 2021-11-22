@@ -8,13 +8,13 @@ use crate::shell_base::{Redirect, STDERR, STDOUT};
 
 /// Wrapper for stdout/stderr operations from shell builtins so that they are redirects-aware
 pub struct OutputDevice<'a> {
-    redirects: &'a Vec<Redirect>,
+    redirects: &'a [Redirect],
     stdout: String,
     stderr: String,
 }
 
 impl<'a> OutputDevice<'a> {
-    pub fn new(redirects: &'a Vec<Redirect>) -> Self {
+    pub fn new(redirects: &'a [Redirect]) -> Self {
         OutputDevice {
             redirects,
             stdout: String::new(),
@@ -25,15 +25,15 @@ impl<'a> OutputDevice<'a> {
     // TODO: ensure this gets called, maybe move it to custom Drop implementation
     pub fn flush(&self) -> Result<(), Report> {
         if !self.stdout.is_empty() {
-            self._flush(STDOUT, &self.stdout)?;
+            self.flush_fd(STDOUT, &self.stdout)?;
         }
         if !self.stderr.is_empty() {
-            self._flush(STDERR, &self.stderr)?;
+            self.flush_fd(STDERR, &self.stderr)?;
         }
         Ok(())
     }
 
-    fn _flush(&self, to_fd: u16, output: &str) -> Result<(), Report> {
+    fn flush_fd(&self, to_fd: u16, output: &str) -> Result<(), Report> {
         let mut is_redirected = false;
         for redirect in self.redirects {
             match redirect {
