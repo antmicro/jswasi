@@ -90,7 +90,7 @@ fn main() {
     let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {
-            eprintln!("shell: error occured: {}", e);
+            eprintln!("shell: error occurred: {}", e);
             2
         }
     };

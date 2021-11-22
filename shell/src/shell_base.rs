@@ -48,7 +48,7 @@ pub enum Redirect {
 }
 
 impl Redirect {
-    #[allow(dead_code)]
+    #[cfg(target_os = "wasi")]
     fn as_syscall_string(&self) -> String {
         match self {
             Self::Read((fd, filename)) => format!("{} {} {}", fd, filename, "read"),
@@ -442,7 +442,7 @@ impl Shell {
 
     /// Expands input line with history expansion.
     /// Returns `None` if the event designator was not found
-    fn history_expantion(&mut self, input: &str) -> HistoryExpansion {
+    fn history_expansion(&mut self, input: &str) -> HistoryExpansion {
         let mut processed = input.to_string();
         if let Some(last_command) = self.history.last() {
             processed = processed.replace("!!", last_command);
@@ -462,7 +462,7 @@ impl Shell {
             } else {
                 (history_number - 1) as usize
             };
-            // get that entry from history (if it exitst)
+            // get that entry from history (if it exists)
             if let Some(history_cmd) = self.history.get(history_number) {
                 // replace the match with the entry from history
                 processed = processed.replace(full_match, history_cmd);
@@ -513,7 +513,7 @@ impl Shell {
     pub fn run_interpreter(&mut self) -> Result<i32, Report> {
         if self.should_echo {
             // disable echoing on hterm side (ignore Error that will arise on wasi runtimes other
-            // than ours (wasmer/wasitime)
+            // than ours (wasmer/wasmtime)
             let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
         }
 
@@ -571,7 +571,7 @@ impl Shell {
                 continue;
             }
 
-            match self.history_expantion(&input) {
+            match self.history_expansion(&input) {
                 HistoryExpansion::Expanded(expanded) => {
                     input = expanded;
                     continue;
@@ -747,9 +747,9 @@ impl Shell {
                 Ok(EXIT_SUCCESS)
             }
             "export" => {
-                // export creates an env value if A=B notation is used, or just
-                // copies a local var to env if no "=" is used.
-                // export on unexisting local var exports empty variable.
+                // export creates an env value if A=B notation is used,
+                // or just copies a local var to env if "=" is not used.
+                // Export on nonexisting local var exports empty variable.
                 if args.is_empty() {
                     output_device
                         .eprintln("export: help: export <VAR>[=<VALUE>] [<VAR>[=<VALUE>]] ...");
@@ -820,13 +820,13 @@ impl Shell {
                     let mut archive = zip::ZipArchive::new(file).unwrap();
                     for i in 0..archive.len() {
                         let mut file = archive.by_index(i).unwrap();
-                        let outpath = file.enclosed_name().to_owned().unwrap();
+                        let output_path = file.enclosed_name().to_owned().unwrap();
                         if file.name().ends_with('/') {
-                            output_device.println(&format!("creating dir {}", outpath.display()));
-                            fs::create_dir_all(&outpath).unwrap();
+                            output_device.println(&format!("creating dir {}", output_path.display()));
+                            fs::create_dir_all(&output_path).unwrap();
                             continue;
                         }
-                        if let Some(parent) = outpath.parent() {
+                        if let Some(parent) = output_path.parent() {
                             if !parent.exists() {
                                 output_device
                                     .println(&format!("creating dir {}", parent.display()));
@@ -837,8 +837,8 @@ impl Shell {
                             "decompressing {}",
                             file.enclosed_name().unwrap().display()
                         ));
-                        let mut outfile = fs::File::create(&outpath).unwrap();
-                        io::copy(&mut file, &mut outfile).unwrap();
+                        let mut output_file = fs::File::create(&output_path).unwrap();
+                        io::copy(&mut file, &mut output_file).unwrap();
                         println!(
                             "decompressing {} done.",
                             file.enclosed_name().unwrap().display()
@@ -868,7 +868,7 @@ impl Shell {
             }
             "hexdump" => {
                 if args.is_empty() {
-                    output_device.eprintln("hexdump: help: hexump <filename>");
+                    output_device.eprintln("hexdump: help: hexdump <filename>");
                     Ok(EXIT_FAILURE)
                 } else {
                     let contents = fs::read(args.remove(0)).unwrap_or_else(|_| {
@@ -927,41 +927,41 @@ impl Shell {
             }
             // external commands or command not found
             _ => {
-                let fullpath = if command.starts_with('/') {
-                    let fullpath = PathBuf::from(command);
-                    if fullpath.is_file() {
-                        Ok(fullpath)
+                let full_path = if command.starts_with('/') {
+                    let full_path = PathBuf::from(command);
+                    if full_path.is_file() {
+                        Ok(full_path)
                     } else {
-                        Err(format!("{}: no such file or directory", fullpath.display()))
+                        Err(format!("{}: no such file or directory", full_path.display()))
                     }
                 } else if command.starts_with('.') {
                     let path = PathBuf::from(&self.pwd);
-                    let fullpath = path.join(command);
-                    if fullpath.is_file() {
-                        Ok(fullpath)
+                    let full_path = path.join(command);
+                    if full_path.is_file() {
+                        Ok(full_path)
                     } else {
-                        Err(format!("{}: no such file or directory", fullpath.display()))
+                        Err(format!("{}: no such file or directory", full_path.display()))
                     }
                 } else {
                     let mut found = false;
-                    let mut fullpath = PathBuf::new();
+                    let mut full_path = PathBuf::new();
                     // get PATH env variable, split it and look for binaries in each directory
                     for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
                         let bin_dir = PathBuf::from(bin_dir);
-                        fullpath = bin_dir.join(&command);
-                        if fullpath.is_file() {
+                        full_path = bin_dir.join(&command);
+                        if full_path.is_file() {
                             found = true;
                             break;
                         }
                     }
                     if found {
-                        Ok(fullpath)
+                        Ok(full_path)
                     } else {
                         Err(format!("{}: command not found", command))
                     }
                 };
 
-                match fullpath {
+                match full_path {
                     Ok(path) => {
                         let file = File::open(&path).unwrap();
                         if let Some(Ok(line)) = BufReader::new(file).lines().next() {

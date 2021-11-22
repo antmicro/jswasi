@@ -92,7 +92,7 @@ fn handle_pipe(
         fs::remove_file(format!("/proc/pipe{}.txt", i)).unwrap();
     }
 
-    // if ! was present at the begining of the pipe, return logical negation of last command status
+    // if ! was present at the beginning of the pipe, return logical negation of last command status
     if negate {
         (exit_status != EXIT_SUCCESS) as i32
     } else {

@@ -6,8 +6,7 @@ use color_eyre::Report;
 
 use crate::shell_base::{Redirect, STDERR, STDOUT};
 
-/// Wrapper for stdout/stderr operations from shell builtins
-/// so that they are redirects-aware
+/// Wrapper for stdout/stderr operations from shell builtins so that they are redirects-aware
 pub struct OutputDevice<'a> {
     redirects: &'a Vec<Redirect>,
     stdout: String,

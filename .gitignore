@@ -1,10 +1,11 @@
 .idea/
 .vs/
+.vscode/
 
 shell/target
 shell/Cargo.lock
 
-node_modules
+node_modules/
 package-lock.json
 
 .eslintcache
@@ -15,5 +16,4 @@ ci/images.txt
 ci/images
 ci/package-lock.json
 
-dist
-
+dist/
