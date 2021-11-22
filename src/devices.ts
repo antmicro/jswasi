@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { ProcessManager } from "./process-manager.js";
+import ProcessManager from "./process-manager.js";
 import { OpenFile } from "./filesystem.js";
 
 const DECODER = new TextDecoder();
@@ -187,7 +187,7 @@ export class OpenedFd implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    return await this.openedFile.write(content.slice(0));
+    return this.openedFile.write(content.slice(0));
   }
 
   async stat(): Promise<{
@@ -200,11 +200,11 @@ export class OpenedFd implements IO {
     mtim: bigint;
     ctim: bigint;
   }> {
-    return await this.openedFile.stat();
+    return this.openedFile.stat();
   }
 
   async lastModified(): Promise<number> {
-    return await this.openedFile.lastModified();
+    return this.openedFile.lastModified();
   }
 
   open(): OpenedFd {
@@ -216,7 +216,7 @@ export class OpenedFd implements IO {
   }
 
   async seek(offset: number, whence: number): Promise<number> {
-    return await this.openedFile.seek(offset, whence);
+    return this.openedFile.seek(offset, whence);
   }
 
   async truncate(size: number = 0) {

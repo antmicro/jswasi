@@ -13,6 +13,8 @@
   "rules": {
     "camelcase": "off",
     "import/no-unresolved": "off",
-    "import/extensions": "off"
+    "import/extensions": "off",
+    "no-restricted-syntax": "off",
+    "max-classes-per-file": "off"
   }
 }

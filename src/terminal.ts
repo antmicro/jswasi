@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { ProcessManager } from "./process-manager.js";
+import ProcessManager from "./process-manager.js";
 import { syscallCallback } from "./syscalls.js";
 import { FileOrDir, OpenFlags, Filesystem, Directory } from "./filesystem.js";
 import { Stdin, Stdout, Stderr } from "./devices.js";
@@ -76,10 +76,9 @@ export async function fetchFile(
     return;
   }
   // @ts-ignore TODO: add API for file manipulation to File class
-  const file = await entry._handle.getFile();
+  const file = await entry.handle.getFile();
   // only fetch binary if not yet present
   if (refetch || file.size === 0) {
-    let response;
     if (
       !(address.startsWith("http://") || address.startsWith("https://")) ||
       address.startsWith(location.origin)
@@ -91,10 +90,10 @@ export async function fetchFile(
       address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
     }
 
-    response = await fetch(address);
+    const response = await fetch(address);
     if (response.status === 200) {
       // @ts-ignore TODO: add API for file manipulation to File class
-      const writable = await entry._handle.createWritable();
+      const writable = await entry.handle.createWritable();
       await response.body.pipeTo(writable);
     } else {
       console.log(`Failed downloading ${filename} from ${address}`);
@@ -153,11 +152,8 @@ async function initFs(anchor: HTMLElement) {
       fetchFile(filesystem.rootDir, filename, address, false)
   );
 
-  anchor.innerHTML += "<br/>" + "Starting download of mandatory";
   await Promise.all(always_fetch_promises);
   await Promise.all(necessary_promises);
-  anchor.innerHTML += "<br/>" + "Mandatory finished.";
-  anchor.innerHTML += "<br/>" + "Starting download of optional";
   // don't await this on purpose
   // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
   //       it can say that command is not found or just fail at instantiation
@@ -177,10 +173,6 @@ export async function init(
     return;
   }
 
-  anchor.innerHTML = "Fetching binaries, this should only happen once.";
-  await initFs(anchor);
-  anchor.innerHTML = "";
-
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
@@ -189,7 +181,7 @@ export async function init(
   const processManager = new ProcessManager(
     "process.js",
     // receive_callback
-    (output) => {
+    (output: string) => {
       terminal.io.print(output);
       if (window.stdout_attached) {
         window.buffer += output;
@@ -265,13 +257,13 @@ export async function init(
         .entry;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
-        await dir._handle.getDirectoryHandle(entry.name, { create: true });
-        for await (const [name, handle] of entry.entries()) {
+        await dir.handle.getDirectoryHandle(entry.name, { create: true });
+        for await (const [, handle] of entry.entries()) {
           await copyEntry(handle, `${path}/${entry.name}`);
         }
       } else {
         // create VFS file, open dragged file as stream and pipe it to VFS file
-        const handle = await dir._handle.getFileHandle(entry.name, {
+        const handle = await dir.handle.getFileHandle(entry.name, {
           create: true,
         });
         const writable = await handle.createWritable();

@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 import { FileOrDir } from "./filesystem.js";
 import { filesystem, fetchFile } from "./terminal.js";
-import { ProcessManager } from "./process-manager";
+import ProcessManager from "./process-manager";
 
 export async function mount(
   processManager: ProcessManager,
@@ -90,10 +90,10 @@ export async function wget(
 ): Promise<number> {
   let path: string;
   let address: string;
-  if (args.length == 2) {
+  if (args.length === 2) {
     address = args[1];
     path = address.split("/").slice(-1)[0];
-  } else if (args.length == 3) {
+  } else if (args.length === 3) {
     address = args[1];
     path = args[2];
   } else {
@@ -103,7 +103,7 @@ export async function wget(
   if (!path.startsWith("/")) {
     path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
   }
-  const { err, name, dir } = await filesystem.resolveAbsolute(path);
+  const { dir } = await filesystem.resolveAbsolute(path);
   await fetchFile(dir, path, address);
   return 0;
 }
@@ -131,7 +131,7 @@ export async function download(
     if (err !== constants.WASI_ESUCCESS) {
       processManager.terminal.io.println(`download: no such file: ${path}`);
     } else {
-      const stream = (await entry._handle.getFile()).stream();
+      const stream = (await entry.handle.getFile()).stream();
       let local_handle;
       try {
         local_handle = await window.showSaveFilePicker({
@@ -190,7 +190,7 @@ export async function free(
   let total_mem = "";
   let used_mem = "";
   let avail_mem = "";
-  if (args.length > 1 && args[1] == "-h") {
+  if (args.length > 1 && args[1] === "-h") {
     total_mem = utils.human_readable(total_mem_raw);
     used_mem = utils.human_readable(used_mem_raw);
     avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);

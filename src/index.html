@@ -25,7 +25,7 @@
       script.onload = async () => {
         await lib.init();
         await init(document.querySelector("#terminal"), (path, entryName) =>
-          console.log(`[added dropped file as '${path}/${entryName}`)
+          console.log(`[added dropped file as '${path}/${entryName}]`)
         );
       };
       document.body.appendChild(script);

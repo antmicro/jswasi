@@ -190,15 +190,15 @@ export const WASI_EVENTTYPE_CLOCK = 0;
 export const WASI_EVENTTYPE_FD_READ = 1;
 export const WASI_EVENTTYPE_FD_WRITE = 2;
 
-export const WASI_FILESTAT_SET_ATIM = 1 << 0;
-export const WASI_FILESTAT_SET_ATIM_NOW = 1 << 1;
-export const WASI_FILESTAT_SET_MTIM = 1 << 2;
-export const WASI_FILESTAT_SET_MTIM_NOW = 1 << 3;
+export const WASI_FILESTAT_SET_ATIM = 1;
+export const WASI_FILESTAT_SET_ATIM_NOW = 2;
+export const WASI_FILESTAT_SET_MTIM = 4;
+export const WASI_FILESTAT_SET_MTIM_NOW = 8;
 
-export const WASI_O_CREAT = 1 << 0;
-export const WASI_O_DIRECTORY = 1 << 1;
-export const WASI_O_EXCL = 1 << 2;
-export const WASI_O_TRUNC = 1 << 3;
+export const WASI_O_CREAT = 1;
+export const WASI_O_DIRECTORY = 2;
+export const WASI_O_EXCL = 4;
+export const WASI_O_TRUNC = 8;
 
 export const WASI_PREOPENTYPE_DIR = 0;
 

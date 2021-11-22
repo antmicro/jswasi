@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { mount, umount, wget, download, ps, free } from "./browser-apps.js";
-import { ProcessManager } from "./process-manager.js";
+import ProcessManager from "./process-manager.js";
 import { filesystem } from "./terminal.js";
 
 const RED_ANSI = "\u001b[31m";

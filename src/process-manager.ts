@@ -26,13 +26,14 @@ class ProcessInfo {
       event: MessageEvent,
       processManager: ProcessManager
     ) => Promise<void>,
-    public env: Record<string, string>
+    public env: Record<string, string>,
+    public isJob: boolean
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
   }
 }
 
-export class ProcessManager {
+export default class ProcessManager {
   public buffer = "";
 
   public currentProcess: number = null;
@@ -77,7 +78,8 @@ export class ProcessManager {
       parentId,
       parentLock,
       syscallCallback,
-      env
+      env,
+      isJob
     );
     worker.onmessage = (event) => syscallCallback(event, this);
 
@@ -89,10 +91,10 @@ export class ProcessManager {
         FileOrDir.File
       );
       if (binary.entry === null) {
-        console.warn(`No such binary: ${command}`);
+        console.error(`No such binary: ${command}`);
         return;
       }
-      const file = await binary.entry._handle.getFile();
+      const file = await binary.entry.handle.getFile();
       const bufferSource = await file.arrayBuffer();
       this.compiledModules[command] = await WebAssembly.compile(bufferSource);
     }
@@ -105,7 +107,6 @@ export class ProcessManager {
       args,
       env,
     ]);
-    return id;
   }
 
   terminateProcess(id: number, exitNo: number = 0) {
