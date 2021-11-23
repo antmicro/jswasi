@@ -17,6 +17,8 @@
     "max-classes-per-file": "off",
     "no-bitwise": ["warn", { "allow": ["|"] }],
     "no-console": "off",
-    "dot-notation": "off"
+    "dot-notation": "off",
+    "no-param-reassign": "off",
+    "no-use-before-define": "off"
   }
 }

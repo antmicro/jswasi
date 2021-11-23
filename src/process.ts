@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 

@@ -8,7 +8,7 @@ const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export interface IO {
-  file_type: number;
+  fileType: number;
   isatty: boolean;
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer): void;
   write(content: Uint8Array): Promise<number>;
@@ -25,7 +25,7 @@ export interface IO {
 }
 
 export class Stdin implements IO {
-  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
 
@@ -45,7 +45,7 @@ export class Stdin implements IO {
   }
 
   async write(content: Uint8Array): Promise<number> {
-    throw "can't write to stdin!";
+    throw Error("can't write to stdin!");
   }
 
   // TODO: fill dummy values with something meaningful
@@ -62,7 +62,7 @@ export class Stdin implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.file_type,
+      file_type: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -73,14 +73,14 @@ export class Stdin implements IO {
 }
 
 export class Stdout implements IO {
-  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
-    throw "can't read from stdout!";
+    throw Error("can't read from stdout!");
   }
 
   async write(content: Uint8Array): Promise<number> {
@@ -104,7 +104,7 @@ export class Stdout implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.file_type,
+      file_type: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -115,14 +115,14 @@ export class Stdout implements IO {
 }
 
 export class Stderr implements IO {
-  file_type = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
 
   read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
-    throw "can't read from stderr!";
+    throw Error("can't read from stderr!");
   }
 
   async write(content: Uint8Array): Promise<number> {
@@ -145,7 +145,7 @@ export class Stderr implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.file_type,
+      file_type: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -164,8 +164,8 @@ export class OpenedFd implements IO {
 
   constructor(private openedFile: OpenFile) {}
 
-  get file_type(): number {
-    return this.openedFile.file_type;
+  get fileType(): number {
+    return this.openedFile.fileType;
   }
 
   get path(): string {
@@ -174,13 +174,13 @@ export class OpenedFd implements IO {
 
   async read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
     const lck = new Int32Array(sbuf, 0, 1);
-    const readlen = new Int32Array(sbuf, 4, 1);
-    const readbuf = new Uint8Array(sbuf, 8, requestedLen);
+    const readLen = new Int32Array(sbuf, 4, 1);
+    const readBuf = new Uint8Array(sbuf, 8, requestedLen);
 
     const [data, err] = await this.openedFile.read(requestedLen);
     if (err === 0) {
-      readbuf.set(data);
-      readlen[0] = data.byteLength;
+      readLen[0] = data.byteLength;
+      readBuf.set(data);
     }
     Atomics.store(lck, 0, err);
     Atomics.notify(lck, 0);

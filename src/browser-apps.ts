@@ -6,18 +6,18 @@ import ProcessManager from "./process-manager";
 
 export async function mount(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  console.log(`mount(${process_id}, ${args})`);
+  console.log(`mount(${processId}, ${args})`);
 
   switch (args.length) {
     case 1: {
       processManager.terminal.io.println("wasmfs on /");
-      for (const mount of filesystem.mounts) {
+      for (const mountedDir of filesystem.mounts) {
         processManager.terminal.io.println(
-          `fsapi on /${`${mount.parts.join("/")}/${mount.name}`}`
+          `fsapi on /${`${mountedDir.parts.join("/")}/${mountedDir.name}`}`
         );
       }
       return constants.WASI_ESUCCESS;
@@ -41,9 +41,10 @@ export async function mount(
         return 1;
       }
 
-      let mount_point;
+      let mountPoint;
       try {
-        mount_point = await showDirectoryPicker();
+        // eslint-disable-next-line no-undef
+        mountPoint = await showDirectoryPicker();
       } catch (e) {
         processManager.terminal.io.println(
           "mount: failed to open local directory"
@@ -51,11 +52,11 @@ export async function mount(
         return 1; // TODO: what would be a proper error here?
       }
 
-      await filesystem.addMount(path, mount_point);
+      await filesystem.addMount(path, mountPoint);
       return 0;
     }
     default: {
-      processManager.terminal.io.println("mount: help: mount [<mountpoint>]");
+      processManager.terminal.io.println("mount: help: mount [<mount-point>]");
       return 1;
     }
   }
@@ -63,7 +64,7 @@ export async function mount(
 
 export function umount(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): number {
@@ -84,7 +85,7 @@ export function umount(
 
 export async function wget(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
@@ -110,7 +111,7 @@ export async function wget(
 
 export async function download(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
@@ -120,21 +121,25 @@ export async function download(
     );
     return 1;
   }
-  for (let path of args.slice(1)) {
-    if (!path.startsWith("/")) {
-      path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
-    }
+  Promise.all(
+    args.slice(1).map(async (path: string) => {
+      if (!path.startsWith("/")) {
+        path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
+      }
 
-    const { err, entry } = await (
-      await filesystem.rootDir
-    ).getEntry(path, FileOrDir.File);
-    if (err !== constants.WASI_ESUCCESS) {
-      processManager.terminal.io.println(`download: no such file: ${path}`);
-    } else {
+      const { err, entry } = await filesystem.rootDir.getEntry(
+        path,
+        FileOrDir.File
+      );
+      if (err !== constants.WASI_ESUCCESS) {
+        processManager.terminal.io.println(`download: no such file: ${path}`);
+        return Promise.resolve();
+      }
+
       const stream = (await entry.handle.getFile()).stream();
-      let local_handle;
+      let localHandle;
       try {
-        local_handle = await window.showSaveFilePicker({
+        localHandle = await window.showSaveFilePicker({
           // @ts-ignore 'suggestedName' does not exist in type 'SaveFilePickerOptions' (it does)
           suggestedName: path.split("/").slice(-1)[0],
         });
@@ -144,67 +149,67 @@ export async function download(
         );
         return 1; // TODO: what would be a proper error here?
       }
-      const writable = await local_handle.createWritable();
+      const writable = await localHandle.createWritable();
       // @ts-ignore pipeTo is still experimental
-      await stream.pipeTo(writable);
-    }
-  }
+      return stream.pipeTo(writable);
+    })
+  );
   return 0;
 }
 
 export async function ps(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  let ps_data = "  PID TTY          TIME CMD\n\r";
+  let psData = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
     const now = new Date();
-    // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognised)
+    // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognized)
     const time = Math.floor(now.getTime() / 1000) - workerInfo.timestamp;
     const seconds = time % 60;
     const minutes = ((time - seconds) / 60) % 60;
     const hours = (time - seconds - minutes * 60) / 60 / 60;
-    ps_data += `${`     ${id}`.slice(-5)} pts/0    ${`00${hours}`.slice(
+    psData += `${`     ${id}`.slice(-5)} pts/0    ${`00${hours}`.slice(
       -2
     )}:${`00${minutes}`.slice(-2)}:${`00${seconds}`.slice(-2)} ${
-      // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognised)
+      // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognized)
       workerInfo.cmd.split("/").slice(-1)[0]
     }\n\r`;
   }
-  processManager.terminalOutputCallback(ps_data);
+  processManager.terminalOutputCallback(psData);
   return 0;
 }
 
 export async function free(
   processManager: ProcessManager,
-  process_id: number,
+  processId: number,
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
   // @ts-ignore memory is non-standard API available only in Chrome
-  const total_mem_raw = performance.memory.jsHeapSizeLimit;
+  const totalMemoryRaw = performance.memory.jsHeapSizeLimit;
   // @ts-ignore
-  const used_mem_raw = performance.memory.usedJSHeapSize;
-  let total_mem = "";
-  let used_mem = "";
-  let avail_mem = "";
+  const usedMemoryRaw = performance.memory.usedJSHeapSize;
+  let totalMemory = "";
+  let usedMemory = "";
+  let availableMemory = "";
   if (args.length > 1 && args[1] === "-h") {
-    total_mem = utils.human_readable(total_mem_raw);
-    used_mem = utils.human_readable(used_mem_raw);
-    avail_mem = utils.human_readable(total_mem_raw - used_mem_raw);
+    totalMemory = utils.human_readable(totalMemoryRaw);
+    usedMemory = utils.human_readable(usedMemoryRaw);
+    availableMemory = utils.human_readable(totalMemoryRaw - usedMemoryRaw);
   } else {
-    total_mem = `${Math.round(total_mem_raw / 1024)}`;
-    used_mem = `${Math.round(used_mem_raw / 1024)}`;
-    avail_mem = `${Math.round((total_mem_raw - used_mem_raw) / 1024)}`;
+    totalMemory = `${Math.round(totalMemoryRaw / 1024)}`;
+    usedMemory = `${Math.round(usedMemoryRaw / 1024)}`;
+    availableMemory = `${Math.round((totalMemoryRaw - usedMemoryRaw) / 1024)}`;
   }
-  let free_data = "               total        used   available\n\r";
-  free_data += `Mem:      ${`          ${total_mem}`.slice(
+  let freeData = "               total        used   available\n\r";
+  freeData += `Mem:      ${`          ${totalMemory}`.slice(
     -10
-  )}  ${`          ${used_mem}`.slice(-10)}  ${`          ${avail_mem}`.slice(
+  )}  ${`          ${usedMemory}`.slice(
     -10
-  )}\n\r`;
-  processManager.terminalOutputCallback(free_data);
+  )}  ${`          ${availableMemory}`.slice(-10)}\n\r`;
+  processManager.terminalOutputCallback(freeData);
   return 0;
 }
