@@ -577,16 +577,18 @@ impl Shell {
     fn handle_input(&mut self, input: &str) -> Result<i32, Report> {
         let lex = Lexer::new(input.chars());
         let parser = DefaultParser::new(lex);
+        let mut exit_status = EXIT_SUCCESS;
         for cmd in parser {
-            match cmd {
+            exit_status = match cmd {
                 Ok(cmd) => interpret(self, &cmd),
                 Err(e) => {
                     println!("{:?}", e);
+                    EXIT_FAILURE
                 }
             }
         }
         // TODO: pass proper exit status code
-        Ok(EXIT_SUCCESS)
+        Ok(exit_status)
     }
 
     pub fn execute_command(

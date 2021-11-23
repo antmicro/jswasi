@@ -7,15 +7,19 @@ use conch_parser::ast;
 
 use crate::shell_base::{syscall, Redirect, Shell, EXIT_FAILURE, EXIT_SUCCESS, STDIN, STDOUT};
 
-pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) {
-    // println!("{:#?}", cmd);
-    match &cmd.0 {
-        ast::Command::Job(list) => handle_listable_command(shell, list, true),
-        ast::Command::List(list) => handle_listable_command(shell, list, false),
-    };
+pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) -> i32 {
+    handle_top_level_command(shell, cmd, false, &mut Vec::new())
 }
 
-fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) {
+pub fn handle_top_level_command(shell: &mut Shell, top_level_command: &ast::TopLevelCommand<String>, background: bool, redirects: &mut Vec<Redirect>) -> i32 {
+    // println!("{:#?}", cmd);
+    match &top_level_command.0 {
+        ast::Command::Job(list) => handle_listable_command(shell, list, true),
+        ast::Command::List(list) => handle_listable_command(shell, list, false),
+    }
+}
+
+fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) -> i32 {
     let mut status_code = match &list.first {
         ast::ListableCommand::Single(cmd) => {
             handle_pipeable_command(shell, cmd, background, &mut Vec::new())
@@ -45,9 +49,13 @@ fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, back
                     }
                 }
             }
-            (_, _) => {}
+            (_, _) => {
+                // either (fail, And) or (success, Or)
+            }
         }
     }
+
+    status_code
 }
 
 fn handle_pipe(
@@ -109,9 +117,35 @@ fn handle_pipeable_command(
     match cmd {
         ast::PipeableCommand::Simple(cmd) => {
             handle_simple_command(shell, cmd, background, redirects)
+        },
+        ast::PipeableCommand::Compound(cmd) => {
+            handle_compound_command(shell, cmd, background, redirects)
         }
+        ast::PipeableCommand::FunctionDef(_name, _cmds) => {
+            eprintln!("FunctionDef not yet handled (but it would be cool)");
+            EXIT_FAILURE
+        }
+    }
+}
+
+fn handle_compound_command(
+    shell: &mut Shell,
+    cmd: &ast::DefaultCompoundCommand,
+    background: bool,
+    redirects: &mut Vec<Redirect>,
+) -> i32 {
+    let ast::CompoundCommand {kind, io} = cmd;
+    match kind {
+        ast::CompoundCommandKind::Subshell(subshell_cmds) => {
+            // TODO: this should actually spawn a subshell
+            let mut exit_status = EXIT_SUCCESS;
+            for subshell_cmd in subshell_cmds {
+                exit_status = handle_top_level_command(shell, subshell_cmd, background, redirects)
+            }
+            exit_status
+        },
         any => {
-            println!("PipeableCommand not yet handled: {:#?}", any);
+            eprintln!("CompoundCommandKind not yet handled: {:#?}", any);
             EXIT_FAILURE
         }
     }
@@ -158,7 +192,7 @@ fn handle_simple_command(
         match shell.execute_command(&args.remove(0), &mut args, &env, background, redirects) {
             Ok(result) => result,
             Err(error) => {
-                println!("shell error: {:?}", error);
+                eprintln!("shell error: {:?}", error);
                 EXIT_FAILURE
             }
         }
@@ -224,7 +258,7 @@ fn handle_redirect_type(
             }
         }
         any => {
-            println!("Redirect not yet handled: {:?}", any);
+            eprintln!("Redirect not yet handled: {:?}", any);
             None
         }
     }
