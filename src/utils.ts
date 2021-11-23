@@ -23,16 +23,16 @@ export function realpath(path: string): string {
     throw Error("path must be absolute");
   }
   const result = [];
-  let result_path = "";
-  let tmp_path = path;
+  let resultPath = "";
+  let tmpPath = path;
   let part = "";
   let level = 0;
-  const root_path = path[0] === "/";
-  while (tmp_path !== "") {
-    if (tmp_path.indexOf("/") !== -1) {
-      part = tmp_path.substr(0, tmp_path.indexOf("/"));
-    } else part = tmp_path;
-    tmp_path = tmp_path.substr(part.length + 1);
+  const rootPath = path[0] === "/";
+  while (tmpPath !== "") {
+    if (tmpPath.indexOf("/") !== -1) {
+      part = tmpPath.substr(0, tmpPath.indexOf("/"));
+    } else part = tmpPath;
+    tmpPath = tmpPath.substr(part.length + 1);
     if (part === "..") {
       if (level > 0) level -= 1;
     } else if (part === ".") {
@@ -42,10 +42,10 @@ export function realpath(path: string): string {
       level += 1;
     }
   }
-  result_path = result.slice(0, level).join("/");
-  if (root_path) if (result_path === "") return "/";
-  result_path = result_path.replace("/./", "/");
-  return result_path;
+  resultPath = result.slice(0, level).join("/");
+  if (rootPath) if (resultPath === "") return "/";
+  resultPath = resultPath.replace("/./", "/");
+  return resultPath;
 }
 
 export function msToNs(ms: number): bigint {
@@ -70,7 +70,7 @@ export function now(clockId: number, cpuTimeStart: bigint): bigint {
   }
 }
 
-export function human_readable(bytes: number): string {
+export function humanReadable(bytes: number): string {
   const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;
   let unit = 0;

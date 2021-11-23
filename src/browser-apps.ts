@@ -196,9 +196,9 @@ export async function free(
   let usedMemory = "";
   let availableMemory = "";
   if (args.length > 1 && args[1] === "-h") {
-    totalMemory = utils.human_readable(totalMemoryRaw);
-    usedMemory = utils.human_readable(usedMemoryRaw);
-    availableMemory = utils.human_readable(totalMemoryRaw - usedMemoryRaw);
+    totalMemory = utils.humanReadable(totalMemoryRaw);
+    usedMemory = utils.humanReadable(usedMemoryRaw);
+    availableMemory = utils.humanReadable(totalMemoryRaw - usedMemoryRaw);
   } else {
     totalMemory = `${Math.round(totalMemoryRaw / 1024)}`;
     usedMemory = `${Math.round(usedMemoryRaw / 1024)}`;

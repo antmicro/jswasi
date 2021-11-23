@@ -7,7 +7,7 @@ import { Stdin, Stdout, Stderr } from "./devices.js";
 declare global {
   interface Window {
     logOutput: boolean;
-    stdout_attached: boolean;
+    stdoutAttached: boolean;
     buffer: string;
   }
 }
@@ -104,9 +104,9 @@ export async function fetchFile(
 async function initFs() {
   // setup filesystem
   const root = await navigator.storage.getDirectory();
-  const tmp = await root.getDirectoryHandle("tmp", { create: true });
+  await root.getDirectoryHandle("tmp", { create: true });
   // TODO: this will be a in-memory vfs in the future
-  const proc = await root.getDirectoryHandle("proc", { create: true });
+  await root.getDirectoryHandle("proc", { create: true });
   const home = await root.getDirectoryHandle("home", { create: true });
   const ant = await home.getDirectoryHandle("ant", { create: true });
 
@@ -121,12 +121,12 @@ async function initFs() {
     await w.close();
   }
 
-  const etc = await root.getDirectoryHandle("etc", { create: true });
+  await root.getDirectoryHandle("etc", { create: true });
 
   const usr = await root.getDirectoryHandle("usr", { create: true });
   const bin = await usr.getDirectoryHandle("bin", { create: true });
 
-  const lib = await root.getDirectoryHandle("lib", { create: true });
+  await root.getDirectoryHandle("lib", { create: true });
 
   // create dummy files for browser executed commands
   await bin.getFileHandle("mount", { create: true });
@@ -137,27 +137,27 @@ async function initFs() {
   await bin.getFileHandle("free", { create: true });
 
   const local = await usr.getDirectoryHandle("local", { create: true });
-  const local_bin = await local.getDirectoryHandle("bin", { create: true });
+  await local.getDirectoryHandle("bin", { create: true });
 
-  const always_fetch_promises = Object.entries(ALWAYS_FETCH_BINARIES).map(
+  const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
     ([filename, address]) =>
       fetchFile(filesystem.rootDir, filename, address, true)
   );
-  const necessary_promises = Object.entries(NECESSARY_BINARIES).map(
+  const necessaryPromises = Object.entries(NECESSARY_BINARIES).map(
     ([filename, address]) =>
       fetchFile(filesystem.rootDir, filename, address, false)
   );
-  const optional_promises = Object.entries(OPTIONAL_BINARIES).map(
+  const optionalPromises = Object.entries(OPTIONAL_BINARIES).map(
     ([filename, address]) =>
       fetchFile(filesystem.rootDir, filename, address, false)
   );
 
-  await Promise.all(always_fetch_promises);
-  await Promise.all(necessary_promises);
+  await Promise.all(alwaysFetchPromises);
+  await Promise.all(necessaryPromises);
   // don't await this on purpose
   // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
   //       it can say that command is not found or just fail at instantiation
-  Promise.all(optional_promises);
+  Promise.all(optionalPromises);
 }
 
 // anchor is any HTMLElement that will be used to initialize hterm
@@ -185,7 +185,7 @@ export async function init(
     // receive_callback
     (output: string) => {
       terminal.io.print(output);
-      if (window.stdout_attached) {
+      if (window.stdoutAttached) {
         window.buffer += output;
       }
       if (window.logOutput) {
@@ -223,7 +223,7 @@ export async function init(
     } else {
       // regular characters
       processManager.pushToBuffer(data);
-      if (window.stdout_attached) {
+      if (window.stdoutAttached) {
         window.buffer += data;
       }
     }
@@ -289,10 +289,10 @@ export async function init(
     await Promise.all(entryPromises);
   });
 
-  const pwd_dir = (
+  const pwdDir = (
     await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)
   ).entry;
-  pwd_dir.path = ".";
+  pwdDir.path = ".";
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -303,7 +303,7 @@ export async function init(
       new Stdout(processManager),
       new Stderr(processManager),
       filesystem.rootDir.open(),
-      pwd_dir.open(),
+      pwdDir.open(),
       // TODO: why must fds[5] be present for ls to work, and what should it be
       filesystem.rootDir.open(),
     ],

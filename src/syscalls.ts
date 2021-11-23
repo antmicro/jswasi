@@ -18,9 +18,9 @@ export default async function syscallCallback(
   event: MessageEvent,
   processManager: ProcessManager
 ): Promise<void> {
-  const [process_id, action, data] = event.data;
-  const full_command = processManager.processInfos[process_id].cmd;
-  const process_name = full_command.substr(full_command.lastIndexOf("/") + 1);
+  const [processId, action, data] = event.data;
+  const fullCommand = processManager.processInfos[processId].cmd;
+  const processName = fullCommand.substr(fullCommand.lastIndexOf("/") + 1);
 
   switch (action) {
     case "stdout": {
@@ -28,14 +28,14 @@ export default async function syscallCallback(
       break;
     }
     case "stderr": {
-      const output = data.replaceAll("\n", "\r\n");
-
-      processManager.terminalOutputCallback(`${RED_ANSI}${output}${RESET}`);
+      processManager.terminalOutputCallback(
+        `${RED_ANSI}${data.replaceAll("\n", "\r\n")}${RESET}`
+      );
       break;
     }
     case "console": {
       console.log(
-        `%c [dbg (%c${process_name}:${process_id}%c)] %c ${data}`,
+        `%c [dbg (%c${processName}:${processId}%c)] %c ${data}`,
         "background:black; color: white;",
         "background:black; color:yellow;",
         "background: black; color:white;",
@@ -44,47 +44,47 @@ export default async function syscallCallback(
       break;
     }
     case "exit": {
-      const dbg = processManager.processInfos[process_id].env.DEBUG === "1";
-      processManager.terminateProcess(process_id, data);
+      const dbg = processManager.processInfos[processId].env.DEBUG === "1";
+      processManager.terminateProcess(processId, data);
       if (dbg) {
         console.log(
-          `%c [dbg (%c${process_name}:${process_id}%c)] %c exited with result code ${data}`,
+          `%c [dbg (%c${processName}:${processId}%c)] %c exited with result code ${data}`,
           "background:black; color: white;",
           "background:black; color:yellow;",
           "background: black; color:white;",
           "background:default; color: default;"
         );
       }
-      if (process_id === 0) {
+      if (processId === 0) {
         window.alive = false;
         window.exitCode = data;
       }
       break;
     }
     case "chdir": {
-      const [pwd, sbuf] = data;
-      const lock = new Int32Array(sbuf, 0, 1);
-      const { fds } = processManager.processInfos[process_id];
+      const [pwd, sharedBuffer] = data;
+      const lock = new Int32Array(sharedBuffer, 0, 1);
+      const { fds } = processManager.processInfos[processId];
 
       const { entry } = await filesystem.rootDir.getEntry(
         pwd,
         FileOrDir.Directory
       );
-      const open_pwd = await entry.open();
-      open_pwd.path = ".";
-      fds[4] = open_pwd;
+      const openedPwd = entry.open();
+      openedPwd.path = ".";
+      fds[4] = openedPwd;
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
     }
     case "isatty": {
-      const [sbuf, fd] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const isatty = new Int32Array(sbuf, 4, 1);
+      const [sharedBuffer, fd] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const isatty = new Int32Array(sharedBuffer, 4, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         isatty[0] = fds[fd].isatty;
         err = constants.WASI_ESUCCESS;
@@ -97,68 +97,68 @@ export default async function syscallCallback(
       break;
     }
     case "set_env": {
-      const [[key, value], sbuf] = data;
-      const lock = new Int32Array(sbuf, 0, 1);
-      processManager.processInfos[process_id].env[key] = value;
+      const [[key, value], sharedBuffer] = data;
+      const lock = new Int32Array(sharedBuffer, 0, 1);
+      processManager.processInfos[processId].env[key] = value;
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
     }
     case "set_echo": {
-      const [shouldEcho, sbuf] = data;
-      const lock = new Int32Array(sbuf, 0, 1);
+      const [shouldEcho, sharedBuffer] = data;
+      const lock = new Int32Array(sharedBuffer, 0, 1);
       // TODO: should this be simply $ECHO env variable?
-      processManager.processInfos[process_id].shouldEcho = shouldEcho === "1";
+      processManager.processInfos[processId].shouldEcho = shouldEcho === "1";
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
     }
     case "spawn": {
-      const [fullpath, args, env, sbuf, background, redirects] = data;
-      const parent_lck = new Int32Array(sbuf, 0, 1);
-      args.splice(0, 0, fullpath.split("/").pop());
-      switch (fullpath) {
+      const [fullPath, args, env, sharedBuffer, background, redirects] = data;
+      const parentLck = new Int32Array(sharedBuffer, 0, 1);
+      args.splice(0, 0, fullPath.split("/").pop());
+      switch (fullPath) {
         case "/usr/bin/ps": {
-          const result = await ps(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = await ps(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/mount": {
-          const result = await mount(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = await mount(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/umount": {
-          const result = await umount(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = umount(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/free": {
-          const result = await free(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = await free(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/wget": {
-          const result = await wget(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = await wget(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/download": {
-          const result = await download(processManager, process_id, args, env);
-          Atomics.store(parent_lck, 0, result);
-          Atomics.notify(parent_lck, 0);
+          const result = await download(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
           break;
         }
         default: {
           // TODO: is shallow copy enough, or should we deep copy?
-          const childFds = processManager.processInfos[process_id].fds.slice(0);
+          const childFds = processManager.processInfos[processId].fds.slice(0);
           Promise.all(
             redirects.map(async (redirect: any) => {
               let mode: string;
@@ -189,19 +189,19 @@ export default async function syscallCallback(
             })
           );
           const id = await processManager.spawnProcess(
-            process_id,
-            background ? null : parent_lck,
+            processId,
+            background ? null : parentLck,
             syscallCallback,
-            fullpath,
+            fullPath,
             childFds,
             args,
             env,
             background
           );
-          const new_process_name = fullpath.split("/").slice(-1)[0];
+          const newProcessName = fullPath.split("/").slice(-1)[0];
           if (env.DEBUG === "1") {
             console.log(
-              `%c [dbg (%c${new_process_name}:${id}%c)] %c spawned by ${process_name}:${process_id}`,
+              `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
               "background:black; color: white;",
               "background:black; color:yellow;",
               "background: black; color:white;",
@@ -209,8 +209,8 @@ export default async function syscallCallback(
             );
           }
           if (background) {
-            Atomics.store(parent_lck, 0, 0);
-            Atomics.notify(parent_lck, 0);
+            Atomics.store(parentLck, 0, 0);
+            Atomics.notify(parentLck, 0);
           }
           break;
         }
@@ -219,16 +219,16 @@ export default async function syscallCallback(
       break;
     }
     case "fd_prestat_get": {
-      const [sbuf, fd] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const name_len = new Int32Array(sbuf, 4, 1);
-      const preopen_type = new Uint8Array(sbuf, 8, 1);
+      const [sharedBuffer, fd] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const nameLen = new Int32Array(sharedBuffer, 4, 1);
+      const preopenType = new Uint8Array(sharedBuffer, 8, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        preopen_type[0] = fds[fd].file_type;
-        name_len[0] = fds[fd].path.length;
+        preopenType[0] = fds[fd].fileType;
+        nameLen[0] = fds[fd].path.length;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -240,17 +240,17 @@ export default async function syscallCallback(
     }
 
     case "path_symlink": {
-      const [sbuf, path, fd, newpath] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, path, fd, newPath] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
       let entry;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        const linkpath = `${newpath}.link`;
-        console.log(`We should symlink ${newpath} --> ${path} [dir fd=${fd}]`);
+        const linkPath = `${newPath}.link`;
+        console.log(`We should symlink ${newPath} --> ${path} [dir fd=${fd}]`);
         ({ err, entry } = await fds[fd].getEntry(
-          linkpath,
+          linkPath,
           FileOrDir.File,
           OpenFlags.Create | OpenFlags.Truncate
         ));
@@ -268,12 +268,12 @@ export default async function syscallCallback(
     }
 
     case "fd_prestat_dir_name": {
-      const [sbuf, fd, path_len] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const path = new Uint8Array(sbuf, 4, path_len);
+      const [sharedBuffer, fd, pathLen] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const path = new Uint8Array(sharedBuffer, 4, pathLen);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         path.set(new TextEncoder().encode(fds[fd].path), 0);
         err = constants.WASI_ESUCCESS;
@@ -286,11 +286,11 @@ export default async function syscallCallback(
       break;
     }
     case "fd_write": {
-      const [sbuf, fd, content_] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, fd, content_] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
       const content = new Uint8Array(content_);
 
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       const err = await fds[fd].write(content);
 
       Atomics.store(lck, 0, err);
@@ -298,39 +298,39 @@ export default async function syscallCallback(
       break;
     }
     case "fd_read": {
-      const [sbuf, fd, len] = data;
+      const [sharedBuffer, fd, len] = data;
 
-      const { fds } = processManager.processInfos[process_id];
-      await fds[fd].read(process_id, len, sbuf);
+      const { fds } = processManager.processInfos[processId];
+      await fds[fd].read(processId, len, sharedBuffer);
 
       break;
     }
     case "path_open": {
       const [
-        sbuf,
-        dir_fd,
+        sharedBuffer,
+        dirFd,
         path,
-        dirflags,
-        oflags,
-        fs_rights_base,
-        fs_rights_inheriting,
-        fdflags,
+        dirFlags,
+        oFlags,
+        fsRightsBase,
+        fsRightsInheriting,
+        fdFlags,
       ] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const opened_fd = new Int32Array(sbuf, 4, 1);
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const openedFd = new Int32Array(sharedBuffer, 4, 1);
 
       let err;
       let entry;
-      const { fds } = processManager.processInfos[process_id];
-      if (fds[dir_fd] !== undefined) {
-        ({ err, entry } = await fds[dir_fd].getEntry(
+      const { fds } = processManager.processInfos[processId];
+      if (fds[dirFd] !== undefined) {
+        ({ err, entry } = await fds[dirFd].getEntry(
           path,
           FileOrDir.Any,
-          oflags
+          oFlags
         ));
         if (err === constants.WASI_ESUCCESS) {
           fds.push(await entry.open());
-          opened_fd[0] = fds.length - 1;
+          openedFd[0] = fds.length - 1;
         }
       }
 
@@ -339,11 +339,11 @@ export default async function syscallCallback(
       break;
     }
     case "fd_close": {
-      const [sbuf, fd] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, fd] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         fds[fd].close();
         fds[fd] = undefined;
@@ -357,17 +357,17 @@ export default async function syscallCallback(
       break;
     }
     case "fd_filestat_get": {
-      const [sbuf, fd] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const buf = new DataView(sbuf, 4);
+      const [sharedBuffer, fd] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const buf = new DataView(sharedBuffer, 4);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         const stat = await fds[fd].stat();
         buf.setBigUint64(0, stat.dev, true);
         buf.setBigUint64(8, stat.ino, true);
-        buf.setUint8(16, stat.file_type);
+        buf.setUint8(16, stat.fileType);
         buf.setBigUint64(24, stat.nlink, true);
         buf.setBigUint64(32, stat.size, true);
         buf.setBigUint64(38, stat.atim, true);
@@ -383,22 +383,22 @@ export default async function syscallCallback(
       break;
     }
     case "path_filestat_get": {
-      const [sbuf, fd, path, flags] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const buf = new DataView(sbuf, 4);
+      const [sharedBuffer, fd, path, flags] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const buf = new DataView(sharedBuffer, 4);
 
       let err;
       let entry;
 
       if (path[0] !== "!") {
-        const { fds } = processManager.processInfos[process_id];
+        const { fds } = processManager.processInfos[processId];
         if (fds[fd] !== undefined) {
           ({ err, entry } = await fds[fd].getEntry(path, FileOrDir.Any));
           if (err === constants.WASI_ESUCCESS) {
             const stat = await entry.stat();
             buf.setBigUint64(0, stat.dev, true);
             buf.setBigUint64(8, stat.ino, true);
-            buf.setUint8(16, stat.file_type);
+            buf.setUint8(16, stat.fileType);
             buf.setBigUint64(24, stat.nlink, true);
             buf.setBigUint64(32, stat.size, true);
             buf.setBigUint64(40, stat.atim, true);
@@ -425,14 +425,14 @@ export default async function syscallCallback(
       break;
     }
     case "fd_seek": {
-      const [sbuf, fd, offset, whence] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const file_pos = new BigUint64Array(sbuf, 8, 1);
+      const [sharedBuffer, fd, offset, whence] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const filePos = new BigUint64Array(sharedBuffer, 8, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        file_pos[0] = BigInt(await fds[fd].seek(Number(offset), whence));
+        filePos[0] = BigInt(await fds[fd].seek(Number(offset), whence));
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -443,45 +443,45 @@ export default async function syscallCallback(
       break;
     }
     case "fd_readdir": {
-      const [sbuf, fd, cookie, databuf_len] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const buf_used = new Uint32Array(sbuf, 4, 1);
-      const databuf = new DataView(sbuf, 8, databuf_len);
-      let databuf_ptr = 0;
+      const [sharedBuffer, fd, cookie, dataBufLen] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const bufUsed = new Uint32Array(sharedBuffer, 4, 1);
+      const dataBuf = new DataView(sharedBuffer, 8, dataBufLen);
+      let dataBufPtr = 0;
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         const entries = await fds[fd].entries();
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
-          const namebuf = new TextEncoder().encode(entry.path);
+          const nameBuf = new TextEncoder().encode(entry.path);
 
-          if (databuf_ptr + 8 > databuf_len) break;
-          databuf.setBigUint64(databuf_ptr, BigInt(i + 1), true);
-          databuf_ptr += 8;
+          if (dataBufPtr + 8 > dataBufLen) break;
+          dataBuf.setBigUint64(dataBufPtr, BigInt(i + 1), true);
+          dataBufPtr += 8;
 
-          if (databuf_ptr + 8 >= databuf_len) break;
+          if (dataBufPtr + 8 >= dataBufLen) break;
           // TODO: get file stats ino (dummy 0n for now)
-          databuf.setBigUint64(databuf_ptr, 0n, true);
-          databuf_ptr += 8;
+          dataBuf.setBigUint64(dataBufPtr, 0n, true);
+          dataBufPtr += 8;
 
-          if (databuf_ptr + 4 >= databuf_len) break;
-          databuf.setUint32(databuf_ptr, namebuf.byteLength, true);
-          databuf_ptr += 4;
+          if (dataBufPtr + 4 >= dataBufLen) break;
+          dataBuf.setUint32(dataBufPtr, nameBuf.byteLength, true);
+          dataBufPtr += 4;
 
-          if (databuf_ptr + 4 >= databuf_len) break;
-          const { file_type } = entry;
-          databuf.setUint8(databuf_ptr, file_type);
-          databuf_ptr += 4; // uint8 + padding
+          if (dataBufPtr + 4 >= dataBufLen) break;
+          const { fileType } = entry;
+          dataBuf.setUint8(dataBufPtr, fileType);
+          dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit
-          if (databuf_ptr + namebuf.byteLength >= databuf_len) break;
-          const databuf8 = new Uint8Array(sbuf, 8);
-          databuf8.set(namebuf, databuf_ptr);
-          databuf_ptr += namebuf.byteLength;
+          if (dataBufPtr + nameBuf.byteLength >= dataBufLen) break;
+          const dataBuf8 = new Uint8Array(sharedBuffer, 8);
+          dataBuf8.set(nameBuf, dataBufPtr);
+          dataBufPtr += nameBuf.byteLength;
         }
-        buf_used[0] = databuf_ptr > databuf_len ? databuf_len : databuf_ptr;
+        bufUsed[0] = dataBufPtr > dataBufLen ? dataBufLen : dataBufPtr;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -492,11 +492,11 @@ export default async function syscallCallback(
       break;
     }
     case "path_unlink_file": {
-      const [sbuf, fd, path] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, fd, path] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         ({ err } = fds[fd].deleteEntry(path, { recursive: false }));
       }
@@ -506,11 +506,11 @@ export default async function syscallCallback(
       break;
     }
     case "path_remove_directory": {
-      const [sbuf, fd, path] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, fd, path] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         ({ err } = fds[fd].deleteEntry(path, { recursive: true }));
       }
@@ -520,11 +520,11 @@ export default async function syscallCallback(
       break;
     }
     case "path_create_directory": {
-      const [sbuf, fd, path] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
+      const [sharedBuffer, fd, path] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         err = await fds[fd].getEntry(
           path,
@@ -540,29 +540,29 @@ export default async function syscallCallback(
       break;
     }
     case "fd_fdstat_get": {
-      const [sbuf, fd] = data;
-      const lck = new Int32Array(sbuf, 0, 1);
-      const file_type = new Uint8Array(sbuf, 4, 1);
-      const rights_base = new BigUint64Array(sbuf, 8, 1);
-      const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
+      const [sharedBuffer, fd] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const fileType = new Uint8Array(sharedBuffer, 4, 1);
+      const rightsBase = new BigUint64Array(sharedBuffer, 8, 1);
+      const rightsInheriting = new BigUint64Array(sharedBuffer, 16, 1);
 
       let err;
-      const { fds } = processManager.processInfos[process_id];
+      const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        file_type[0] = fds[fd].file_type;
+        fileType[0] = fds[fd].fileType;
         // TODO: analyze this
         /*
-        rights_base[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (file_type[0] == constants.WASI_FILETYPE_DIRECTORY) {
-          rights_base[0] |= constants.WASI_RIGHT_FD_READDIR;
+        rightsBase[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+        if (fileType[0] == constants.WASI_FILETYPE_DIRECTORY) {
+          rightsBase[0] |= constants.WASI_RIGHT_FD_READDIR;
         }
-        rights_inheriting[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (file_type[0] == constants.WASI_FILETYPE_DIRECTORY) {
-          rights_inheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
+        rightsInheriting[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+        if (fileType[0] == constants.WASI_FILETYPE_DIRECTORY) {
+          rightsInheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
         }
         */
-        rights_base[0] = BigInt(0xffffffff);
-        rights_inheriting[0] = BigInt(0xffffffff);
+        rightsBase[0] = BigInt(0xffffffff);
+        rightsInheriting[0] = BigInt(0xffffffff);
 
         err = constants.WASI_ESUCCESS;
       } else {

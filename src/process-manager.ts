@@ -4,8 +4,8 @@ import { FileOrDir, Filesystem } from "./filesystem.js";
 type BufferRequestQueue = {
   requestedLen: number;
   lck: Int32Array;
-  readlen: Int32Array;
-  sbuf: Uint8Array;
+  readLen: Int32Array;
+  sharedBuffer: Uint8Array;
 }[];
 
 class ProcessInfo {
@@ -49,7 +49,9 @@ export default class ProcessManager {
     public readonly terminalOutputCallback: (output: string) => void,
     public readonly terminal: any, // TODO: should we declare HTerminal stump or even import the real thing?
     public readonly filesystem: Filesystem
-  ) {}
+  ) {
+    // it's a constructor with only parameter properties
+  }
 
   async spawnProcess(
     parentId: number,
@@ -92,7 +94,7 @@ export default class ProcessManager {
       );
       if (binary.entry === null) {
         console.error(`No such binary: ${command}`);
-        return;
+        return -1;
       }
       const file = await binary.entry.handle.getFile();
       const bufferSource = await file.arrayBuffer();
@@ -107,6 +109,8 @@ export default class ProcessManager {
       args,
       env,
     ]);
+
+    return id;
   }
 
   terminateProcess(id: number, exitNo: number = 0) {
@@ -150,14 +154,14 @@ export default class ProcessManager {
           0 &&
         this.buffer.length !== 0
       ) {
-        const { requestedLen, lck, readlen, sbuf } =
+        const { requestedLen, lck, readLen, sharedBuffer } =
           this.processInfos[this.currentProcess].bufferRequestQueue.shift();
         this.sendBufferToProcess(
           this.currentProcess,
           requestedLen,
           lck,
-          readlen,
-          sbuf
+          readLen,
+          sharedBuffer
         );
       }
     }
@@ -167,7 +171,7 @@ export default class ProcessManager {
     workerId: number,
     requestedLen: number,
     lck: Int32Array,
-    readlen: Int32Array,
+    readLen: Int32Array,
     buf: Uint8Array
   ): void {
     // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
@@ -175,16 +179,16 @@ export default class ProcessManager {
       this.processInfos[workerId].bufferRequestQueue.push({
         requestedLen,
         lck,
-        readlen,
-        sbuf: buf,
+        readLen,
+        sharedBuffer: buf,
       });
     } else {
-      readlen[0] =
+      readLen[0] =
         this.buffer.length > requestedLen ? requestedLen : this.buffer.length;
-      for (let j = 0; j < readlen[0]; j += 1) {
+      for (let j = 0; j < readLen[0]; j += 1) {
         buf[j] = this.buffer.charCodeAt(j);
       }
-      this.buffer = this.buffer.slice(readlen[0]);
+      this.buffer = this.buffer.slice(readLen[0]);
       Atomics.store(lck, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lck, 0);
     }

@@ -15,10 +15,14 @@
     "import/extensions": "off",
     "no-restricted-syntax": "off",
     "max-classes-per-file": "off",
-    "no-bitwise": ["warn", { "allow": ["|"] }],
+    "no-bitwise": ["warn", { "allow": ["|", "&"] }],
     "no-console": "off",
     "dot-notation": "off",
     "no-param-reassign": "off",
-    "no-use-before-define": "off"
+    "no-use-before-define": "off",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["error"],
+    "no-useless-constructor": "off",
+    "@typescript-eslint/no-useless-constructor": ["error"]
   }
 }

@@ -71,11 +71,17 @@ let myself: number;
 let programArgs: string[];
 let env: Record<string, string>;
 
-onmessage = (e) => {
+onmessage = async (e) => {
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
       [, mod, myself, programArgs, env] = e.data;
+
+      try {
+        await start_wasm();
+      } catch (err) {
+        send_to_kernel(["console", `Worker failed: ${err}`]);
+      }
     }
   }
 };
@@ -99,7 +105,8 @@ function worker_console_log(msg: any) {
 function do_exit(exitCode: number) {
   worker_console_log("calling close()");
   send_to_kernel(["exit", exitCode]);
-  close();
+  // eslint-disable-next-line no-restricted-globals
+  self.close();
 }
 
 function WASI(): WASICallbacks {
@@ -112,16 +119,16 @@ function WASI(): WASICallbacks {
   function isatty(fd: number): number {
     worker_console_log(`isatty(${fd}`);
 
-    const sbuf = new SharedArrayBuffer(4 + 4); // lock, isatty
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 4); // lock, isatty
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const isatty = new Int32Array(sbuf, 4, 1);
+    const isAttyPtr = new Int32Array(sharedBuffer, 4, 1);
 
-    send_to_kernel(["isatty", [sbuf, fd]]);
+    send_to_kernel(["isatty", [sharedBuffer, fd]]);
     Atomics.wait(lck, 0, -1);
 
-    const err = Atomics.load(lck, 0);
-    return isatty[0];
+    // const err = Atomics.load(lck, 0);
+    return isAttyPtr[0];
   }
 
   function environ_sizes_get(environ_count: ptr, environ_size: ptr) {
@@ -135,14 +142,14 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const environ_count_ = Object.keys(env).length;
-    view.setUint32(environ_count, environ_count_, true);
+    const environCount = Object.keys(env).length;
+    view.setUint32(environ_count, environCount, true);
 
-    const environ_size_ = Object.entries(env).reduce(
+    const environSize = Object.entries(env).reduce(
       (sum, [key, val]) => sum + ENCODER.encode(`${key}=${val}\0`).byteLength,
       0
     );
-    view.setUint32(environ_size, environ_size_, true);
+    view.setUint32(environ_size, environSize, true);
 
     return constants.WASI_ESUCCESS;
   }
@@ -221,14 +228,14 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 20); // lock, filetype, rights base, rights inheriting
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 20); // lock, filetype, rights base, rights inheriting
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const file_type = new Uint8Array(sbuf, 4, 1);
-    const rights_base = new BigUint64Array(sbuf, 8, 1);
-    const rights_inheriting = new BigUint64Array(sbuf, 16, 1);
+    const fileType = new Uint8Array(sharedBuffer, 4, 1);
+    const rights_base = new BigUint64Array(sharedBuffer, 8, 1);
+    const rights_inheriting = new BigUint64Array(sharedBuffer, 16, 1);
 
-    send_to_kernel(["fd_fdstat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_fdstat_get", [sharedBuffer, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -237,7 +244,7 @@ function WASI(): WASICallbacks {
       return err;
     }
 
-    view.setUint8(buf, file_type[0]);
+    view.setUint8(buf, fileType[0]);
     if (fd <= 2) {
       view.setUint32(buf + 2, constants.WASI_FDFLAG_APPEND, true);
     } else {
@@ -282,10 +289,10 @@ function WASI(): WASICallbacks {
     const content = new SharedArrayBuffer(written);
     const content_view = new Uint8Array(content);
     for (let i = 0; i < written; i += 1) content_view[i] = bufferBytes[i]; // TODO
-    const sbuf = new SharedArrayBuffer(4);
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    send_to_kernel(["fd_write", [sbuf, fd, content]]);
+    send_to_kernel(["fd_write", [sharedBuffer, fd, content]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -332,10 +339,10 @@ function WASI(): WASICallbacks {
   function fd_close(fd: number) {
     worker_console_log(`fd_close(${fd})`);
 
-    const sbuf = new SharedArrayBuffer(4);
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    send_to_kernel(["fd_close", [sbuf, fd]]);
+    send_to_kernel(["fd_close", [sharedBuffer, fd]]);
     Atomics.wait(lck, 0, -1);
 
     return Atomics.load(lck, 0);
@@ -348,12 +355,12 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 64); // lock, stat buffer
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const statbuf = new DataView(sbuf, 4);
+    const statbuf = new DataView(sharedBuffer, 4);
 
-    send_to_kernel(["fd_filestat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_filestat_get", [sharedBuffer, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -364,7 +371,7 @@ function WASI(): WASICallbacks {
 
     const dev = statbuf.getBigUint64(0, true);
     const ino = statbuf.getBigUint64(8, true);
-    const file_type = statbuf.getUint8(16);
+    const fileType = statbuf.getUint8(16);
     const nlink = statbuf.getBigUint64(24, true);
     const size = statbuf.getBigUint64(32, true);
     const atim = statbuf.getBigUint64(38, true);
@@ -373,7 +380,7 @@ function WASI(): WASICallbacks {
 
     view.setBigUint64(buf, dev, true);
     view.setBigUint64(buf + 8, ino, true);
-    view.setUint8(buf + 16, file_type);
+    view.setUint8(buf + 16, fileType);
     view.setBigUint64(buf + 24, nlink, true);
     view.setBigUint64(buf + 32, size, true);
     view.setBigUint64(buf + 38, atim, true);
@@ -398,14 +405,14 @@ function WASI(): WASICallbacks {
       const addr = view.getUint32(iovs + 8 * i, true);
       const len = view.getUint32(iovs + 8 * i + 4, true);
 
-      // TODO: ripe for optimisation, addr and len could be put inside a vector and requested all at once
-      const sbuf = new SharedArrayBuffer(4 + 4 + len); // lock, read length, read buffer
-      const lck = new Int32Array(sbuf, 0, 1);
+      // TODO: ripe for optimization, addr and len could be put inside a vector and requested all at once
+      const sharedBuffer = new SharedArrayBuffer(4 + 4 + len); // lock, read length, read buffer
+      const lck = new Int32Array(sharedBuffer, 0, 1);
       lck[0] = -1;
-      const readlen = new Int32Array(sbuf, 4, 1);
-      const readbuf = new Uint8Array(sbuf, 8, len);
+      const readLen = new Int32Array(sharedBuffer, 4, 1);
+      const readBuf = new Uint8Array(sharedBuffer, 8, len);
 
-      send_to_kernel(["fd_read", [sbuf, fd, len]]);
+      send_to_kernel(["fd_read", [sharedBuffer, fd, len]]);
       Atomics.wait(lck, 0, -1);
 
       const err = Atomics.load(lck, 0);
@@ -413,8 +420,8 @@ function WASI(): WASICallbacks {
         return err;
       }
 
-      view8.set(readbuf, addr);
-      read += readlen[0];
+      view8.set(readBuf, addr);
+      read += readLen[0];
     }
     if (fd > 2) worker_console_log(`fd_read read ${read} bytes.`);
     view.setUint32(nread, read, true);
@@ -440,13 +447,13 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 4 + buf_len); // lock, buf_used, buf
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len); // lock, buf_used, buf
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const buf_used = new Uint32Array(sbuf, 4, 1);
-    const databuf = new Uint8Array(sbuf, 8);
+    const bufUsed = new Uint32Array(sharedBuffer, 4, 1);
+    const dataBuffer = new Uint8Array(sharedBuffer, 8);
 
-    send_to_kernel(["fd_readdir", [sbuf, fd, cookie, buf_len]]);
+    send_to_kernel(["fd_readdir", [sharedBuffer, fd, cookie, buf_len]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -454,8 +461,8 @@ function WASI(): WASICallbacks {
       return err;
     }
 
-    view8.set(databuf, buf);
-    view.setUint32(bufused, buf_used[0], true);
+    view8.set(dataBuffer, buf);
+    view.setUint32(bufused, bufUsed[0], true);
 
     return constants.WASI_ESUCCESS;
   }
@@ -471,12 +478,12 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const file_pos = new BigUint64Array(sbuf, 8, 1);
+    const file_pos = new BigUint64Array(sharedBuffer, 8, 1);
 
-    send_to_kernel(["fd_seek", [sbuf, fd, offset, whence]]);
+    send_to_kernel(["fd_seek", [sharedBuffer, fd, offset, whence]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -500,11 +507,11 @@ function WASI(): WASICallbacks {
       `path_create_directory(${fd}, ${path}, ${path_len}) [path=${path}]`
     );
 
-    const sbuf = new SharedArrayBuffer(4); // lock
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    send_to_kernel(["path_create_directory", [sbuf, fd, path]]);
+    send_to_kernel(["path_create_directory", [sharedBuffer, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -533,12 +540,12 @@ function WASI(): WASICallbacks {
       )}) [path=${path}]`
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 64); // lock, stat buffer
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 64); // lock, stat buffer
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const statbuf = new DataView(sbuf, 4);
+    const statbuf = new DataView(sharedBuffer, 4);
 
-    send_to_kernel(["path_filestat_get", [sbuf, fd, path, flags]]);
+    send_to_kernel(["path_filestat_get", [sharedBuffer, fd, path, flags]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -549,7 +556,7 @@ function WASI(): WASICallbacks {
 
     const dev = statbuf.getBigUint64(0, true);
     const ino = statbuf.getBigUint64(8, true);
-    const file_type = statbuf.getUint8(16);
+    const fileType = statbuf.getUint8(16);
     const nlink = statbuf.getBigUint64(24, true);
     const size = statbuf.getBigUint64(32, true);
     const atim = statbuf.getBigUint64(40, true);
@@ -558,7 +565,7 @@ function WASI(): WASICallbacks {
 
     view.setBigUint64(buf, dev, true);
     view.setBigUint64(buf + 8, ino, true);
-    view.setUint8(buf + 16, file_type);
+    view.setUint8(buf + 16, fileType);
     view.setBigUint64(buf + 24, nlink, true);
     view.setBigUint64(buf + 32, size, true);
     view.setBigUint64(buf + 40, atim, true);
@@ -596,14 +603,14 @@ function WASI(): WASICallbacks {
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
     worker_console_log(`path_open: path = ${path}`);
 
-    const sbuf = new SharedArrayBuffer(4 + 4); // lock, opened fd
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 4); // lock, opened fd
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const opened_fd = new Int32Array(sbuf, 4, 1);
+    const opened_fd = new Int32Array(sharedBuffer, 4, 1);
     send_to_kernel([
       "path_open",
       [
-        sbuf,
+        sharedBuffer,
         dir_fd,
         path,
         dirflags,
@@ -630,8 +637,8 @@ function WASI(): WASICallbacks {
       JSON.parse(syscallDataJson);
     switch (command) {
       case "spawn": {
-        const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sbuf, 0, 1);
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
         send_to_kernel([
           "spawn",
@@ -639,7 +646,7 @@ function WASI(): WASICallbacks {
             args[0],
             args.slice(1),
             { ...env, ...extended_env },
-            sbuf,
+            sharedBuffer,
             background,
             redirects,
           ],
@@ -654,22 +661,22 @@ function WASI(): WASICallbacks {
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "chdir": {
-        const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sbuf, 0, 1);
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
         const dir = utils.realpath(args[0]);
-        send_to_kernel(["chdir", [dir, sbuf]]);
+        send_to_kernel(["chdir", [dir, sharedBuffer]]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
         return `${err}\x1b${dir}`;
       }
       case "set_env": {
-        const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sbuf, 0, 1);
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
-        send_to_kernel(["set_env", [args, sbuf]]);
+        send_to_kernel(["set_env", [args, sharedBuffer]]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
@@ -685,23 +692,23 @@ function WASI(): WASICallbacks {
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "set_echo": {
-        const sbuf = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sbuf, 0, 1);
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
-        send_to_kernel(["set_echo", [args[0], sbuf]]);
+        send_to_kernel(["set_echo", [args[0], sharedBuffer]]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "isatty": {
-        const sbuf = new SharedArrayBuffer(8);
-        const lck = new Int32Array(sbuf, 0, 1);
+        const sharedBuffer = new SharedArrayBuffer(8);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
-        const isattyPtr = new Int32Array(sbuf, 4, 1);
+        const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
         const fd = parseInt(args[0], 10);
 
-        send_to_kernel(["isatty", [sbuf, fd]]);
+        send_to_kernel(["isatty", [sharedBuffer, fd]]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b${isattyPtr[0]}`;
@@ -761,11 +768,11 @@ function WASI(): WASICallbacks {
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
-    const sbuf = new SharedArrayBuffer(4); // lock
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    send_to_kernel(["path_remove_directory", [sbuf, fd, path]]);
+    send_to_kernel(["path_remove_directory", [sharedBuffer, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -786,11 +793,11 @@ function WASI(): WASICallbacks {
 
     const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
 
-    const sbuf = new SharedArrayBuffer(4); // lock
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    send_to_kernel(["path_unlink_file", [sbuf, fd, path]]);
+    send_to_kernel(["path_unlink_file", [sharedBuffer, fd, path]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -808,13 +815,13 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const name_len = new Int32Array(sbuf, 4, 1);
-    const preopen_type = new Uint8Array(sbuf, 8, 1);
+    const name_len = new Int32Array(sharedBuffer, 4, 1);
+    const preopen_type = new Uint8Array(sharedBuffer, 8, 1);
 
-    send_to_kernel(["fd_prestat_get", [sbuf, fd]]);
+    send_to_kernel(["fd_prestat_get", [sharedBuffer, fd]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -822,7 +829,7 @@ function WASI(): WASICallbacks {
       view.setUint8(buf, preopen_type[0]);
       view.setUint32(buf + 4, name_len[0], true);
       worker_console_log(
-        `fd_prestat_get returned preonepend type ${preopen_type[0]} of size ${name_len[0]}`
+        `fd_prestat_get returned preopened type ${preopen_type[0]} of size ${name_len[0]}`
       );
     } else {
       worker_console_log(`fd_prestat_get returned ${err}`);
@@ -838,12 +845,12 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const sbuf = new SharedArrayBuffer(4 + path_len); // lock, path
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4 + path_len); // lock, path
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const path = new Uint8Array(sbuf, 4, path_len);
+    const path = new Uint8Array(sharedBuffer, 4, path_len);
 
-    send_to_kernel(["fd_prestat_dir_name", [sbuf, fd, path_len]]);
+    send_to_kernel(["fd_prestat_dir_name", [sharedBuffer, fd, path_len]]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -894,11 +901,11 @@ function WASI(): WASICallbacks {
     );
     worker_console_log(`path_symlink: ${newpath} --> ${path}`);
 
-    const sbuf = new SharedArrayBuffer(4); // lock
-    const lck = new Int32Array(sbuf, 0, 1);
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    send_to_kernel(["path_symlink", [sbuf, path, fd, newpath]]);
+    send_to_kernel(["path_symlink", [sharedBuffer, path, fd, newpath]]);
 
     Atomics.wait(lck, 0, -1);
 
@@ -1137,6 +1144,7 @@ async function importWasmModule(
     wasiCallbacks.setModuleInstance(instance);
     try {
       // @ts-ignore
+      // eslint-disable-next-line no-underscore-dangle
       instance.exports._start();
       do_exit(0);
     } catch (e) {
@@ -1165,10 +1173,4 @@ async function start_wasm() {
       start_wasm();
     }, 0);
   }
-}
-
-try {
-  start_wasm();
-} catch (err) {
-  send_to_kernel(["console", `Worker failed: ${err}`]);
 }

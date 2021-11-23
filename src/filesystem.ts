@@ -258,7 +258,7 @@ abstract class Entry {
   async stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
@@ -274,7 +274,7 @@ abstract class Entry {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.fileType,
+      fileType: this.fileType,
       nlink: 0n,
       size: BigInt(await this.size()),
       atim: time,

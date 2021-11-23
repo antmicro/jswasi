@@ -15,7 +15,7 @@ export interface IO {
   stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
@@ -52,7 +52,7 @@ export class Stdin implements IO {
   async stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
@@ -62,7 +62,7 @@ export class Stdin implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.fileType,
+      fileType: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -94,7 +94,7 @@ export class Stdout implements IO {
   async stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
@@ -104,7 +104,7 @@ export class Stdout implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.fileType,
+      fileType: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -135,7 +135,7 @@ export class Stderr implements IO {
   async stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
@@ -145,7 +145,7 @@ export class Stderr implements IO {
     return {
       dev: 0n,
       ino: 0n,
-      file_type: this.fileType,
+      fileType: this.fileType,
       nlink: 0n,
       size: 0n,
       atim: 0n,
@@ -193,7 +193,7 @@ export class OpenedFd implements IO {
   async stat(): Promise<{
     dev: bigint;
     ino: bigint;
-    file_type: number;
+    fileType: number;
     nlink: bigint;
     size: bigint;
     atim: bigint;
