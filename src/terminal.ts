@@ -22,6 +22,7 @@ const NECESSARY_BINARIES = {
   "/usr/bin/tree": "resources/tree.wasm",
   "/usr/bin/purge": "resources/purge.wasm",
   "/usr/bin/nohup": "resources/nohup.wasm",
+  "/usr/bin/webutils": "resources/webutils.wasm",
 };
 
 const OPTIONAL_BINARIES = {

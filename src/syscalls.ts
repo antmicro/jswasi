@@ -119,6 +119,43 @@ export default async function syscallCallback(
       const [fullPath, args, env, sharedBuffer, background, redirects] = data;
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
       args.splice(0, 0, fullPath.split("/").pop());
+
+      // save parent file descriptors table,
+      // replace it with child's for the duration of spawn call
+      // restore parent table before returning
+      // TODO: is shallow copy enough, or should we deep copy?
+      const parentFds = processManager.processInfos[processId].fds.slice(0);
+      const { fds } = processManager.processInfos[processId];
+      await Promise.all(
+        redirects.map(async (redirect: any) => {
+          let mode: string;
+          let path: string;
+          let fd: number;
+          if ("Read" in redirect) {
+            mode = "read";
+            [fd, path] = redirect.Read;
+          } else if ("Write" in redirect) {
+            mode = "write";
+            [fd, path] = redirect.Write;
+          } else if ("Append" in redirect) {
+            mode = "append";
+            [fd, path] = redirect.Append;
+          }
+          const { entry } = await filesystem.rootDir.getEntry(
+            path,
+            FileOrDir.File,
+            OpenFlags.Create
+          );
+          fds[fd] = entry.open();
+          const openFile = fds[fd];
+          if (mode === "write") {
+            await openFile.truncate();
+          } else if (mode === "append") {
+            await openFile.seek(0, constants.WASI_WHENCE_END);
+          }
+        })
+      );
+
       switch (fullPath) {
         case "/usr/bin/ps": {
           const result = await ps(processManager, processId, args, env);
@@ -157,43 +194,12 @@ export default async function syscallCallback(
           break;
         }
         default: {
-          // TODO: is shallow copy enough, or should we deep copy?
-          const childFds = processManager.processInfos[processId].fds.slice(0);
-          Promise.all(
-            redirects.map(async (redirect: any) => {
-              let mode: string;
-              let path: string;
-              let fd: number;
-              if ("Read" in redirect) {
-                mode = "read";
-                [fd, path] = redirect.Read;
-              } else if ("Write" in redirect) {
-                mode = "write";
-                [fd, path] = redirect.Write;
-              } else if ("Append" in redirect) {
-                mode = "append";
-                [fd, path] = redirect.Append;
-              }
-              const { entry } = await filesystem.rootDir.getEntry(
-                path,
-                FileOrDir.File,
-                OpenFlags.Create
-              );
-              childFds[fd] = entry.open();
-              const openFile = childFds[fd];
-              if (mode === "write") {
-                await openFile.truncate();
-              } else if (mode === "append") {
-                await openFile.seek(0, constants.WASI_WHENCE_END);
-              }
-            })
-          );
           const id = await processManager.spawnProcess(
             processId,
             background ? null : parentLck,
             syscallCallback,
             fullPath,
-            childFds,
+            fds,
             args,
             env,
             background
@@ -216,6 +222,8 @@ export default async function syscallCallback(
         }
       }
 
+      // restore parent file descriptor table
+      processManager.processInfos[processId].fds = parentFds;
       break;
     }
     case "fd_prestat_get": {

@@ -4,6 +4,8 @@ import { FileOrDir } from "./filesystem.js";
 import { filesystem, fetchFile } from "./terminal.js";
 import ProcessManager from "./process-manager";
 
+const ENCODER = new TextEncoder();
+
 export async function mount(
   processManager: ProcessManager,
   processId: number,
@@ -12,12 +14,17 @@ export async function mount(
 ): Promise<number> {
   console.log(`mount(${processId}, ${args})`);
 
+  const stdout = processManager.processInfos[processId].fds[1];
+  const stderr = processManager.processInfos[processId].fds[2];
+
   switch (args.length) {
     case 1: {
-      processManager.terminal.io.println("wasmfs on /");
-      for (const mountedDir of filesystem.mounts) {
-        processManager.terminal.io.println(
-          `fsapi on /${`${mountedDir.parts.join("/")}/${mountedDir.name}`}`
+      stdout.write(ENCODER.encode("wasmfs on /\n"));
+      for (const mountPoint of filesystem.mounts) {
+        stdout.write(
+          ENCODER.encode(
+            `fsapi on /${`${mountPoint.parts.join("/")}/${mountPoint.name}`}\n`
+          )
         );
       }
       return constants.WASI_ESUCCESS;
@@ -25,9 +32,7 @@ export async function mount(
     case 2: {
       let path = args[1];
       if (path === "/") {
-        processManager.terminal.io.println(
-          `mount: cannot mount at root directory`
-        );
+        stderr.write(ENCODER.encode(`mount: cannot mount at root directory\n`));
         return 1;
       }
       // handle relative path
@@ -37,7 +42,7 @@ export async function mount(
 
       // check if path exits
       if (!(await filesystem.pathExists(path, FileOrDir.Directory))) {
-        processManager.terminal.io.println(`mount: ${path}: no such directory`);
+        stdout.write(ENCODER.encode(`mount: ${path}: no such directory\n`));
         return 1;
       }
 
@@ -46,9 +51,7 @@ export async function mount(
         // eslint-disable-next-line no-undef
         mountPoint = await showDirectoryPicker();
       } catch (e) {
-        processManager.terminal.io.println(
-          "mount: failed to open local directory"
-        );
+        stderr.write(ENCODER.encode("mount: failed to open local directory\n"));
         return 1; // TODO: what would be a proper error here?
       }
 
@@ -56,7 +59,7 @@ export async function mount(
       return 0;
     }
     default: {
-      processManager.terminal.io.println("mount: help: mount [<mount-point>]");
+      stderr.write(ENCODER.encode("mount: help: mount [<mount-point>]\n"));
       return 1;
     }
   }
@@ -68,6 +71,8 @@ export function umount(
   args: string[],
   env: Record<string, string>
 ): number {
+  const stderr = processManager.processInfos[processId].fds[2];
+
   let path = args[1];
   // handle relative path
   if (!path.startsWith("/")) {
@@ -75,7 +80,7 @@ export function umount(
   }
 
   if (!filesystem.isMounted(path)) {
-    processManager.terminal.io.println(`umount: ${path}: not mounted`);
+    stderr.write(ENCODER.encode(`umount: ${path}: not mounted\n`));
     return 1;
   }
 
@@ -89,6 +94,8 @@ export async function wget(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
+  const stderr = processManager.processInfos[processId].fds[2];
+
   let path: string;
   let address: string;
   if (args.length === 2) {
@@ -98,7 +105,7 @@ export async function wget(
     address = args[1];
     path = args[2];
   } else {
-    processManager.terminal.io.println("wget: help: wget <address> [<path>]");
+    stderr.write(ENCODER.encode("wget: help: wget <address> [<path>]\n"));
     return 1;
   }
   if (!path.startsWith("/")) {
@@ -115,13 +122,15 @@ export async function download(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
+  const stderr = processManager.processInfos[processId].fds[2];
+
   if (args.length === 1) {
-    processManager.terminal.io.println(
-      "download: help: download <address> [<path>]"
+    stderr.write(
+      ENCODER.encode("download: help: download <address> [<path>]\n")
     );
     return 1;
   }
-  Promise.all(
+  await Promise.all(
     args.slice(1).map(async (path: string) => {
       if (!path.startsWith("/")) {
         path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
@@ -132,7 +141,7 @@ export async function download(
         FileOrDir.File
       );
       if (err !== constants.WASI_ESUCCESS) {
-        processManager.terminal.io.println(`download: no such file: ${path}`);
+        stderr.write(ENCODER.encode(`download: no such file: ${path}\n`));
         return Promise.resolve();
       }
 
@@ -144,9 +153,7 @@ export async function download(
           suggestedName: path.split("/").slice(-1)[0],
         });
       } catch (e) {
-        processManager.terminal.io.println(
-          "download: unable to save file locally"
-        );
+        stderr.write(ENCODER.encode("download: unable to save file locally\n"));
         return 1; // TODO: what would be a proper error here?
       }
       const writable = await localHandle.createWritable();
@@ -163,6 +170,7 @@ export async function ps(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
+  const stdout = processManager.processInfos[processId].fds[1];
   let psData = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
     const now = new Date();
@@ -178,7 +186,8 @@ export async function ps(
       workerInfo.cmd.split("/").slice(-1)[0]
     }\n\r`;
   }
-  processManager.terminalOutputCallback(psData);
+
+  stdout.write(ENCODER.encode(psData));
   return 0;
 }
 
@@ -188,6 +197,8 @@ export async function free(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
+  const stdout = processManager.processInfos[processId].fds[1];
+
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;
   // @ts-ignore
@@ -210,6 +221,6 @@ export async function free(
   )}  ${`          ${usedMemory}`.slice(
     -10
   )}  ${`          ${availableMemory}`.slice(-10)}\n\r`;
-  processManager.terminalOutputCallback(freeData);
+  stdout.write(ENCODER.encode(freeData));
   return 0;
 }
