@@ -95,9 +95,9 @@ function worker_console_log(msg: any) {
   }
 }
 
-function do_exit(exit_code: number) {
+function do_exit(exitCode: number) {
   worker_console_log("calling close()");
-  send_to_kernel(["exit", exit_code]);
+  send_to_kernel(["exit", exitCode]);
   close();
 }
 

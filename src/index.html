@@ -9,10 +9,10 @@
       import { init } from "./terminal.js";
       window.buffer = "";
       window.alive = true;
-      window.exit_code = 0;
-      window.stdout_read_data = function () {
-        if (window.stdout_attached !== undefined)
-          if (window.stdout_attached && buffer.length > 0) {
+      window.exitCode = 0;
+      window.stdoutReadData = function () {
+        if (window.stdoutAttached !== undefined)
+          if (window.stdoutAttached && buffer.length > 0) {
             let tmp = window.buffer;
             window.buffer = "";
             return tmp;

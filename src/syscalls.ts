@@ -9,7 +9,7 @@ const RESET = "\u001b[0m";
 
 declare global {
   interface Window {
-    exit_code: number;
+    exitCode: number;
     alive: boolean;
   }
 }
@@ -57,7 +57,7 @@ export default async function syscallCallback(
       }
       if (process_id === 0) {
         window.alive = false;
-        window.exit_code = data;
+        window.exitCode = data;
       }
       break;
     }
@@ -252,7 +252,7 @@ export default async function syscallCallback(
         ({ err, entry } = await fds[fd].getEntry(
           linkpath,
           FileOrDir.File,
-          1 | 4
+          OpenFlags.Create | OpenFlags.Truncate
         ));
         if (err === constants.WASI_ESUCCESS) {
           const file = await entry.open();

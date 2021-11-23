@@ -11,10 +11,12 @@
   },
   "plugins": ["@typescript-eslint"],
   "rules": {
-    "camelcase": "off",
     "import/no-unresolved": "off",
     "import/extensions": "off",
     "no-restricted-syntax": "off",
-    "max-classes-per-file": "off"
+    "max-classes-per-file": "off",
+    "no-bitwise": ["warn", { "allow": ["|"] }],
+    "no-console": "off",
+    "dot-notation": "off"
   }
 }
