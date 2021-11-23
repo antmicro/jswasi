@@ -1168,7 +1168,7 @@ async function start_wasm() {
 }
 
 try {
-  (async () => await start_wasm())();
+  start_wasm();
 } catch (err) {
   send_to_kernel(["console", `Worker failed: ${err}`]);
 }
