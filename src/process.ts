@@ -713,6 +713,17 @@ function WASI(): WASICallbacks {
 
         return `${constants.EXIT_SUCCESS}\x1b${isattyPtr[0]}`;
       }
+      case "getpid": {
+        const sharedBuffer = new SharedArrayBuffer(8);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+        const pidPtr = new Int32Array(sharedBuffer, 4, 1);
+
+        send_to_kernel(["getpid", [sharedBuffer]]);
+        Atomics.wait(lck, 0, -1);
+
+        return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
+      }
       default: {
         worker_console_log(`Special command ${command} not found.`);
         throw Error(`Special command '${command} not found.`);
@@ -747,7 +758,7 @@ function WASI(): WASICallbacks {
         view.setUint32(buffer_used_ptr, buffer_len, true);
         return constants.WASI_ESUCCESS;
       }
-      const result = ENCODER.encode(`${special_parse(path.slice(1))}\0`);
+      const result = ENCODER.encode(special_parse(path.slice(1)));
       let count = result.byteLength;
       if (count > 1024) count = 1024;
       view8.set(result.slice(0, count), buffer_ptr);

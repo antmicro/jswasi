@@ -274,8 +274,17 @@ fn handle_simple_word<'a>(shell: &'a Shell, word: &'a ast::DefaultSimpleWord) ->
                 }
             }
             ast::Parameter::Question => Some(shell.last_exit_status.to_string()),
-            any => Some(format!("{:?}", any)),
+            ast::Parameter::Dollar => {
+                #[cfg(not(target_os = "wasi"))]
+                {
+                    use std::process;
+                    Some(process::id().to_string())
+                }
+                #[cfg(target_os = "wasi")]
+                Some(syscall("getpid", &[], &HashMap::new(), false, &[]).unwrap().output)
+            }
+            any => Some(format!("parameter not yet handled: {:?}", any)),
         },
-        any => Some(format!("{:?}", any)),
+        any => Some(format!("simple word not yet handled: {:?}", any)),
     }
 }

@@ -51,10 +51,10 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/rapidlua/llc/0.0.4/llc.wasm",
 };
 
-// things that are global and should be shared between all tab instances
-export let filesystem: Filesystem;
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
+// export const filesystem: Filesystem = new Filesystem(await navigator.storage.getDirectory());
+export let filesystem: Filesystem;
 navigator.storage
   .getDirectory()
   .then((rootHandle: FileSystemDirectoryHandle) => {
@@ -161,6 +161,53 @@ async function initFs() {
   Promise.all(optionalPromises);
 }
 
+function initDropImport(
+  terminalContentWindow: Window,
+  notifyDroppedFileSaved: (path: string, entryName: string) => void,
+  processManager: ProcessManager
+) {
+  terminalContentWindow.addEventListener("dragover", (e) => e.preventDefault());
+  terminalContentWindow.addEventListener("drop", async (e) => {
+    e.preventDefault();
+
+    const copyEntry = async (
+      entry: FileSystemDirectoryHandle | FileSystemFileHandle,
+      path: string
+    ) => {
+      const dir = (await filesystem.rootDir.getEntry(path, FileOrDir.Directory))
+        .entry;
+      if (entry.kind === "directory") {
+        // create directory in VFS, expand path and fill directory contents
+        await dir.handle.getDirectoryHandle(entry.name, { create: true });
+        for await (const [, handle] of entry.entries()) {
+          await copyEntry(handle, `${path}/${entry.name}`);
+        }
+      } else {
+        // create VFS file, open dragged file as stream and pipe it to VFS file
+        const handle = await dir.handle.getFileHandle(entry.name, {
+          create: true,
+        });
+        const writable = await handle.createWritable();
+        const stream = (await entry.getFile()).stream();
+        // @ts-ignore pipeTo is still experimental
+        await stream.pipeTo(writable);
+        if (notifyDroppedFileSaved) notifyDroppedFileSaved(path, entry.name);
+      }
+    };
+    const pwd =
+      processManager.processInfos[processManager.currentProcess].env.PWD;
+    const entryPromises = [];
+    for (const item of e.dataTransfer.items) {
+      if (item.kind === "file") {
+        entryPromises.push(
+          item.getAsFileSystemHandle().then((entry) => copyEntry(entry, pwd))
+        );
+      }
+    }
+    await Promise.all(entryPromises);
+  });
+}
+
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behaviour
@@ -248,47 +295,7 @@ export async function init(
   // hterm creates iframe child of provided anchor, we assume there's only one of those
   const terminalContentWindow =
     anchor.getElementsByTagName("iframe")[0].contentWindow;
-  terminalContentWindow.addEventListener("dragover", (e) => e.preventDefault());
-  terminalContentWindow.addEventListener("drop", async (e) => {
-    e.preventDefault();
-
-    const copyEntry = async (
-      entry: FileSystemDirectoryHandle | FileSystemFileHandle,
-      path: string
-    ) => {
-      const dir = (await filesystem.rootDir.getEntry(path, FileOrDir.Directory))
-        .entry;
-      if (entry.kind === "directory") {
-        // create directory in VFS, expand path and fill directory contents
-        await dir.handle.getDirectoryHandle(entry.name, { create: true });
-        for await (const [, handle] of entry.entries()) {
-          await copyEntry(handle, `${path}/${entry.name}`);
-        }
-      } else {
-        // create VFS file, open dragged file as stream and pipe it to VFS file
-        const handle = await dir.handle.getFileHandle(entry.name, {
-          create: true,
-        });
-        const writable = await handle.createWritable();
-        const stream = (await entry.getFile()).stream();
-        // @ts-ignore pipeTo is still experimental
-        await stream.pipeTo(writable);
-        if (notifyDroppedFileSaved) notifyDroppedFileSaved(path, entry.name);
-      }
-    };
-
-    const pwd =
-      processManager.processInfos[processManager.currentProcess].env.PWD;
-    const entryPromises = [];
-    for (const item of e.dataTransfer.items) {
-      if (item.kind === "file") {
-        entryPromises.push(
-          item.getAsFileSystemHandle().then((entry) => copyEntry(entry, pwd))
-        );
-      }
-    }
-    await Promise.all(entryPromises);
-  });
+  initDropImport(terminalContentWindow, notifyDroppedFileSaved, processManager);
 
   const pwdDir = (
     await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)

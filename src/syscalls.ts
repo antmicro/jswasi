@@ -96,6 +96,17 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
+    case "getpid": {
+      const [sharedBuffer] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const pid = new Int32Array(sharedBuffer, 4, 1);
+
+      pid[0] = processManager.processInfos[processId].id;
+
+      Atomics.store(lck, 0, constants.WASI_ESUCCESS);
+      Atomics.notify(lck, 0);
+      break;
+    }
     case "set_env": {
       const [[key, value], sharedBuffer] = data;
       const lock = new Int32Array(sharedBuffer, 0, 1);
