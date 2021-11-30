@@ -22,7 +22,6 @@ const NECESSARY_BINARIES = {
   "/usr/bin/tree": "resources/tree.wasm",
   "/usr/bin/purge": "resources/purge.wasm",
   "/usr/bin/nohup": "resources/nohup.wasm",
-  "/usr/bin/webutils": "resources/webutils.wasm",
 };
 
 const OPTIONAL_BINARIES = {
@@ -166,8 +165,10 @@ function initDropImport(
   notifyDroppedFileSaved: (path: string, entryName: string) => void,
   processManager: ProcessManager
 ) {
-  terminalContentWindow.addEventListener("dragover", (e) => e.preventDefault());
-  terminalContentWindow.addEventListener("drop", async (e) => {
+  terminalContentWindow.addEventListener("dragover", (e: DragEvent) =>
+    e.preventDefault()
+  );
+  terminalContentWindow.addEventListener("drop", async (e: DragEvent) => {
     e.preventDefault();
 
     const copyEntry = async (
@@ -199,12 +200,31 @@ function initDropImport(
     const entryPromises = [];
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {
-        entryPromises.push(
-          item.getAsFileSystemHandle().then((entry) => copyEntry(entry, pwd))
-        );
+        entryPromises.push(async () => {
+          const entry = await item.getAsFileSystemHandle();
+          await copyEntry(entry, pwd);
+        });
       }
     }
     await Promise.all(entryPromises);
+  });
+}
+
+function initServiceWorker() {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").then(
+      (registration: ServiceWorkerRegistration) => {
+        // Registration was successful
+        console.log(
+          "ServiceWorker registration successful with scope: ",
+          registration.scope
+        );
+      },
+      (err) => {
+        // registration failed :(
+        console.log("ServiceWorker registration failed: ", err);
+      }
+    );
   });
 }
 
@@ -223,7 +243,7 @@ export async function init(
       "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
     return;
   }
-
+  initServiceWorker();
   await initFs();
 
   // FIXME: for now we assume hterm is in scope

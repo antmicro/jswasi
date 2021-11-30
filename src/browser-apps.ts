@@ -112,6 +112,7 @@ export async function wget(
     path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
   }
   const { dir } = await filesystem.resolveAbsolute(path);
+  // TODO: inform if failed, for example when there is no internet connection
   await fetchFile(dir, path, address);
   return 0;
 }
