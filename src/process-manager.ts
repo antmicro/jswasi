@@ -20,8 +20,8 @@ class ProcessInfo {
     public cmd: string,
     public worker: Worker,
     public fds: any[], // TODO: add FileDescriptor wrapper class
-    public parentId: number,
-    public parentLock: Int32Array,
+    public parentId: number | null,
+    public parentLock: Int32Array | null,
     public callback: (
       event: MessageEvent,
       processManager: ProcessManager
@@ -36,7 +36,7 @@ class ProcessInfo {
 export default class ProcessManager {
   public buffer = "";
 
-  public currentProcess: number = null;
+  public currentProcess: number | null;
 
   public nextProcessId = 0;
 
@@ -54,8 +54,8 @@ export default class ProcessManager {
   }
 
   async spawnProcess(
-    parentId: number,
-    parentLock: Int32Array,
+    parentId: number | null,
+    parentLock: Int32Array | null,
     syscallCallback: (
       event: MessageEvent,
       processManager: ProcessManager

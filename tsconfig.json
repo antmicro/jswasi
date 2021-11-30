@@ -6,7 +6,8 @@
     "removeComments": false,
     "watch": false,
     "noImplicitAny": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "strictNullChecks": false
   },
   "include": ["src/*"],
   "exclude": ["node_modules", "dist"]

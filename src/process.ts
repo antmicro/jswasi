@@ -110,7 +110,7 @@ function do_exit(exitCode: number) {
 }
 
 function WASI(): WASICallbacks {
-  let moduleInstanceExports: WebAssembly.Exports = null;
+  let moduleInstanceExports: WebAssembly.Exports;
 
   function setModuleInstance(instance: WebAssembly.Instance) {
     moduleInstanceExports = instance.exports;

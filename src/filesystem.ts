@@ -45,11 +45,11 @@ export class Filesystem {
     }
 
     const root = await navigator.storage.getDirectory();
-    let components = null;
+    let components;
     try {
       components = await root.resolve(dir.handle);
     } catch {
-      if (this.DEBUG) console.log("There was an error in root.resolve...");
+      throw Error("There was an error in root.resolve...");
     }
 
     // if there are many mounts for the same path, we want to return the latest
@@ -230,7 +230,7 @@ abstract class Entry {
 
   public path: string;
 
-  public parent: Directory;
+  public parent: Directory | null;
 
   protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle;
 
@@ -239,7 +239,7 @@ abstract class Entry {
   constructor(
     path: string,
     handle: FileSystemDirectoryHandle | FileSystemFileHandle,
-    parent: Directory,
+    parent: Directory | null,
     filesystem: Filesystem
   ) {
     if (filesystem.DEBUG)

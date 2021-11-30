@@ -210,10 +210,13 @@ function initDropImport(
 
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
-// you can use it to customize the behaviour
+// you can use it to customize the behavior
 export async function init(
   anchor: HTMLElement,
-  notifyDroppedFileSaved: (path: string, entryName: string) => void = null
+  notifyDroppedFileSaved: (
+    path: string,
+    entryName: string
+  ) => void | null = null
 ): Promise<void> {
   if (!navigator.storage.getDirectory) {
     anchor.innerHTML =

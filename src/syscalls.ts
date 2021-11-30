@@ -151,6 +151,8 @@ export default async function syscallCallback(
           } else if ("Append" in redirect) {
             mode = "append";
             [fd, path] = redirect.Append;
+          } else {
+            throw Error("unrecognized redirect type");
           }
           const { entry } = await filesystem.rootDir.getEntry(
             path,
