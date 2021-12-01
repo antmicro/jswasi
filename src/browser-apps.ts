@@ -99,11 +99,10 @@ export async function wget(
   let path: string;
   let address: string;
   if (args.length === 2) {
-    address = args[1];
-    path = address.split("/").slice(-1)[0];
+    [, address] = args;
+    [path] = address.split("/").slice(-1);
   } else if (args.length === 3) {
-    address = args[1];
-    path = args[2];
+    [, address, path] = args;
   } else {
     stderr.write(ENCODER.encode("wget: help: wget <address> [<path>]\n"));
     return 1;
