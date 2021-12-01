@@ -15,7 +15,6 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path[0:7] == "/proxy/":
             real_path = base64.b64decode(self.path[7:].encode('ascii')).decode('ascii')
-            print("TODO: should get",real_path)
             self.send_response(200)
             self.end_headers()
             self.copyfile(urllib.request.urlopen(real_path), self.wfile)

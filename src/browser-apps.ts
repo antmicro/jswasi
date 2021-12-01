@@ -112,8 +112,16 @@ export async function wget(
     path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
   }
   const { dir } = await filesystem.resolveAbsolute(path);
-  // TODO: inform if failed, for example when there is no internet connection
-  await fetchFile(dir, path, address);
+  try {
+    await fetchFile(dir, path, address);
+  } catch (error) {
+    stderr.write(
+      ENCODER.encode(
+        `wget: could not get resource: ${error.message.toLowerCase()}\n`
+      )
+    );
+    return 1;
+  }
   return 0;
 }
 
