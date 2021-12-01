@@ -213,16 +213,12 @@ function initDropImport(
 function initServiceWorker() {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").then(
-      (registration: ServiceWorkerRegistration) => {
+      () => {
         // Registration was successful
-        console.log(
-          "ServiceWorker registration successful with scope: ",
-          registration.scope
-        );
       },
       (err) => {
         // registration failed :(
-        console.log("ServiceWorker registration failed: ", err);
+        console.warn("ServiceWorker registration failed: ", err);
       }
     );
   });
