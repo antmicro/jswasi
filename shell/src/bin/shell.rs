@@ -42,14 +42,10 @@ fn main() {
             env!("SHELL_TARGET")
         ))
         .author("Antmicro <www.antmicro.com>")
-        .arg(
-            Arg::new("FILE")
-                .about("Execute commands from file")
-                .index(1),
-        )
+        .arg(Arg::new("FILE").help("Execute commands from file").index(1))
         .arg(
             Arg::new("command")
-                .about("Execute provided command")
+                .help("Execute provided command")
                 .short('c')
                 .long("command")
                 .value_name("COMMAND")
