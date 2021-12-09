@@ -20,10 +20,37 @@ export class Filesystem {
 
   mounts: { parts: string[]; name: string; dir: Directory }[] = [];
 
+  symlinks: { parts: string[]; name: string; to: Directory | File }[] = [];
+
   public readonly rootDir: Directory;
 
   constructor(public rootHandle: FileSystemDirectoryHandle) {
     this.rootDir = new Directory("", rootHandle, null, this);
+  }
+
+  async loadSymlinks() {
+    const symlinks = await this.rootDir.getEntry(
+      "/etc/symlinks.txt",
+      FileOrDir.File
+    );
+    const file = await symlinks.entry.handle.getFile();
+    const content = await file.text();
+
+    await Promise.all(
+      content.split("\n").map(async (line) => {
+        const [source, destination] = line.split(" -> ");
+        if (!source || !destination) {
+          return;
+        }
+        const { parts, name } = parsePath(source);
+        const entry = await this.rootDir.getEntry(destination, FileOrDir.Any);
+        if (entry.err === constants.WASI_ESUCCESS) {
+          this.symlinks.push({ parts, name, to: entry.entry });
+        } else {
+          console.warn(`Got symlink for non-existent file: ${destination}`);
+        }
+      })
+    );
   }
 
   async getDirectory(
@@ -54,11 +81,23 @@ export class Filesystem {
 
     // if there are many mounts for the same path, we want to return the latest
     const reversedMounts = [].concat(this.mounts).reverse();
-    for (const { parts, name: childName, dir: childDir } of reversedMounts) {
-      if (arraysEqual(parts, components) && childName === name) {
-        return childDir;
+    for (const { parts, name: mountName, dir: mountDir } of reversedMounts) {
+      if (arraysEqual(parts, components) && mountName === name) {
+        return mountDir;
       }
     }
+
+    // check if a symlink exists
+    for (const { parts, name: symlinkName, to: symlinkDestination } of this
+      .symlinks) {
+      if (arraysEqual(parts, components) && symlinkName === name) {
+        if (symlinkDestination instanceof Directory) {
+          return symlinkDestination;
+        }
+        throw new TypeError("symlink doesn't point to a directory");
+      }
+    }
+
     const handle = await dir.handle.getDirectoryHandle(name, options);
     return new Directory(name, handle, dir, this);
   }
@@ -68,6 +107,24 @@ export class Filesystem {
     name: string,
     options: { create: boolean } = { create: false }
   ): Promise<File> {
+    const root = await navigator.storage.getDirectory();
+    let components;
+    try {
+      components = await root.resolve(dir.handle);
+    } catch {
+      throw Error("There was an error in root.resolve...");
+    }
+    // check if a symlink exists
+    for (const { parts, name: symlinkName, to: symlinkDestination } of this
+      .symlinks) {
+      if (arraysEqual(parts, components) && symlinkName === name) {
+        if (symlinkDestination instanceof File) {
+          return symlinkDestination;
+        }
+        throw new TypeError("symlink doesn't point to a file");
+      }
+    }
+
     const handle = await dir.handle.getFileHandle(name, options);
     return new File(name, handle, dir, this);
   }

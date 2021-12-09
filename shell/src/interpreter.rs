@@ -8,10 +8,13 @@ use conch_parser::ast;
 use crate::shell_base::{syscall, Redirect, Shell, EXIT_FAILURE, EXIT_SUCCESS, STDIN, STDOUT};
 
 pub fn interpret(shell: &mut Shell, cmd: &ast::TopLevelCommand<String>) -> i32 {
-    handle_top_level_command(shell, cmd, false, &mut Vec::new())
+    handle_top_level_command(shell, cmd)
 }
 
-pub fn handle_top_level_command(shell: &mut Shell, top_level_command: &ast::TopLevelCommand<String>, background: bool, redirects: &mut Vec<Redirect>) -> i32 {
+fn handle_top_level_command(
+    shell: &mut Shell,
+    top_level_command: &ast::TopLevelCommand<String>,
+) -> i32 {
     // println!("{:#?}", cmd);
     match &top_level_command.0 {
         ast::Command::Job(list) => handle_listable_command(shell, list, true),
@@ -19,7 +22,11 @@ pub fn handle_top_level_command(shell: &mut Shell, top_level_command: &ast::TopL
     }
 }
 
-fn handle_listable_command(shell: &mut Shell, list: &ast::DefaultAndOrList, background: bool) -> i32 {
+fn handle_listable_command(
+    shell: &mut Shell,
+    list: &ast::DefaultAndOrList,
+    background: bool,
+) -> i32 {
     let mut status_code = match &list.first {
         ast::ListableCommand::Single(cmd) => {
             handle_pipeable_command(shell, cmd, background, &mut Vec::new())
@@ -117,7 +124,7 @@ fn handle_pipeable_command(
     match cmd {
         ast::PipeableCommand::Simple(cmd) => {
             handle_simple_command(shell, cmd, background, redirects)
-        },
+        }
         ast::PipeableCommand::Compound(cmd) => {
             handle_compound_command(shell, cmd, background, redirects)
         }
@@ -134,16 +141,16 @@ fn handle_compound_command(
     background: bool,
     redirects: &mut Vec<Redirect>,
 ) -> i32 {
-    let ast::CompoundCommand {kind, io} = cmd;
+    let ast::CompoundCommand { kind, io } = cmd;
     match kind {
         ast::CompoundCommandKind::Subshell(subshell_cmds) => {
             // TODO: this should actually spawn a subshell
             let mut exit_status = EXIT_SUCCESS;
             for subshell_cmd in subshell_cmds {
-                exit_status = handle_top_level_command(shell, subshell_cmd, background, redirects)
+                exit_status = handle_top_level_command(shell, subshell_cmd)
             }
             exit_status
-        },
+        }
         any => {
             eprintln!("CompoundCommandKind not yet handled: {:#?}", any);
             EXIT_FAILURE
@@ -315,7 +322,11 @@ fn handle_simple_word<'a>(shell: &'a Shell, word: &'a ast::DefaultSimpleWord) ->
                     Some(process::id().to_string())
                 }
                 #[cfg(target_os = "wasi")]
-                Some(syscall("getpid", &[], &HashMap::new(), false, &[]).unwrap().output)
+                Some(
+                    syscall("getpid", &[], &HashMap::new(), false, &[])
+                        .unwrap()
+                        .output,
+                )
             }
             any => Some(format!("parameter not yet handled: {:?}", any)),
         },

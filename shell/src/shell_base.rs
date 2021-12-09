@@ -900,18 +900,18 @@ impl Shell {
                     Ok(EXIT_SUCCESS)
                 }
             }
-            "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "ls"
-            | "printf" | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" | "wc" => {
-                args.insert(0, command.to_string());
-                #[cfg(target_os = "wasi")]
-                args.insert(0, String::from("/usr/bin/coreutils"));
-                #[cfg(not(target_os = "wasi"))]
-                args.insert(0, String::from("/bin/busybox"));
-                let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-                Ok(syscall("spawn", &args_[..], env, background, redirects)
-                    .unwrap()
-                    .exit_status)
-            }
+            // "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "printf"
+            // | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" | "wc" => {
+            //     args.insert(0, command.to_string());
+            //     #[cfg(target_os = "wasi")]
+            //     args.insert(0, String::from("/usr/bin/coreutils"));
+            //     #[cfg(not(target_os = "wasi"))]
+            //     args.insert(0, String::from("/bin/busybox"));
+            //     let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
+            //     Ok(syscall("spawn", &args_[..], env, background, redirects)
+            //         .unwrap()
+            //         .exit_status)
+            // }
             // external commands or command not found
             _ => {
                 let full_path = if command.starts_with('/') {
