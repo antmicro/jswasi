@@ -252,6 +252,38 @@ export class Filesystem {
       }
     }
 
+    // check if a symlink exists
+    for (const { parts, name, to: symlinkDestination } of this.symlinks) {
+      let alreadyExists = false;
+      for (const entry of entries) {
+        if (entry.path === name) {
+          alreadyExists = true;
+          break;
+        }
+      }
+      if (!alreadyExists) {
+        if (arraysEqual(parts, components)) {
+          switch (symlinkDestination.handle.kind) {
+            case "file": {
+              entries.push(
+                new File(name, symlinkDestination.handle, dir, this)
+              );
+              break;
+            }
+            case "directory": {
+              entries.push(
+                new Directory(name, symlinkDestination.handle, dir, this)
+              );
+              break;
+            }
+            default: {
+              throw Error("Unexpected handle kind");
+            }
+          }
+        }
+      }
+    }
+
     for await (const [name, handle] of dir.handle.entries()) {
       // mounted directories hide directories they are mounted to
       let alreadyExists = false;
