@@ -1,4 +1,5 @@
 import * as constants from "./constants.js";
+import * as utils from "./utils.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { mount, umount, wget, download, ps, free } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -261,23 +262,35 @@ export default async function syscallCallback(
     }
 
     case "path_symlink": {
-      const [sharedBuffer, path, fd, newPath] = data;
+      const [sharedBuffer, oldPath, oldFd, newPath] = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      const { fds } = processManager.processInfos[processId];
+      if (fds[oldFd] === undefined) {
+        Atomics.store(lck, 0, constants.WASI_EBADF);
+        Atomics.notify(lck, 0);
+      }
+
+      const { err, entry } = await fds[oldFd].getEntry(oldPath, FileOrDir.Any);
+      if (err === constants.WASI_ESUCCESS) {
+        await filesystem.addSymlink(entry, newPath, oldPath);
+      }
+
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+
+    case "path_link": {
+      const [sharedBuffer, oldFd, oldFlags, oldPath, newFd, newPath] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
-      let entry;
       const { fds } = processManager.processInfos[processId];
-      if (fds[fd] !== undefined) {
-        const linkPath = `${newPath}.link`;
-        console.log(`We should symlink ${newPath} --> ${path} [dir fd=${fd}]`);
-        ({ err, entry } = await fds[fd].getEntry(
-          linkPath,
-          FileOrDir.File,
-          OpenFlags.Create | OpenFlags.Truncate
-        ));
+      if (fds[oldFd] !== undefined) {
+        console.log(`TODO: we should hard link ${newPath} --> ${oldPath}`);
         if (err === constants.WASI_ESUCCESS) {
-          const file = await entry.open();
-          await file.write(new TextEncoder().encode(path));
+          // TODO
         }
       } else {
         err = constants.WASI_EBADF;

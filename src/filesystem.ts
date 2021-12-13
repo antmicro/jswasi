@@ -18,39 +18,75 @@ export const enum OpenFlags {
 export class Filesystem {
   DEBUG: boolean = false;
 
+  // TODO: parts could be a key, that would optimise the lookup
   mounts: { parts: string[]; name: string; dir: Directory }[] = [];
 
-  symlinks: { parts: string[]; name: string; to: Directory | File }[] = [];
+  // TODO: we don't need to keep the parsed path I think
+  symlinks: {
+    source: string;
+    destination: string;
+    parts: string[];
+    name: string;
+    to: Directory | File;
+  }[] = [];
 
   public readonly rootDir: Directory;
 
-  constructor(public rootHandle: FileSystemDirectoryHandle) {
+  constructor(rootHandle: FileSystemDirectoryHandle) {
     this.rootDir = new Directory("", rootHandle, null, this);
   }
 
   async loadSymlinks() {
-    const symlinks = await this.rootDir.getEntry(
+    const { entry: symlinks } = await this.rootDir.getEntry(
+      "/etc/symlinks.txt",
+      FileOrDir.File,
+      OpenFlags.Create
+    );
+    const file = await symlinks.handle.getFile();
+    const content = await file.text();
+
+    this.symlinks = (
+      await Promise.all(
+        Object.entries(JSON.parse(content)).map(
+          async ([source, destination]: [string, string]) => {
+            const { parts, name } = parsePath(source);
+            const entry = await this.rootDir.getEntry(
+              destination,
+              FileOrDir.Any
+            );
+            if (entry.err === constants.WASI_ESUCCESS) {
+              return { source, destination, parts, name, to: entry.entry };
+            }
+            // throw new Error(`Got symlink for non-existent file: ${destination}`);
+            return null;
+          }
+        )
+      )
+    ).filter((symlink) => symlink !== null);
+  }
+
+  async addSymlink(to: File | Directory, source: string, destination: string) {
+    const { parts, name } = parsePath(source);
+    this.symlinks.push({ source, destination, parts, name, to });
+
+    const { entry: symlinks } = await this.rootDir.getEntry(
       "/etc/symlinks.txt",
       FileOrDir.File
     );
-    const file = await symlinks.entry.handle.getFile();
-    const content = await file.text();
-
-    await Promise.all(
-      content.split("\n").map(async (line) => {
-        const [source, destination] = line.split(" -> ");
-        if (!source || !destination) {
-          return;
-        }
-        const { parts, name } = parsePath(source);
-        const entry = await this.rootDir.getEntry(destination, FileOrDir.Any);
-        if (entry.err === constants.WASI_ESUCCESS) {
-          this.symlinks.push({ parts, name, to: entry.entry });
-        } else {
-          console.warn(`Got symlink for non-existent file: ${destination}`);
-        }
-      })
+    const data = JSON.stringify(
+      Object.assign(
+        {},
+        ...this.symlinks.map(({ source: src, destination: dst }) => ({
+          [src]: dst,
+        }))
+      )
     );
+    const w = await symlinks.handle.createWritable();
+    await w.write({
+      type: "write",
+      data,
+    });
+    await w.close();
   }
 
   async getDirectory(
@@ -119,6 +155,10 @@ export class Filesystem {
       .symlinks) {
       if (arraysEqual(parts, components) && symlinkName === name) {
         if (symlinkDestination instanceof File) {
+          // check if symlink is valid
+          // we only ever await once in the loop right before returning
+          // eslint-disable-next-line no-await-in-loop
+          await symlinkDestination.handle.getFile();
           return symlinkDestination;
         }
         throw new TypeError("symlink doesn't point to a file");
@@ -412,18 +452,21 @@ export class Directory extends Entry {
     openFlags?: OpenFlags
   ): Promise<{ err: number; entry: File }>;
 
+  // eslint-disable-next-line no-dupe-class-members
   getEntry(
     path: string,
     mode: FileOrDir.Directory,
     openFlags?: OpenFlags
   ): Promise<{ err: number; entry: Directory }>;
 
+  // eslint-disable-next-line no-dupe-class-members
   getEntry(
     path: string,
     mode: FileOrDir,
     openFlags?: OpenFlags
   ): Promise<{ err: number; entry: File | Directory }>;
 
+  // eslint-disable-next-line no-dupe-class-members
   async getEntry(
     path: string,
     mode: FileOrDir,
@@ -434,10 +477,14 @@ export class Directory extends Entry {
         `Directory(this.path="${this.path}").getEntry(path="${path}", mode=${mode}, cflags=${cflags})`
       );
 
-    let { err, name, parent } = await this.filesystem.getParent(this, path);
+    const {
+      err: getParentErr,
+      name,
+      parent,
+    } = await this.filesystem.getParent(this, path);
 
-    if (err !== constants.WASI_ESUCCESS) {
-      return { err, entry: null };
+    if (getParentErr !== constants.WASI_ESUCCESS) {
+      return { err: getParentErr, entry: null };
     }
 
     if (name === "." || name === "..") {
@@ -482,7 +529,7 @@ export class Directory extends Entry {
           });
           return { err: constants.WASI_ESUCCESS, entry };
         } catch (err) {
-          if (err.name === "TypeMismatchError" || err.name == "TypeError") {
+          if (err.name === "TypeMismatchError" || err.name === "TypeError") {
             if (!(mode & FileOrDir.Directory)) {
               return { err: constants.WASI_EISDIR, entry: null };
             }
@@ -510,6 +557,7 @@ export class Directory extends Entry {
       }
     };
 
+    let err;
     let entry: File | Directory;
     if (cflags & OpenFlags.Create) {
       if (cflags & OpenFlags.Exclusive) {

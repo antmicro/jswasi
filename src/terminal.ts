@@ -121,35 +121,6 @@ async function initFs() {
     await w.close();
   }
 
-  const etc = await root.getDirectoryHandle("etc", { create: true });
-  const symlinks = await etc.getFileHandle("symlinks.txt", { create: true });
-  if ((await symlinks.getFile()).size === 0) {
-    const w = await symlinks.createWritable();
-    await w.write({
-      type: "write",
-      position: 0,
-      data: `/usr/bin/ls -> /usr/bin/coreutils
-/usr/bin/mkdir -> /usr/bin/coreutils
-/usr/bin/rmdir -> /usr/bin/coreutils
-/usr/bin/touch -> /usr/bin/coreutils
-/usr/bin/rm -> /usr/bin/coreutils
-/usr/bin/mv -> /usr/bin/coreutils
-/usr/bin/cp -> /usr/bin/coreutils
-/usr/bin/echo -> /usr/bin/coreutils
-/usr/bin/date -> /usr/bin/coreutils
-/usr/bin/printf -> /usr/bin/coreutils
-/usr/bin/env -> /usr/bin/coreutils
-/usr/bin/cat -> /usr/bin/coreutils
-/usr/bin/realpath -> /usr/bin/coreutils
-/usr/bin/ln -> /usr/bin/coreutils
-/usr/bin/printenv -> /usr/bin/coreutils
-/usr/bin/md5sum -> /usr/bin/coreutils
-/usr/bin/wc -> /usr/bin/coreutils`,
-    });
-    await w.close();
-  }
-  await filesystem.loadSymlinks();
-
   const usr = await root.getDirectoryHandle("usr", { create: true });
   const bin = await usr.getDirectoryHandle("bin", { create: true });
 
@@ -181,6 +152,38 @@ async function initFs() {
 
   await Promise.all(alwaysFetchPromises);
   await Promise.all(necessaryPromises);
+
+  const etc = await root.getDirectoryHandle("etc", { create: true });
+  const symlinks = await etc.getFileHandle("symlinks.txt", { create: true });
+  if ((await symlinks.getFile()).size === 0) {
+    const w = await symlinks.createWritable();
+    await w.write({
+      type: "write",
+      position: 0,
+      data: JSON.stringify({
+        "/usr/bin/ls": "/usr/bin/coreutils",
+        "/usr/bin/mkdir": "/usr/bin/coreutils",
+        "/usr/bin/rmdir": "/usr/bin/coreutils",
+        "/usr/bin/touch": "/usr/bin/coreutils",
+        "/usr/bin/rm": "/usr/bin/coreutils",
+        "/usr/bin/mv": "/usr/bin/coreutils",
+        "/usr/bin/cp": "/usr/bin/coreutils",
+        "/usr/bin/echo": "/usr/bin/coreutils",
+        "/usr/bin/date": "/usr/bin/coreutils",
+        "/usr/bin/printf": "/usr/bin/coreutils",
+        "/usr/bin/env": "/usr/bin/coreutils",
+        "/usr/bin/cat": "/usr/bin/coreutils",
+        "/usr/bin/realpath": "/usr/bin/coreutils",
+        "/usr/bin/ln": "/usr/bin/coreutils",
+        "/usr/bin/printenv": "/usr/bin/coreutils",
+        "/usr/bin/md5sum": "/usr/bin/coreutils",
+        "/usr/bin/wc": "/usr/bin/coreutils",
+      }),
+    });
+    await w.close();
+  }
+  await filesystem.loadSymlinks();
+
   // don't await this on purpose
   // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
   //       it can say that command is not found or just fail at instantiation

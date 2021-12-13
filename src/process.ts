@@ -891,32 +891,82 @@ function WASI(): WASICallbacks {
   }
 
   function path_symlink(
-    path_ptr: ptr,
-    path_len: number,
+    old_path_ptr: ptr,
+    old_path_len: number,
     fd: number,
-    newpath_ptr: ptr,
-    newpath_len: number
+    new_path_ptr: ptr,
+    new_path_len: number
   ) {
     worker_console_log(
-      `path_symlink(0x${path_ptr.toString(
+      `path_symlink(0x${old_path_ptr.toString(
         16
-      )}, ${path_len}, ${fd}, 0x${newpath_ptr.toString(16)}, ${newpath_len})`
+      )}, ${old_path_len}, ${fd}, 0x${new_path_ptr.toString(
+        16
+      )}, ${new_path_len})`
     );
     const view8 = new Uint8Array(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
-    const newpath = DECODER.decode(
-      view8.slice(newpath_ptr, newpath_ptr + newpath_len)
+    const oldPath = DECODER.decode(
+      view8.slice(old_path_ptr, old_path_ptr + old_path_len)
     );
-    worker_console_log(`path_symlink: ${newpath} --> ${path}`);
+    let newPath = DECODER.decode(
+      view8.slice(new_path_ptr, new_path_ptr + new_path_len)
+    );
+    // TODO: revisit this hack, it's part of this absolute vs relative path issue (same as viu and others)
+    if (!newPath.startsWith("/")) {
+      newPath = `/${newPath}`;
+    }
+    worker_console_log(`path_symlink: ${newPath} --> ${oldPath}`);
 
     const sharedBuffer = new SharedArrayBuffer(4); // lock
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    send_to_kernel(["path_symlink", [sharedBuffer, path, fd, newpath]]);
+    send_to_kernel(["path_symlink", [sharedBuffer, oldPath, fd, newPath]]);
+
+    Atomics.wait(lck, 0, -1);
+
+    const err = Atomics.load(lck, 0);
+
+    return err;
+  }
+
+  function path_link(
+    old_fd: number,
+    old_flags: number,
+    old_path_ptr: ptr,
+    old_path_len: number,
+    new_fd: number,
+    new_path_ptr: ptr,
+    new_path_len: number
+  ) {
+    // TODO: fill this in
+    worker_console_log(
+      `path_link(${old_fd}, ${old_flags}, ${old_path_ptr}, ${old_path_len}, ${new_fd}, ${new_path_ptr}, ${new_path_len})`
+    );
+
+    const view8 = new Uint8Array(
+      (moduleInstanceExports.memory as WebAssembly.Memory).buffer
+    );
+
+    const oldPath = DECODER.decode(
+      view8.slice(old_path_ptr, old_path_ptr + old_path_len)
+    );
+    const newPath = DECODER.decode(
+      view8.slice(new_path_ptr, new_path_ptr + new_path_len)
+    );
+    worker_console_log(`path_link: ${newPath} -> ${env.PWD + oldPath}`);
+
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+
+    send_to_kernel([
+      "path_link",
+      [sharedBuffer, old_fd, old_flags, oldPath, new_fd, newPath],
+    ]);
 
     Atomics.wait(lck, 0, -1);
 
@@ -1064,10 +1114,6 @@ function WASI(): WASICallbacks {
   }
 
   function sock_shutdown() {
-    return placeholder();
-  }
-
-  function path_link() {
     return placeholder();
   }
 
