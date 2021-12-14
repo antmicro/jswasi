@@ -48,6 +48,8 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/liftm/dust-wasi/0.5.4-3/dust.wasm",
   "/usr/local/bin/llc":
     "https://registry-cdn.wapm.io/contents/rapidlua/llc/0.0.4/llc.wasm",
+  "/usr/local/bin/rsign2":
+    "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
 };
 
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
