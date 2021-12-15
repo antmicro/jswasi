@@ -265,19 +265,21 @@ export async function init(
     path: string,
     entryName: string
   ) => void | null = null
-): Promise<void> {
-  if (!navigator.storage.getDirectory) {
-    anchor.innerHTML =
-      "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
-    return;
-  }
-  initServiceWorker();
-  await initFs();
-
+): Promise<any> {
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
   const terminal = new hterm.Terminal();
+
+  if (!navigator.storage.getDirectory) {
+    anchor.innerHTML =
+      "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
+    return terminal;
+  }
+
+  initServiceWorker();
+
+  await initFs();
 
   const processManager = new ProcessManager(
     "process.js",
@@ -291,7 +293,6 @@ export async function init(
         console.log(`[OUT] ${output}`);
       }
     },
-    terminal,
     filesystem
   );
 
@@ -383,4 +384,6 @@ export async function init(
     },
     false
   );
+
+  return terminal;
 }
