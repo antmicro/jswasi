@@ -20,14 +20,16 @@ use serde::Serialize;
 use crate::interpreter::interpret;
 use crate::output_device::OutputDevice;
 
+type Fd = u16;
+
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
 pub const EXIT_CRITICAL_FAILURE: i32 = 2;
 pub const EXIT_CMD_NOT_FOUND: i32 = 127;
 
-pub const STDIN: u16 = 0;
-pub const STDOUT: u16 = 1;
-pub const STDERR: u16 = 2;
+pub const STDIN: Fd = 0;
+pub const STDOUT: Fd = 1;
+pub const STDERR: Fd = 2;
 
 const CLEAR_ESCAPE_CODE: &str = "\x1b[2J\x1b[H";
 
@@ -42,12 +44,12 @@ pub struct SyscallResult {
     pub output: String,
 }
 
-// TODO: use newtype pattern, make u16 an Fd type
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Redirect {
-    Read((u16, String)),
-    Write((u16, String)),
-    Append((u16, String)),
+    Read((Fd, String)),
+    Write((Fd, String)),
+    Append((Fd, String)),
 }
 
 // communicate with the worker thread
@@ -121,13 +123,13 @@ pub fn syscall(
 }
 
 pub struct Shell {
-    // TODO: check which pubs are actually necessary
     pub pwd: PathBuf,
-    pub history: Vec<String>,
-    history_file: Option<File>,
     pub vars: HashMap<String, String>,
-    pub should_echo: bool,
     pub last_exit_status: i32,
+
+    history: Vec<String>,
+    history_file: Option<File>,
+    should_echo: bool,
     cursor_position: usize,
 }
 
@@ -188,7 +190,6 @@ impl Shell {
     }
 
     /// Builds a line from standard input.
-    /// Returns `None` if the line would be empty
     // TODO: maybe wrap in one more loop and only return when non-empty line is produced?
     fn get_line(&mut self, input: &mut String) {
         let mut input_stash = String::new();
@@ -425,7 +426,6 @@ impl Shell {
     }
 
     /// Expands input line with history expansion.
-    /// Returns `None` if the event designator was not found
     fn history_expansion(&mut self, input: &str) -> HistoryExpansion {
         let mut processed = input.to_string();
         if let Some(last_command) = self.history.last() {
@@ -497,7 +497,7 @@ impl Shell {
     pub fn run_interpreter(&mut self) -> Result<i32, Report> {
         if self.should_echo {
             // disable echoing on hterm side (ignore Error that will arise on wasi runtimes other
-            // than ours (wasmer/wasmtime)
+            // than ours browser implementation (i. e. wasmer/wasmtime)
             let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
         }
 
@@ -582,7 +582,7 @@ impl Shell {
             exit_status = match cmd {
                 Ok(cmd) => interpret(self, &cmd),
                 Err(e) => {
-                    println!("{:?}", e);
+                    eprintln!("shell: parse error: {:?}", e);
                     EXIT_FAILURE
                 }
             }
