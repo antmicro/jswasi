@@ -65,7 +65,7 @@ async function getFilesystem(): Promise<Filesystem> {
 
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
-// export const filesystem: Filesystem = await getFilesystem();
+// export const filesystem: Filesystem = await createFilesystem();
 export let filesystem: Filesystem;
 Promise.resolve().then(async () => {
   filesystem = await getFilesystem();
@@ -86,7 +86,7 @@ export async function fetchFile(
     console.warn(`Unable to resolve path for ${dir.path} and ${filename}`);
     return;
   }
-  // @ts-ignore TODO: add API for file manipulation to File class
+
   const file = await entry.handle.getFile();
   // only fetch binary if not yet present
   if (refetch || file.size === 0) {

@@ -1,13 +1,17 @@
+// @ts-ignore, such imports are too fresh for typescript?
+import { get, set } from "https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm";
 import * as constants from "./constants.js";
 import { parsePath, arraysEqual } from "./utils.js";
 import { OpenedFd } from "./devices.js";
 
+// eslint-disable-next-line no-shadow
 export const enum FileOrDir {
   File = 1,
   Directory = 2,
   Any = 3,
 }
 
+// eslint-disable-next-line no-shadow
 export const enum OpenFlags {
   Create = 1, // constants.WASI_O_CREAT,
   Directory = 2, // constants.WASI_O_DIRECTORY,
@@ -21,7 +25,7 @@ export class Filesystem {
   // TODO: parts could be a key, that would optimise the lookup
   mounts: { parts: string[]; name: string; dir: Directory }[] = [];
 
-  // TODO: we don't need to keep the parsed path I think
+  // TODO: parts could be a key, that would optimise the lookup
   symlinks: {
     source: string;
     destination: string;
@@ -38,8 +42,8 @@ export class Filesystem {
     rootHandle: FileSystemDirectoryHandle,
     metaHandle: FileSystemDirectoryHandle
   ) {
-    this.rootDir = new Directory("", rootHandle, null, this);
-    this.metaDir = new Directory("", metaHandle, null, this);
+    this.rootDir = new Directory("", rootHandle, null, this, null);
+    this.metaDir = new Directory("", metaHandle, null, this, null);
   }
 
   async loadSymlinks() {
@@ -139,8 +143,9 @@ export class Filesystem {
       }
     }
 
+    const fullPath = components.join("/") + name;
     const handle = await dir.handle.getDirectoryHandle(name, options);
-    return new Directory(name, handle, dir, this);
+    return new Directory(name, handle, dir, this, await get(fullPath));
   }
 
   async getFile(
@@ -169,8 +174,9 @@ export class Filesystem {
       }
     }
 
+    const fullPath = components.join("/") + name;
     const handle = await dir.handle.getFileHandle(name, options);
-    return new File(name, handle, dir, this);
+    return new File(name, handle, dir, this, await get(fullPath));
   }
 
   async pathExists(
@@ -190,7 +196,7 @@ export class Filesystem {
       parts.join("/"),
       FileOrDir.Directory
     );
-    const dir = new Directory(name, mountedHandle, parent.entry, this);
+    const dir = new Directory(name, mountedHandle, parent.entry, this, null);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
   }
@@ -306,16 +312,29 @@ export class Filesystem {
       }
       if (!alreadyExists) {
         if (arraysEqual(parts, components)) {
+          const fullPath = parts.join("/") + name;
           switch (symlinkDestination.handle.kind) {
             case "file": {
               entries.push(
-                new File(name, symlinkDestination.handle, dir, this)
+                new File(
+                  name,
+                  symlinkDestination.handle,
+                  dir,
+                  this,
+                  await get(fullPath)
+                )
               );
               break;
             }
             case "directory": {
               entries.push(
-                new Directory(name, symlinkDestination.handle, dir, this)
+                new Directory(
+                  name,
+                  symlinkDestination.handle,
+                  dir,
+                  this,
+                  await get(fullPath)
+                )
               );
               break;
             }
@@ -360,27 +379,16 @@ export class Filesystem {
 abstract class Entry {
   public readonly fileType: number;
 
-  public path: string;
-
-  public parent: Directory | null;
-
-  protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle;
-
-  protected readonly filesystem: Filesystem;
-
   constructor(
-    path: string,
-    handle: FileSystemDirectoryHandle | FileSystemFileHandle,
-    parent: Directory | null,
-    filesystem: Filesystem
+    public path: string,
+    protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
+    public parent: Directory | null,
+    protected readonly filesystem: Filesystem,
+    public readonly metadata: {} | null
   ) {
     if (filesystem.DEBUG) {
       console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
     }
-    this.path = path;
-    this.handle = handle;
-    this.parent = parent;
-    this.filesystem = filesystem;
   }
 
   abstract size(): Promise<number>;
