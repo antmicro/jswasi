@@ -1,5 +1,4 @@
 import * as constants from "./constants.js";
-import * as utils from "./utils.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
 import { mount, umount, wget, download, ps, free } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -72,7 +71,7 @@ export default async function syscallCallback(
         FileOrDir.Directory
       );
       const openedPwd = entry.open();
-      openedPwd.path = ".";
+      openedPwd.name = ".";
       fds[4] = openedPwd;
 
       Atomics.store(lock, 0, 0);
@@ -250,7 +249,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         preopenType[0] = fds[fd].fileType;
-        nameLen[0] = fds[fd].path.length;
+        nameLen[0] = fds[fd].name.length;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -309,7 +308,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        path.set(new TextEncoder().encode(fds[fd].path), 0);
+        path.set(new TextEncoder().encode(fds[fd].name), 0);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -489,7 +488,7 @@ export default async function syscallCallback(
         const entries = await fds[fd].entries();
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
-          const nameBuf = new TextEncoder().encode(entry.path);
+          const nameBuf = new TextEncoder().encode(entry.name);
 
           if (dataBufPtr + 8 > dataBufLen) break;
           dataBuf.setBigUint64(dataBufPtr, BigInt(i + 1), true);
@@ -584,19 +583,18 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         fileType[0] = fds[fd].fileType;
-        // TODO: analyze this
-        /*
-        rightsBase[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (fileType[0] == constants.WASI_FILETYPE_DIRECTORY) {
+        rightsBase[0] =
+          constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+        if (fileType[0] === constants.WASI_FILETYPE_DIRECTORY) {
           rightsBase[0] |= constants.WASI_RIGHT_FD_READDIR;
         }
-        rightsInheriting[0] = constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (fileType[0] == constants.WASI_FILETYPE_DIRECTORY) {
+        rightsInheriting[0] =
+          constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
+        if (fileType[0] === constants.WASI_FILETYPE_DIRECTORY) {
           rightsInheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
         }
-        */
-        rightsBase[0] = BigInt(0xffffffff);
-        rightsInheriting[0] = BigInt(0xffffffff);
+        // rightsBase[0] = BigInt(0xffffffff);
+        // rightsInheriting[0] = BigInt(0xffffffff);
 
         err = constants.WASI_ESUCCESS;
       } else {

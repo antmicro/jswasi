@@ -13,10 +13,10 @@ export const enum FileOrDir {
 
 // eslint-disable-next-line no-shadow
 export const enum OpenFlags {
-  Create = 1, // constants.WASI_O_CREAT,
-  Directory = 2, // constants.WASI_O_DIRECTORY,
-  Exclusive = 4, // constants.WASI_O_EXCL,
-  Truncate = 8, // constants.WASI_O_TRUNC,
+  Create = 1, // constants.WASI_O_CREAT
+  Directory = 2, // constants.WASI_O_DIRECTORY
+  Exclusive = 4, // constants.WASI_O_EXCL
+  Truncate = 8, // constants.WASI_O_TRUNC
 }
 
 export class Filesystem {
@@ -42,8 +42,8 @@ export class Filesystem {
     rootHandle: FileSystemDirectoryHandle,
     metaHandle: FileSystemDirectoryHandle
   ) {
-    this.rootDir = new Directory("", rootHandle, null, this, null);
-    this.metaDir = new Directory("", metaHandle, null, this, null);
+    this.rootDir = new Directory("", "", rootHandle, null, this, null);
+    this.metaDir = new Directory("", "", metaHandle, null, this, null);
   }
 
   async loadSymlinks() {
@@ -106,7 +106,7 @@ export class Filesystem {
   ): Promise<Directory> {
     // TODO: revisit this hack
     if (
-      dir.path === "" &&
+      dir.name === "" &&
       (name === "." || name === ".." || name === "" || name === "/")
     )
       return this.rootDir;
@@ -143,9 +143,9 @@ export class Filesystem {
       }
     }
 
-    const fullPath = components.join("/") + name;
+    const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getDirectoryHandle(name, options);
-    return new Directory(name, handle, dir, this, await get(fullPath));
+    return new Directory(name, path, handle, dir, this, await get(path));
   }
 
   async getFile(
@@ -174,9 +174,9 @@ export class Filesystem {
       }
     }
 
-    const fullPath = components.join("/") + name;
+    const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
-    return new File(name, handle, dir, this, await get(fullPath));
+    return new File(name, path, handle, dir, this, await get(path));
   }
 
   async pathExists(
@@ -196,7 +196,15 @@ export class Filesystem {
       parts.join("/"),
       FileOrDir.Directory
     );
-    const dir = new Directory(name, mountedHandle, parent.entry, this, null);
+    const path = `/${parts.join("/")}/${name}`;
+    const dir = new Directory(
+      name,
+      path,
+      mountedHandle,
+      parent.entry,
+      this,
+      await get(path)
+    );
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
   }
@@ -261,7 +269,7 @@ export class Filesystem {
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (
-      dir.path === "" &&
+      dir.name === "" &&
       (path === "." || path === ".." || path === "" || path === "/")
     )
       return { err: constants.WASI_ESUCCESS, name: "", parent: dir };
@@ -285,7 +293,7 @@ export class Filesystem {
     }
 
     if (this.DEBUG)
-      console.log(`getParent resolved as = {"${name}", "${dir.path}"}`);
+      console.log(`getParent resolved as = {"${name}", "${dir.name}"}`);
     return { err: constants.WASI_ESUCCESS, name, parent: dir };
   }
 
@@ -305,23 +313,25 @@ export class Filesystem {
     for (const { parts, name, to: symlinkDestination } of this.symlinks) {
       let alreadyExists = false;
       for (const entry of entries) {
-        if (entry.path === name) {
+        if (entry.name === name) {
           alreadyExists = true;
           break;
         }
       }
       if (!alreadyExists) {
         if (arraysEqual(parts, components)) {
-          const fullPath = parts.join("/") + name;
+          const path = `/${parts.join("/")}/${name}`;
           switch (symlinkDestination.handle.kind) {
             case "file": {
               entries.push(
                 new File(
                   name,
+                  path,
                   symlinkDestination.handle,
                   dir,
                   this,
-                  await get(fullPath)
+                  // eslint-disable-next-line no-await-in-loop
+                  await get(path)
                 )
               );
               break;
@@ -330,10 +340,12 @@ export class Filesystem {
               entries.push(
                 new Directory(
                   name,
+                  path,
                   symlinkDestination.handle,
                   dir,
                   this,
-                  await get(fullPath)
+                  // eslint-disable-next-line no-await-in-loop
+                  await get(path)
                 )
               );
               break;
@@ -350,19 +362,24 @@ export class Filesystem {
       // mounted directories hide directories they are mounted to
       let alreadyExists = false;
       for (const entry of entries) {
-        if (entry.path === name) {
+        if (entry.name === name) {
           alreadyExists = true;
           break;
         }
       }
       if (!alreadyExists) {
+        const path = `/${components.join("/")}/${name}`;
         switch (handle.kind) {
           case "file": {
-            entries.push(new File(name, handle, dir, this));
+            entries.push(
+              new File(name, path, handle, dir, this, await get(path))
+            );
             break;
           }
           case "directory": {
-            entries.push(new Directory(name, handle, dir, this));
+            entries.push(
+              new Directory(name, path, handle, dir, this, await get(path))
+            );
             break;
           }
           default: {
@@ -380,6 +397,7 @@ abstract class Entry {
   public readonly fileType: number;
 
   constructor(
+    public name: string,
     public path: string,
     protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
     public parent: Directory | null,
@@ -407,11 +425,11 @@ abstract class Entry {
     ctim: bigint;
   }> {
     if (this.filesystem.DEBUG) {
-      console.log(`Entry(this.path="${this.path}").stat()`);
+      console.log(`Entry(this.path="${this.name}").stat()`);
     }
-    let lmod = await this.lastModified();
-    if (!Number.isFinite(lmod)) lmod = 0; // TODO:
-    const time = BigInt(lmod) * 1_000_000n;
+    let lastMod = await this.lastModified();
+    if (!Number.isFinite(lastMod)) lastMod = 0; // TODO:
+    const time = BigInt(lastMod) * 1_000_000n;
     return {
       dev: 0n,
       ino: 0n,
@@ -436,7 +454,7 @@ export class Directory extends Entry {
 
   async entries(): Promise<(File | Directory)[]> {
     if (this.filesystem.DEBUG)
-      console.log(`Directory(this.path="${this.path}").entries()`);
+      console.log(`Directory(this.path="${this.name}").entries()`);
     return this.filesystem.entries(this);
   }
 
@@ -450,10 +468,12 @@ export class Directory extends Entry {
 
   open(): OpenDirectory {
     return new OpenDirectory(
+      this.name,
       this.path,
       this.handle,
       this.parent,
-      this.filesystem
+      this.filesystem,
+      this.metadata
     );
   }
 
@@ -486,7 +506,7 @@ export class Directory extends Entry {
   ): Promise<{ err: number; entry: File | Directory }> {
     if (this.filesystem.DEBUG)
       console.log(
-        `Directory(this.path="${this.path}").getEntry(path="${path}", mode=${mode}, cflags=${cflags})`
+        `Directory(this.path="${this.name}").getEntry(path="${path}", mode=${mode}, cflags=${cflags})`
       );
 
     const {
@@ -509,19 +529,23 @@ export class Directory extends Entry {
 
       if (name === ".") {
         const entry = new Directory(
+          parent.name,
           parent.path,
           parent.handle,
           parent.parent,
-          this.filesystem
+          parent.filesystem,
+          parent.metadata
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
       if (name === "..") {
         const entry = new Directory(
+          parent.parent.name,
           parent.parent.path,
           parent.parent.handle,
           parent.parent.parent,
-          this.filesystem
+          parent.parent.filesystem,
+          parent.parent.metadata
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
@@ -606,7 +630,7 @@ export class OpenDirectory extends Directory {
     path: string,
     options = { recursive: false }
   ): Promise<{ err: number }> {
-    console.log(`OpenDirectory(${this.path}).deleteEntry(${path}, ${options})`);
+    console.log(`OpenDirectory(${this.name}).deleteEntry(${path}, ${options})`);
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
@@ -637,7 +661,14 @@ export class File extends Entry {
   // TODO: remove OpenedFd dependency, add wrapper for OpenedFdDirectory
   open(): OpenedFd {
     return new OpenedFd(
-      new OpenFile(this.path, this.handle, this.parent, this.filesystem)
+      new OpenFile(
+        this.name,
+        this.path,
+        this.handle,
+        this.parent,
+        this.filesystem,
+        this.metadata
+      )
     );
   }
 }
@@ -652,7 +683,7 @@ export class OpenFile extends File {
   private DEBUG: boolean = false;
 
   async read(len: number): Promise<[Uint8Array, number]> {
-    if (this.DEBUG) console.log(`OpenFile(${this.path}).read(${len})`);
+    if (this.DEBUG) console.log(`OpenFile(${this.name}).read(${len})`);
     const size = await this.size();
     if (this.filePosition < size) {
       const file = await this.handle.getFile();
@@ -671,7 +702,7 @@ export class OpenFile extends File {
   async write(buffer: Uint8Array): Promise<number> {
     if (this.DEBUG)
       console.log(
-        `OpenFile(${this.path}).write(${this.path} len=${buffer.byteLength}, position ${this.filePosition})`
+        `OpenFile(${this.name}).write(${this.name} len=${buffer.byteLength}, position ${this.filePosition})`
       );
     try {
       const w = await this.handle.createWritable({ keepExistingData: true });
@@ -695,7 +726,7 @@ export class OpenFile extends File {
 
   async seek(offset: number, whence: number): Promise<number> {
     if (this.DEBUG)
-      console.log(`OpenFile(${this.path}).seek(${offset}, ${whence})`);
+      console.log(`OpenFile(${this.name}).seek(${offset}, ${whence})`);
     switch (whence) {
       case constants.WASI_WHENCE_SET: {
         this.filePosition = offset;
@@ -720,7 +751,7 @@ export class OpenFile extends File {
 
   async truncate(size: number = 0) {
     if (this.DEBUG)
-      console.log(`OpenFile(${this.path}).truncate(${this.size})`);
+      console.log(`OpenFile(${this.name}).truncate(${this.size})`);
     const writable = await this.handle.createWritable();
     await writable.write({ type: "truncate", size });
     await writable.close();

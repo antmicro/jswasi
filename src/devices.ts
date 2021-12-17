@@ -162,10 +162,16 @@ export class Stderr implements IO {
 export class OpenedFd implements IO {
   isatty = false;
 
-  constructor(private openedFile: OpenFile) {}
+  constructor(private openedFile: OpenFile) {
+    // empty constructor
+  }
 
   get fileType(): number {
     return this.openedFile.fileType;
+  }
+
+  get name(): string {
+    return this.openedFile.name;
   }
 
   get path(): string {

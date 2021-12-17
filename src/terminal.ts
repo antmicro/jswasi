@@ -83,7 +83,7 @@ export async function fetchFile(
     OpenFlags.Create
   );
   if (err !== constants.WASI_ESUCCESS) {
-    console.warn(`Unable to resolve path for ${dir.path} and ${filename}`);
+    console.warn(`Unable to resolve path for ${dir.name} and ${filename}`);
     return;
   }
 
@@ -361,7 +361,7 @@ export async function init(
   const pwdDir = (
     await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)
   ).entry;
-  pwdDir.path = ".";
+  pwdDir.name = ".";
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
