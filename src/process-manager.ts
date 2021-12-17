@@ -47,6 +47,7 @@ export default class ProcessManager {
   constructor(
     private readonly scriptName: string,
     public readonly terminalOutputCallback: (output: string) => void,
+    public readonly terminal: any, // TODO: should we declare HTerminal stump or even import the real thing?
     public readonly filesystem: Filesystem
   ) {
     // it's a constructor with only parameter properties
