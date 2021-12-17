@@ -52,15 +52,24 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
 };
 
+async function getFilesystem(): Promise<Filesystem> {
+  const topHandle = await navigator.storage.getDirectory();
+  const rootHandle = await topHandle.getDirectoryHandle("root", {
+    create: true,
+  });
+  const metaHandle = await topHandle.getDirectoryHandle("meta", {
+    create: true,
+  });
+  return new Filesystem(rootHandle, metaHandle);
+}
+
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
-// export const filesystem: Filesystem = new Filesystem(await navigator.storage.getDirectory());
+// export const filesystem: Filesystem = await getFilesystem();
 export let filesystem: Filesystem;
-navigator.storage
-  .getDirectory()
-  .then((rootHandle: FileSystemDirectoryHandle) => {
-    filesystem = new Filesystem(rootHandle);
-  });
+Promise.resolve().then(async () => {
+  filesystem = await getFilesystem();
+});
 
 export async function fetchFile(
   dir: Directory,
@@ -103,9 +112,10 @@ export async function fetchFile(
   }
 }
 
+// setup filesystem
 async function initFs() {
-  // setup filesystem
-  const root = await navigator.storage.getDirectory();
+  // TODO: this all should go through our filesystem API (filesystem.rootDir.getEntry(), etc.)
+  const root = filesystem.rootDir.handle;
   await root.getDirectoryHandle("tmp", { create: true });
   // TODO: this will be a in-memory vfs in the future
   await root.getDirectoryHandle("proc", { create: true });

@@ -32,8 +32,14 @@ export class Filesystem {
 
   public readonly rootDir: Directory;
 
-  constructor(rootHandle: FileSystemDirectoryHandle) {
+  public readonly metaDir: Directory;
+
+  constructor(
+    rootHandle: FileSystemDirectoryHandle,
+    metaHandle: FileSystemDirectoryHandle
+  ) {
     this.rootDir = new Directory("", rootHandle, null, this);
+    this.metaDir = new Directory("", metaHandle, null, this);
   }
 
   async loadSymlinks() {
@@ -107,10 +113,9 @@ export class Filesystem {
       return dir.parent;
     }
 
-    const root = await navigator.storage.getDirectory();
     let components;
     try {
-      components = await root.resolve(dir.handle);
+      components = await this.rootDir.handle.resolve(dir.handle);
     } catch {
       throw Error("There was an error in root.resolve...");
     }
@@ -143,10 +148,9 @@ export class Filesystem {
     name: string,
     options: { create: boolean } = { create: false }
   ): Promise<File> {
-    const root = await navigator.storage.getDirectory();
     let components;
     try {
-      components = await root.resolve(dir.handle);
+      components = await this.rootDir.handle.resolve(dir.handle);
     } catch {
       throw Error("There was an error in root.resolve...");
     }
@@ -280,8 +284,7 @@ export class Filesystem {
   }
 
   async entries(dir: Directory): Promise<(File | Directory)[]> {
-    const root = await navigator.storage.getDirectory();
-    const components = await root.resolve(dir.handle);
+    const components = await this.rootDir.handle.resolve(dir.handle);
 
     const entries: (File | Directory)[] = [];
 
@@ -371,8 +374,9 @@ abstract class Entry {
     parent: Directory | null,
     filesystem: Filesystem
   ) {
-    if (filesystem.DEBUG)
+    if (filesystem.DEBUG) {
       console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
+    }
     this.path = path;
     this.handle = handle;
     this.parent = parent;
@@ -399,7 +403,7 @@ abstract class Entry {
     }
     let lmod = await this.lastModified();
     if (!Number.isFinite(lmod)) lmod = 0; // TODO:
-    const time = BigInt(lmod) * BigInt(1_000_000n);
+    const time = BigInt(lmod) * 1_000_000n;
     return {
       dev: 0n,
       ino: 0n,
