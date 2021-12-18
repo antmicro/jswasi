@@ -649,8 +649,7 @@ export class File extends Entry {
   declare readonly handle: FileSystemFileHandle;
 
   async size(): Promise<number> {
-    const file = await this.handle.getFile();
-    return file.size;
+    return (await this.handle.getFile()).size;
   }
 
   async lastModified(): Promise<number> {

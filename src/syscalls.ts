@@ -1,6 +1,14 @@
 import * as constants from "./constants.js";
 import { FileOrDir, OpenFlags } from "./filesystem.js";
-import { mount, umount, wget, download, ps, free } from "./browser-apps.js";
+import {
+  mount,
+  umount,
+  wget,
+  download,
+  ps,
+  free,
+  reset,
+} from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { filesystem } from "./terminal.js";
 
@@ -202,6 +210,12 @@ export default async function syscallCallback(
         }
         case "/usr/bin/download": {
           const result = await download(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        case "/usr/bin/reset": {
+          const result = await reset(processManager, processId, args, env);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;

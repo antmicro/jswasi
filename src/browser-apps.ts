@@ -232,3 +232,13 @@ export async function free(
   stdout.write(ENCODER.encode(freeData));
   return 0;
 }
+
+export async function reset(
+  processManager: ProcessManager,
+  processId: number,
+  args: string[],
+  env: Record<string, string>
+): Promise<number> {
+  location.reload();
+  return 0;
+}

@@ -145,6 +145,7 @@ async function initFs() {
   await bin.getFileHandle("download", { create: true });
   await bin.getFileHandle("ps", { create: true });
   await bin.getFileHandle("free", { create: true });
+  await bin.getFileHandle("reset", { create: true });
 
   const local = await usr.getDirectoryHandle("local", { create: true });
   await local.getDirectoryHandle("bin", { create: true });
