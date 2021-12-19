@@ -58,18 +58,18 @@ export async function createFilesystem(): Promise<Filesystem> {
   let rootMetadata: Metadata = await get("");
   if (!rootMetadata) {
     rootMetadata = {
-      dev: 0n, // ID of device containing file
-      ino: 0n, // inode number (always 0)
-      fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
+      dev: 0n,
+      ino: 0n,
+      fileType: constants.WASI_FILETYPE_DIRECTORY,
       userMode: 7,
       groupMode: 7,
-      nlink: 0n, // number of hard links (always 0)
-      uid: 0, // user ID of owner
-      gid: 0, // group ID of owner
-      rdev: 0, // device ID (if special file)
-      size: 0n, // total size, in bytes
-      blockSize: 0, // block size for filesystem I/O
-      blocks: 0, // number of 512B blocks allocated
+      nlink: 0n,
+      uid: 0,
+      gid: 0,
+      rdev: 0,
+      size: 0n,
+      blockSize: 0,
+      blocks: 0,
       atim: 0n,
       mtim: 0n,
       ctim: 0n,
@@ -783,6 +783,7 @@ export class OpenFile extends File {
     return 0;
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async close() {
     // TODO: add implementation when reworking OpenFile
   }

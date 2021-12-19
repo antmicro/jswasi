@@ -25,6 +25,7 @@
     "no-useless-constructor": "off",
     "@typescript-eslint/no-useless-constructor": ["error"],
     "no-undef": "off",
-    "no-restricted-globals": "off"
+    "no-restricted-globals": "off",
+    "no-empty-function": "off"
   }
 }

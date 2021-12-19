@@ -175,7 +175,9 @@ export async function download(
 export async function ps(
   processManager: ProcessManager,
   processId: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   args: string[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
   const stdout = processManager.processInfos[processId].fds[1];
@@ -203,6 +205,7 @@ export async function free(
   processManager: ProcessManager,
   processId: number,
   args: string[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
   const stdout = processManager.processInfos[processId].fds[1];
@@ -234,9 +237,13 @@ export async function free(
 }
 
 export async function reset(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   processManager: ProcessManager,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   processId: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   args: string[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
   location.reload();

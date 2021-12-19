@@ -7,24 +7,25 @@ const DECODER = new TextDecoder();
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
-export interface IO {
+export interface In {
   fileType: number;
   isatty: boolean;
-  read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer): void;
-  write(content: Uint8Array): Promise<number>;
-  stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }>;
+  read(
+    workerId: number,
+    requestedLen: number,
+    sharedBuffer: SharedArrayBuffer
+  ): void;
+  stat(): Promise<Stat>;
 }
 
-export class Stdin implements IO {
+export interface Out {
+  fileType: number;
+  isatty: boolean;
+  write(content: Uint8Array): Promise<number>;
+  stat(): Promise<Stat>;
+}
+
+export class Stdin implements In {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
@@ -44,21 +45,8 @@ export class Stdin implements IO {
     );
   }
 
-  async write(content: Uint8Array): Promise<number> {
-    throw Error("can't write to stdin!");
-  }
-
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }> {
+  async stat(): Promise<Stat> {
     return {
       dev: 0n,
       ino: 0n,
@@ -72,16 +60,12 @@ export class Stdin implements IO {
   }
 }
 
-export class Stdout implements IO {
+export class Stdout implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
-
-  read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
-    throw Error("can't read from stdout!");
-  }
 
   async write(content: Uint8Array): Promise<number> {
     this.workerTable.terminalOutputCallback(
@@ -91,16 +75,7 @@ export class Stdout implements IO {
   }
 
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }> {
+  async stat(): Promise<Stat> {
     return {
       dev: 0n,
       ino: 0n,
@@ -114,16 +89,12 @@ export class Stdout implements IO {
   }
 }
 
-export class Stderr implements IO {
+export class Stderr implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
 
   isatty = true;
 
   constructor(private workerTable: ProcessManager) {}
-
-  read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
-    throw Error("can't read from stderr!");
-  }
 
   async write(content: Uint8Array): Promise<number> {
     const output = DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n");
@@ -132,16 +103,7 @@ export class Stderr implements IO {
   }
 
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }> {
+  async stat(): Promise<Stat> {
     return {
       dev: 0n,
       ino: 0n,
@@ -159,7 +121,7 @@ export class Stderr implements IO {
   }
 }
 
-export class OpenedFd implements IO {
+export class OpenedFd implements In, Out {
   isatty = false;
 
   constructor(private openedFile: OpenFile) {
