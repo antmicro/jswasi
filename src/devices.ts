@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
-import { OpenFile } from "./filesystem.js";
+import { OpenFile, Stat } from "./filesystem.js";
 
 const DECODER = new TextDecoder();
 
@@ -167,7 +167,7 @@ export class OpenedFd implements IO {
   }
 
   get fileType(): number {
-    return this.openedFile.fileType;
+    return this.openedFile.metadata.fileType;
   }
 
   get name(): string {
@@ -176,6 +176,10 @@ export class OpenedFd implements IO {
 
   get path(): string {
     return this.openedFile.path;
+  }
+
+  get size(): bigint {
+    return this.openedFile.metadata.size;
   }
 
   async read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
@@ -196,21 +200,8 @@ export class OpenedFd implements IO {
     return this.openedFile.write(content.slice(0));
   }
 
-  async stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }> {
+  async stat(): Promise<Stat> {
     return this.openedFile.stat();
-  }
-
-  async lastModified(): Promise<number> {
-    return this.openedFile.lastModified();
   }
 
   open(): OpenedFd {

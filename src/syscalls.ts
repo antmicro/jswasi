@@ -361,7 +361,7 @@ export default async function syscallCallback(
         oFlags,
         fsRightsBase,
         fsRightsInheriting,
-        fdFlags,
+        fsFlags,
       ] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const openedFd = new Int32Array(sharedBuffer, 4, 1);
@@ -607,8 +607,6 @@ export default async function syscallCallback(
         if (fileType[0] === constants.WASI_FILETYPE_DIRECTORY) {
           rightsInheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
         }
-        // rightsBase[0] = BigInt(0xffffffff);
-        // rightsInheriting[0] = BigInt(0xffffffff);
 
         err = constants.WASI_ESUCCESS;
       } else {

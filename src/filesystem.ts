@@ -1,5 +1,5 @@
 // @ts-ignore, such imports are too fresh for typescript?
-import { get, set } from "https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm";
+import { get, set, del } from "https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm";
 import * as constants from "./constants.js";
 import { parsePath, arraysEqual } from "./utils.js";
 import { OpenedFd } from "./devices.js";
@@ -19,11 +19,74 @@ export const enum OpenFlags {
   Truncate = 8, // constants.WASI_O_TRUNC
 }
 
+export type Metadata = {
+  dev: bigint; // ID of device containing file
+  ino: bigint; // inode number (always 0)
+  fileType: number; // file type
+  userMode: number;
+  groupMode: number;
+  nlink: bigint; // number of hard links (always 0)
+  uid: number; // user ID of owner
+  gid: number; // group ID of owner
+  rdev: number; // device ID (if special file)
+  size: bigint; // total size, in bytes
+  blockSize: number; // block size for filesystem I/O
+  blocks: number; // number of 512B blocks allocated
+  atim: bigint; // access time
+  mtim: bigint; // modification time
+  ctim: bigint; // change time
+};
+
+export type Stat = {
+  dev: bigint;
+  ino: bigint;
+  fileType: number;
+  nlink: bigint;
+  size: bigint;
+  atim: bigint;
+  mtim: bigint;
+  ctim: bigint;
+};
+
+type Mount = { parts: string[]; name: string; dir: Directory };
+
+export async function createFilesystem(): Promise<Filesystem> {
+  const topHandle = await navigator.storage.getDirectory();
+  const rootHandle = await topHandle.getDirectoryHandle("root", {
+    create: true,
+  });
+  let rootMetadata: Metadata = await get("");
+  if (!rootMetadata) {
+    rootMetadata = {
+      dev: 0n, // ID of device containing file
+      ino: 0n, // inode number (always 0)
+      fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
+      userMode: 7,
+      groupMode: 7,
+      nlink: 0n, // number of hard links (always 0)
+      uid: 0, // user ID of owner
+      gid: 0, // group ID of owner
+      rdev: 0, // device ID (if special file)
+      size: 0n, // total size, in bytes
+      blockSize: 0, // block size for filesystem I/O
+      blocks: 0, // number of 512B blocks allocated
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
+    await set("", rootMetadata);
+  }
+  const metaHandle = await topHandle.getDirectoryHandle("meta", {
+    create: true,
+  });
+  return new Filesystem(rootHandle, rootMetadata, metaHandle);
+}
+
 export class Filesystem {
   DEBUG: boolean = false;
 
   // TODO: parts could be a key, that would optimise the lookup
-  mounts: { parts: string[]; name: string; dir: Directory }[] = [];
+  mounts: Mount[] = [];
 
   // TODO: parts could be a key, that would optimise the lookup
   symlinks: {
@@ -40,6 +103,7 @@ export class Filesystem {
 
   constructor(
     rootHandle: FileSystemDirectoryHandle,
+    rootMetadata: Metadata,
     metaHandle: FileSystemDirectoryHandle
   ) {
     this.rootDir = new Directory("", "", rootHandle, null, this, null);
@@ -145,7 +209,30 @@ export class Filesystem {
 
     const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getDirectoryHandle(name, options);
-    return new Directory(name, path, handle, dir, this, await get(path));
+    let metadata: Metadata;
+    if (options.create) {
+      metadata = {
+        dev: 0n, // ID of device containing file
+        ino: 0n, // inode number (always 0)
+        fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
+        userMode: 7,
+        groupMode: 7,
+        nlink: 0n, // number of hard links (always 0)
+        uid: 0, // user ID of owner
+        gid: 0, // group ID of owner
+        rdev: 0, // device ID (if special file)
+        size: 0n, // total size, in bytes
+        blockSize: 0, // block size for filesystem I/O
+        blocks: 0, // number of 512B blocks allocated
+        atim: 0n,
+        mtim: 0n,
+        ctim: 0n,
+      };
+      await set(path, metadata);
+    } else {
+      metadata = await get(path);
+    }
+    return new Directory(name, path, handle, dir, this, metadata);
   }
 
   async getFile(
@@ -176,6 +263,30 @@ export class Filesystem {
 
     const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
+    const file = await handle.getFile();
+    let metadata: Metadata;
+    if (options.create) {
+      metadata = {
+        dev: 0n,
+        ino: 0n,
+        fileType: constants.WASI_FILETYPE_REGULAR_FILE,
+        userMode: 6,
+        groupMode: 6,
+        nlink: 0n,
+        uid: 0,
+        gid: 0,
+        rdev: 0,
+        size: BigInt(file.size),
+        blockSize: 0,
+        blocks: 0,
+        atim: 0n,
+        mtim: BigInt(file.lastModified) * 1_000_000n,
+        ctim: 0n,
+      };
+      await set(path, metadata);
+    } else {
+      metadata = await get(path);
+    }
     return new File(name, path, handle, dir, this, await get(path));
   }
 
@@ -394,52 +505,25 @@ export class Filesystem {
 }
 
 abstract class Entry {
-  public readonly fileType: number;
-
   constructor(
     public name: string,
     public path: string,
     protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
     public parent: Directory | null,
     protected readonly filesystem: Filesystem,
-    public readonly metadata: {} | null
+    public readonly metadata: Metadata
   ) {
     if (filesystem.DEBUG) {
       console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
     }
   }
 
-  abstract size(): Promise<number>;
-
-  abstract lastModified(): Promise<number>;
-
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<{
-    dev: bigint;
-    ino: bigint;
-    fileType: number;
-    nlink: bigint;
-    size: bigint;
-    atim: bigint;
-    mtim: bigint;
-    ctim: bigint;
-  }> {
+  async stat(): Promise<Stat> {
     if (this.filesystem.DEBUG) {
-      console.log(`Entry(this.path="${this.name}").stat()`);
+      console.log(`Entry(path="${this.path}").stat()`);
     }
-    let lastMod = await this.lastModified();
-    if (!Number.isFinite(lastMod)) lastMod = 0; // TODO:
-    const time = BigInt(lastMod) * 1_000_000n;
-    return {
-      dev: 0n,
-      ino: 0n,
-      fileType: this.fileType,
-      nlink: 0n,
-      size: BigInt(await this.size()),
-      atim: time,
-      mtim: time,
-      ctim: time,
-    };
+    return get(this.path);
   }
 }
 
@@ -448,22 +532,10 @@ export class Directory extends Entry {
 
   declare readonly handle: FileSystemDirectoryHandle;
 
-  async size(): Promise<number> {
-    return 0;
-  }
-
   async entries(): Promise<(File | Directory)[]> {
     if (this.filesystem.DEBUG)
       console.log(`Directory(this.path="${this.name}").entries()`);
     return this.filesystem.entries(this);
-  }
-
-  async lastModified(): Promise<number> {
-    // // TODO: this is very slow for massive local directories
-    // const entries = await this.entries();
-    // const dates = await Promise.all(entries.map(entry => entry.lastModified()));
-    // return Math.max(...dates);
-    return 0;
   }
 
   open(): OpenDirectory {
@@ -506,7 +578,7 @@ export class Directory extends Entry {
   ): Promise<{ err: number; entry: File | Directory }> {
     if (this.filesystem.DEBUG)
       console.log(
-        `Directory(this.path="${this.name}").getEntry(path="${path}", mode=${mode}, cflags=${cflags})`
+        `Directory(path="${this.path}").getEntry(path="${path}", mode=${mode}, cflags=${cflags})`
       );
 
     const {
@@ -634,10 +706,12 @@ export class OpenDirectory extends Directory {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
+      await del(parent.path + name);
     }
     return { err };
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async close() {
     // TODO: what would that mean to close a FileSystemDirectoryHandle?
   }
@@ -647,15 +721,6 @@ export class File extends Entry {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
   declare readonly handle: FileSystemFileHandle;
-
-  async size(): Promise<number> {
-    return (await this.handle.getFile()).size;
-  }
-
-  async lastModified(): Promise<number> {
-    const file = await this.handle.getFile();
-    return file.lastModified;
-  }
 
   // TODO: remove OpenedFd dependency, add wrapper for OpenedFdDirectory
   open(): OpenedFd {
@@ -683,8 +748,7 @@ export class OpenFile extends File {
 
   async read(len: number): Promise<[Uint8Array, number]> {
     if (this.DEBUG) console.log(`OpenFile(${this.name}).read(${len})`);
-    const size = await this.size();
-    if (this.filePosition < size) {
+    if (this.filePosition < this.metadata.size) {
       const file = await this.handle.getFile();
       let data = await file
         .slice(this.filePosition, this.filePosition + len)
@@ -736,7 +800,7 @@ export class OpenFile extends File {
         break;
       }
       case constants.WASI_WHENCE_END: {
-        this.filePosition = (await this.size()) + offset;
+        this.filePosition = Number(this.metadata.size) + offset;
         break;
       }
       default: {
@@ -749,8 +813,7 @@ export class OpenFile extends File {
   }
 
   async truncate(size: number = 0) {
-    if (this.DEBUG)
-      console.log(`OpenFile(${this.name}).truncate(${this.size})`);
+    if (this.DEBUG) console.log(`OpenFile(${this.name}).truncate(${size})`);
     const writable = await this.handle.createWritable();
     await writable.write({ type: "truncate", size });
     await writable.close();

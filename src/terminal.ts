@@ -1,7 +1,13 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { FileOrDir, OpenFlags, Filesystem, Directory } from "./filesystem.js";
+import {
+  FileOrDir,
+  OpenFlags,
+  Filesystem,
+  Directory,
+  createFilesystem,
+} from "./filesystem.js";
 import { Stdin, Stdout, Stderr } from "./devices.js";
 
 declare global {
@@ -11,6 +17,8 @@ declare global {
     buffer: string;
   }
 }
+
+const ENCODER = new TextEncoder();
 
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
@@ -52,23 +60,12 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
 };
 
-async function getFilesystem(): Promise<Filesystem> {
-  const topHandle = await navigator.storage.getDirectory();
-  const rootHandle = await topHandle.getDirectoryHandle("root", {
-    create: true,
-  });
-  const metaHandle = await topHandle.getDirectoryHandle("meta", {
-    create: true,
-  });
-  return new Filesystem(rootHandle, metaHandle);
-}
-
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
 // export const filesystem: Filesystem = await createFilesystem();
 export let filesystem: Filesystem;
 Promise.resolve().then(async () => {
-  filesystem = await getFilesystem();
+  filesystem = await createFilesystem();
 });
 
 export async function fetchFile(
@@ -114,41 +111,108 @@ export async function fetchFile(
 
 // setup filesystem
 async function initFs() {
-  // TODO: this all should go through our filesystem API (filesystem.rootDir.getEntry(), etc.)
-  const root = filesystem.rootDir.handle;
-  await root.getDirectoryHandle("tmp", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/tmp",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
   // TODO: this will be a in-memory vfs in the future
-  await root.getDirectoryHandle("proc", { create: true });
-  const home = await root.getDirectoryHandle("home", { create: true });
-  const ant = await home.getDirectoryHandle("ant", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/proc",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await filesystem.rootDir.getEntry(
+    "/home",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await filesystem.rootDir.getEntry(
+    "/home/ant",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
 
-  const shellrc = await ant.getFileHandle(".shellrc", { create: true });
-  if ((await shellrc.getFile()).size === 0) {
-    const w = await shellrc.createWritable();
-    await w.write({
-      type: "write",
-      position: 0,
-      data: "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6",
-    });
-    await w.close();
+  const shellrc = (
+    await filesystem.rootDir.getEntry(
+      "/home/ant/.shellrc",
+      FileOrDir.File,
+      OpenFlags.Create
+    )
+  ).entry;
+  if (shellrc.metadata.size === 0n) {
+    const openedShellrc = shellrc.open();
+    openedShellrc.write(
+      ENCODER.encode(
+        "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
+      )
+    );
   }
 
-  const usr = await root.getDirectoryHandle("usr", { create: true });
-  const bin = await usr.getDirectoryHandle("bin", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/usr",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
 
-  await root.getDirectoryHandle("lib", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/lib",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
 
   // create dummy files for browser executed commands
-  await bin.getFileHandle("mount", { create: true });
-  await bin.getFileHandle("umount", { create: true });
-  await bin.getFileHandle("wget", { create: true });
-  await bin.getFileHandle("download", { create: true });
-  await bin.getFileHandle("ps", { create: true });
-  await bin.getFileHandle("free", { create: true });
-  await bin.getFileHandle("reset", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/mount",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/umount",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/wget",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/download",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/ps",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/free",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/bin/reset",
+    FileOrDir.File,
+    OpenFlags.Create
+  );
 
-  const local = await usr.getDirectoryHandle("local", { create: true });
-  await local.getDirectoryHandle("bin", { create: true });
+  await filesystem.rootDir.getEntry(
+    "/usr/local",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await filesystem.rootDir.getEntry(
+    "/usr/local/bin",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
 
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
     ([filename, address]) =>
@@ -166,34 +230,43 @@ async function initFs() {
   await Promise.all(alwaysFetchPromises);
   await Promise.all(necessaryPromises);
 
-  const etc = await root.getDirectoryHandle("etc", { create: true });
-  const symlinks = await etc.getFileHandle("symlinks.txt", { create: true });
-  if ((await symlinks.getFile()).size === 0) {
-    const w = await symlinks.createWritable();
-    await w.write({
-      type: "write",
-      position: 0,
-      data: JSON.stringify({
-        "/usr/bin/ls": "/usr/bin/coreutils",
-        "/usr/bin/mkdir": "/usr/bin/coreutils",
-        "/usr/bin/rmdir": "/usr/bin/coreutils",
-        "/usr/bin/touch": "/usr/bin/coreutils",
-        "/usr/bin/rm": "/usr/bin/coreutils",
-        "/usr/bin/mv": "/usr/bin/coreutils",
-        "/usr/bin/cp": "/usr/bin/coreutils",
-        "/usr/bin/echo": "/usr/bin/coreutils",
-        "/usr/bin/date": "/usr/bin/coreutils",
-        "/usr/bin/printf": "/usr/bin/coreutils",
-        "/usr/bin/env": "/usr/bin/coreutils",
-        "/usr/bin/cat": "/usr/bin/coreutils",
-        "/usr/bin/realpath": "/usr/bin/coreutils",
-        "/usr/bin/ln": "/usr/bin/coreutils",
-        "/usr/bin/printenv": "/usr/bin/coreutils",
-        "/usr/bin/md5sum": "/usr/bin/coreutils",
-        "/usr/bin/wc": "/usr/bin/coreutils",
-      }),
-    });
-    await w.close();
+  await filesystem.rootDir.getEntry(
+    "/etc",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  const symlinks = (
+    await filesystem.rootDir.getEntry(
+      "/etc/symlinks.txt",
+      FileOrDir.File,
+      OpenFlags.Create
+    )
+  ).entry;
+  if (symlinks.metadata.size === 0n) {
+    const openedSymlinks = symlinks.open();
+    openedSymlinks.write(
+      ENCODER.encode(
+        JSON.stringify({
+          "/usr/bin/ls": "/usr/bin/coreutils",
+          "/usr/bin/mkdir": "/usr/bin/coreutils",
+          "/usr/bin/rmdir": "/usr/bin/coreutils",
+          "/usr/bin/touch": "/usr/bin/coreutils",
+          "/usr/bin/rm": "/usr/bin/coreutils",
+          "/usr/bin/mv": "/usr/bin/coreutils",
+          "/usr/bin/cp": "/usr/bin/coreutils",
+          "/usr/bin/echo": "/usr/bin/coreutils",
+          "/usr/bin/date": "/usr/bin/coreutils",
+          "/usr/bin/printf": "/usr/bin/coreutils",
+          "/usr/bin/env": "/usr/bin/coreutils",
+          "/usr/bin/cat": "/usr/bin/coreutils",
+          "/usr/bin/realpath": "/usr/bin/coreutils",
+          "/usr/bin/ln": "/usr/bin/coreutils",
+          "/usr/bin/printenv": "/usr/bin/coreutils",
+          "/usr/bin/md5sum": "/usr/bin/coreutils",
+          "/usr/bin/wc": "/usr/bin/coreutils",
+        })
+      )
+    );
   }
   await filesystem.loadSymlinks();
 
@@ -355,9 +428,11 @@ export async function init(
 
   // drag and drop support (save dragged files and folders to current directory)
   // hterm creates iframe child of provided anchor, we assume there's only one of those
-  const terminalContentWindow =
-    anchor.getElementsByTagName("iframe")[0].contentWindow;
-  initDropImport(terminalContentWindow, notifyDroppedFileSaved, processManager);
+  initDropImport(
+    anchor.getElementsByTagName("iframe")[0].contentWindow,
+    notifyDroppedFileSaved,
+    processManager
+  );
 
   const pwdDir = (
     await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)

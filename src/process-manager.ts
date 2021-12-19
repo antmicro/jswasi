@@ -1,15 +1,15 @@
 import * as constants from "./constants.js";
 import { FileOrDir, Filesystem } from "./filesystem.js";
 
-type BufferRequestQueue = {
+type BufferRequest = {
   requestedLen: number;
   lck: Int32Array;
   readLen: Int32Array;
   sharedBuffer: Uint8Array;
-}[];
+};
 
 class ProcessInfo {
-  public bufferRequestQueue: BufferRequestQueue = [];
+  public bufferRequestQueue: BufferRequest[] = [];
 
   public shouldEcho = true;
 
@@ -61,7 +61,7 @@ export default class ProcessManager {
       processManager: ProcessManager
     ) => Promise<void>,
     command: string,
-    fds: any[], // TODO
+    fds: any[], // TODO: add In and Out interfaces, change this signature to (In | Out)[]
     args: string[],
     env: Record<string, string>,
     isJob: boolean
