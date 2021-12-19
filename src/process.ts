@@ -583,13 +583,13 @@ function WASI(): WASICallbacks {
     oflags: number,
     fs_rights_base: number,
     fs_rights_inheriting: number,
-    fdflags: number,
+    fs_flags: number,
     opened_fd_ptr: ptr
   ) {
     worker_console_log(
       `path_open(${dir_fd}, ${dirflags}, 0x${path_ptr.toString(
         16
-      )}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fdflags}, 0x${opened_fd_ptr.toString(
+      )}, ${path_len}, ${oflags}, ${fs_rights_base}, ${fs_rights_inheriting}, ${fs_flags}, 0x${opened_fd_ptr.toString(
         16
       )})`
     );
@@ -617,7 +617,7 @@ function WASI(): WASICallbacks {
         oflags,
         fs_rights_base,
         fs_rights_inheriting,
-        fdflags,
+        fs_flags,
       ],
     ]);
     Atomics.wait(lck, 0, -1);
