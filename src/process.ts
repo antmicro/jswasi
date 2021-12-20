@@ -733,14 +733,14 @@ function WASI(): WASICallbacks {
 
   function path_readlink(
     fd: number,
-    path_ptr: ptr,
-    path_len: number,
-    buffer_ptr: ptr,
-    buffer_len: number,
-    buffer_used_ptr: ptr
+    pathPtr: ptr,
+    pathLen: number,
+    bufferPtr: ptr,
+    bufferLen: number,
+    bufferUsedPtr: ptr
   ) {
     workerConsoleLog(
-      `path_readlink(${fd}, ${path_ptr}, ${path_len}, ${buffer_ptr}, ${buffer_len}, ${buffer_used_ptr})`
+      `path_readlink(${fd}, ${pathPtr}, ${pathLen}, ${bufferPtr}, ${bufferLen}, ${bufferUsedPtr})`
     );
     const view8 = new Uint8Array(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
@@ -748,22 +748,48 @@ function WASI(): WASICallbacks {
     const view = new DataView(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
-    const path = DECODER.decode(view8.slice(path_ptr, path_ptr + path_len));
-    workerConsoleLog(`path is ${path}, buffer_len = ${buffer_len}, fd = ${fd}`);
+    const path = DECODER.decode(view8.slice(pathPtr, pathPtr + pathLen));
+    workerConsoleLog(`path is ${path}, buffer_len = ${bufferLen}, fd = ${fd}`);
+    // special case, path_readlink is used for spawning subprocesses
     if (path[0] === "!") {
-      if (buffer_len < 1024) {
+      if (bufferLen < 1024) {
         // we need enough buffer to execute the function only once
-        view.setUint32(buffer_used_ptr, buffer_len, true);
+        view.setUint32(bufferUsedPtr, bufferLen, true);
         return constants.WASI_ESUCCESS;
       }
       const result = ENCODER.encode(special_parse(path.slice(1)));
       let count = result.byteLength;
       if (count > 1024) count = 1024;
-      view8.set(result.slice(0, count), buffer_ptr);
-      view.setUint32(buffer_used_ptr, count, true);
+      view8.set(result.slice(0, count), bufferPtr);
+      view.setUint32(bufferUsedPtr, count, true);
       return constants.WASI_ESUCCESS;
     }
-    return constants.WASI_EBADF;
+
+    const sharedBuffer = new SharedArrayBuffer(4 + bufferLen + 4); // lock, path buffer, buffer used
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+    const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
+    const buffer = new Uint8Array(sharedBuffer, 8, bufferLen);
+    sendToKernel([
+      "path_readlink",
+      {
+        sharedBuffer,
+        fd,
+        path,
+        bufferLen,
+      },
+    ]);
+    Atomics.wait(lck, 0, -1);
+
+    const err = Atomics.load(lck, 0);
+    if (err !== constants.WASI_ESUCCESS) {
+      return err;
+    }
+
+    view8.set(buffer, bufferPtr);
+    view.setUint32(bufferUsedPtr, bufferUsed[0], true);
+
+    return constants.WASI_ESUCCESS;
   }
 
   function path_remove_directory(fd: number, path_ptr: ptr, path_len: number) {
@@ -907,13 +933,9 @@ function WASI(): WASICallbacks {
     const oldPath = DECODER.decode(
       view8.slice(old_path_ptr, old_path_ptr + old_path_len)
     );
-    let newPath = DECODER.decode(
+    const newPath = DECODER.decode(
       view8.slice(new_path_ptr, new_path_ptr + new_path_len)
     );
-    // TODO: revisit this hack, it's part of this absolute vs relative path issue (same as viu and others)
-    if (!newPath.startsWith("/")) {
-      newPath = `/${newPath}`;
-    }
     workerConsoleLog(`path_symlink: ${newPath} --> ${oldPath}`);
 
     const sharedBuffer = new SharedArrayBuffer(4); // lock

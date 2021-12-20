@@ -63,6 +63,7 @@ const OPTIONAL_BINARIES = {
 // TODO: node (in ci/grab-screencast.js) doesn't accept top level await
 //   it can potentially be fixed by making the script an ESModule
 // export const filesystem: Filesystem = await createFilesystem();
+// eslint-disable-next-line import/no-mutable-exports
 export let filesystem: Filesystem;
 Promise.resolve().then(async () => {
   filesystem = await createFilesystem();
@@ -123,6 +124,11 @@ async function initFs() {
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
+    "/etc",
+    FileOrDir.Directory,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await filesystem.rootDir.getEntry(
     "/home",
     FileOrDir.Directory,
     OpenFlags.Create | OpenFlags.Directory
@@ -140,8 +146,8 @@ async function initFs() {
       OpenFlags.Create
     )
   ).entry;
-  if (shellrc.metadata.size === 0n) {
-    const openedShellrc = shellrc.open();
+  if ((await shellrc.metadata()).size === 0n) {
+    const openedShellrc = await shellrc.open();
     openedShellrc.write(
       ENCODER.encode(
         "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
@@ -230,45 +236,91 @@ async function initFs() {
   await Promise.all(alwaysFetchPromises);
   await Promise.all(necessaryPromises);
 
-  await filesystem.rootDir.getEntry(
-    "/etc",
-    FileOrDir.Directory,
-    OpenFlags.Create | OpenFlags.Directory
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/ls",
+    "/usr/bin/coreutils"
   );
-  const symlinks = (
-    await filesystem.rootDir.getEntry(
-      "/etc/symlinks.txt",
-      FileOrDir.File,
-      OpenFlags.Create
-    )
-  ).entry;
-  if (symlinks.metadata.size === 0n) {
-    const openedSymlinks = symlinks.open();
-    openedSymlinks.write(
-      ENCODER.encode(
-        JSON.stringify({
-          "/usr/bin/ls": "/usr/bin/coreutils",
-          "/usr/bin/mkdir": "/usr/bin/coreutils",
-          "/usr/bin/rmdir": "/usr/bin/coreutils",
-          "/usr/bin/touch": "/usr/bin/coreutils",
-          "/usr/bin/rm": "/usr/bin/coreutils",
-          "/usr/bin/mv": "/usr/bin/coreutils",
-          "/usr/bin/cp": "/usr/bin/coreutils",
-          "/usr/bin/echo": "/usr/bin/coreutils",
-          "/usr/bin/date": "/usr/bin/coreutils",
-          "/usr/bin/printf": "/usr/bin/coreutils",
-          "/usr/bin/env": "/usr/bin/coreutils",
-          "/usr/bin/cat": "/usr/bin/coreutils",
-          "/usr/bin/realpath": "/usr/bin/coreutils",
-          "/usr/bin/ln": "/usr/bin/coreutils",
-          "/usr/bin/printenv": "/usr/bin/coreutils",
-          "/usr/bin/md5sum": "/usr/bin/coreutils",
-          "/usr/bin/wc": "/usr/bin/coreutils",
-        })
-      )
-    );
-  }
-  await filesystem.loadSymlinks();
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/mkdir",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/rmdir",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/touch",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/rm",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/mv",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/cp",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/echo",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/date",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/printf",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/env",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/cat",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/realpath",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/ln",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/printenv",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/md5sum",
+    "/usr/bin/coreutils"
+  );
+  filesystem.addSymlink(
+    filesystem.rootDir,
+    "/usr/bin/wc",
+    "/usr/bin/coreutils"
+  );
 
   // don't await this on purpose
   // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,
@@ -424,6 +476,7 @@ export async function init(
   io.sendString = onTerminalInput;
 
   // TODO: maybe save all output and rewrite it on adjusted size?
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   io.onTerminalResize = (columns: number, rows: number) => {};
 
   // drag and drop support (save dragged files and folders to current directory)

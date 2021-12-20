@@ -15,6 +15,8 @@ import { filesystem } from "./terminal.js";
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
+const ENCODER = new TextEncoder();
+
 declare global {
   interface Window {
     exitCode: number;
@@ -167,7 +169,7 @@ export default async function syscallCallback(
             FileOrDir.File,
             OpenFlags.Create
           );
-          fds[fd] = entry.open();
+          fds[fd] = await entry.open();
           const openFile = fds[fd];
           if (mode === "write") {
             await openFile.truncate();
@@ -275,19 +277,16 @@ export default async function syscallCallback(
     }
 
     case "path_symlink": {
-      const [sharedBuffer, oldPath, oldFd, newPath] = data;
+      const [sharedBuffer, oldPath, newFd, newPath] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
-      if (fds[oldFd] === undefined) {
+      if (fds[newFd] === undefined) {
         Atomics.store(lck, 0, constants.WASI_EBADF);
         Atomics.notify(lck, 0);
       }
 
-      const { err, entry } = await fds[oldFd].getEntry(oldPath, FileOrDir.Any);
-      if (err === constants.WASI_ESUCCESS) {
-        await filesystem.addSymlink(entry, newPath, oldPath);
-      }
+      const err = await filesystem.addSymlink(fds[newFd], newPath, oldPath);
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
@@ -314,6 +313,34 @@ export default async function syscallCallback(
       break;
     }
 
+    case "path_readlink": {
+      const { sharedBuffer, fd, path, bufferLen } = data;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
+      const buffer = new Uint8Array(sharedBuffer, 8, bufferLen);
+
+      let err;
+      const { fds } = processManager.processInfos[processId];
+      if (fds[fd] !== undefined) {
+        let linkedPath;
+        ({ err, linkedPath } = await fds[fd].readlink(path));
+        if (err === constants.WASI_ESUCCESS) {
+          if (linkedPath.length > bufferLen) {
+            bufferUsed[0] = bufferLen;
+          } else {
+            buffer.set(ENCODER.encode(linkedPath), 0);
+            bufferUsed[0] = linkedPath.length;
+          }
+        }
+      } else {
+        err = constants.WASI_EBADF;
+      }
+
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+
     case "fd_prestat_dir_name": {
       const [sharedBuffer, fd, pathLen] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -322,7 +349,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        path.set(new TextEncoder().encode(fds[fd].name), 0);
+        path.set(ENCODER.encode(fds[fd].name), 0);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

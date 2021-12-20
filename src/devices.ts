@@ -124,12 +124,8 @@ export class Stderr implements Out {
 export class OpenedFd implements In, Out {
   isatty = false;
 
-  constructor(private openedFile: OpenFile) {
+  constructor(private openedFile: OpenFile, public fileType: number) {
     // empty constructor
-  }
-
-  get fileType(): number {
-    return this.openedFile.metadata.fileType;
   }
 
   get name(): string {
@@ -140,8 +136,8 @@ export class OpenedFd implements In, Out {
     return this.openedFile.path;
   }
 
-  get size(): bigint {
-    return this.openedFile.metadata.size;
+  async size(): Promise<bigint> {
+    return (await this.openedFile.metadata()).size;
   }
 
   async read(workerId: number, requestedLen: number, sbuf: SharedArrayBuffer) {
@@ -166,7 +162,7 @@ export class OpenedFd implements In, Out {
     return this.openedFile.stat();
   }
 
-  open(): OpenedFd {
+  async open(): Promise<OpenedFd> {
     return this.openedFile.open();
   }
 

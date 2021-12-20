@@ -19,12 +19,23 @@ export const enum OpenFlags {
   Truncate = 8, // constants.WASI_O_TRUNC
 }
 
+export type StoredData = {
+  fileType: number; // file type
+  userMode: number; // read-write-execute permissions of user
+  groupMode: number; // read-write-execute permissions of group
+  uid: number; // user ID of owner
+  gid: number; // group ID of owner
+  atim: bigint; // access time
+  mtim: bigint; // modification time
+  ctim: bigint; // change time
+};
+
 export type Metadata = {
   dev: bigint; // ID of device containing file
   ino: bigint; // inode number (always 0)
   fileType: number; // file type
-  userMode: number;
-  groupMode: number;
+  userMode: number; // read-write-execute permissions of user
+  groupMode: number; // read-write-execute permissions of group
   nlink: bigint; // number of hard links (always 0)
   uid: number; // user ID of owner
   gid: number; // group ID of owner
@@ -55,21 +66,14 @@ export async function createFilesystem(): Promise<Filesystem> {
   const rootHandle = await topHandle.getDirectoryHandle("root", {
     create: true,
   });
-  let rootMetadata: Metadata = await get("");
+  let rootMetadata: StoredData = await get("");
   if (!rootMetadata) {
     rootMetadata = {
-      dev: 0n,
-      ino: 0n,
       fileType: constants.WASI_FILETYPE_DIRECTORY,
       userMode: 7,
       groupMode: 7,
-      nlink: 0n,
       uid: 0,
       gid: 0,
-      rdev: 0,
-      size: 0n,
-      blockSize: 0,
-      blocks: 0,
       atim: 0n,
       mtim: 0n,
       ctim: 0n,
@@ -79,7 +83,7 @@ export async function createFilesystem(): Promise<Filesystem> {
   const metaHandle = await topHandle.getDirectoryHandle("meta", {
     create: true,
   });
-  return new Filesystem(rootHandle, rootMetadata, metaHandle);
+  return new Filesystem(rootHandle, metaHandle);
 }
 
 export class Filesystem {
@@ -88,79 +92,43 @@ export class Filesystem {
   // TODO: parts could be a key, that would optimise the lookup
   mounts: Mount[] = [];
 
-  // TODO: parts could be a key, that would optimise the lookup
-  symlinks: {
-    source: string;
-    destination: string;
-    parts: string[];
-    name: string;
-    to: Directory | File;
-  }[] = [];
-
   public readonly rootDir: Directory;
 
   public readonly metaDir: Directory;
 
   constructor(
     rootHandle: FileSystemDirectoryHandle,
-    rootMetadata: Metadata,
     metaHandle: FileSystemDirectoryHandle
   ) {
-    this.rootDir = new Directory("", "", rootHandle, null, this, null);
-    this.metaDir = new Directory("", "", metaHandle, null, this, null);
+    this.rootDir = new Directory("", "", rootHandle, null, this);
+    this.metaDir = new Directory("", "", metaHandle, null, this);
   }
 
-  async loadSymlinks() {
-    const { entry: symlinks } = await this.rootDir.getEntry(
-      "/etc/symlinks.txt",
+  // eslint-disable-next-line class-methods-use-this
+  async addSymlink(
+    dir: Directory,
+    source: string,
+    destination: string
+  ): Promise<number> {
+    const { err, entry } = await dir.getEntry(
+      source,
       FileOrDir.File,
-      OpenFlags.Create
+      OpenFlags.Create | OpenFlags.Exclusive
     );
-    const file = await symlinks.handle.getFile();
-    const content = await file.text();
+    if (err === constants.WASI_ESUCCESS) {
+      const metadata = await entry.metadata();
+      metadata.fileType = constants.WASI_FILETYPE_SYMBOLIC_LINK;
+      const w = await entry.handle.createWritable({ keepExistingData: true });
+      await w.write({
+        type: "write",
+        position: 0,
+        data: destination,
+      });
+      await w.close();
+      await set(entry.path, metadata);
+    }
 
-    this.symlinks = (
-      await Promise.all(
-        Object.entries(JSON.parse(content)).map(
-          async ([source, destination]: [string, string]) => {
-            const { parts, name } = parsePath(source);
-            const entry = await this.rootDir.getEntry(
-              destination,
-              FileOrDir.Any
-            );
-            if (entry.err === constants.WASI_ESUCCESS) {
-              return { source, destination, parts, name, to: entry.entry };
-            }
-            // throw new Error(`Got symlink for non-existent file: ${destination}`);
-            return null;
-          }
-        )
-      )
-    ).filter((symlink) => symlink !== null);
-  }
-
-  async addSymlink(to: File | Directory, source: string, destination: string) {
-    const { parts, name } = parsePath(source);
-    this.symlinks.push({ source, destination, parts, name, to });
-
-    const { entry: symlinks } = await this.rootDir.getEntry(
-      "/etc/symlinks.txt",
-      FileOrDir.File
-    );
-    const data = JSON.stringify(
-      Object.assign(
-        {},
-        ...this.symlinks.map(({ source: src, destination: dst }) => ({
-          [src]: dst,
-        }))
-      )
-    );
-    const w = await symlinks.handle.createWritable();
-    await w.write({
-      type: "write",
-      data,
-    });
-    await w.close();
+    return err;
   }
 
   async getDirectory(
@@ -196,43 +164,23 @@ export class Filesystem {
       }
     }
 
-    // check if a symlink exists
-    for (const { parts, name: symlinkName, to: symlinkDestination } of this
-      .symlinks) {
-      if (arraysEqual(parts, components) && symlinkName === name) {
-        if (symlinkDestination instanceof Directory) {
-          return symlinkDestination;
-        }
-        throw new TypeError("symlink doesn't point to a directory");
-      }
-    }
-
     const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getDirectoryHandle(name, options);
-    let metadata: Metadata;
-    if (options.create) {
+    let metadata: StoredData = await get(path);
+    if (!metadata && options.create) {
       metadata = {
-        dev: 0n, // ID of device containing file
-        ino: 0n, // inode number (always 0)
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
         userMode: 7,
         groupMode: 7,
-        nlink: 0n, // number of hard links (always 0)
         uid: 0, // user ID of owner
         gid: 0, // group ID of owner
-        rdev: 0, // device ID (if special file)
-        size: 0n, // total size, in bytes
-        blockSize: 0, // block size for filesystem I/O
-        blocks: 0, // number of 512B blocks allocated
         atim: 0n,
         mtim: 0n,
         ctim: 0n,
       };
       await set(path, metadata);
-    } else {
-      metadata = await get(path);
     }
-    return new Directory(name, path, handle, dir, this, metadata);
+    return new Directory(name, path, handle, dir, this);
   }
 
   async getFile(
@@ -246,48 +194,25 @@ export class Filesystem {
     } catch {
       throw Error("There was an error in root.resolve...");
     }
-    // check if a symlink exists
-    for (const { parts, name: symlinkName, to: symlinkDestination } of this
-      .symlinks) {
-      if (arraysEqual(parts, components) && symlinkName === name) {
-        if (symlinkDestination instanceof File) {
-          // check if symlink is valid
-          // we only ever await once in the loop right before returning
-          // eslint-disable-next-line no-await-in-loop
-          await symlinkDestination.handle.getFile();
-          return symlinkDestination;
-        }
-        throw new TypeError("symlink doesn't point to a file");
-      }
-    }
 
     const path = `/${components.join("/")}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
-    let metadata: Metadata;
-    if (options.create) {
+    let metadata: StoredData = await get(path);
+    if (!metadata && options.create) {
       metadata = {
-        dev: 0n,
-        ino: 0n,
         fileType: constants.WASI_FILETYPE_REGULAR_FILE,
         userMode: 6,
         groupMode: 6,
-        nlink: 0n,
         uid: 0,
         gid: 0,
-        rdev: 0,
-        size: BigInt(file.size),
-        blockSize: 0,
-        blocks: 0,
         atim: 0n,
         mtim: BigInt(file.lastModified) * 1_000_000n,
         ctim: 0n,
       };
       await set(path, metadata);
-    } else {
-      metadata = await get(path);
     }
-    return new File(name, path, handle, dir, this, await get(path));
+    return new File(name, path, handle, dir, this);
   }
 
   async pathExists(
@@ -308,14 +233,7 @@ export class Filesystem {
       FileOrDir.Directory
     );
     const path = `/${parts.join("/")}/${name}`;
-    const dir = new Directory(
-      name,
-      path,
-      mountedHandle,
-      parent.entry,
-      this,
-      await get(path)
-    );
+    const dir = new Directory(name, path, mountedHandle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
   }
@@ -420,55 +338,6 @@ export class Filesystem {
       }
     }
 
-    // check if a symlink exists
-    for (const { parts, name, to: symlinkDestination } of this.symlinks) {
-      let alreadyExists = false;
-      for (const entry of entries) {
-        if (entry.name === name) {
-          alreadyExists = true;
-          break;
-        }
-      }
-      if (!alreadyExists) {
-        if (arraysEqual(parts, components)) {
-          const path = `/${parts.join("/")}/${name}`;
-          switch (symlinkDestination.handle.kind) {
-            case "file": {
-              entries.push(
-                new File(
-                  name,
-                  path,
-                  symlinkDestination.handle,
-                  dir,
-                  this,
-                  // eslint-disable-next-line no-await-in-loop
-                  await get(path)
-                )
-              );
-              break;
-            }
-            case "directory": {
-              entries.push(
-                new Directory(
-                  name,
-                  path,
-                  symlinkDestination.handle,
-                  dir,
-                  this,
-                  // eslint-disable-next-line no-await-in-loop
-                  await get(path)
-                )
-              );
-              break;
-            }
-            default: {
-              throw Error("Unexpected handle kind");
-            }
-          }
-        }
-      }
-    }
-
     for await (const [name, handle] of dir.handle.entries()) {
       // mounted directories hide directories they are mounted to
       let alreadyExists = false;
@@ -482,15 +351,11 @@ export class Filesystem {
         const path = `/${components.join("/")}/${name}`;
         switch (handle.kind) {
           case "file": {
-            entries.push(
-              new File(name, path, handle, dir, this, await get(path))
-            );
+            entries.push(new File(name, path, handle, dir, this));
             break;
           }
           case "directory": {
-            entries.push(
-              new Directory(name, path, handle, dir, this, await get(path))
-            );
+            entries.push(new Directory(name, path, handle, dir, this));
             break;
           }
           default: {
@@ -510,20 +375,41 @@ abstract class Entry {
     public path: string,
     protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
     public parent: Directory | null,
-    protected readonly filesystem: Filesystem,
-    public readonly metadata: Metadata
+    protected readonly filesystem: Filesystem
   ) {
     if (filesystem.DEBUG) {
       console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
     }
   }
 
-  // TODO: fill dummy values with something meaningful
+  async metadata(): Promise<Metadata> {
+    if (this.filesystem.DEBUG) {
+      console.log(`Entry(path="${this.path}").metadata()`);
+    }
+    const storedData: StoredData = await get(this.path);
+    let size;
+    if (this.handle.kind === "file") {
+      size = BigInt((await this.handle.getFile()).size);
+    } else {
+      size = 4096n;
+    }
+    return {
+      dev: 0n,
+      ino: 0n,
+      nlink: 1n,
+      rdev: 0,
+      size,
+      blockSize: 0,
+      blocks: 0,
+      ...storedData,
+    };
+  }
+
   async stat(): Promise<Stat> {
     if (this.filesystem.DEBUG) {
       console.log(`Entry(path="${this.path}").stat()`);
     }
-    return get(this.path);
+    return this.metadata();
   }
 }
 
@@ -544,8 +430,7 @@ export class Directory extends Entry {
       this.path,
       this.handle,
       this.parent,
-      this.filesystem,
-      this.metadata
+      this.filesystem
     );
   }
 
@@ -605,8 +490,7 @@ export class Directory extends Entry {
           parent.path,
           parent.handle,
           parent.parent,
-          parent.filesystem,
-          parent.metadata
+          parent.filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
@@ -616,8 +500,7 @@ export class Directory extends Entry {
           parent.parent.path,
           parent.parent.handle,
           parent.parent.parent,
-          parent.parent.filesystem,
-          parent.parent.metadata
+          parent.parent.filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
@@ -711,6 +594,16 @@ export class OpenDirectory extends Directory {
     return { err };
   }
 
+  async readlink(
+    path: string
+  ): Promise<{ err: number; linkedPath: string | null }> {
+    const { err, entry } = await this.getEntry(path, FileOrDir.File);
+    if (err === constants.WASI_ESUCCESS) {
+      return { err, linkedPath: await (await entry.handle.getFile()).text() };
+    }
+    return { err, linkedPath: null };
+  }
+
   // eslint-disable-next-line class-methods-use-this
   async close() {
     // TODO: what would that mean to close a FileSystemDirectoryHandle?
@@ -723,16 +616,16 @@ export class File extends Entry {
   declare readonly handle: FileSystemFileHandle;
 
   // TODO: remove OpenedFd dependency, add wrapper for OpenedFdDirectory
-  open(): OpenedFd {
+  async open(): Promise<OpenedFd> {
     return new OpenedFd(
       new OpenFile(
         this.name,
         this.path,
         this.handle,
         this.parent,
-        this.filesystem,
-        this.metadata
-      )
+        this.filesystem
+      ),
+      (await this.metadata()).fileType
     );
   }
 }
@@ -747,9 +640,27 @@ export class OpenFile extends File {
   private DEBUG: boolean = false;
 
   async read(len: number): Promise<[Uint8Array, number]> {
-    if (this.DEBUG) console.log(`OpenFile(${this.name}).read(${len})`);
-    if (this.filePosition < this.metadata.size) {
+    if (this.DEBUG)
+      console.log(`OpenFile(${this.path}, ${this.name}).read(${len})`);
+    let handle;
+    let size;
+    if (
+      (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+    ) {
       const file = await this.handle.getFile();
+      const path = await file.text();
+      const { err, entry } = await this.parent.getEntry(path, FileOrDir.File);
+      if (err !== constants.WASI_ESUCCESS) {
+        return [new Uint8Array(0), err];
+      }
+      handle = entry.handle;
+      size = file.size;
+    } else {
+      handle = this.handle;
+      size = (await this.metadata()).size;
+    }
+    if (this.filePosition < size) {
+      const file = await handle.getFile();
       let data = await file
         .slice(this.filePosition, this.filePosition + len)
         .arrayBuffer();
@@ -767,20 +678,30 @@ export class OpenFile extends File {
       console.log(
         `OpenFile(${this.name}).write(${this.name} len=${buffer.byteLength}, position ${this.filePosition})`
       );
-    try {
-      const w = await this.handle.createWritable({ keepExistingData: true });
-      await w.write({
-        type: "write",
-        position: this.filePosition,
-        data: buffer,
-      });
-      await w.close();
-      this.filePosition += buffer.byteLength;
-    } catch (err) {
-      console.log(`Error during writing: ${err}`);
-      return 1;
+    let handle;
+    if (
+      (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+    ) {
+      const file = await this.handle.getFile();
+      const path = await file.text();
+      const { err, entry } = await this.parent.getEntry(path, FileOrDir.File);
+      if (err !== constants.WASI_ESUCCESS) {
+        return err;
+      }
+      handle = entry.handle;
+    } else {
+      handle = this.handle;
     }
-    return 0;
+
+    const w = await handle.createWritable({ keepExistingData: true });
+    await w.write({
+      type: "write",
+      position: this.filePosition,
+      data: buffer,
+    });
+    await w.close();
+    this.filePosition += buffer.byteLength;
+    return constants.WASI_ESUCCESS;
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -801,7 +722,7 @@ export class OpenFile extends File {
         break;
       }
       case constants.WASI_WHENCE_END: {
-        this.filePosition = Number(this.metadata.size) + offset;
+        this.filePosition = Number((await this.metadata()).size) + offset;
         break;
       }
       default: {
