@@ -88,15 +88,31 @@ export default class ProcessManager {
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     if (!this.compiledModules[command]) {
-      const binary = await this.filesystem.rootDir.getEntry(
+      const { err, entry } = await this.filesystem.rootDir.getEntry(
         command,
         FileOrDir.File
       );
-      if (binary.entry === null) {
+      if (err !== constants.WASI_ESUCCESS) {
         console.error(`No such binary: ${command}`);
-        return -1;
+        return err;
       }
-      const file = await binary.entry.handle.getFile();
+      let handle;
+      if (
+        (await entry.metadata()).fileType ===
+        constants.WASI_FILETYPE_SYMBOLIC_LINK
+      ) {
+        // TODO: what about symlinks to symlinks, I think this would break
+        handle = (
+          await entry.parent.getEntry(
+            await (await entry.handle.getFile()).text(),
+            FileOrDir.File
+          )
+        ).entry.handle;
+      } else {
+        handle = entry.handle;
+      }
+
+      const file = await handle.getFile();
       const bufferSource = await file.arrayBuffer();
       this.compiledModules[command] = await WebAssembly.compile(bufferSource);
     }

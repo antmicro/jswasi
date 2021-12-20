@@ -434,6 +434,16 @@ export class Directory extends Entry {
     );
   }
 
+  async readlink(
+    path: string
+  ): Promise<{ err: number; linkedPath: string | null }> {
+    const { err, entry } = await this.getEntry(path, FileOrDir.File);
+    if (err === constants.WASI_ESUCCESS) {
+      return { err, linkedPath: await (await entry.handle.getFile()).text() };
+    }
+    return { err, linkedPath: null };
+  }
+
   // basically copied form RReverser's wasi-fs-access
   getEntry(
     path: string,
@@ -592,16 +602,6 @@ export class OpenDirectory extends Directory {
       await del(parent.path + name);
     }
     return { err };
-  }
-
-  async readlink(
-    path: string
-  ): Promise<{ err: number; linkedPath: string | null }> {
-    const { err, entry } = await this.getEntry(path, FileOrDir.File);
-    if (err === constants.WASI_ESUCCESS) {
-      return { err, linkedPath: await (await entry.handle.getFile()).text() };
-    }
-    return { err, linkedPath: null };
   }
 
   // eslint-disable-next-line class-methods-use-this

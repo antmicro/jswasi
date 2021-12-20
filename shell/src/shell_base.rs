@@ -3,6 +3,7 @@ use std::env;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
+use std::io::ErrorKind;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -43,7 +44,6 @@ pub struct SyscallResult {
     pub exit_status: i32,
     pub output: String,
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub enum Redirect {
@@ -942,7 +942,14 @@ impl Shell {
                     for bin_dir in env::var("PATH").unwrap_or_default().split(':') {
                         let bin_dir = PathBuf::from(bin_dir);
                         full_path = bin_dir.join(&command);
-                        if full_path.is_file() {
+                        // see https://internals.rust-lang.org/t/the-api-of-path-exists-encourages-broken-code/13817/3
+                        if fs::metadata(&full_path).map(|_| true).or_else(|error| {
+                            if error.kind() == ErrorKind::NotFound {
+                                Ok(false)
+                            } else {
+                                Err(error)
+                            }
+                        })? {
                             found = true;
                             break;
                         }
