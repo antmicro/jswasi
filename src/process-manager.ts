@@ -1,5 +1,6 @@
 import * as constants from "./constants.js";
-import { FileOrDir, Filesystem } from "./filesystem.js";
+import { OpenedFd, Stderr, Stdin, Stdout } from "./devices.js";
+import { FileOrDir, Filesystem, OpenDirectory } from "./filesystem.js";
 
 type BufferRequest = {
   requestedLen: number;
@@ -19,7 +20,7 @@ class ProcessInfo {
     public id: number,
     public cmd: string,
     public worker: Worker,
-    public fds: any[], // TODO: add FileDescriptor wrapper class
+    public fds: (Stdin | Stdout | Stderr | OpenedFd | OpenDirectory)[], // TODO: add FileDescriptor wrapper class
     public parentId: number | null,
     public parentLock: Int32Array | null,
     public callback: (

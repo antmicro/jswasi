@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { FileOrDir, OpenFlags } from "./filesystem.js";
+import { FileOrDir, OpenDirectory, OpenFlags } from "./filesystem.js";
 import {
   mount,
   umount,
@@ -11,6 +11,7 @@ import {
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { filesystem } from "./terminal.js";
+import { OpenedFd } from "./devices.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -96,7 +97,8 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        isatty[0] = fds[fd].isatty;
+        // this can be Stdin/Stdout/Stderr/OpenedFd
+        isatty[0] = Number((fds[fd] as OpenedFd).isatty);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -172,9 +174,9 @@ export default async function syscallCallback(
           fds[fd] = await entry.open();
           const openFile = fds[fd];
           if (mode === "write") {
-            await openFile.truncate();
+            await (openFile as OpenedFd).truncate();
           } else if (mode === "append") {
-            await openFile.seek(0, constants.WASI_WHENCE_END);
+            await (openFile as OpenedFd).seek(0, constants.WASI_WHENCE_END);
           }
         })
       );
@@ -265,7 +267,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         preopenType[0] = fds[fd].fileType;
-        nameLen[0] = fds[fd].name.length;
+        nameLen[0] = (fds[fd] as OpenedFd).name.length;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -286,7 +288,10 @@ export default async function syscallCallback(
         Atomics.notify(lck, 0);
       }
 
-      const err = await filesystem.addSymlink(fds[newFd], newPath, oldPath);
+      const err = await (fds[newFd] as OpenDirectory).addSymlink(
+        newPath,
+        oldPath
+      );
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
@@ -323,7 +328,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         let linkedPath;
-        ({ err, linkedPath } = await fds[fd].readlink(path));
+        ({ err, linkedPath } = await (fds[fd] as OpenDirectory).readlink(path));
         if (err === constants.WASI_ESUCCESS) {
           if (linkedPath.length > bufferLen) {
             bufferUsed[0] = bufferLen;
@@ -349,7 +354,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        path.set(ENCODER.encode(fds[fd].name), 0);
+        path.set(ENCODER.encode((fds[fd] as OpenedFd).name), 0);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -365,7 +370,7 @@ export default async function syscallCallback(
       const content = new Uint8Array(content_);
 
       const { fds } = processManager.processInfos[processId];
-      const err = await fds[fd].write(content);
+      const err = await (fds[fd] as OpenedFd).write(content);
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
@@ -375,7 +380,7 @@ export default async function syscallCallback(
       const [sharedBuffer, fd, len] = data;
 
       const { fds } = processManager.processInfos[processId];
-      await fds[fd].read(processId, len, sharedBuffer);
+      await (fds[fd] as OpenedFd).read(processId, len, sharedBuffer);
 
       break;
     }
@@ -397,7 +402,7 @@ export default async function syscallCallback(
       let entry;
       const { fds } = processManager.processInfos[processId];
       if (fds[dirFd] !== undefined) {
-        ({ err, entry } = await fds[dirFd].getEntry(
+        ({ err, entry } = await (fds[dirFd] as OpenDirectory).getEntry(
           path,
           FileOrDir.Any,
           oFlags
@@ -419,7 +424,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        fds[fd].close();
+        (fds[fd] as OpenedFd).close();
         fds[fd] = undefined;
         err = constants.WASI_ESUCCESS;
       } else {
@@ -467,7 +472,10 @@ export default async function syscallCallback(
       if (path[0] !== "!") {
         const { fds } = processManager.processInfos[processId];
         if (fds[fd] !== undefined) {
-          ({ err, entry } = await fds[fd].getEntry(path, FileOrDir.Any));
+          ({ err, entry } = await (fds[fd] as OpenDirectory).getEntry(
+            path,
+            FileOrDir.Any
+          ));
           if (err === constants.WASI_ESUCCESS) {
             const stat = await entry.stat();
             buf.setBigUint64(0, stat.dev, true);
@@ -506,7 +514,9 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        filePos[0] = BigInt(await fds[fd].seek(Number(offset), whence));
+        filePos[0] = BigInt(
+          await (fds[fd] as OpenedFd).seek(Number(offset), whence)
+        );
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -526,7 +536,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        const entries = await fds[fd].entries();
+        const entries = await (fds[fd] as OpenDirectory).entries();
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name);
@@ -572,7 +582,9 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        ({ err } = fds[fd].deleteEntry(path, { recursive: false }));
+        ({ err } = await (fds[fd] as OpenDirectory).deleteEntry(path, {
+          recursive: false,
+        }));
       }
 
       Atomics.store(lck, 0, err);
@@ -586,7 +598,9 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        ({ err } = fds[fd].deleteEntry(path, { recursive: true }));
+        ({ err } = await (fds[fd] as OpenDirectory).deleteEntry(path, {
+          recursive: true,
+        }));
       }
 
       Atomics.store(lck, 0, err);
@@ -600,11 +614,11 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        err = await fds[fd].getEntry(
+        ({ err } = await (fds[fd] as OpenDirectory).getEntry(
           path,
           FileOrDir.Directory,
           OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive
-        );
+        ));
       } else {
         err = constants.WASI_EBADF;
       }

@@ -104,33 +104,6 @@ export class Filesystem {
     this.metaDir = new Directory("", "", metaHandle, null, this);
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async addSymlink(
-    dir: Directory,
-    source: string,
-    destination: string
-  ): Promise<number> {
-    const { err, entry } = await dir.getEntry(
-      source,
-      FileOrDir.File,
-      OpenFlags.Create | OpenFlags.Exclusive
-    );
-    if (err === constants.WASI_ESUCCESS) {
-      const metadata = await entry.metadata();
-      metadata.fileType = constants.WASI_FILETYPE_SYMBOLIC_LINK;
-      const w = await entry.handle.createWritable({ keepExistingData: true });
-      await w.write({
-        type: "write",
-        position: 0,
-        data: destination,
-      });
-      await w.close();
-      await set(entry.path, metadata);
-    }
-
-    return err;
-  }
-
   async getDirectory(
     dir: Directory,
     name: string,
@@ -432,6 +405,28 @@ export class Directory extends Entry {
       this.parent,
       this.filesystem
     );
+  }
+
+  async addSymlink(source: string, destination: string): Promise<number> {
+    const { err, entry } = await this.getEntry(
+      source,
+      FileOrDir.File,
+      OpenFlags.Create | OpenFlags.Exclusive
+    );
+    if (err === constants.WASI_ESUCCESS) {
+      const metadata = await entry.metadata();
+      metadata.fileType = constants.WASI_FILETYPE_SYMBOLIC_LINK;
+      const w = await entry.handle.createWritable({ keepExistingData: true });
+      await w.write({
+        type: "write",
+        position: 0,
+        data: destination,
+      });
+      await w.close();
+      await set(entry.path, metadata);
+    }
+
+    return err;
   }
 
   async readlink(

@@ -229,91 +229,23 @@ async function initFs() {
   await Promise.all(alwaysFetchPromises);
   await Promise.all(necessaryPromises);
 
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/ls",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/mkdir",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/rmdir",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/touch",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/rm",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/mv",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/cp",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/echo",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/date",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/printf",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/env",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/cat",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/realpath",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/ln",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/printenv",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/md5sum",
-    "/usr/bin/coreutils"
-  );
-  filesystem.addSymlink(
-    filesystem.rootDir,
-    "/usr/bin/wc",
-    "/usr/bin/coreutils"
-  );
+  filesystem.rootDir.addSymlink("/usr/bin/ls", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/touch", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/rm", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/mv", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/cp", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/echo", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/date", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/printf", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/env", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/cat", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/realpath", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/ln", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils");
+  filesystem.rootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils");
 
   // don't await this on purpose
   // TODO: it means however that if you invoke optional binary right after shell first boot it will fail,

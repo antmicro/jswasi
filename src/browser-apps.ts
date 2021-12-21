@@ -3,6 +3,7 @@ import * as utils from "./utils.js";
 import { FileOrDir } from "./filesystem.js";
 import { filesystem, fetchFile } from "./terminal.js";
 import ProcessManager from "./process-manager";
+import { Stderr, Stdout } from "./devices.js";
 
 const ENCODER = new TextEncoder();
 
@@ -14,8 +15,8 @@ export async function mount(
 ): Promise<number> {
   console.log(`mount(${processId}, ${args})`);
 
-  const stdout = processManager.processInfos[processId].fds[1];
-  const stderr = processManager.processInfos[processId].fds[2];
+  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
+  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   switch (args.length) {
     case 1: {
@@ -71,7 +72,7 @@ export function umount(
   args: string[],
   env: Record<string, string>
 ): number {
-  const stderr = processManager.processInfos[processId].fds[2];
+  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   let path = args[1];
   // handle relative path
@@ -94,7 +95,7 @@ export async function wget(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds[2];
+  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   let path: string;
   let address: string;
@@ -130,7 +131,7 @@ export async function download(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds[2];
+  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   if (args.length === 1) {
     stderr.write(
@@ -180,7 +181,8 @@ export async function ps(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds[1];
+  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
+
   let psData = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
     const now = new Date();
@@ -208,7 +210,7 @@ export async function free(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds[1];
+  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
 
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;
