@@ -60,14 +60,7 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
 };
 
-// TODO: node (in ci/grab-screencast.js) doesn't accept top level await
-//   it can potentially be fixed by making the script an ESModule
-// export const filesystem: Filesystem = await createFilesystem();
-// eslint-disable-next-line import/no-mutable-exports
-export let filesystem: Filesystem;
-Promise.resolve().then(async () => {
-  filesystem = await createFilesystem();
-});
+export const filesystem: Filesystem = await createFilesystem();
 
 export async function fetchFile(
   dir: Directory,
