@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::ErrorKind;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::exit;
 use std::thread;
 use std::time::Duration;
@@ -120,6 +120,16 @@ pub fn syscall(
         }
     };
     Ok(result)
+}
+
+fn path_exists(path: &str) -> io::Result<bool> {
+    fs::metadata(path).map(|_| true).or_else(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            Ok(false)
+        } else {
+            Err(error)
+        }
+    })
 }
 
 pub struct Shell {
@@ -631,7 +641,7 @@ impl Shell {
                     PathBuf::from(&self.pwd).join(&args[0])
                 };
 
-                if !Path::new(&path).exists() {
+                if !path_exists(path.to_str().unwrap())? {
                     output_device.eprintln(&format!(
                         "cd: {}: No such file or directory",
                         path.display()
@@ -900,23 +910,11 @@ impl Shell {
                     Ok(EXIT_SUCCESS)
                 }
             }
-            // "mkdir" | "rmdir" | "touch" | "rm" | "mv" | "cp" | "echo" | "date" | "printf"
-            // | "env" | "cat" | "realpath" | "ln" | "printenv" | "md5sum" | "wc" => {
-            //     args.insert(0, command.to_string());
-            //     #[cfg(target_os = "wasi")]
-            //     args.insert(0, String::from("/usr/bin/coreutils"));
-            //     #[cfg(not(target_os = "wasi"))]
-            //     args.insert(0, String::from("/bin/busybox"));
-            //     let args_: Vec<&str> = args.iter().map(|s| &**s).collect();
-            //     Ok(syscall("spawn", &args_[..], env, background, redirects)
-            //         .unwrap()
-            //         .exit_status)
-            // }
             // external commands or command not found
             _ => {
                 let full_path = if command.starts_with('/') {
                     let full_path = PathBuf::from(command);
-                    if full_path.is_file() {
+                    if path_exists(full_path.to_str().unwrap())? {
                         Ok(full_path)
                     } else {
                         Err(format!(
@@ -927,7 +925,7 @@ impl Shell {
                 } else if command.starts_with('.') {
                     let path = PathBuf::from(&self.pwd);
                     let full_path = path.join(command);
-                    if full_path.is_file() {
+                    if path_exists(full_path.to_str().unwrap())? {
                         Ok(full_path)
                     } else {
                         Err(format!(
@@ -943,13 +941,7 @@ impl Shell {
                         let bin_dir = PathBuf::from(bin_dir);
                         full_path = bin_dir.join(&command);
                         // see https://internals.rust-lang.org/t/the-api-of-path-exists-encourages-broken-code/13817/3
-                        if fs::metadata(&full_path).map(|_| true).or_else(|error| {
-                            if error.kind() == ErrorKind::NotFound {
-                                Ok(false)
-                            } else {
-                                Err(error)
-                            }
-                        })? {
+                        if path_exists(full_path.to_str().unwrap())? {
                             found = true;
                             break;
                         }
