@@ -21,7 +21,7 @@
       };
       const script = document.createElement("script");
       script.type = "text/javascript";
-      script.src = "./hterm_all.js";
+      script.src = "./vendor/hterm_all.js";
       script.onload = async () => {
         await lib.init();
         await init(document.querySelector("#terminal"), (path, entryName) =>

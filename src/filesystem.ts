@@ -1,5 +1,5 @@
 // @ts-ignore, such imports are too fresh for typescript?
-import { get, set, del } from "https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm";
+import { get, set, del } from "./vendor/idb-keyval.js";
 import * as constants from "./constants.js";
 import { parsePath, arraysEqual } from "./utils.js";
 import { OpenedFd } from "./devices.js";
