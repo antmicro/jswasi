@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FileOrDir } from "./filesystem.js";
-import { filesystem, fetchFile } from "./terminal.js";
+import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem.js";
+import { fetchFile, filesystem } from "./terminal.js";
 import ProcessManager from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
 
@@ -20,9 +20,9 @@ export async function mount(
 
   switch (args.length) {
     case 1: {
-      stdout.write(ENCODER.encode("wasmfs on /\n"));
+      await stdout.write(ENCODER.encode("wasmfs on /\n"));
       for (const mountPoint of filesystem.mounts) {
-        stdout.write(
+        await stdout.write(
           ENCODER.encode(
             `fsapi on /${`${mountPoint.parts.join("/")}/${mountPoint.name}`}\n`
           )
@@ -33,7 +33,9 @@ export async function mount(
     case 2: {
       let path = args[1];
       if (path === "/") {
-        stderr.write(ENCODER.encode(`mount: cannot mount at root directory\n`));
+        await stderr.write(
+          ENCODER.encode(`mount: cannot mount at root directory\n`)
+        );
         return 1;
       }
       // handle relative path
@@ -43,7 +45,9 @@ export async function mount(
 
       // check if path exits
       if (!(await filesystem.pathExists(path, FileOrDir.Directory))) {
-        stdout.write(ENCODER.encode(`mount: ${path}: no such directory\n`));
+        await stdout.write(
+          ENCODER.encode(`mount: ${path}: no such directory\n`)
+        );
         return 1;
       }
 
@@ -52,7 +56,9 @@ export async function mount(
         // eslint-disable-next-line no-undef
         mountPoint = await showDirectoryPicker();
       } catch (e) {
-        stderr.write(ENCODER.encode("mount: failed to open local directory\n"));
+        await stderr.write(
+          ENCODER.encode("mount: failed to open local directory\n")
+        );
         return 1; // TODO: what would be a proper error here?
       }
 
@@ -60,18 +66,20 @@ export async function mount(
       return 0;
     }
     default: {
-      stderr.write(ENCODER.encode("mount: help: mount [<mount-point>]\n"));
+      await stderr.write(
+        ENCODER.encode("mount: help: mount [<mount-point>]\n")
+      );
       return 1;
     }
   }
 }
 
-export function umount(
+export async function umount(
   processManager: ProcessManager,
   processId: number,
   args: string[],
   env: Record<string, string>
-): number {
+): Promise<number> {
   const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   let path = args[1];
@@ -81,7 +89,7 @@ export function umount(
   }
 
   if (!filesystem.isMounted(path)) {
-    stderr.write(ENCODER.encode(`umount: ${path}: not mounted\n`));
+    await stderr.write(ENCODER.encode(`umount: ${path}: not mounted\n`));
     return 1;
   }
 
@@ -105,7 +113,7 @@ export async function wget(
   } else if (args.length === 3) {
     [, address, path] = args;
   } else {
-    stderr.write(ENCODER.encode("wget: help: wget <address> [<path>]\n"));
+    await stderr.write(ENCODER.encode("wget: help: wget <address> [<path>]\n"));
     return 1;
   }
   if (!path.startsWith("/")) {
@@ -115,7 +123,7 @@ export async function wget(
   try {
     await fetchFile(dir, path, address);
   } catch (error) {
-    stderr.write(
+    await stderr.write(
       ENCODER.encode(
         `wget: could not get resource: ${error.message.toLowerCase()}\n`
       )
@@ -134,7 +142,7 @@ export async function download(
   const stderr = processManager.processInfos[processId].fds[2] as Stderr;
 
   if (args.length === 1) {
-    stderr.write(
+    await stderr.write(
       ENCODER.encode("download: help: download <address> [<path>]\n")
     );
     return 1;
@@ -150,7 +158,7 @@ export async function download(
         FileOrDir.File
       );
       if (err !== constants.WASI_ESUCCESS) {
-        stderr.write(ENCODER.encode(`download: no such file: ${path}\n`));
+        await stderr.write(ENCODER.encode(`download: no such file: ${path}\n`));
         return Promise.resolve();
       }
 
@@ -162,15 +170,17 @@ export async function download(
           suggestedName: path.split("/").slice(-1)[0],
         });
       } catch (e) {
-        stderr.write(ENCODER.encode("download: unable to save file locally\n"));
-        return 1; // TODO: what would be a proper error here?
+        await stderr.write(
+          ENCODER.encode("download: unable to save file locally\n")
+        );
+        return constants.EXIT_FAILURE;
       }
       const writable = await localHandle.createWritable();
       // @ts-ignore pipeTo is still experimental
       return stream.pipeTo(writable);
     })
   );
-  return 0;
+  return constants.EXIT_SUCCESS;
 }
 
 export async function ps(
@@ -199,7 +209,7 @@ export async function ps(
     }\n\r`;
   }
 
-  stdout.write(ENCODER.encode(psData));
+  await stdout.write(ENCODER.encode(psData));
   return 0;
 }
 
@@ -234,8 +244,9 @@ export async function free(
   )}  ${`          ${usedMemory}`.slice(
     -10
   )}  ${`          ${availableMemory}`.slice(-10)}\n\r`;
-  stdout.write(ENCODER.encode(freeData));
-  return 0;
+  await stdout.write(ENCODER.encode(freeData));
+
+  return constants.EXIT_SUCCESS;
 }
 
 export async function reset(
@@ -249,5 +260,5 @@ export async function reset(
   env: Record<string, string>
 ): Promise<number> {
   location.reload();
-  return 0;
+  return constants.EXIT_SUCCESS;
 }

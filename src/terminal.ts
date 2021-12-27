@@ -2,13 +2,14 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
 import {
-  FileOrDir,
-  OpenFlags,
-  Filesystem,
-  Directory,
   createFilesystem,
+  Directory,
+  FileOrDir,
+  Filesystem,
+  LookupFlags,
+  OpenFlags,
 } from "./filesystem.js";
-import { Stdin, Stdout, Stderr } from "./devices.js";
+import { Stderr, Stdin, Stdout } from "./devices.js";
 
 declare global {
   interface Window {
@@ -71,6 +72,7 @@ export async function fetchFile(
   const { err, entry } = await dir.getEntry(
     filename,
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   if (err !== constants.WASI_ESUCCESS) {
@@ -108,27 +110,32 @@ async function initFs() {
   await filesystem.rootDir.getEntry(
     "/tmp",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   // TODO: this will be a in-memory vfs in the future
   await filesystem.rootDir.getEntry(
     "/proc",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
     "/etc",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
     "/home",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
     "/home/ant",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
 
@@ -136,6 +143,7 @@ async function initFs() {
     await filesystem.rootDir.getEntry(
       "/home/ant/.shellrc",
       FileOrDir.File,
+      LookupFlags.SymlinkFollow,
       OpenFlags.Create
     )
   ).entry;
@@ -151,17 +159,20 @@ async function initFs() {
   await filesystem.rootDir.getEntry(
     "/usr",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
 
   await filesystem.rootDir.getEntry(
     "/lib",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
 
@@ -169,47 +180,56 @@ async function initFs() {
   await filesystem.rootDir.getEntry(
     "/usr/bin/mount",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/umount",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/wget",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/download",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/ps",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/free",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
   await filesystem.rootDir.getEntry(
     "/usr/bin/reset",
     FileOrDir.File,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create
   );
 
   await filesystem.rootDir.getEntry(
     "/usr/local",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
   await filesystem.rootDir.getEntry(
     "/usr/local/bin",
     FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
 
@@ -268,8 +288,14 @@ function initDropImport(
       entry: FileSystemDirectoryHandle | FileSystemFileHandle,
       path: string
     ) => {
-      const dir = (await filesystem.rootDir.getEntry(path, FileOrDir.Directory))
-        .entry;
+      const dir = (
+        await filesystem.rootDir.getEntry(
+          path,
+          FileOrDir.Directory,
+          LookupFlags.SymlinkFollow,
+          OpenFlags.Create
+        )
+      ).entry;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
         await dir.handle.getDirectoryHandle(entry.name, { create: true });

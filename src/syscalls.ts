@@ -6,13 +6,13 @@ import {
   OpenFlags,
 } from "./filesystem.js";
 import {
+  download,
+  free,
   mount,
+  ps,
+  reset,
   umount,
   wget,
-  download,
-  ps,
-  free,
-  reset,
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { filesystem } from "./terminal.js";
@@ -86,7 +86,7 @@ export default async function syscallCallback(
         pwd,
         FileOrDir.Directory
       );
-      const openedPwd = entry.open();
+      const openedPwd = entry.open() as OpenDirectory;
       openedPwd.name = ".";
       fds[4] = openedPwd;
 
@@ -201,7 +201,7 @@ export default async function syscallCallback(
           break;
         }
         case "/usr/bin/umount": {
-          const result = umount(processManager, processId, args, env);
+          const result = await umount(processManager, processId, args, env);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
