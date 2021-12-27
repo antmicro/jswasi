@@ -1,5 +1,10 @@
 import * as constants from "./constants.js";
-import { FileOrDir, OpenDirectory, OpenFlags } from "./filesystem.js";
+import {
+  FileOrDir,
+  LookupFlags,
+  OpenDirectory,
+  OpenFlags,
+} from "./filesystem.js";
 import {
   mount,
   umount,
@@ -11,7 +16,7 @@ import {
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { filesystem } from "./terminal.js";
-import { OpenedFd } from "./devices.js";
+import { OpenedFd, Out } from "./devices.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -169,6 +174,7 @@ export default async function syscallCallback(
           const { entry } = await filesystem.rootDir.getEntry(
             path,
             FileOrDir.File,
+            LookupFlags.NoFollow,
             OpenFlags.Create
           );
           fds[fd] = await entry.open();
@@ -305,10 +311,9 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[oldFd] !== undefined) {
-        console.log(`TODO: we should hard link ${newPath} --> ${oldPath}`);
-        if (err === constants.WASI_ESUCCESS) {
-          // TODO
-        }
+        err = await (fds[constants.WASI_STDERR_FILENO] as Out).write(
+          ENCODER.encode("hard links are not supported")
+        );
       } else {
         err = constants.WASI_EBADF;
       }
@@ -364,10 +369,11 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
+
     case "fd_write": {
-      const [sharedBuffer, fd, content_] = data;
+      const [sharedBuffer, fd, contentPtr] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const content = new Uint8Array(content_);
+      const content = new Uint8Array(contentPtr);
 
       const { fds } = processManager.processInfos[processId];
       const err = await (fds[fd] as OpenedFd).write(content);
@@ -376,14 +382,17 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
+
     case "fd_read": {
       const [sharedBuffer, fd, len] = data;
 
       const { fds } = processManager.processInfos[processId];
       await (fds[fd] as OpenedFd).read(processId, len, sharedBuffer);
 
+      // releasing the lock is delegated to read() call
       break;
     }
+
     case "path_open": {
       const [
         sharedBuffer,
@@ -393,7 +402,7 @@ export default async function syscallCallback(
         oFlags,
         fsRightsBase,
         fsRightsInheriting,
-        fsFlags,
+        fdFlags,
       ] = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const openedFd = new Int32Array(sharedBuffer, 4, 1);
@@ -405,7 +414,11 @@ export default async function syscallCallback(
         ({ err, entry } = await (fds[dirFd] as OpenDirectory).getEntry(
           path,
           FileOrDir.Any,
-          oFlags
+          dirFlags,
+          oFlags,
+          fsRightsBase,
+          fsRightsInheriting,
+          fdFlags
         ));
         if (err === constants.WASI_ESUCCESS) {
           fds.push(await entry.open());
