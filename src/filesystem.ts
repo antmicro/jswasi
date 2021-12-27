@@ -122,12 +122,7 @@ export class Filesystem {
       return dir.parent;
     }
 
-    let components;
-    try {
-      components = await this.rootDir.handle.resolve(dir.handle);
-    } catch {
-      throw Error("There was an error in root.resolve...");
-    }
+    const components = dir.path.split("/").slice(1);
 
     // if there are many mounts for the same path, we want to return the latest
     const reversedMounts = [].concat(this.mounts).reverse();
@@ -137,10 +132,10 @@ export class Filesystem {
       }
     }
 
-    const path = `/${components.join("/")}/${name}`;
+    const path = `${dir.path}/${name}`;
     const handle = await dir.handle.getDirectoryHandle(name, options);
     let metadata: StoredData = await get(path);
-    if (!metadata && options.create) {
+    if (!metadata) {
       metadata = {
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
         userMode: 7,
@@ -161,22 +156,15 @@ export class Filesystem {
     name: string,
     options: { create: boolean } = { create: false }
   ): Promise<File> {
-    let components;
-    try {
-      components = await this.rootDir.handle.resolve(dir.handle);
-    } catch {
-      throw Error("There was an error in root.resolve...");
-    }
-
-    const path = `/${components.join("/")}/${name}`;
+    const path = `${dir.path}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
     let metadata: StoredData = await get(path);
-    if (!metadata && options.create) {
+    if (!metadata) {
       metadata = {
         fileType: constants.WASI_FILETYPE_REGULAR_FILE,
-        userMode: 6,
-        groupMode: 6,
+        userMode: 7,
+        groupMode: 7,
         uid: 0,
         gid: 0,
         atim: 0n,
@@ -305,7 +293,7 @@ export class Filesystem {
     const entries: (File | Directory)[] = [];
 
     const reversedMounts = [].concat(this.mounts).reverse();
-    for (const { parts, mountDir } of reversedMounts) {
+    for (const { parts, dir: mountDir } of reversedMounts) {
       if (arraysEqual(parts, components)) {
         entries.push(mountDir);
       }
@@ -321,7 +309,7 @@ export class Filesystem {
         }
       }
       if (!alreadyExists) {
-        const path = `/${components.join("/")}/${name}`;
+        const path = `${dir.path}/${name}`;
         switch (handle.kind) {
           case "file": {
             entries.push(new File(name, path, handle, dir, this));
