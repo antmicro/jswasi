@@ -15,7 +15,6 @@ import {
   wget,
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
-import { filesystem } from "./terminal.js";
 import { OpenedFd, Out } from "./devices.js";
 
 const RED_ANSI = "\u001b[31m";
@@ -82,7 +81,7 @@ export default async function syscallCallback(
       const lock = new Int32Array(sharedBuffer, 0, 1);
       const { fds } = processManager.processInfos[processId];
 
-      const { entry } = await filesystem.rootDir.getEntry(
+      const { entry } = await processManager.filesystem.rootDir.getEntry(
         pwd,
         FileOrDir.Directory
       );
@@ -171,7 +170,7 @@ export default async function syscallCallback(
           } else {
             throw Error("unrecognized redirect type");
           }
-          const { entry } = await filesystem.rootDir.getEntry(
+          const { entry } = await processManager.filesystem.rootDir.getEntry(
             path,
             FileOrDir.File,
             LookupFlags.NoFollow,

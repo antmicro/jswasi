@@ -61,8 +61,6 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
 };
 
-export const filesystem: Filesystem = await createFilesystem();
-
 export async function fetchFile(
   dir: Directory,
   filename: string,
@@ -106,7 +104,7 @@ export async function fetchFile(
 }
 
 // setup filesystem
-async function initFs() {
+async function initFs(filesystem: Filesystem) {
   await filesystem.rootDir.getEntry(
     "/tmp",
     FileOrDir.Directory,
@@ -289,7 +287,7 @@ function initDropImport(
       path: string
     ) => {
       const dir = (
-        await filesystem.rootDir.getEntry(
+        await processManager.filesystem.rootDir.getEntry(
           path,
           FileOrDir.Directory,
           LookupFlags.SymlinkFollow,
@@ -358,8 +356,11 @@ export async function init(
       "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
     return;
   }
+
+  const filesystem: Filesystem = await createFilesystem();
+
   initServiceWorker();
-  await initFs();
+  await initFs(filesystem);
 
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail

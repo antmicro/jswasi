@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem.js";
-import { fetchFile, filesystem } from "./terminal.js";
+import { FileOrDir } from "./filesystem.js";
+import { fetchFile } from "./terminal.js";
 import ProcessManager from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
 
@@ -21,7 +21,8 @@ export async function mount(
   switch (args.length) {
     case 1: {
       await stdout.write(ENCODER.encode("wasmfs on /\n"));
-      for (const mountPoint of filesystem.mounts) {
+      for (const mountPoint of processManager.filesystem.mounts) {
+        // eslint-disable-next-line no-await-in-loop
         await stdout.write(
           ENCODER.encode(
             `fsapi on /${`${mountPoint.parts.join("/")}/${mountPoint.name}`}\n`
@@ -44,7 +45,9 @@ export async function mount(
       }
 
       // check if path exits
-      if (!(await filesystem.pathExists(path, FileOrDir.Directory))) {
+      if (
+        !(await processManager.filesystem.pathExists(path, FileOrDir.Directory))
+      ) {
         await stdout.write(
           ENCODER.encode(`mount: ${path}: no such directory\n`)
         );
@@ -62,7 +65,7 @@ export async function mount(
         return 1; // TODO: what would be a proper error here?
       }
 
-      await filesystem.addMount(path, mountPoint);
+      await processManager.filesystem.addMount(path, mountPoint);
       return 0;
     }
     default: {
@@ -88,12 +91,12 @@ export async function umount(
     path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
   }
 
-  if (!filesystem.isMounted(path)) {
+  if (!processManager.filesystem.isMounted(path)) {
     await stderr.write(ENCODER.encode(`umount: ${path}: not mounted\n`));
     return 1;
   }
 
-  filesystem.removeMount(path);
+  processManager.filesystem.removeMount(path);
   return 0;
 }
 
@@ -119,7 +122,7 @@ export async function wget(
   if (!path.startsWith("/")) {
     path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
   }
-  const { dir } = await filesystem.resolveAbsolute(path);
+  const { dir } = await processManager.filesystem.resolveAbsolute(path);
   try {
     await fetchFile(dir, path, address);
   } catch (error) {
@@ -153,7 +156,7 @@ export async function download(
         path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
       }
 
-      const { err, entry } = await filesystem.rootDir.getEntry(
+      const { err, entry } = await processManager.filesystem.rootDir.getEntry(
         path,
         FileOrDir.File
       );
