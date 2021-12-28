@@ -237,18 +237,18 @@ export class Filesystem {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<Directory> {
+  ): Promise<{ err: number; entry: Directory }> {
     // TODO: revisit this hack
     if (
       dir.name === "" &&
       (name === "." || name === ".." || name === "" || name === "/")
     )
-      return this.rootDir;
+      return { err: constants.WASI_ESUCCESS, entry: this.rootDir };
     if (name === ".") {
-      return dir;
+      return { err: constants.WASI_ESUCCESS, entry: dir };
     }
     if (name === "..") {
-      return dir.parent;
+      return { err: constants.WASI_ESUCCESS, entry: dir.parent };
     }
 
     const components = dir.path.split("/").slice(1);
@@ -283,12 +283,13 @@ export class Filesystem {
       metadata.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
       lookupFlags & LookupFlags.SymlinkFollow
     ) {
-      // TODO: use this err, function return type should be Promise<{ err: number, dir: Directory}>
       const { err, linkedPath } = await dir.readlink(path);
-      return this.getDirectory(
-        dir,
+      if (err !== constants.WASI_ESUCCESS) {
+        return { err, entry: null };
+      }
+      return dir.getEntry(
         linkedPath,
-        options,
+        FileOrDir.Directory,
         lookupFlags,
         openFlags,
         fsRightsBase,
@@ -297,7 +298,10 @@ export class Filesystem {
       );
     }
 
-    return new Directory(name, path, handle, dir, this);
+    return {
+      err: constants.WASI_ESUCCESS,
+      entry: new Directory(name, path, handle, dir, this),
+    };
   }
 
   async getFile(
@@ -309,7 +313,7 @@ export class Filesystem {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<File> {
+  ): Promise<{ err: number; entry: File }> {
     const path = `${dir.path}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
@@ -332,12 +336,13 @@ export class Filesystem {
       metadata.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
       lookupFlags & LookupFlags.SymlinkFollow
     ) {
-      // TODO: use this err, function return type should be Promise<{ err: number, dir: Directory}>
       const { err, linkedPath } = await dir.readlink(path);
-      return this.getFile(
-        dir,
+      if (err !== constants.WASI_ESUCCESS) {
+        return { err, entry: null };
+      }
+      return dir.getEntry(
         linkedPath,
-        options,
+        FileOrDir.File,
         lookupFlags,
         openFlags,
         fsRightsBase,
@@ -346,7 +351,10 @@ export class Filesystem {
       );
     }
 
-    return new File(name, path, handle, dir, this);
+    return {
+      err: constants.WASI_ESUCCESS,
+      entry: new File(name, path, handle, dir, this),
+    };
   }
 
   async pathExists(
@@ -412,7 +420,7 @@ export class Filesystem {
     try {
       for (const part of parts) {
         // eslint-disable-next-line no-await-in-loop
-        dir = await this.getDirectory(dir, part);
+        ({ entry: dir } = await this.getDirectory(dir, part));
       }
       if (this.DEBUG) console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
       return { err: constants.WASI_ESUCCESS, name, dir };
@@ -450,7 +458,7 @@ export class Filesystem {
     try {
       for (const part of parts) {
         // eslint-disable-next-line no-await-in-loop
-        dir = await this.getDirectory(dir, part);
+        ({ entry: dir } = await this.getDirectory(dir, part));
       }
     } catch (err) {
       if (err.name === "NotFoundError") {
@@ -657,9 +665,6 @@ export class Directory extends Entry {
     fsRightsInheriting: Rights = Rights.None,
     fdFlags: FdFlags = FdFlags.None
   ): Promise<{ err: number; entry: File | Directory }> {
-    if (this.filesystem.DEBUG)
-      console.log("Directory.getEntry", this, arguments);
-
     const {
       err: getParentErr,
       name,
@@ -709,7 +714,7 @@ export class Directory extends Entry {
     ): Promise<{ err: number; entry: File | Directory }> => {
       if (mode & FileOrDir.File) {
         try {
-          const entry = await this.filesystem.getFile(
+          return await this.filesystem.getFile(
             parent,
             name,
             {
@@ -721,7 +726,6 @@ export class Directory extends Entry {
             fsRightsInheriting,
             fdFlags
           );
-          return { err: constants.WASI_ESUCCESS, entry };
         } catch (err) {
           if (err.name === "TypeMismatchError" || err.name === "TypeError") {
             if (!(mode & FileOrDir.Directory)) {
@@ -735,7 +739,7 @@ export class Directory extends Entry {
         }
       }
       try {
-        const entry = await this.filesystem.getDirectory(
+        return await this.filesystem.getDirectory(
           parent,
           name,
           {
@@ -747,7 +751,6 @@ export class Directory extends Entry {
           fsRightsInheriting,
           fdFlags
         );
-        return { err: constants.WASI_ESUCCESS, entry };
       } catch (err) {
         if (err.name === "TypeMismatchError" || err.name === "TypeError") {
           return { err: constants.WASI_ENOTDIR, entry: null };
