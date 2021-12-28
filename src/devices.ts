@@ -1,6 +1,7 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
-import { OpenFile, Stat } from "./filesystem.js";
+import { FsaOpenFile } from "./filesystem/filesystem.js";
+import { Stat } from "./filesystem/enums.js";
 
 const DECODER = new TextDecoder();
 

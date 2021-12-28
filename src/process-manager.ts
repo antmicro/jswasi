@@ -1,8 +1,10 @@
 import * as constants from "./constants.js";
 import { OpenedFd, Stderr, Stdin, Stdout } from "./devices.js";
-import { FileOrDir, Filesystem, OpenDirectory } from "./filesystem.js";
+import { FsaOpenDirectory } from "./filesystem/filesystem.js";
+import { FileOrDir } from "./filesystem/enums.js";
+import { Filesystem } from "./filesystem/interfaces";
 
-type FileDescriptor = Stdin | Stdout | Stderr | OpenedFd | OpenDirectory;
+type FileDescriptor = Stdin | Stdout | Stderr | OpenedFd | FsaOpenDirectory;
 
 type BufferRequest = {
   requestedLen: number;
@@ -91,10 +93,9 @@ export default class ProcessManager {
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     if (!this.compiledModules[command]) {
-      const { err, entry } = await this.filesystem.rootDir.getEntry(
-        command,
-        FileOrDir.File
-      );
+      const { err, entry } = await this.filesystem
+        .getRootDir()
+        .getEntry(command, FileOrDir.File);
       if (err !== constants.WASI_ESUCCESS) {
         console.error(`No such binary: ${command}`);
         return err;
@@ -106,10 +107,12 @@ export default class ProcessManager {
       ) {
         // TODO: what about symlinks to symlinks, I think this would break
         handle = (
-          await entry.parent.getEntry(
-            await (await entry.handle.getFile()).text(),
-            FileOrDir.File
-          )
+          await entry
+            .parent()
+            .getEntry(
+              await (await entry.handle.getFile()).text(),
+              FileOrDir.File
+            )
         ).entry.handle;
       } else {
         handle = entry.handle;

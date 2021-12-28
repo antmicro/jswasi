@@ -1,191 +1,21 @@
 // @ts-ignore - different path structure in dist folder
-import { get, set, del } from "./vendor/idb-keyval.js";
-import * as constants from "./constants.js";
-import { parsePath, arraysEqual } from "./utils.js";
-import { OpenedFd } from "./devices.js";
+import { del, get, set } from "../vendor/idb-keyval.js";
+import * as constants from "../constants.js";
+import { arraysEqual, parsePath } from "../utils.js";
+import { OpenedFd } from "../devices.js";
+import {
+  FdFlags,
+  FileOrDir,
+  LookupFlags,
+  Metadata,
+  OpenFlags,
+  Rights,
+  Stat,
+  StoredData,
+} from "./enums.js";
+import { DirEntry, Entry, Filesystem, Mount } from "./interfaces";
 
-// Specifies open mode for getting a filesystem entry
-export const enum FileOrDir {
-  // Only open if it's a file
-  File = 1,
-  // Only open if it's a directory
-  Directory = 2,
-  // Open either file or directory
-  Any = 3,
-}
-
-// Open flags used by path_open.
-export const enum OpenFlags {
-  // If none of the flags shouldn't be set
-  None = 0,
-  // Create file if it doesn't exist. Value of constants.WASI_O_CREAT.
-  Create = 1,
-  // Fail if not a directory. Value of constants.WASI_O_DIRECTORY.
-  Directory = 2,
-  // Fail if file already exists. Value of constants.WASI_O_EXCL.
-  Exclusive = 4,
-  // Truncate file to size 0. Value of constants.WASI_O_TRUNC.
-  Truncate = 8,
-}
-
-// Flags determining the method of how paths are resolved.
-export const enum LookupFlags {
-  // Don't follow symbolic links, return symbolic file itself
-  NoFollow = 0,
-  // As long as the resolved path corresponds to a symbolic link, it is expanded.
-  SymlinkFollow = 1,
-}
-
-// File descriptor rights, determining which actions may be performed.
-export const enum Rights {
-  None = 0,
-  // The right to invoke fd_datasync. If path_open is set, includes the right to invoke path_open with fdflags::dsync.
-  FdDatasync = 1 << 0,
-  // The right to invoke fd_read and sock_recv. If rights::fd_seek is set, includes the right to invoke fd_pread.
-  FdRead = 1 << 1,
-  // The right to invoke fd_seek. This flag implies rights::fd_tell.
-  FdSeek = 1 << 2,
-  // The right to invoke fd_fdstat_set_flags.
-  FdFdstatSetFlags = 1 << 3,
-  // The right to invoke fd_sync. If path_open is set, includes the right to invoke path_open with fdflags::rsync and fdflags::dsync.
-  FdSync = 1 << 4,
-  // The right to invoke fd_seek in such a way that the file offset remains unaltered (i.e., whence::cur with offset zero), or to invoke fd_tell.
-  FdTell = 1 << 5,
-  // The right to invoke fd_write and sock_send. If rights::fd_seek is set, includes the right to invoke fd_pwrite.
-  FdWrite = 1 << 6,
-  // The right to invoke fd_advise.
-  FdAdvise = 1 << 7,
-  // The right to invoke fd_allocate.
-  FdAllocate = 1 << 8,
-  // The right to invoke path_create_directory.
-  PathCreateDirectory = 1 << 9,
-  // If path_open is set, the right to invoke path_open with oflags::creat.
-  PathCreateFile = 1 << 10,
-  // The right to invoke path_link with the file descriptor as the source directory.
-  PathLinkSource = 1 << 11,
-  // The right to invoke path_link with the file descriptor as the target directory.
-  PathLinkTarget = 1 << 12,
-  // The right to invoke path_open.
-  PathOpen = 1 << 13,
-  // The right to invoke fd_readdir.
-  FdReadDir = 1 << 14,
-  // The right to invoke path_readlink.
-  PathReadLink = 1 << 15,
-  // The right to invoke path_rename with the file descriptor as the source directory.
-  PathRenameSource = 1 << 16,
-  // The right to invoke path_rename with the file descriptor as the target directory.
-  PathRenameTarget = 1 << 17,
-  // The right to invoke path_filestat_get.
-  PathFilestatGet = 1 << 18,
-  // The right to change a file's size (there is no path_filestat_set_size).
-  // If path_open is set, includes the right to invoke path_open with oflags::trunc.
-  PathFilestatSetSize = 1 << 19,
-  // The right to invoke path_filestat_set_times.
-  PathFilestatSetTimes = 1 << 20,
-  // The right to invoke fd_filestat_get.
-  FdFilestatGet = 1 << 21,
-  // The right to invoke fd_filestat_set_size.
-  FdFilestatSetSize = 1 << 22,
-  // The right to invoke fd_filestat_set_times.
-  FdFilestatSetTimes = 1 << 23,
-  // The right to invoke path_symlink.
-  PathSymlink = 1 << 24,
-  //  The right to invoke path_remove_directory.
-  PathRemoveDirectory = 1 << 25,
-  // The right to invoke path_unlink_file.
-  PathUnlinkFile = 1 << 26,
-  // If rights::fd_read is set, includes the right to invoke poll_oneoff to subscribe to eventtype::fd_read.
-  // If rights::fd_write is set, includes the right to invoke poll_oneoff to subscribe to eventtype::fd_write.
-  PollFdReadWrite = 1 << 27,
-  // The right to invoke sock_shutdown.
-  SockShutdown = 1 << 28,
-}
-
-// File descriptor flags.
-export const enum FdFlags {
-  None = 0,
-  // Append mode: Data written to the file is always appended to the file's end.
-  Append = 1 << 0,
-  // Write according to synchronized I/O data integrity completion. Only the data stored in the file is synchronized.
-  DSync = 1 << 1,
-  // Non-blocking mode.
-  NonBlock = 1 << 2,
-  // Synchronized read I/O operations.
-  RSync = 1 << 3,
-  // Write according to synchronized I/O file integrity completion.
-  // In addition to synchronizing the data stored in the file, the implementation may also synchronously update the file's metadata.
-  Sync = 1 << 4,
-}
-
-// Data about a file or directory stored persistently
-export type StoredData = {
-  // file type
-  fileType: number;
-  // read-write-execute permissions of user
-  userMode: number;
-  // read-write-execute permissions of group
-  groupMode: number;
-  // user ID of owner
-  uid: number;
-  // group ID of owner
-  gid: number;
-  // access time
-  atim: bigint;
-  // modification time
-  mtim: bigint;
-  // change time
-  ctim: bigint;
-};
-
-// All metadata about a file or directory
-export type Metadata = {
-  // ID of device containing file
-  dev: bigint;
-  // inode number (always 0)
-  ino: bigint;
-  // file type
-  fileType: number;
-  // read-write-execute permissions of user
-  userMode: number;
-  // read-write-execute permissions of group
-  groupMode: number;
-  // number of hard links (always 0)
-  nlink: bigint;
-  // user ID of owner
-  uid: number;
-  // group ID of owner
-  gid: number;
-  // device ID (if special file)
-  rdev: number;
-  // total size, in bytes
-  size: bigint;
-  // block size for filesystem I/O
-  blockSize: number;
-  // number of 512B blocks allocated
-  blocks: number;
-  // access time
-  atim: bigint;
-  // modification time
-  mtim: bigint;
-  // change time
-  ctim: bigint;
-};
-
-// Data returned about a file or directory in various syscalls
-export type Stat = {
-  dev: bigint;
-  ino: bigint;
-  fileType: number;
-  nlink: bigint;
-  size: bigint;
-  atim: bigint;
-  mtim: bigint;
-  ctim: bigint;
-};
-
-type Mount = { parts: string[]; name: string; dir: Directory };
-
-export async function createFilesystem(): Promise<Filesystem> {
+export async function createFsaFilesystem(): Promise<FsaFilesystem> {
   const topHandle = await navigator.storage.getDirectory();
   const rootHandle = await topHandle.getDirectoryHandle("root", {
     create: true,
@@ -207,29 +37,45 @@ export async function createFilesystem(): Promise<Filesystem> {
   const metaHandle = await topHandle.getDirectoryHandle("meta", {
     create: true,
   });
-  return new Filesystem(rootHandle, metaHandle);
+  return new FsaFilesystem(rootHandle, metaHandle);
 }
 
-export class Filesystem {
-  DEBUG: boolean = false;
+class FsaFilesystem implements Filesystem {
+  private DEBUG = false;
 
   // TODO: parts could be a key, that would optimise the lookup
   mounts: Mount[] = [];
 
-  public readonly rootDir: Directory;
+  readonly rootDir: FsaDirectory;
 
-  public readonly metaDir: Directory;
+  readonly metaDir: FsaDirectory;
 
   constructor(
     rootHandle: FileSystemDirectoryHandle,
     metaHandle: FileSystemDirectoryHandle
   ) {
-    this.rootDir = new Directory("", "", rootHandle, null, this);
-    this.metaDir = new Directory("", "", metaHandle, null, this);
+    this.rootDir = new FsaDirectory("", rootHandle, null, this);
+    this.metaDir = new FsaDirectory("", metaHandle, null, this);
+  }
+
+  isDebug(): boolean {
+    return this.DEBUG;
+  }
+
+  getRootDir(): FsaDirectory {
+    return this.rootDir;
+  }
+
+  getMetaDir(): FsaDirectory {
+    return this.metaDir;
+  }
+
+  getMounts(): Mount[] {
+    return this.mounts;
   }
 
   async getDirectory(
-    dir: Directory,
+    dir: FsaDirectory,
     name: string,
     options: { create: boolean } = { create: false },
     lookupFlags?: LookupFlags,
@@ -237,31 +83,31 @@ export class Filesystem {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: Directory }> {
+  ): Promise<{ err: number; entry: FsaDirectory }> {
     // TODO: revisit this hack
     if (
-      dir.name === "" &&
+      dir.name() === "" &&
       (name === "." || name === ".." || name === "" || name === "/")
     )
-      return { err: constants.WASI_ESUCCESS, entry: this.rootDir };
+      return { err: constants.WASI_ESUCCESS, entry: this.getRootDir() };
     if (name === ".") {
       return { err: constants.WASI_ESUCCESS, entry: dir };
     }
     if (name === "..") {
-      return { err: constants.WASI_ESUCCESS, entry: dir.parent };
+      return { err: constants.WASI_ESUCCESS, entry: dir.parent() };
     }
 
-    const components = dir.path.split("/").slice(1);
+    const components = dir.path().split("/").slice(1);
 
     // if there are many mounts for the same path, we want to return the latest
-    const reversedMounts = [].concat(this.mounts).reverse();
+    const reversedMounts = [].concat(this.getMounts).reverse();
     for (const { parts, name: mountName, dir: mountDir } of reversedMounts) {
       if (arraysEqual(parts, components) && mountName === name) {
         return mountDir;
       }
     }
 
-    const path = `${dir.path}/${name}`;
+    const path = `${dir.path()}/${name}`;
     // TODO: should also consider getFileHandle in case it's a symlink
     const handle = await dir.handle.getDirectoryHandle(name, options);
     let metadata: StoredData = await get(path);
@@ -300,12 +146,12 @@ export class Filesystem {
 
     return {
       err: constants.WASI_ESUCCESS,
-      entry: new Directory(name, path, handle, dir, this),
+      entry: new FsaDirectory(path, handle, dir, this),
     };
   }
 
   async getFile(
-    dir: Directory,
+    dir: FsaDirectory,
     name: string,
     options: { create: boolean } = { create: false },
     lookupFlags?: LookupFlags,
@@ -313,8 +159,8 @@ export class Filesystem {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File }> {
-    const path = `${dir.path}/${name}`;
+  ): Promise<{ err: number; entry: FsaFile }> {
+    const path = `${dir.path()}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
     let metadata: StoredData = await get(path);
@@ -353,7 +199,7 @@ export class Filesystem {
 
     return {
       err: constants.WASI_ESUCCESS,
-      entry: new File(name, path, handle, dir, this),
+      entry: new FsaFile(path, handle, dir, this),
     };
   }
 
@@ -361,7 +207,7 @@ export class Filesystem {
     absolutePath: string,
     mode: FileOrDir = FileOrDir.Any
   ): Promise<boolean> {
-    const { err } = await this.rootDir.getEntry(
+    const { err } = await this.getRootDir().getEntry(
       absolutePath,
       mode,
       LookupFlags.NoFollow,
@@ -375,14 +221,14 @@ export class Filesystem {
     mountedHandle: FileSystemDirectoryHandle
   ): Promise<number> {
     const { parts, name } = parsePath(absolutePath);
-    const parent = await this.rootDir.getEntry(
+    const parent = await this.getRootDir().getEntry(
       parts.join("/"),
       FileOrDir.Directory,
       LookupFlags.SymlinkFollow,
       OpenFlags.None
     );
     const path = `/${parts.join("/")}/${name}`;
-    const dir = new Directory(name, path, mountedHandle, parent.entry, this);
+    const dir = new FsaDirectory(path, mountedHandle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
   }
@@ -411,18 +257,19 @@ export class Filesystem {
 
   async resolveAbsolute(
     path: string
-  ): Promise<{ err: number; name: string; dir: Directory }> {
-    if (this.DEBUG) console.log(`resolveAbsolute(${path})`);
+  ): Promise<{ err: number; name: string; dir: FsaDirectory }> {
+    if (this.isDebug()) console.log(`resolveAbsolute(${path})`);
 
     const { parts, name } = parsePath(path);
-    let dir = this.rootDir;
+    let dir = this.getRootDir();
 
     try {
       for (const part of parts) {
         // eslint-disable-next-line no-await-in-loop
         ({ entry: dir } = await this.getDirectory(dir, part));
       }
-      if (this.DEBUG) console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
+      if (this.isDebug())
+        console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
       return { err: constants.WASI_ESUCCESS, name, dir };
     } catch (err) {
       if (err.name === "NotFoundError") {
@@ -436,10 +283,10 @@ export class Filesystem {
   }
 
   async getParent(
-    dir: Directory,
+    dir: FsaDirectory,
     path: string
-  ): Promise<{ err: number; name: string; parent: Directory }> {
-    if (this.DEBUG)
+  ): Promise<{ err: number; name: string; parent: FsaDirectory }> {
+    if (this.isDebug())
       console.log(
         `getParent(dir.handle.name="${dir.handle.name}", path="${path}")`
       );
@@ -447,11 +294,11 @@ export class Filesystem {
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (
-      dir.name === "" &&
+      dir.name() === "" &&
       (path === "." || path === ".." || path === "" || path === "/")
     )
       return { err: constants.WASI_ESUCCESS, name: "", parent: dir };
-    if (path.startsWith("/")) dir = this.rootDir;
+    if (path.startsWith("/")) dir = this.getRootDir();
 
     const { parts, name } = parsePath(path);
 
@@ -470,17 +317,17 @@ export class Filesystem {
       throw err;
     }
 
-    if (this.DEBUG)
+    if (this.isDebug())
       console.log(`getParent resolved as = {"${name}", "${dir.name}"}`);
     return { err: constants.WASI_ESUCCESS, name, parent: dir };
   }
 
-  async entries(dir: Directory): Promise<(File | Directory)[]> {
-    const components = await this.rootDir.handle.resolve(dir.handle);
+  async entries(dir: FsaDirectory): Promise<DirEntry[]> {
+    const components = await this.getRootDir().handle.resolve(dir.handle);
 
-    const entries: (File | Directory)[] = [];
+    const entries: DirEntry[] = [];
 
-    const reversedMounts = [].concat(this.mounts).reverse();
+    const reversedMounts = [].concat(this.getMounts).reverse();
     for (const { parts, dir: mountDir } of reversedMounts) {
       if (arraysEqual(parts, components)) {
         entries.push(mountDir);
@@ -491,26 +338,14 @@ export class Filesystem {
       // mounted directories hide directories they are mounted to
       let alreadyExists = false;
       for (const entry of entries) {
-        if (entry.name === name) {
+        if (entry.name() === name) {
           alreadyExists = true;
           break;
         }
       }
       if (!alreadyExists) {
-        const path = `${dir.path}/${name}`;
-        switch (handle.kind) {
-          case "file": {
-            entries.push(new File(name, path, handle, dir, this));
-            break;
-          }
-          case "directory": {
-            entries.push(new Directory(name, path, handle, dir, this));
-            break;
-          }
-          default: {
-            throw Error("Unexpected handle kind");
-          }
-        }
+        const path = `${dir.path()}/${name}`;
+        entries.push(new FsaDirEntry(path, handle, dir, this));
       }
     }
 
@@ -518,24 +353,44 @@ export class Filesystem {
   }
 }
 
-abstract class Entry {
+abstract class FsaEntry implements Entry {
+  private readonly storedPath: string;
+
+  protected storedName: string;
+
+  private readonly storedParent: FsaDirectory;
+
   constructor(
-    public name: string,
-    public path: string,
+    path: string,
     protected readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
-    public parent: Directory | null,
+    parent: FsaDirectory | null,
     protected readonly filesystem: Filesystem
   ) {
-    if (filesystem.DEBUG) {
-      console.log(`new Entry(path="${path}", parent.path="${parent?.path}")`);
+    if (filesystem.isDebug()) {
+      console.log(`new Entry(path="${path}", parent.path="${parent?.path()}")`);
     }
+
+    this.storedPath = path;
+    this.storedName = path.split("/").slice(-1)[0];
+  }
+
+  path(): string {
+    return this.storedPath;
+  }
+
+  name(): string {
+    return this.storedName;
+  }
+
+  parent(): FsaDirectory {
+    return this.storedParent;
   }
 
   async metadata(): Promise<Metadata> {
-    if (this.filesystem.DEBUG) {
-      console.log(`Entry(path="${this.path}").metadata()`);
+    if (this.filesystem.isDebug()) {
+      console.log(`Entry(path="${this.path()}").metadata()`);
     }
-    const storedData: StoredData = await get(this.path);
+    const storedData: StoredData = await get(this.path());
     let size;
     if (this.handle.kind === "file") {
       size = BigInt((await this.handle.getFile()).size);
@@ -555,30 +410,31 @@ abstract class Entry {
   }
 
   async stat(): Promise<Stat> {
-    if (this.filesystem.DEBUG) {
-      console.log(`Entry(path="${this.path}").stat()`);
+    if (this.filesystem.isDebug()) {
+      console.log(`Entry(path="${this.path()}").stat()`);
     }
     return this.metadata();
   }
 }
 
-export class Directory extends Entry {
+class FsaDirEntry extends FsaEntry {}
+
+export class FsaDirectory extends FsaEntry {
   public readonly fileType: number = constants.WASI_FILETYPE_DIRECTORY;
 
   declare readonly handle: FileSystemDirectoryHandle;
 
-  async entries(): Promise<(File | Directory)[]> {
-    if (this.filesystem.DEBUG)
-      console.log(`Directory(this.path="${this.name}").entries()`);
+  async entries(): Promise<DirEntry[]> {
+    if (this.filesystem.isDebug())
+      console.log(`Directory(this.path="${this.path()}").entries()`);
     return this.filesystem.entries(this);
   }
 
-  open(): OpenDirectory {
-    return new OpenDirectory(
-      this.name,
-      this.path,
+  open(): FsaOpenDirectory {
+    return new FsaOpenDirectory(
+      this.path(),
       this.handle,
-      this.parent,
+      this.parent(),
       this.filesystem
     );
   }
@@ -600,7 +456,7 @@ export class Directory extends Entry {
         data: destination,
       });
       await w.close();
-      await set(entry.path, metadata);
+      await set(entry.path(), metadata);
     }
 
     return err;
@@ -631,7 +487,7 @@ export class Directory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File }>;
+  ): Promise<{ err: number; entry: FsaFile }>;
 
   // eslint-disable-next-line no-dupe-class-members
   getEntry(
@@ -642,7 +498,7 @@ export class Directory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: Directory }>;
+  ): Promise<{ err: number; entry: FsaDirectory }>;
 
   // eslint-disable-next-line no-dupe-class-members
   getEntry(
@@ -653,7 +509,7 @@ export class Directory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File | Directory }>;
+  ): Promise<{ err: number; entry: FsaFile | FsaDirectory }>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getEntry(
@@ -664,7 +520,7 @@ export class Directory extends Entry {
     fsRightsBase: Rights = Rights.None,
     fsRightsInheriting: Rights = Rights.None,
     fdFlags: FdFlags = FdFlags.None
-  ): Promise<{ err: number; entry: File | Directory }> {
+  ): Promise<{ err: number; entry: FsaFile | FsaDirectory }> {
     const {
       err: getParentErr,
       name,
@@ -684,22 +540,20 @@ export class Directory extends Entry {
       }
 
       if (name === ".") {
-        const entry = new Directory(
-          parent.name,
-          parent.path,
+        const entry = new FsaDirectory(
+          parent.path(),
           parent.handle,
-          parent.parent,
+          parent.parent(),
           parent.filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
       if (name === "..") {
-        const entry = new Directory(
-          parent.parent.name,
-          parent.parent.path,
-          parent.parent.handle,
-          parent.parent.parent,
-          parent.parent.filesystem
+        const entry = new FsaDirectory(
+          parent.parent().path(),
+          parent.parent().handle,
+          parent.parent().parent(),
+          parent.parent().filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
       }
@@ -711,7 +565,7 @@ export class Directory extends Entry {
 
     const open = async (
       create: boolean
-    ): Promise<{ err: number; entry: File | Directory }> => {
+    ): Promise<{ err: number; entry: FsaFile | FsaDirectory }> => {
       if (mode & FileOrDir.File) {
         try {
           return await this.filesystem.getFile(
@@ -763,7 +617,7 @@ export class Directory extends Entry {
     };
 
     let err;
-    let entry: File | Directory;
+    let entry: FsaFile | FsaDirectory;
     if (openFlags & OpenFlags.Create) {
       if (openFlags & OpenFlags.Exclusive) {
         if ((await open(false)).err === constants.WASI_ESUCCESS) {
@@ -790,9 +644,13 @@ export class Directory extends Entry {
 
     return { err, entry };
   }
+
+  setAsCwd() {
+    this.storedName = ".";
+  }
 }
 
-export class OpenDirectory extends Directory {
+export class FsaOpenDirectory extends FsaDirectory {
   public readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
 
   async deleteEntry(
@@ -803,7 +661,7 @@ export class OpenDirectory extends Directory {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
-      await del(parent.path + name);
+      await del(parent.path() + name);
     }
     return { err };
   }
@@ -814,7 +672,7 @@ export class OpenDirectory extends Directory {
   }
 }
 
-export class File extends Entry {
+export class FsaFile extends FsaEntry {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
   declare readonly handle: FileSystemFileHandle;
@@ -822,13 +680,7 @@ export class File extends Entry {
   // TODO: remove OpenedFd dependency, add wrapper for OpenedFdDirectory
   async open(): Promise<OpenedFd> {
     return new OpenedFd(
-      new OpenFile(
-        this.name,
-        this.path,
-        this.handle,
-        this.parent,
-        this.filesystem
-      ),
+      new FsaOpenFile(this.path(), this.handle, this.parent(), this.filesystem),
       (await this.metadata()).fileType
     );
   }
@@ -836,7 +688,7 @@ export class File extends Entry {
 
 // Represents File opened for reading and writing
 // it is backed by File System Access API through a FileSystemFileHandle handle
-export class OpenFile extends File {
+export class FsaOpenFile extends FsaFile {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
   private filePosition: number = 0;
@@ -844,8 +696,7 @@ export class OpenFile extends File {
   private DEBUG: boolean = false;
 
   async read(len: number): Promise<[Uint8Array, number]> {
-    if (this.DEBUG)
-      console.log(`OpenFile(${this.path}, ${this.name}).read(${len})`);
+    if (this.DEBUG) console.log(`OpenFile(${this.path()}).read(${len})`);
     let handle;
     let size;
     if (
@@ -853,7 +704,7 @@ export class OpenFile extends File {
     ) {
       const file = await this.handle.getFile();
       const path = await file.text();
-      const { err, entry } = await this.parent.getEntry(
+      const { err, entry } = await this.parent().getEntry(
         path,
         FileOrDir.File,
         LookupFlags.SymlinkFollow,
@@ -893,7 +744,7 @@ export class OpenFile extends File {
     ) {
       const file = await this.handle.getFile();
       const path = await file.text();
-      const { err, entry } = await this.parent.getEntry(
+      const { err, entry } = await this.parent().getEntry(
         path,
         FileOrDir.File,
         LookupFlags.SymlinkFollow,

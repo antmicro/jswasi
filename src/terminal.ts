@@ -1,15 +1,10 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import {
-  createFilesystem,
-  Directory,
-  FileOrDir,
-  Filesystem,
-  LookupFlags,
-  OpenFlags,
-} from "./filesystem.js";
+import { createFsaFilesystem, FsaDirectory } from "./filesystem/filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
+import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
+import { Filesystem } from "./filesystem/interfaces";
 
 declare global {
   interface Window {
@@ -62,7 +57,7 @@ const OPTIONAL_BINARIES = {
 };
 
 export async function fetchFile(
-  dir: Directory,
+  dir: FsaDirectory,
   filename: string,
   address: string,
   refetch: boolean = true
@@ -105,45 +100,57 @@ export async function fetchFile(
 
 // setup filesystem
 async function initFs(filesystem: Filesystem) {
-  await filesystem.rootDir.getEntry(
-    "/tmp",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/tmp",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
   // TODO: this will be a in-memory vfs in the future
-  await filesystem.rootDir.getEntry(
-    "/proc",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await filesystem.rootDir.getEntry(
-    "/etc",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await filesystem.rootDir.getEntry(
-    "/home",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await filesystem.rootDir.getEntry(
-    "/home/ant",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/proc",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/etc",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/home",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/home/ant",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
 
   const shellrc = (
-    await filesystem.rootDir.getEntry(
-      "/home/ant/.shellrc",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    )
+    await filesystem
+      .getRootDir()
+      .getEntry(
+        "/home/ant/.shellrc",
+        FileOrDir.File,
+        LookupFlags.SymlinkFollow,
+        OpenFlags.Create
+      )
   ).entry;
   if ((await shellrc.metadata()).size === 0n) {
     const openedShellrc = await shellrc.open();
@@ -154,94 +161,118 @@ async function initFs(filesystem: Filesystem) {
     );
   }
 
-  await filesystem.rootDir.getEntry(
-    "/usr",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
 
-  await filesystem.rootDir.getEntry(
-    "/lib",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/lib",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
 
   // create dummy files for browser executed commands
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/mount",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/umount",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/wget",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/download",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/ps",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/free",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/bin/reset",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/mount",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/umount",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/wget",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/download",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/ps",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/free",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/bin/reset",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    );
 
-  await filesystem.rootDir.getEntry(
-    "/usr/local",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await filesystem.rootDir.getEntry(
-    "/usr/local/bin",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/local",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+  await filesystem
+    .getRootDir()
+    .getEntry(
+      "/usr/local/bin",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
 
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
     ([filename, address]) =>
-      fetchFile(filesystem.rootDir, filename, address, true)
+      fetchFile(filesystem.getRootDir(), filename, address, true)
   );
   const necessaryPromises = Object.entries(NECESSARY_BINARIES).map(
     ([filename, address]) =>
-      fetchFile(filesystem.rootDir, filename, address, false)
+      fetchFile(filesystem.getRootDir(), filename, address, false)
   );
   const optionalPromises = Object.entries(OPTIONAL_BINARIES).map(
     ([filename, address]) =>
-      fetchFile(filesystem.rootDir, filename, address, false)
+      fetchFile(filesystem.getRootDir(), filename, address, false)
   );
 
   await Promise.all([
@@ -251,23 +282,27 @@ async function initFs(filesystem: Filesystem) {
   ]);
 
   await Promise.all([
-    filesystem.rootDir.addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/touch", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/rm", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/mv", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/cp", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/echo", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/date", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/printf", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/env", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/cat", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/realpath", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
-    filesystem.rootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/touch", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/rm", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/mv", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/cp", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/echo", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/date", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/printf", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/env", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/cat", "/usr/bin/coreutils"),
+    filesystem
+      .getRootDir()
+      .addSymlink("/usr/bin/realpath", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
+    filesystem
+      .getRootDir()
+      .addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
+    filesystem.getRootDir().addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
   ]);
 }
 
@@ -287,12 +322,14 @@ function initDropImport(
       path: string
     ) => {
       const dir = (
-        await processManager.filesystem.rootDir.getEntry(
-          path,
-          FileOrDir.Directory,
-          LookupFlags.SymlinkFollow,
-          OpenFlags.Create
-        )
+        await processManager.filesystem
+          .getRootDir()
+          .getEntry(
+            path,
+            FileOrDir.Directory,
+            LookupFlags.SymlinkFollow,
+            OpenFlags.Create
+          )
       ).entry;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
@@ -357,7 +394,7 @@ export async function init(
     return;
   }
 
-  const filesystem: Filesystem = await createFilesystem();
+  const filesystem: Filesystem = await createFsaFilesystem();
 
   initServiceWorker();
   await initFs(filesystem);
@@ -369,7 +406,6 @@ export async function init(
 
   const processManager = new ProcessManager(
     "process.js",
-    // receive_callback
     (output: string) => {
       terminal.io.print(output);
       if (window.stdoutAttached) {
@@ -440,9 +476,9 @@ export async function init(
   );
 
   const pwdDir = (
-    await filesystem.rootDir.getEntry("/home/ant", FileOrDir.Directory)
+    await filesystem.getRootDir().getEntry("/home/ant", FileOrDir.Directory)
   ).entry;
-  pwdDir.name = ".";
+  pwdDir.setAsCwd();
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -452,10 +488,10 @@ export async function init(
       new Stdin(processManager),
       new Stdout(processManager),
       new Stderr(processManager),
-      filesystem.rootDir.open(),
+      filesystem.getRootDir().open(),
       pwdDir.open(),
       // TODO: why must fds[5] be present for ls to work, and what should it be
-      filesystem.rootDir.open(),
+      filesystem.getRootDir().open(),
     ],
     ["/usr/bin/shell"],
     {

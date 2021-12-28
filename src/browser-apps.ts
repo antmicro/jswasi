@@ -1,9 +1,9 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FileOrDir } from "./filesystem.js";
 import { fetchFile } from "./terminal.js";
 import ProcessManager from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
+import { FileOrDir } from "./filesystem/enums.js";
 
 const ENCODER = new TextEncoder();
 
@@ -21,7 +21,7 @@ export async function mount(
   switch (args.length) {
     case 1: {
       await stdout.write(ENCODER.encode("wasmfs on /\n"));
-      for (const mountPoint of processManager.filesystem.mounts) {
+      for (const mountPoint of processManager.filesystem.getMounts()) {
         // eslint-disable-next-line no-await-in-loop
         await stdout.write(
           ENCODER.encode(
@@ -156,10 +156,9 @@ export async function download(
         path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
       }
 
-      const { err, entry } = await processManager.filesystem.rootDir.getEntry(
-        path,
-        FileOrDir.File
-      );
+      const { err, entry } = await processManager.filesystem
+        .getRootDir()
+        .getEntry(path, FileOrDir.File);
       if (err !== constants.WASI_ESUCCESS) {
         await stderr.write(ENCODER.encode(`download: no such file: ${path}\n`));
         return Promise.resolve();
