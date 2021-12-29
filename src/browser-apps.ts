@@ -124,7 +124,7 @@ export async function wget(
   }
   const { dir } = await processManager.filesystem.resolveAbsolute(path);
   try {
-    await fetchFile(dir, path, address);
+    await fetchFile(dir.open(), path, address);
   } catch (error) {
     await stderr.write(
       ENCODER.encode(
@@ -158,6 +158,7 @@ export async function download(
 
       const { err, entry } = await processManager.filesystem
         .getRootDir()
+        .open()
         .getEntry(path, FileOrDir.File);
       if (err !== constants.WASI_ESUCCESS) {
         await stderr.write(ENCODER.encode(`download: no such file: ${path}\n`));

@@ -983,7 +983,7 @@ function WASI(): WASICallbacks {
 
     sendToKernel([
       "path_link",
-      [sharedBuffer, old_fd, old_flags, oldPath, new_fd, newPath],
+      { sharedBuffer, old_fd, old_flags, oldPath, new_fd, newPath },
     ]);
 
     Atomics.wait(lck, 0, -1);

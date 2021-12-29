@@ -1,10 +1,13 @@
 import * as constants from "./constants.js";
-import { OpenedFd, Stderr, Stdin, Stdout } from "./devices.js";
-import { FsaOpenDirectory } from "./filesystem/filesystem.js";
+import { In, Out } from "./devices.js";
+import {
+  Filesystem,
+  OpenDirectory,
+  OpenFile,
+} from "./filesystem/interfaces.js";
 import { FileOrDir } from "./filesystem/enums.js";
-import { Filesystem } from "./filesystem/interfaces";
 
-type FileDescriptor = Stdin | Stdout | Stderr | OpenedFd | FsaOpenDirectory;
+type FileDescriptor = In | Out | OpenFile | OpenDirectory;
 
 type BufferRequest = {
   requestedLen: number;
@@ -66,7 +69,7 @@ export default class ProcessManager {
       processManager: ProcessManager
     ) => Promise<void>,
     command: string,
-    fds: any[], // TODO: add In and Out interfaces, change this signature to (In | Out)[]
+    fds: FileDescriptor[],
     args: string[],
     env: Record<string, string>,
     isJob: boolean
@@ -95,6 +98,7 @@ export default class ProcessManager {
     if (!this.compiledModules[command]) {
       const { err, entry } = await this.filesystem
         .getRootDir()
+        .open()
         .getEntry(command, FileOrDir.File);
       if (err !== constants.WASI_ESUCCESS) {
         console.error(`No such binary: ${command}`);
@@ -109,6 +113,7 @@ export default class ProcessManager {
         handle = (
           await entry
             .parent()
+            .open()
             .getEntry(
               await (await entry.handle.getFile()).text(),
               FileOrDir.File
