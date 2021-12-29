@@ -65,9 +65,6 @@ export interface Filesystem {
 }
 
 export interface Entry {
-  handle: any; // TODO: TEMPORARY!!!
-  filesystem: any; // TODO: TEMPORARY!!!
-
   parent(): Directory;
 
   path(): string;

@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { createFsaFilesystem } from "./filesystem/filesystem.js";
+import { createFsaFilesystem } from "./filesystem/fsa-filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { Filesystem, OpenDirectory } from "./filesystem/interfaces";
