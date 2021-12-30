@@ -13,37 +13,6 @@ export type Mount = { parts: string[]; name: string; dir: Directory };
 export interface Filesystem {
   getRootDir(): Directory;
 
-  getMetaDir(): Directory;
-
-  getParent(
-    dir: Directory,
-    path: string
-  ): Promise<{ err: number; name: string; parent: Directory }>;
-
-  getDirectory(
-    dir: OpenDirectory,
-    name: string,
-    options: { create: boolean },
-    lookupFlags?: LookupFlags,
-    openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: Directory }>;
-
-  getFile(
-    dir: OpenDirectory,
-    name: string,
-    options: { create: boolean },
-    lookupFlags?: LookupFlags,
-    openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File }>;
-
-  dirEntries(dir: OpenDirectory): Promise<DirEntry[]>;
-
   resolveAbsolute(
     path: string
   ): Promise<{ err: number; name: string; dir: Directory }>;
