@@ -364,6 +364,8 @@ abstract class FsaEntry implements Entry {
 
   private readonly storedParent: FsaDirectory;
 
+  protected _metadata: Metadata;
+
   constructor(
     path: string,
     public readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
@@ -388,30 +390,33 @@ abstract class FsaEntry implements Entry {
   }
 
   async metadata(): Promise<Metadata> {
-    const storedData: StoredData = await get(this.path());
-    let size;
-    if (this.handle.kind === "file") {
-      size = BigInt((await this.handle.getFile()).size);
-    } else {
-      size = 4096n;
+    if (!this._metadata) {
+      const storedData: StoredData = await get(this.path());
+      let size;
+      if (this.handle.kind === "file") {
+        size = BigInt((await this.handle.getFile()).size);
+      } else {
+        size = 4096n;
+      }
+      this._metadata = {
+        dev: 0n,
+        ino: 0n,
+        nlink: 1n,
+        rdev: 0,
+        size,
+        gid: storedData.gid,
+        uid: storedData.uid,
+        userMode: storedData.userMode,
+        groupMode: storedData.groupMode,
+        blockSize: 0,
+        blocks: 0,
+        fileType: storedData.fileType,
+        atim: storedData.atim,
+        mtim: storedData.mtim,
+        ctim: storedData.ctim,
+      };
     }
-    return {
-      dev: 0n,
-      ino: 0n,
-      nlink: 1n,
-      rdev: 0,
-      size,
-      gid: storedData.gid,
-      uid: storedData.uid,
-      userMode: storedData.userMode,
-      groupMode: storedData.groupMode,
-      blockSize: 0,
-      blocks: 0,
-      fileType: storedData.fileType,
-      atim: storedData.atim,
-      mtim: storedData.mtim,
-      ctim: storedData.ctim,
-    };
+    return this._metadata;
   }
 
   async stat(): Promise<Stat> {
@@ -436,28 +441,34 @@ export class FsaDirectory extends FsaEntry implements Directory {
   }
 }
 
+// TODO: extend FsaEntry instead of FsaDirectory
 export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   public readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
 
+  declare readonly handle: FileSystemDirectoryHandle;
+
   async metadata(): Promise<Metadata> {
-    const storedData: StoredData = await get(this.path());
-    return {
-      dev: 0n,
-      ino: 0n,
-      nlink: 1n,
-      rdev: 0,
-      size: 4096n,
-      gid: storedData.gid,
-      uid: storedData.uid,
-      userMode: storedData.userMode,
-      groupMode: storedData.groupMode,
-      blockSize: 0,
-      blocks: 0,
-      fileType: constants.WASI_PREOPENTYPE_DIR,
-      atim: storedData.atim,
-      mtim: storedData.mtim,
-      ctim: storedData.ctim,
-    };
+    if (!this._metadata) {
+      const storedData: StoredData = await get(this.path());
+      this._metadata = {
+        dev: 0n,
+        ino: 0n,
+        nlink: 1n,
+        rdev: 0,
+        size: 4096n,
+        gid: storedData.gid,
+        uid: storedData.uid,
+        userMode: storedData.userMode,
+        groupMode: storedData.groupMode,
+        blockSize: 0,
+        blocks: 0,
+        fileType: constants.WASI_PREOPENTYPE_DIR,
+        atim: storedData.atim,
+        mtim: storedData.mtim,
+        ctim: storedData.ctim,
+      };
+    }
+    return this._metadata;
   }
 
   async entries(): Promise<DirEntry[]> {
@@ -513,6 +524,15 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
       return { err, linkedPath: await (await entry.handle.getFile()).text() };
     }
     return { err, linkedPath: null };
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async close() {
+    // in FSA there is no need to close a directory
+  }
+
+  setAsCwd() {
+    this.storedName = ".";
   }
 
   // basically copied form RReverser's wasi-fs-access
@@ -680,15 +700,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     }
 
     return { err, entry };
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async close() {
-    // TODO: what would that mean to close a FileSystemDirectoryHandle?
-  }
-
-  setAsCwd() {
-    this.storedName = ".";
   }
 }
 
