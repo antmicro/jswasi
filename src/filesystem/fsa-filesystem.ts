@@ -77,6 +77,55 @@ class FsaFilesystem implements Filesystem {
     return this.mounts;
   }
 
+  async getFile(
+    dir: FsaOpenDirectory,
+    name: string,
+    options: { create: boolean } = { create: false },
+    lookupFlags?: LookupFlags
+  ): Promise<{ err: number; entry: FsaFile }> {
+    const path = `${dir.path()}/${name}`;
+    const handle = await dir.handle.getFileHandle(name, options);
+    const file = await handle.getFile();
+    let storedData: StoredData = await get(path);
+    if (!storedData) {
+      storedData = {
+        fileType: constants.WASI_FILETYPE_REGULAR_FILE,
+        userMode: 7,
+        groupMode: 7,
+        uid: 0,
+        gid: 0,
+        atim: 0n,
+        mtim: BigInt(file.lastModified) * 1_000_000n,
+        ctim: 0n,
+      };
+      await set(path, storedData);
+    }
+
+    if (
+      storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
+      lookupFlags & LookupFlags.SymlinkFollow
+    ) {
+      const { err: readlinkErr, linkedPath } = await dir.readlink(path);
+      if (readlinkErr !== constants.WASI_ESUCCESS) {
+        return { err: readlinkErr, entry: null };
+      }
+      const {
+        err: getParentErr,
+        parent,
+        name,
+      } = await this.getParent(dir, linkedPath);
+      if (getParentErr !== constants.WASI_ESUCCESS) {
+        return { err: getParentErr, entry: null };
+      }
+      return this.getFile(parent.open(), name, options, lookupFlags);
+    }
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      entry: new FsaFile(path, handle, dir, this),
+    };
+  }
+
   async getDirectory(
     dir: FsaOpenDirectory,
     name: string,
@@ -121,6 +170,22 @@ class FsaFilesystem implements Filesystem {
     const path = `${dir.path()}/${name}`;
     // TODO: should also consider getFileHandle in case it's a symlink
     const handle = await dir.handle.getDirectoryHandle(name, options);
+    // if (lookupFlags & LookupFlags.SymlinkFollow) {
+    //   const storedData: StoredData = await get(path);
+    //   if (storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+    //
+    //   }
+    // }
+    // let handle;
+    // try {
+    //   handle = await dir.handle.getDirectoryHandle(name, options);
+    // } catch (err) {
+    //   if (lookupFlags & LookupFlags.SymlinkFollow && (err.name === "TypeMismatchError" || err.name === "TypeError")) {
+    //     return dir.getEntry(path, FileOrDir.Directory, LookupFlags.SymlinkFollow);
+    //   }
+    //
+    //   throw err;
+    // }
     let storedData: StoredData = await get(path);
     if (!storedData) {
       storedData = {
@@ -158,59 +223,6 @@ class FsaFilesystem implements Filesystem {
     return {
       err: constants.WASI_ESUCCESS,
       entry: new FsaDirectory(path, handle, dir, this),
-    };
-  }
-
-  async getFile(
-    dir: FsaOpenDirectory,
-    name: string,
-    options: { create: boolean } = { create: false },
-    lookupFlags?: LookupFlags,
-    openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: FsaFile }> {
-    const path = `${dir.path()}/${name}`;
-    const handle = await dir.handle.getFileHandle(name, options);
-    const file = await handle.getFile();
-    let storedData: StoredData = await get(path);
-    if (!storedData) {
-      storedData = {
-        fileType: constants.WASI_FILETYPE_REGULAR_FILE,
-        userMode: 7,
-        groupMode: 7,
-        uid: 0,
-        gid: 0,
-        atim: 0n,
-        mtim: BigInt(file.lastModified) * 1_000_000n,
-        ctim: 0n,
-      };
-      await set(path, storedData);
-    }
-
-    if (
-      storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
-      lookupFlags & LookupFlags.SymlinkFollow
-    ) {
-      const { err, linkedPath } = await dir.readlink(path);
-      if (err !== constants.WASI_ESUCCESS) {
-        return { err, entry: null };
-      }
-      return dir.getEntry(
-        linkedPath,
-        FileOrDir.File,
-        lookupFlags,
-        openFlags,
-        fsRightsBase,
-        fsRightsInheriting,
-        fdFlags
-      );
-    }
-
-    return {
-      err: constants.WASI_ESUCCESS,
-      entry: new FsaFile(path, handle, dir, this),
     };
   }
 
@@ -575,7 +587,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   async getEntry(
     path: string,
     mode: FileOrDir,
-    dirFlags: LookupFlags = LookupFlags.SymlinkFollow,
+    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
     openFlags: OpenFlags = OpenFlags.None,
     fsRightsBase: Rights = Rights.None,
     fsRightsInheriting: Rights = Rights.None,
@@ -634,11 +646,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
             {
               create,
             },
-            dirFlags,
-            openFlags,
-            fsRightsBase,
-            fsRightsInheriting,
-            fdFlags
+            lookupFlags
           );
         } catch (err) {
           if (err.name === "TypeMismatchError" || err.name === "TypeError") {
@@ -659,7 +667,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
           {
             create,
           },
-          dirFlags,
+          lookupFlags,
           openFlags,
           fsRightsBase,
           fsRightsInheriting,
