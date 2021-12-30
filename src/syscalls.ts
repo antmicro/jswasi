@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { OpenFile, OpenDirectory } from "./filesystem/interfaces.js";
+import { OpenDirectory, OpenFile } from "./filesystem/interfaces.js";
 import {
   download,
   free,
@@ -631,6 +631,7 @@ export default async function syscallCallback(
         ({ err } = await (fds[fd] as OpenDirectory).getEntry(
           path,
           FileOrDir.Directory,
+          LookupFlags.SymlinkFollow,
           OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive
         ));
       } else {
