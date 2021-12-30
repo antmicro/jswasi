@@ -21,6 +21,7 @@ import {
   Mount,
   OpenDirectory,
   OpenFile,
+  StreamableFile,
 } from "./interfaces.js";
 
 export async function createFsaFilesystem(): Promise<FsaFilesystem> {
@@ -703,7 +704,7 @@ export class FsaFile extends FsaEntry implements File {
 
 // Represents File opened for reading and writing
 // it is backed by File System Access API through a FileSystemFileHandle handle
-export class FsaOpenFile extends FsaEntry implements OpenFile {
+export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
 
   private filePosition: number = 0;

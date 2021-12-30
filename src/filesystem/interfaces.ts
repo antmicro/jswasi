@@ -138,7 +138,15 @@ export interface OpenDirectory extends Entry {
 }
 
 export interface File extends Entry {
-  open(): Promise<OpenFile>;
+  open(): Promise<OpenFile & StreamableFile>;
+}
+
+export interface StreamableFile {
+  arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer>;
+
+  readableStream(): Promise<NodeJS.ReadableStream>;
+
+  writableStream(): Promise<WritableStream>;
 }
 
 export interface OpenFile extends Entry {
@@ -159,10 +167,4 @@ export interface OpenFile extends Entry {
   seek(offset: number, whence: number): Promise<number>;
 
   truncate(size: number): Promise<void>;
-
-  arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer>;
-
-  readableStream(): Promise<NodeJS.ReadableStream>;
-
-  writableStream(): Promise<WritableStream>;
 }
