@@ -334,6 +334,11 @@ class FsaFilesystem implements Filesystem {
     }
 
     for await (const [name, handle] of dir.handle.entries()) {
+      // FSA API implementation detail: file associated with opened writable stream of FileSystemFileHandle
+      if (name.endsWith(".crswap")) {
+        continue;
+      }
+
       // mounted directories hide directories they are mounted to
       let alreadyExists = false;
       for (const entry of entries) {
@@ -711,38 +716,27 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
 
   public declare readonly handle: FileSystemFileHandle;
 
+  private writer: FileSystemWritableFileStream;
+
   // eslint-disable-next-line class-methods-use-this
   isatty(): boolean {
-    return true;
+    return false;
+  }
+
+  async getWriter() {
+    if (!this.writer) {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: true,
+      });
+    }
+    return this.writer;
   }
 
   async read(len: number): Promise<[Uint8Array, number]> {
-    let handle: FileSystemFileHandle;
-    let size;
-    if (
-      (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
-    ) {
+    await this.flush();
+
+    if (this.filePosition < (await this.metadata()).size) {
       const file = await this.handle.getFile();
-      const path = await file.text();
-      const { err, entry } = await this.parent()
-        .open()
-        .getEntry(
-          path,
-          FileOrDir.File,
-          LookupFlags.SymlinkFollow,
-          OpenFlags.None
-        );
-      if (err !== constants.WASI_ESUCCESS) {
-        return [new Uint8Array(0), err];
-      }
-      handle = entry.handle;
-      size = file.size;
-    } else {
-      handle = this.handle;
-      size = (await this.metadata()).size;
-    }
-    if (this.filePosition < size) {
-      const file = await handle.getFile();
       let data = await file
         .slice(this.filePosition, this.filePosition + len)
         .arrayBuffer();
@@ -772,47 +766,22 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     Atomics.notify(lck, 0);
   }
 
-  // TODO: each write creates new writable, store it on creation
   async write(buffer: Uint8Array): Promise<number> {
-    let handle: FileSystemFileHandle;
-    if (
-      (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
-    ) {
-      const file = await this.handle.getFile();
-      const path = await file.text();
-      const { err, entry } = await this.parent()
-        .open()
-        .getEntry(
-          path,
-          FileOrDir.File,
-          LookupFlags.SymlinkFollow,
-          OpenFlags.None
-        );
-      if (err !== constants.WASI_ESUCCESS) {
-        return err;
-      }
-      handle = entry.handle;
-    } else {
-      handle = this.handle;
-    }
-
-    const w = await handle.createWritable({ keepExistingData: true });
     // data passed to write function cannot have the underlying buffer as shared
     const data = new ArrayBuffer(buffer.byteLength);
     new Uint8Array(data).set(new Uint8Array(buffer));
-    await w.write({
+    console.log(`writing ${new TextDecoder().decode(data)} to ${this.path()}`);
+    await (
+      await this.getWriter()
+    ).write({
       type: "write",
       position: this.filePosition,
       data,
     });
-    await w.close();
+    // TODO: this flush creates a bottleneck, but without it data is not written to file
+    await this.flush();
     this.filePosition += buffer.byteLength;
     return constants.WASI_ESUCCESS;
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async close() {
-    // TODO: add implementation when reworking OpenFile
   }
 
   async seek(offset: number, whence: number): Promise<number> {
@@ -833,16 +802,25 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
         throw Error("Unhandled whence case");
       }
     }
-    // TODO: this only makes sense if we store WritableFileStream on class
-    // await w.write({type: "seek", position: offset});
+
+    await this.writer?.write({ type: "seek", position: this.filePosition });
+    await this.flush();
+
     return this.filePosition;
   }
 
   async truncate(size: number = 0) {
-    const writable = await this.handle.createWritable();
-    await writable.write({ type: "truncate", size });
-    await writable.close();
-    this.filePosition = 0;
+    await (await this.getWriter()).write({ type: "truncate", size });
+    this.filePosition = size;
+  }
+
+  async flush() {
+    await this.writer?.close();
+    this.writer = null;
+  }
+
+  async close() {
+    await this.flush();
   }
 
   async arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer> {

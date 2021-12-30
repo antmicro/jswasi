@@ -98,7 +98,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         // this can be Stdin/Stdout/Stderr/OpenedFd
-        isatty[0] = Number((fds[fd] as OpenFile).isatty());
+        isatty[0] = Number((fds[fd] as OpenFile | In | Out).isatty());
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
