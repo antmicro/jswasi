@@ -11,8 +11,6 @@ import {
 export type Mount = { parts: string[]; name: string; dir: Directory };
 
 export interface Filesystem {
-  isDebug(): boolean;
-
   getRootDir(): Directory;
 
   getMetaDir(): Directory;

@@ -49,8 +49,6 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
 }
 
 class FsaFilesystem implements Filesystem {
-  private DEBUG = false;
-
   // TODO: parts could be a key, that would optimise the lookup
   mounts: Mount[] = [];
 
@@ -64,10 +62,6 @@ class FsaFilesystem implements Filesystem {
   ) {
     this.rootDir = new FsaDirectory("", rootHandle, null, this);
     this.metaDir = new FsaDirectory("", metaHandle, null, this);
-  }
-
-  isDebug(): boolean {
-    return this.DEBUG;
   }
 
   getRootDir(): FsaDirectory {
@@ -273,8 +267,6 @@ class FsaFilesystem implements Filesystem {
   async resolveAbsolute(
     path: string
   ): Promise<{ err: number; name: string; dir: Directory }> {
-    if (this.isDebug()) console.log(`resolveAbsolute(${path})`);
-
     const { parts, name } = parsePath(path);
     let dir = this.getRootDir();
 
@@ -283,8 +275,6 @@ class FsaFilesystem implements Filesystem {
         // eslint-disable-next-line no-await-in-loop
         ({ entry: dir } = await this.getDirectory(dir.open(), part));
       }
-      if (this.isDebug())
-        console.log(`resolveAbsolute(${path}) = ${name}, ${dir}`);
       return { err: constants.WASI_ESUCCESS, name, dir };
     } catch (err) {
       if (err.name === "NotFoundError") {
@@ -301,9 +291,6 @@ class FsaFilesystem implements Filesystem {
     dir: FsaDirectory,
     path: string
   ): Promise<{ err: number; name: string; parent: FsaDirectory }> {
-    if (this.isDebug())
-      console.log(`getParent(name="${dir.handle.name}", path="${path}")`);
-
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (
@@ -330,8 +317,6 @@ class FsaFilesystem implements Filesystem {
       throw err;
     }
 
-    if (this.isDebug())
-      console.log(`getParent resolved as = {"${name}", "${dir.name}"}`);
     return { err: constants.WASI_ESUCCESS, name, parent: dir };
   }
 
@@ -379,10 +364,6 @@ abstract class FsaEntry implements Entry {
     parent: FsaDirectory,
     public readonly filesystem: FsaFilesystem
   ) {
-    if (filesystem.isDebug()) {
-      console.log(`new Entry(path="${path}", parent.path="${parent?.path()}")`);
-    }
-
     this.storedPath = path;
     this.storedName = path.split("/").slice(-1)[0];
     this.storedParent = parent;
@@ -401,9 +382,6 @@ abstract class FsaEntry implements Entry {
   }
 
   async metadata(): Promise<Metadata> {
-    if (this.filesystem.isDebug()) {
-      console.log(`Entry(path="${this.path()}").metadata()`);
-    }
     const storedData: StoredData = await get(this.path());
     let size;
     if (this.handle.kind === "file") {
@@ -431,9 +409,6 @@ abstract class FsaEntry implements Entry {
   }
 
   async stat(): Promise<Stat> {
-    if (this.filesystem.isDebug()) {
-      console.log(`Entry(path="${this.path()}").stat()`);
-    }
     return this.metadata();
   }
 }
@@ -459,9 +434,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   public readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
 
   async metadata(): Promise<Metadata> {
-    if (this.filesystem.isDebug()) {
-      console.log(`Entry(path="${this.path()}").metadata()`);
-    }
     const storedData: StoredData = await get(this.path());
     return {
       dev: 0n,
@@ -483,8 +455,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   }
 
   async entries(): Promise<DirEntry[]> {
-    if (this.filesystem.isDebug())
-      console.log(`Directory(this.path="${this.path()}").entries()`);
     return this.filesystem.dirEntries(this);
   }
 
@@ -492,7 +462,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     path: string,
     options: { recursive: boolean } = { recursive: false }
   ): Promise<{ err: number }> {
-    console.log(`OpenDirectory(${this.name}).deleteEntry(${path}, ${options})`);
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
@@ -749,7 +718,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
   }
 
   async read(len: number): Promise<[Uint8Array, number]> {
-    if (this.DEBUG) console.log(`OpenFile(${this.path()}).read(${len})`);
     let handle: FileSystemFileHandle;
     let size;
     if (
@@ -807,10 +775,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
 
   // TODO: each write creates new writable, store it on creation
   async write(buffer: Uint8Array): Promise<number> {
-    if (this.DEBUG)
-      console.log(
-        `OpenFile(${this.name}).write(${this.name} len=${buffer.byteLength}, position ${this.filePosition})`
-      );
     let handle: FileSystemFileHandle;
     if (
       (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
@@ -853,8 +817,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
   }
 
   async seek(offset: number, whence: number): Promise<number> {
-    if (this.DEBUG)
-      console.log(`OpenFile(${this.name}).seek(${offset}, ${whence})`);
     switch (whence) {
       case constants.WASI_WHENCE_SET: {
         this.filePosition = offset;
@@ -878,7 +840,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
   }
 
   async truncate(size: number = 0) {
-    if (this.DEBUG) console.log(`OpenFile(${this.name}).truncate(${size})`);
     const writable = await this.handle.createWritable();
     await writable.write({ type: "truncate", size });
     await writable.close();
