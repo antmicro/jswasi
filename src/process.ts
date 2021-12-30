@@ -8,43 +8,40 @@ type ptr = number;
 // TODO: set the proper types for each callback
 type WASICallbacks = {
   // helper
-  setModuleInstance: any;
+  setModuleInstance: (instance: WebAssembly.Instance) => void;
 
   // custom syscalls
   isatty: (fd: number) => number;
 
   // official syscalls
-  environ_sizes_get: any;
-  args_sizes_get: any;
-  fd_prestat_get: any;
-  fd_fdstat_get: any;
-  fd_filestat_get: any;
-  fd_read: any;
-  fd_write: any;
-  fd_prestat_dir_name: any;
-  environ_get: any;
-  args_get: any;
-  poll_oneoff: any;
-  proc_exit: any;
-  fd_close: any;
-  fd_seek: any;
-  random_get: any;
-  clock_time_get: any;
-  fd_readdir: any;
-  path_create_directory: any;
-  path_filestat_get: any;
-  path_link: any;
-  path_open: any;
-  path_readlink: any;
-  path_remove_directory: any;
-  path_rename: any;
-  path_unlink_file: any;
-  sched_yield: any;
+  environ_sizes_get: (environCountPtr: ptr, environSizePtr: ptr) => number;
+  environ_get: (environ: ptr, environBuf: ptr) => number;
+  args_sizes_get: (argc: ptr, argvBufSize: ptr) => number;
+  args_get: (argv: ptr, argvBuf: ptr) => number;
+
+  fd_prestat_get: (fd: number, buf: ptr) => number;
+  fd_fdstat_get: (fd: number, buf: ptr) => number;
+  fd_prestat_dir_name: (fd: number, pathPtr: ptr, pathLen: number) => number;
+  fd_readdir: (
+    fd: number,
+    buf: ptr,
+    bufLen: number,
+    cookie: number,
+    bufUsedPtr: ptr
+  ) => number;
+  fd_filestat_get: (fd: number, buf: ptr) => number;
+  fd_read: (fd: number, iovs: ptr, iovsLen: number, nRead: ptr) => number;
+  fd_write: (fd: number, iovs: ptr, iovsLen: number, nWritten: ptr) => number;
+  fd_seek: (
+    fd: number,
+    offset: BigInt,
+    whence: number,
+    newOffset: ptr
+  ) => number;
+  fd_close: (fd: number) => number;
   fd_datasync: any;
   fd_filestat_set_size: any;
   fd_sync: any;
-  path_symlink: any;
-  clock_res_get: any;
   fd_advise: any;
   fd_allocate: any;
   fd_fdstat_set_flags: any;
@@ -55,11 +52,66 @@ type WASICallbacks = {
   fd_advice: any;
   fd_pwrite: any;
   fd_renumber: any;
+
   path_filestat_set_times: any;
-  proc_raise: any;
+  path_filestat_get: (
+    fd: number,
+    lookupFlags: LookupFlags,
+    pathPtr: ptr,
+    pathLen: number,
+    buf: ptr
+  ) => number;
+  path_open: (
+    dirFd: number,
+    lookupFlags: LookupFlags,
+    pathPtr: ptr,
+    pathLen: number,
+    openFlags: OpenFlags,
+    fsRightsBase: Rights,
+    fsRightsInheriting: Rights,
+    fdFlags: FdFlags,
+    openedFdPtr: ptr
+  ) => number;
+  path_rename: any;
+  path_create_directory: (fd: number, pathPtr: ptr, pathLen: number) => number;
+  path_remove_directory: (fd: number, pathPtr: ptr, pathLen: number) => number;
+  path_link: (
+    oldFd: number,
+    oldFlags: number,
+    oldPathPtr: ptr,
+    oldPathLen: number,
+    newFd: number,
+    newPathPtr: ptr,
+    newPathLen: number
+  ) => number;
+  path_symlink: (
+    oldPathPtr: ptr,
+    oldPathLen: number,
+    newFd: number,
+    newPathPtr: ptr,
+    newPathLen: number
+  ) => number;
+  path_readlink: (
+    fd: number,
+    pathPtr: ptr,
+    pathLen: number,
+    bufferPtr: ptr,
+    bufferLen: number,
+    bufferUsedPtr: ptr
+  ) => number;
+  path_unlink_file: (fd: number, pathPtr: ptr, pathLen: number) => number;
+
   sock_recv: any;
   sock_send: any;
   sock_shutdown: any;
+
+  proc_raise: any;
+  sched_yield: any;
+  poll_oneoff: any;
+  random_get: (bufPtr: ptr, bufLen: number) => number;
+  clock_time_get: (clockId: number, precision: number, time: ptr) => number;
+  clock_res_get: (clock_id: number) => number;
+  proc_exit: (exitCode: number) => void;
 };
 
 const ENCODER = new TextEncoder();
@@ -113,7 +165,7 @@ function doExit(exitCode: number) {
 function WASI(): WASICallbacks {
   let moduleInstanceExports: WebAssembly.Exports;
 
-  function setModuleInstance(instance: WebAssembly.Instance) {
+  function setModuleInstance(instance: WebAssembly.Instance): void {
     moduleInstanceExports = instance.exports;
   }
 
@@ -984,40 +1036,40 @@ function WASI(): WASICallbacks {
 
   // TODO: it doesn't work for now
   function poll_oneoff(
-    sin: ptr,
-    sout: ptr,
-    nsubscriptions: number,
-    nevents: ptr
+    subscriptionsPtr: ptr,
+    eventsPtr: ptr,
+    nSubscriptions: number,
+    nEvents: ptr
   ) {
     workerConsoleLog(
-      `poll_oneoff(${sin}, ${sout}, ${nsubscriptions}, ${nevents})`
+      `poll_oneoff(${subscriptionsPtr}, ${eventsPtr}, ${nSubscriptions}, ${nEvents})`
     );
     const view = new DataView(
       (moduleInstanceExports.memory as WebAssembly.Memory).buffer
     );
 
-    let eventc = 0;
+    let eventCount = 0;
     let waitEnd = 0n;
-    for (let i = 0; i < nsubscriptions; i += 1) {
-      const userdata = view.getBigUint64(sin, true);
-      sin += 8;
-      const eventType = view.getUint8(sin);
-      sin += 1;
+    for (let i = 0; i < nSubscriptions; i += 1) {
+      const userdata = view.getBigUint64(subscriptionsPtr, true);
+      subscriptionsPtr += 8;
+      const eventType = view.getUint8(subscriptionsPtr);
+      subscriptionsPtr += 1;
       switch (eventType) {
         case constants.WASI_EVENTTYPE_CLOCK: {
-          sin += 7;
-          const identifier = view.getBigUint64(sin, true);
-          sin += 8;
-          const clockid = view.getUint32(sin, true);
-          sin += 8;
-          const timestamp = view.getBigUint64(sin, true);
-          sin += 8;
-          const precision = view.getBigUint64(sin, true);
-          sin += 8;
-          const subclockflags = view.getUint16(sin, true);
-          sin += 8;
+          subscriptionsPtr += 7;
+          const identifier = view.getBigUint64(subscriptionsPtr, true);
+          subscriptionsPtr += 8;
+          const clockid = view.getUint32(subscriptionsPtr, true);
+          subscriptionsPtr += 8;
+          const timestamp = view.getBigUint64(subscriptionsPtr, true);
+          subscriptionsPtr += 8;
+          const precision = view.getBigUint64(subscriptionsPtr, true);
+          subscriptionsPtr += 8;
+          const subClockFlags = view.getUint16(subscriptionsPtr, true);
+          subscriptionsPtr += 8;
 
-          const absolute = subclockflags === 1;
+          const absolute = subClockFlags === 1;
 
           workerConsoleLog(
             `identifier = ${identifier}, clockid = ${clockid}, timestamp = ${timestamp}, precision = ${precision}, absolute = ${absolute}`
@@ -1027,32 +1079,32 @@ function WASI(): WASICallbacks {
           const end = absolute ? timestamp : n + timestamp;
           waitEnd = end > waitEnd ? end : waitEnd;
 
-          view.setBigUint64(sout, userdata, true);
-          sout += 8;
-          view.setUint16(sout, constants.WASI_ESUCCESS, true); // error
-          sout += 2; // pad offset 2
-          view.setUint8(sout, constants.WASI_EVENTTYPE_CLOCK);
-          sout += 6; // pad offset 3
+          view.setBigUint64(eventsPtr, userdata, true);
+          eventsPtr += 8;
+          view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true); // error
+          eventsPtr += 2; // pad offset 2
+          view.setUint8(eventsPtr, constants.WASI_EVENTTYPE_CLOCK);
+          eventsPtr += 6; // pad offset 3
 
-          eventc += 1;
+          eventCount += 1;
 
           break;
         }
         case constants.WASI_EVENTTYPE_FD_READ:
         case constants.WASI_EVENTTYPE_FD_WRITE: {
-          sin += 3; // padding
-          view.getUint32(sin, true);
-          sin += 4;
+          subscriptionsPtr += 3; // padding
+          view.getUint32(subscriptionsPtr, true);
+          subscriptionsPtr += 4;
 
-          view.setBigUint64(sout, userdata, true);
-          sout += 8;
-          view.setUint16(sout, constants.WASI_ENOSYS, true); // error
-          sout += 2; // pad offset 2
-          view.setUint8(sout, eventType);
-          sout += 1; // pad offset 3
-          sout += 5; // padding to 8
+          view.setBigUint64(eventsPtr, userdata, true);
+          eventsPtr += 8;
+          view.setUint16(eventsPtr, constants.WASI_ENOSYS, true); // error
+          eventsPtr += 2; // pad offset 2
+          view.setUint8(eventsPtr, eventType);
+          eventsPtr += 1; // pad offset 3
+          eventsPtr += 5; // padding to 8
 
-          eventc += 1;
+          eventCount += 1;
 
           break;
         }
@@ -1061,7 +1113,7 @@ function WASI(): WASICallbacks {
       }
     }
 
-    view.setUint32(nevents, eventc, true);
+    view.setUint32(nEvents, eventCount, true);
 
     while (utils.msToNs(performance.now()) < waitEnd) {
       // nothing

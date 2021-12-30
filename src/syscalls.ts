@@ -552,8 +552,8 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         const entries = await (fds[fd] as OpenDirectory).entries();
-        const fileTypes = await Promise.all(
-          entries.map(async (entry) => (await entry.stat()).fileType)
+        const stats = await Promise.all(
+          entries.map(async (entry) => entry.stat())
         );
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
@@ -564,8 +564,7 @@ export default async function syscallCallback(
           dataBufPtr += 8;
 
           if (dataBufPtr + 8 >= bufLen) break;
-          // TODO: get file stats ino (dummy 0n for now)
-          dataBuf.setBigUint64(dataBufPtr, 0n, true);
+          dataBuf.setBigUint64(dataBufPtr, stats[i].ino, true);
           dataBufPtr += 8;
 
           if (dataBufPtr + 4 >= bufLen) break;
@@ -573,7 +572,7 @@ export default async function syscallCallback(
           dataBufPtr += 4;
 
           if (dataBufPtr + 4 >= bufLen) break;
-          dataBuf.setUint8(dataBufPtr, fileTypes[i]);
+          dataBuf.setUint8(dataBufPtr, stats[i].fileType);
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit

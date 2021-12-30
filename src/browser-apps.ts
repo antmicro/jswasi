@@ -62,7 +62,7 @@ export async function mount(
         await stderr.write(
           ENCODER.encode("mount: failed to open local directory\n")
         );
-        return 1; // TODO: what would be a proper error here?
+        return constants.EXIT_FAILURE;
       }
 
       await processManager.filesystem.addMount(path, mountPoint);
