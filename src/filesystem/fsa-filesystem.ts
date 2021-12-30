@@ -709,8 +709,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
 
   private filePosition: number = 0;
 
-  private DEBUG: boolean = false;
-
   public declare readonly handle: FileSystemFileHandle;
 
   // eslint-disable-next-line class-methods-use-this

@@ -1,6 +1,6 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
-import { Metadata, Stat } from "./filesystem/enums.js";
+import { Stat } from "./filesystem/enums.js";
 
 const DECODER = new TextDecoder();
 

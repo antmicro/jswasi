@@ -549,6 +549,9 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
         const entries = await (fds[fd] as OpenDirectory).entries();
+        const fileTypes = await Promise.all(
+          entries.map(async (entry) => (await entry.stat()).fileType)
+        );
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name());
@@ -567,9 +570,7 @@ export default async function syscallCallback(
           dataBufPtr += 4;
 
           if (dataBufPtr + 4 >= dataBufLen) break;
-          // TODO: await all stat before the loop and create a list of fileTypes
-          const { fileType } = await entry.stat();
-          dataBuf.setUint8(dataBufPtr, fileType);
+          dataBuf.setUint8(dataBufPtr, fileTypes[i]);
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit
