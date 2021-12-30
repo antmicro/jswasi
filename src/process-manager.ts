@@ -104,28 +104,10 @@ export default class ProcessManager {
         console.error(`No such binary: ${command}`);
         return err;
       }
-      let handle;
-      if (
-        (await entry.metadata()).fileType ===
-        constants.WASI_FILETYPE_SYMBOLIC_LINK
-      ) {
-        // TODO: what about symlinks to symlinks, I think this would break
-        handle = (
-          await entry
-            .parent()
-            .open()
-            .getEntry(
-              await (await entry.handle.getFile()).text(),
-              FileOrDir.File
-            )
-        ).entry.handle;
-      } else {
-        handle = entry.handle;
-      }
 
-      const file = await handle.getFile();
-      const bufferSource = await file.arrayBuffer();
-      this.compiledModules[command] = await WebAssembly.compile(bufferSource);
+      this.compiledModules[command] = await WebAssembly.compile(
+        await (await entry.open()).arrayBuffer()
+      );
     }
 
     // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)

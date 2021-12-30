@@ -161,4 +161,10 @@ export interface OpenFile extends Entry {
   seek(offset: number, whence: number): Promise<number>;
 
   truncate(size: number): Promise<void>;
+
+  arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer>;
+
+  readableStream(): Promise<NodeJS.ReadableStream>;
+
+  writableStream(): Promise<WritableStream>;
 }

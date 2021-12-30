@@ -1,7 +1,10 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { createFsaFilesystem } from "./filesystem/fsa-filesystem.js";
+import {
+  createFsaFilesystem,
+  FsaDirectory,
+} from "./filesystem/fsa-filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { Filesystem, OpenDirectory } from "./filesystem/interfaces";
@@ -73,15 +76,14 @@ export async function fetchFile(
     return;
   }
 
-  const file = await entry.handle.getFile();
   // only fetch binary if not yet present
-  if (refetch || file.size === 0) {
+  if (refetch || (await entry.metadata()).size === 0n) {
     if (
-      !(address.startsWith("http://") || address.startsWith("https://")) ||
-      address.startsWith(location.origin)
+      !(
+        !(address.startsWith("http://") || address.startsWith("https://")) ||
+        address.startsWith(location.origin)
+      )
     ) {
-      // files served from same origin
-    } else {
       // files requested from cross-origin that require proxy server
       // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
       address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
@@ -89,8 +91,7 @@ export async function fetchFile(
 
     const response = await fetch(address);
     if (response.status === 200) {
-      // @ts-ignore TODO: add API for file manipulation to File class
-      const writable = await entry.handle.createWritable();
+      const writable = await (await entry.open()).writableStream();
       await response.body.pipeTo(writable);
     } else {
       console.log(`Failed downloading ${filename} from ${address}`);
@@ -106,7 +107,7 @@ async function initFs(openedRootDir: OpenDirectory) {
     LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
-  // TODO: this will be a in-memory vfs in the future
+  // TODO: this will be an in-memory vfs in the future
   await openedRootDir.getEntry(
     "/proc",
     FileOrDir.Directory,
@@ -263,7 +264,7 @@ async function initFs(openedRootDir: OpenDirectory) {
   ]);
 }
 
-function initDropImport(
+function initFsaDropImport(
   terminalContentWindow: Window,
   notifyDroppedFileSaved: (path: string, entryName: string) => void,
   processManager: ProcessManager
@@ -288,7 +289,7 @@ function initDropImport(
             LookupFlags.SymlinkFollow,
             OpenFlags.Create
           )
-      ).entry;
+      ).entry as FsaDirectory;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
         await dir.handle.getDirectoryHandle(entry.name, { create: true });
@@ -427,7 +428,7 @@ export async function init(
 
   // drag and drop support (save dragged files and folders to current directory)
   // hterm creates iframe child of provided anchor, we assume there's only one of those
-  initDropImport(
+  initFsaDropImport(
     anchor.getElementsByTagName("iframe")[0].contentWindow,
     notifyDroppedFileSaved,
     processManager

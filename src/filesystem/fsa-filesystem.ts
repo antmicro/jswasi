@@ -162,7 +162,7 @@ class FsaFilesystem implements Filesystem {
 
     return {
       err: constants.WASI_ESUCCESS,
-      entry: new FsaDirectory(path, handle, dir as FsaOpenDirectory, this),
+      entry: new FsaDirectory(path, handle, dir, this),
     };
   }
 
@@ -177,10 +177,7 @@ class FsaFilesystem implements Filesystem {
     fdFlags?: FdFlags
   ): Promise<{ err: number; entry: FsaFile }> {
     const path = `${dir.path()}/${name}`;
-    const handle = await (dir as FsaOpenDirectory).handle.getFileHandle(
-      name,
-      options
-    );
+    const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
     let storedData: StoredData = await get(path);
     if (!storedData) {
@@ -218,7 +215,7 @@ class FsaFilesystem implements Filesystem {
 
     return {
       err: constants.WASI_ESUCCESS,
-      entry: new FsaFile(path, handle, dir as FsaOpenDirectory, this),
+      entry: new FsaFile(path, handle, dir, this),
     };
   }
 
@@ -246,12 +243,7 @@ class FsaFilesystem implements Filesystem {
         OpenFlags.None
       );
     const path = `/${parts.join("/")}/${name}`;
-    const dir = new FsaDirectory(
-      path,
-      mountedHandle,
-      parent.entry as FsaOpenDirectory,
-      this
-    );
+    const dir = new FsaDirectory(path, mountedHandle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
   }
@@ -310,9 +302,7 @@ class FsaFilesystem implements Filesystem {
     path: string
   ): Promise<{ err: number; name: string; parent: FsaDirectory }> {
     if (this.isDebug())
-      console.log(
-        `getParent((dir as FsaEntry).handle.name="${dir.handle.name}", path="${path}")`
-      );
+      console.log(`getParent(name="${dir.handle.name}", path="${path}")`);
 
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
@@ -368,9 +358,7 @@ class FsaFilesystem implements Filesystem {
       }
       if (!alreadyExists) {
         const path = `${dir.path()}/${name}`;
-        entries.push(
-          new FsaDirEntry(path, handle, dir as FsaOpenDirectory, this)
-        );
+        entries.push(new FsaDirEntry(path, handle, dir, this));
       }
     }
 
@@ -617,7 +605,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
         const entry = new FsaDirectory(
           parent.path(),
           parent.handle,
-          parent.parent() as FsaOpenDirectory,
+          parent.parent(),
           parent.filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
@@ -626,7 +614,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
         const entry = new FsaDirectory(
           parent.parent().path(),
           parent.parent().handle,
-          parent.parent().parent() as FsaOpenDirectory,
+          parent.parent().parent(),
           parent.parent().filesystem
         );
         return { err: constants.WASI_ESUCCESS, entry };
@@ -753,6 +741,8 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
 
   private DEBUG: boolean = false;
 
+  public declare readonly handle: FileSystemFileHandle;
+
   // eslint-disable-next-line class-methods-use-this
   isatty(): boolean {
     return true;
@@ -765,7 +755,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
     if (
       (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
     ) {
-      const file = await (this.handle as FileSystemFileHandle).getFile();
+      const file = await this.handle.getFile();
       const path = await file.text();
       const { err, entry } = await this.parent()
         .open()
@@ -781,7 +771,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
       handle = entry.handle;
       size = file.size;
     } else {
-      handle = this.handle as FileSystemFileHandle;
+      handle = this.handle;
       size = (await this.metadata()).size;
     }
     if (this.filePosition < size) {
@@ -825,7 +815,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
     if (
       (await this.metadata()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
     ) {
-      const file = await (this.handle as FileSystemFileHandle).getFile();
+      const file = await this.handle.getFile();
       const path = await file.text();
       const { err, entry } = await this.parent()
         .open()
@@ -840,7 +830,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
       }
       handle = entry.handle;
     } else {
-      handle = this.handle as FileSystemFileHandle;
+      handle = this.handle;
     }
 
     const w = await handle.createWritable({ keepExistingData: true });
@@ -889,11 +879,21 @@ export class FsaOpenFile extends FsaEntry implements OpenFile {
 
   async truncate(size: number = 0) {
     if (this.DEBUG) console.log(`OpenFile(${this.name}).truncate(${size})`);
-    const writable = await (
-      this.handle as FileSystemFileHandle
-    ).createWritable();
+    const writable = await this.handle.createWritable();
     await writable.write({ type: "truncate", size });
     await writable.close();
     this.filePosition = 0;
+  }
+
+  async arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer> {
+    return (await this.handle.getFile()).arrayBuffer();
+  }
+
+  async readableStream(): Promise<NodeJS.ReadableStream> {
+    return (await this.handle.getFile()).stream();
+  }
+
+  async writableStream(): Promise<WritableStream> {
+    return this.handle.createWritable();
   }
 }

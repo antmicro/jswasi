@@ -165,7 +165,7 @@ export async function download(
         return Promise.resolve();
       }
 
-      const stream = (await entry.handle.getFile()).stream();
+      const stream = await (await entry.open()).readableStream();
       let localHandle;
       try {
         localHandle = await window.showSaveFilePicker({
