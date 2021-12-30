@@ -526,12 +526,11 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     return { err, linkedPath: null };
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async close() {
-    // in FSA there is no need to close a directory
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 
-  setAsCwd() {
+  setAsCwd(): void {
     this.storedName = ".";
   }
 
@@ -789,8 +788,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
       position: this.filePosition,
       data,
     });
-    // TODO: this flush creates a bottleneck, but without it data is not written to file
-    await this.flush();
     this.filePosition += buffer.byteLength;
     return constants.WASI_ESUCCESS;
   }

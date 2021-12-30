@@ -54,7 +54,7 @@ export default async function syscallCallback(
       );
       break;
     }
-    case "exit": {
+    case "proc_exit": {
       const dbg = processManager.processInfos[processId].env.DEBUG === "1";
       processManager.terminateProcess(processId, data);
       if (dbg) {

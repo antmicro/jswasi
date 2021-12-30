@@ -17,6 +17,8 @@ export interface In {
     requestedLen: number,
     sharedBuffer: SharedArrayBuffer
   ): Promise<void>;
+
+  close(): Promise<void>;
 }
 
 export interface Out {
@@ -25,6 +27,8 @@ export interface Out {
   stat(): Promise<Stat>;
 
   write(content: Uint8Array): Promise<number>;
+
+  close(): Promise<void>;
 }
 
 export class Stdin implements In {
@@ -37,7 +41,7 @@ export class Stdin implements In {
     return true;
   }
 
-  async scheduleRead(
+  scheduleRead(
     workerId: number,
     requestedLen: number,
     sbuf: SharedArrayBuffer
@@ -52,11 +56,13 @@ export class Stdin implements In {
       readLen,
       readBuf
     );
+
+    return Promise.resolve();
   }
 
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<Stat> {
-    return {
+  stat(): Promise<Stat> {
+    return Promise.resolve({
       dev: 0n,
       ino: 0n,
       fileType: this.fileType,
@@ -65,7 +71,11 @@ export class Stdin implements In {
       atim: 0n,
       mtim: 0n,
       ctim: 0n,
-    };
+    });
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -79,16 +89,17 @@ export class Stdout implements Out {
     return true;
   }
 
-  async write(content: Uint8Array): Promise<number> {
+  write(content: Uint8Array): Promise<number> {
+    // TODO: maybe blocking on this would fix wrong output order in CI (fast paced command bashing)
     this.workerTable.terminalOutputCallback(
       DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n")
     );
-    return constants.WASI_ESUCCESS;
+    return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<Stat> {
-    return {
+  stat(): Promise<Stat> {
+    return Promise.resolve({
       dev: 0n,
       ino: 0n,
       fileType: this.fileType,
@@ -97,7 +108,11 @@ export class Stdout implements Out {
       atim: 0n,
       mtim: 0n,
       ctim: 0n,
-    };
+    });
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -111,15 +126,15 @@ export class Stderr implements Out {
     return true;
   }
 
-  async write(content: Uint8Array): Promise<number> {
+  write(content: Uint8Array): Promise<number> {
     const output = DECODER.decode(content.slice(0)).replaceAll("\n", "\r\n");
     this.workerTable.terminalOutputCallback(`${RED_ANSI}${output}${RESET}`);
-    return constants.WASI_ESUCCESS;
+    return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
   // TODO: fill dummy values with something meaningful
-  async stat(): Promise<Stat> {
-    return {
+  stat(): Promise<Stat> {
+    return Promise.resolve({
       dev: 0n,
       ino: 0n,
       fileType: this.fileType,
@@ -128,10 +143,10 @@ export class Stderr implements Out {
       atim: 0n,
       mtim: 0n,
       ctim: 0n,
-    };
+    });
   }
 
-  async seek(offset: number, whence: number): Promise<number> {
-    return 0; // do nothing
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 }

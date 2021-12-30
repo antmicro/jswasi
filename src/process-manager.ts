@@ -124,6 +124,14 @@ export default class ProcessManager {
 
   terminateProcess(id: number, exitNo: number = 0) {
     const process = this.processInfos[id];
+
+    // close/flush all opened files to make sure written contents are saved to persistent storage
+    Promise.all(
+      process.fds.map(async (fileDescriptor) => {
+        await fileDescriptor?.close();
+      })
+    );
+
     process.worker.terminate();
     // notify parent that they can resume operation
     if (id !== 0 && process.parentLock != null) {

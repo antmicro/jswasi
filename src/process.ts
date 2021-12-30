@@ -104,7 +104,7 @@ function workerConsoleLog(msg: any) {
 
 function doExit(exitCode: number) {
   workerConsoleLog("calling close()");
-  sendToKernel(["exit", exitCode]);
+  sendToKernel(["proc_exit", exitCode]);
   // eslint-disable-next-line no-restricted-globals
   self.close();
 }
