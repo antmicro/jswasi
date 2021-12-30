@@ -73,7 +73,7 @@ export default async function syscallCallback(
       break;
     }
     case "chdir": {
-      const [pwd, sharedBuffer] = data;
+      const { pwd, sharedBuffer } = data;
       const lock = new Int32Array(sharedBuffer, 0, 1);
       const { fds } = processManager.processInfos[processId];
 
@@ -90,15 +90,14 @@ export default async function syscallCallback(
       break;
     }
     case "isatty": {
-      const [sharedBuffer, fd] = data;
+      const { sharedBuffer, fd } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const isatty = new Int32Array(sharedBuffer, 4, 1);
 
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        // this can be Stdin/Stdout/Stderr/OpenedFd
-        isatty[0] = Number((fds[fd] as OpenFile | In | Out).isatty());
+        isatty[0] = Number(fds[fd].isatty());
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -109,7 +108,7 @@ export default async function syscallCallback(
       break;
     }
     case "getpid": {
-      const [sharedBuffer] = data;
+      const { sharedBuffer } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const pid = new Int32Array(sharedBuffer, 4, 1);
 
@@ -120,7 +119,10 @@ export default async function syscallCallback(
       break;
     }
     case "set_env": {
-      const [[key, value], sharedBuffer] = data;
+      const {
+        args: [key, value],
+        sharedBuffer,
+      } = data;
       const lock = new Int32Array(sharedBuffer, 0, 1);
       processManager.processInfos[processId].env[key] = value;
 
@@ -129,7 +131,7 @@ export default async function syscallCallback(
       break;
     }
     case "set_echo": {
-      const [shouldEcho, sharedBuffer] = data;
+      const { shouldEcho, sharedBuffer } = data;
       const lock = new Int32Array(sharedBuffer, 0, 1);
       // TODO: should this be simply $ECHO env variable?
       processManager.processInfos[processId].shouldEcho = shouldEcho === "1";
@@ -139,9 +141,9 @@ export default async function syscallCallback(
       break;
     }
     case "spawn": {
-      const [fullPath, args, env, sharedBuffer, background, redirects] = data;
+      const { path, args, env, sharedBuffer, background, redirects } = data;
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
-      args.splice(0, 0, fullPath.split("/").pop());
+      args.splice(0, 0, path.split("/").pop());
 
       // save parent file descriptors table,
       // replace it with child's for the duration of spawn call
@@ -185,7 +187,7 @@ export default async function syscallCallback(
         })
       );
 
-      switch (fullPath) {
+      switch (path) {
         case "/usr/bin/ps": {
           const result = await ps(processManager, processId, args, env);
           Atomics.store(parentLck, 0, result);
@@ -233,13 +235,13 @@ export default async function syscallCallback(
             processId,
             background ? null : parentLck,
             syscallCallback,
-            fullPath,
+            path,
             fds,
             args,
             env,
             background
           );
-          const newProcessName = fullPath.split("/").slice(-1)[0];
+          const newProcessName = path.split("/").slice(-1)[0];
           if (env.DEBUG === "1") {
             console.log(
               `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
@@ -262,7 +264,7 @@ export default async function syscallCallback(
       break;
     }
     case "fd_prestat_get": {
-      const [sharedBuffer, fd] = data;
+      const { sharedBuffer, fd } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const nameLen = new Int32Array(sharedBuffer, 4, 1);
       const preopenType = new Uint8Array(sharedBuffer, 8, 1);
@@ -283,7 +285,7 @@ export default async function syscallCallback(
     }
 
     case "path_symlink": {
-      const [sharedBuffer, oldPath, newFd, newPath] = data;
+      const { sharedBuffer, oldPath, newFd, newPath } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
@@ -351,7 +353,7 @@ export default async function syscallCallback(
     }
 
     case "fd_prestat_dir_name": {
-      const [sharedBuffer, fd, pathLen] = data;
+      const { sharedBuffer, fd, pathLen } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const path = new Uint8Array(sharedBuffer, 4, pathLen);
 
@@ -370,12 +372,12 @@ export default async function syscallCallback(
     }
 
     case "fd_write": {
-      const [sharedBuffer, fd, contentPtr] = data;
+      const { sharedBuffer, fd, content } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const content = new Uint8Array(contentPtr);
+      const contentArray = new Uint8Array(content);
 
       const { fds } = processManager.processInfos[processId];
-      const err = await (fds[fd] as OpenFile).write(content);
+      const err = await (fds[fd] as OpenFile).write(contentArray);
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
@@ -383,7 +385,7 @@ export default async function syscallCallback(
     }
 
     case "fd_read": {
-      const [sharedBuffer, fd, len] = data;
+      const { sharedBuffer, fd, len } = data;
 
       const { fds } = processManager.processInfos[processId];
       await (fds[fd] as In).scheduleRead(processId, len, sharedBuffer);
@@ -393,7 +395,7 @@ export default async function syscallCallback(
     }
 
     case "path_open": {
-      const [
+      const {
         sharedBuffer,
         dirFd,
         path,
@@ -402,7 +404,7 @@ export default async function syscallCallback(
         fsRightsBase,
         fsRightsInheriting,
         fdFlags,
-      ] = data;
+      } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const openedFd = new Int32Array(sharedBuffer, 4, 1);
 
@@ -430,7 +432,7 @@ export default async function syscallCallback(
       break;
     }
     case "fd_close": {
-      const [sharedBuffer, fd] = data;
+      const { sharedBuffer, fd } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
@@ -448,7 +450,7 @@ export default async function syscallCallback(
       break;
     }
     case "fd_filestat_get": {
-      const [sharedBuffer, fd] = data;
+      const { sharedBuffer, fd } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const buf = new DataView(sharedBuffer, 4);
 
@@ -474,7 +476,7 @@ export default async function syscallCallback(
       break;
     }
     case "path_filestat_get": {
-      const [sharedBuffer, fd, path, flags] = data;
+      const { sharedBuffer, fd, path, lookupFlags } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const buf = new DataView(sharedBuffer, 4);
 
@@ -486,7 +488,8 @@ export default async function syscallCallback(
         if (fds[fd] !== undefined) {
           ({ err, entry } = await (fds[fd] as OpenDirectory).getEntry(
             path,
-            FileOrDir.Any
+            FileOrDir.Any,
+            lookupFlags
           ));
           if (err === constants.WASI_ESUCCESS) {
             const stat = await entry.stat();
@@ -519,7 +522,7 @@ export default async function syscallCallback(
       break;
     }
     case "fd_seek": {
-      const [sharedBuffer, fd, offset, whence] = data;
+      const { sharedBuffer, fd, offset, whence } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const filePos = new BigUint64Array(sharedBuffer, 8, 1);
 
@@ -539,10 +542,10 @@ export default async function syscallCallback(
       break;
     }
     case "fd_readdir": {
-      const [sharedBuffer, fd, cookie, dataBufLen] = data;
+      const { sharedBuffer, fd, cookie, bufLen } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const bufUsed = new Uint32Array(sharedBuffer, 4, 1);
-      const dataBuf = new DataView(sharedBuffer, 8, dataBufLen);
+      const dataBuf = new DataView(sharedBuffer, 8, bufLen);
       let dataBufPtr = 0;
 
       let err;
@@ -556,30 +559,30 @@ export default async function syscallCallback(
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name());
 
-          if (dataBufPtr + 8 > dataBufLen) break;
+          if (dataBufPtr + 8 > bufLen) break;
           dataBuf.setBigUint64(dataBufPtr, BigInt(i + 1), true);
           dataBufPtr += 8;
 
-          if (dataBufPtr + 8 >= dataBufLen) break;
+          if (dataBufPtr + 8 >= bufLen) break;
           // TODO: get file stats ino (dummy 0n for now)
           dataBuf.setBigUint64(dataBufPtr, 0n, true);
           dataBufPtr += 8;
 
-          if (dataBufPtr + 4 >= dataBufLen) break;
+          if (dataBufPtr + 4 >= bufLen) break;
           dataBuf.setUint32(dataBufPtr, nameBuf.byteLength, true);
           dataBufPtr += 4;
 
-          if (dataBufPtr + 4 >= dataBufLen) break;
+          if (dataBufPtr + 4 >= bufLen) break;
           dataBuf.setUint8(dataBufPtr, fileTypes[i]);
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit
-          if (dataBufPtr + nameBuf.byteLength >= dataBufLen) break;
+          if (dataBufPtr + nameBuf.byteLength >= bufLen) break;
           const dataBuf8 = new Uint8Array(sharedBuffer, 8);
           dataBuf8.set(nameBuf, dataBufPtr);
           dataBufPtr += nameBuf.byteLength;
         }
-        bufUsed[0] = dataBufPtr > dataBufLen ? dataBufLen : dataBufPtr;
+        bufUsed[0] = dataBufPtr > bufLen ? bufLen : dataBufPtr;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -590,13 +593,13 @@ export default async function syscallCallback(
       break;
     }
     case "path_unlink_file": {
-      const [sharedBuffer, fd, path] = data;
+      const { sharedBuffer, fd, path } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        // TODO: should this be seperate OpenDirectory.unlink() function?
+        // TODO: should this be separate OpenDirectory.unlink() function?
         ({ err } = await (fds[fd] as OpenDirectory).deleteEntry(path, {
           recursive: false,
         }));
@@ -607,7 +610,7 @@ export default async function syscallCallback(
       break;
     }
     case "path_remove_directory": {
-      const [sharedBuffer, fd, path] = data;
+      const { sharedBuffer, fd, path } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
@@ -623,7 +626,7 @@ export default async function syscallCallback(
       break;
     }
     case "path_create_directory": {
-      const [sharedBuffer, fd, path] = data;
+      const { sharedBuffer, fd, path } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
@@ -644,7 +647,7 @@ export default async function syscallCallback(
       break;
     }
     case "fd_fdstat_get": {
-      const [sharedBuffer, fd] = data;
+      const { sharedBuffer, fd } = data;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const fileType = new Uint8Array(sharedBuffer, 4, 1);
       const rightsBase = new BigUint64Array(sharedBuffer, 8, 1);

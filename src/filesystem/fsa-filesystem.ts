@@ -447,6 +447,10 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
   declare readonly handle: FileSystemDirectoryHandle;
 
+  isatty(): boolean {
+    return false;
+  }
+
   async metadata(): Promise<Metadata> {
     if (!this._metadata) {
       const storedData: StoredData = await get(this.path());
@@ -780,7 +784,6 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     // data passed to write function cannot have the underlying buffer as shared
     const data = new ArrayBuffer(buffer.byteLength);
     new Uint8Array(data).set(new Uint8Array(buffer));
-    console.log(`writing ${new TextDecoder().decode(data)} to ${this.path()}`);
     await (
       await this.getWriter()
     ).write({

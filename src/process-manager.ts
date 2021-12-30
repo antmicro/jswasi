@@ -27,6 +27,7 @@ class ProcessInfo {
     public id: number,
     public cmd: string,
     public worker: Worker,
+    // TODO: make this Record<number, FileDescriptor>, or better yet, introduce FileDescriptorTable class
     public fds: FileDescriptor[],
     public parentId: number | null,
     public parentLock: Int32Array | null,

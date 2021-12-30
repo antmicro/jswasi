@@ -81,6 +81,8 @@ export interface Directory extends Entry {
 }
 
 export interface OpenDirectory extends Entry {
+  isatty(): boolean;
+
   getEntry(
     path: string,
     mode: FileOrDir.File,
