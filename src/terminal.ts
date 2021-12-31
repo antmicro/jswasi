@@ -195,7 +195,7 @@ async function initFs(openedRootDir: OpenDirectory) {
     }
   })();
 
-  const dummyBiniariesPromise = Promise.all([
+  const dummyBinariesPromise = Promise.all([
     openedRootDir.getEntry(
       "/usr/bin/mount",
       FileOrDir.File,
@@ -262,7 +262,7 @@ async function initFs(openedRootDir: OpenDirectory) {
 
   await usrLocalBinPromise;
   await shellRcPromise;
-  await dummyBiniariesPromise;
+  await dummyBinariesPromise;
   await symlinkCreationPromise;
 
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
@@ -374,8 +374,24 @@ export async function init(
   const filesystem: Filesystem = await createFsaFilesystem();
 
   initServiceWorker();
-  await initFs(filesystem.getRootDir().open());
-
+  if (
+    !(await filesystem.pathExists(
+      filesystem.getMetaDir(),
+      "/filesystem-initiated"
+    ))
+  ) {
+    await initFs(filesystem.getRootDir().open());
+    // create flag file to indicate that the filesystem was already initiated
+    await filesystem
+      .getMetaDir()
+      .open()
+      .getEntry(
+        "/filesystem-initiated",
+        FileOrDir.File,
+        LookupFlags.NoFollow,
+        OpenFlags.Create
+      );
+  }
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore

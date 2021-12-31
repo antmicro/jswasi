@@ -227,12 +227,14 @@ class FsaFilesystem implements Filesystem {
   }
 
   async pathExists(
-    absolutePath: string,
-    mode: FileOrDir = FileOrDir.Any
+    dir: Directory,
+    path: string,
+    mode: FileOrDir = FileOrDir.Any,
+    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow
   ): Promise<boolean> {
-    const { err } = await this.getRootDir()
+    const { err } = await dir
       .open()
-      .getEntry(absolutePath, mode, LookupFlags.NoFollow, OpenFlags.None);
+      .getEntry(path, mode, lookupFlags, OpenFlags.None);
     return err === constants.WASI_ESUCCESS;
   }
 

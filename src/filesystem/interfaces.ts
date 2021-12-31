@@ -13,11 +13,18 @@ export type Mount = { parts: string[]; name: string; dir: Directory };
 export interface Filesystem {
   getRootDir(): Directory;
 
+  getMetaDir(): Directory;
+
   resolveAbsolute(
     path: string
   ): Promise<{ err: number; name: string; dir: Directory }>;
 
-  pathExists(absolutePath: string, mode: FileOrDir): Promise<boolean>;
+  pathExists(
+    dir: Directory,
+    path: string,
+    mode?: FileOrDir,
+    lookupFlags?: LookupFlags
+  ): Promise<boolean>;
 
   getMounts(): Mount[];
 

@@ -46,7 +46,11 @@ export async function mount(
 
       // check if path exits
       if (
-        !(await processManager.filesystem.pathExists(path, FileOrDir.Directory))
+        !(await processManager.filesystem.pathExists(
+          processManager.filesystem.getRootDir(),
+          path,
+          FileOrDir.Directory
+        ))
       ) {
         await stdout.write(
           ENCODER.encode(`mount: ${path}: no such directory\n`)
