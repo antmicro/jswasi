@@ -103,149 +103,144 @@ export async function fetchFile(
 
 // setup filesystem
 async function initFs(openedRootDir: OpenDirectory) {
-  await openedRootDir.getEntry(
-    "/tmp",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  // TODO: this will be an in-memory vfs in the future
-  await openedRootDir.getEntry(
-    "/proc",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
-    "/etc",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
-    "/home",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
-    "/home/ant",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-
-  const shellrc = (
-    await openedRootDir.getEntry(
-      "/home/ant/.shellrc",
-      FileOrDir.File,
+  // top level directories creation
+  await Promise.all([
+    openedRootDir.getEntry(
+      "/tmp",
+      FileOrDir.Directory,
       LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    )
-  ).entry;
-  if ((await shellrc.metadata()).size === 0n) {
-    const openedShellrc = await shellrc.open();
-    openedShellrc.write(
-      ENCODER.encode(
-        "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
-      )
-    );
-  }
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    // TODO: this will be an in-memory vfs in the future
+    openedRootDir.getEntry(
+      "/proc",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/etc",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/home",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/usr",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/lib",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+  ]);
 
-  await openedRootDir.getEntry(
-    "/usr",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  // 2nd level directories creation
+  await Promise.all([
+    openedRootDir.getEntry(
+      "/home/ant",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      "/usr/local",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+  ]);
 
-  await openedRootDir.getEntry(
-    "/lib",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-
-  // create dummy files for browser executed commands
-  await openedRootDir.getEntry(
-    "/usr/bin/mount",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/umount",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/wget",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/download",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/ps",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/free",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin/reset",
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
-  );
-
-  await openedRootDir.getEntry(
-    "/usr/local",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
+  // 3rd level directories/files/symlinks creation
+  const usrLocalBinPromise = openedRootDir.getEntry(
     "/usr/local/bin",
     FileOrDir.Directory,
     LookupFlags.SymlinkFollow,
     OpenFlags.Create | OpenFlags.Directory
   );
 
-  const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, true)
-  );
-  const necessaryPromises = Object.entries(NECESSARY_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
-  );
-  const optionalPromises = Object.entries(OPTIONAL_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
-  );
+  const shellRcPromise = (async () => {
+    // TODO: this should be moved to shell
+    const shellrc = (
+      await openedRootDir.getEntry(
+        "/home/ant/.shellrc",
+        FileOrDir.File,
+        LookupFlags.SymlinkFollow,
+        OpenFlags.Create
+      )
+    ).entry;
+    if ((await shellrc.metadata()).size === 0n) {
+      await (
+        await shellrc.open()
+      ).write(
+        ENCODER.encode(
+          "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
+        )
+      );
+    }
+  })();
 
-  await Promise.all([
-    ...alwaysFetchPromises,
-    ...necessaryPromises,
-    ...optionalPromises,
+  const dummyBiniariesPromise = Promise.all([
+    openedRootDir.getEntry(
+      "/usr/bin/mount",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/umount",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/wget",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/download",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/ps",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/free",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
+    openedRootDir.getEntry(
+      "/usr/bin/reset",
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create
+    ),
   ]);
 
-  await Promise.all([
+  const symlinkCreationPromise = Promise.all([
     openedRootDir.addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
@@ -263,6 +258,27 @@ async function initFs(openedRootDir: OpenDirectory) {
     openedRootDir.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
+  ]);
+
+  await usrLocalBinPromise;
+  await shellRcPromise;
+  await dummyBiniariesPromise;
+  await symlinkCreationPromise;
+
+  const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
+    ([filename, address]) => fetchFile(openedRootDir, filename, address, true)
+  );
+  const necessaryPromises = Object.entries(NECESSARY_BINARIES).map(
+    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
+  );
+  const optionalPromises = Object.entries(OPTIONAL_BINARIES).map(
+    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
+  );
+
+  await Promise.all([
+    ...alwaysFetchPromises,
+    ...necessaryPromises,
+    ...optionalPromises,
   ]);
 }
 
