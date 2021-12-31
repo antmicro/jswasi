@@ -5,7 +5,6 @@ import { FdFlags, LookupFlags, OpenFlags, Rights } from "./filesystem/enums";
 
 type ptr = number;
 
-// TODO: set the proper types for each callback
 type WASICallbacks = {
   // helper
   setModuleInstance: (instance: WebAssembly.Instance) => void;
@@ -318,31 +317,28 @@ function WASI(): WASICallbacks {
 
     let written = 0;
     const bufferBytes: number[] = [];
-
-    const buffers = Array.from({ length: iovsLen }, (_, i) => {
+    for (let i = 0; i < iovsLen; i += 1) {
       const ptr_pos = iovs + i * 8;
       const buf = view.getUint32(ptr_pos, true);
       const bufLen = view.getUint32(ptr_pos + 4, true);
 
-      return new Uint8Array(
+      const iov = new Uint8Array(
         (moduleInstanceExports.memory as WebAssembly.Memory).buffer,
         buf,
         bufLen
       );
-    });
-    buffers.forEach((iov: Uint8Array) => {
+
       for (let b = 0; b < iov.byteLength; b += 1) {
         bufferBytes.push(iov[b]);
       }
       written += iov.byteLength;
-    });
+    }
 
     // TODO: this might potentially cause stack overflow if bufferBytes is large, we should definitely write in chunks
-    const content = new SharedArrayBuffer(written);
-    const content_view = new Uint8Array(content);
-    for (let i = 0; i < written; i += 1) content_view[i] = bufferBytes[i]; // TODO
-    const sharedBuffer = new SharedArrayBuffer(4);
+    const sharedBuffer = new SharedArrayBuffer(4 + written); // lock + content
     const lck = new Int32Array(sharedBuffer, 0, 1);
+    const content = new Uint8Array(sharedBuffer, 4, written);
+    content.set(Uint8Array.from(bufferBytes));
     lck[0] = -1;
     sendToKernel(["fd_write", { sharedBuffer, fd, content }]);
     Atomics.wait(lck, 0, -1);
