@@ -188,9 +188,7 @@ async function initFs(openedRootDir: OpenDirectory) {
       await (
         await shellrc.open()
       ).write(
-        ENCODER.encode(
-          "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
-        )
+        "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
       );
     }
   })();

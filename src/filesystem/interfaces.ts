@@ -138,7 +138,7 @@ export interface OpenFile extends Entry {
     sbuf: SharedArrayBuffer
   ): Promise<void>;
 
-  write(buffer: Uint8Array): Promise<number>;
+  write(buffer: string): Promise<number>;
 
   close(): Promise<void>;
 

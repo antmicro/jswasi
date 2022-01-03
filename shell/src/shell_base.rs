@@ -16,12 +16,14 @@ use conch_parser::parse::DefaultParser;
 use iterm2;
 use lazy_static::lazy_static;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 
 use crate::interpreter::interpret;
 use crate::output_device::OutputDevice;
 
 type Fd = u16;
+type SerializedPath = String;
 
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
@@ -45,11 +47,35 @@ pub struct SyscallResult {
     pub output: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub enum Redirect {
-    Read((Fd, String)),
-    Write((Fd, String)),
-    Append((Fd, String)),
+    Read((Fd, SerializedPath)),
+    Write((Fd, SerializedPath)),
+    Append((Fd, SerializedPath)),
+}
+
+impl Serialize for Redirect {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("Redirect", 3)?;
+        match self {
+            Redirect::Read((fd, path)) => {
+                state.serialize_field("mode", "read")?;
+                state.serialize_field("fd", fd)?;
+                state.serialize_field("path", path)?;
+            }
+            Redirect::Write((fd, path)) => {
+                state.serialize_field("mode", "write")?;
+                state.serialize_field("fd", fd)?;
+                state.serialize_field("path", path)?;
+            }
+            Redirect::Append((fd, path)) => {
+                state.serialize_field("mode", "append")?;
+                state.serialize_field("fd", fd)?;
+                state.serialize_field("path", path)?;
+            }
+        }
+        state.end()
+    }
 }
 
 // communicate with the worker thread

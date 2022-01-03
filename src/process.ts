@@ -2,15 +2,38 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 import { FdFlags, LookupFlags, OpenFlags, Rights } from "./filesystem/enums";
+import {
+  ChdirArgs,
+  FdCloseArgs,
+  FdFdstatGetArgs,
+  FdFilestatGetArgs,
+  FdPrestatDirNameArgs,
+  FdPrestatGetArgs,
+  FdReadArgs,
+  FdReaddirArgs,
+  FdSeekArgs,
+  FdWriteArgs,
+  GetPidArgs,
+  IsAttyArgs,
+  PathCreateDirectoryArgs,
+  PathFilestatGetArgs,
+  PathLinkArgs,
+  PathOpenArgs,
+  PathReadlinkArgs,
+  PathRemoveDirectoryArgs,
+  PathSymlinkArgs,
+  PathUnlinkFileArgs,
+  Redirect,
+  SetEchoArgs,
+  SetEnvArgs,
+  SpawnArgs,
+} from "./types";
 
 type ptr = number;
 
 type WASICallbacks = {
   // helper
   setModuleInstance: (instance: WebAssembly.Instance) => void;
-
-  // custom syscalls
-  isatty: (fd: number) => number;
 
   // official syscalls
   environ_sizes_get: (environCountPtr: ptr, environSizePtr: ptr) => number;
@@ -168,21 +191,6 @@ function WASI(): WASICallbacks {
     moduleInstanceExports = instance.exports;
   }
 
-  function isatty(fd: number): number {
-    workerConsoleLog(`isatty(${fd}`);
-
-    const sharedBuffer = new SharedArrayBuffer(4 + 4); // lock, isatty
-    const lck = new Int32Array(sharedBuffer, 0, 1);
-    lck[0] = -1;
-    const isAttyPtr = new Int32Array(sharedBuffer, 4, 1);
-
-    sendToKernel(["isatty", { sharedBuffer, fd }]);
-    Atomics.wait(lck, 0, -1);
-
-    // const err = Atomics.load(lck, 0);
-    return isAttyPtr[0];
-  }
-
   function environ_sizes_get(environCountPtr: ptr, environSizePtr: ptr) {
     workerConsoleLog(
       `environ_sizes_get(0x${environCountPtr.toString(
@@ -287,7 +295,7 @@ function WASI(): WASICallbacks {
     const rights_base = new BigUint64Array(sharedBuffer, 8, 1);
     const rights_inheriting = new BigUint64Array(sharedBuffer, 16, 1);
 
-    sendToKernel(["fd_fdstat_get", { sharedBuffer, fd }]);
+    sendToKernel(["fd_fdstat_get", { sharedBuffer, fd } as FdFdstatGetArgs]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -334,13 +342,11 @@ function WASI(): WASICallbacks {
       written += iov.byteLength;
     }
 
-    // TODO: this might potentially cause stack overflow if bufferBytes is large, we should definitely write in chunks
     const sharedBuffer = new SharedArrayBuffer(4 + written); // lock + content
     const lck = new Int32Array(sharedBuffer, 0, 1);
-    const content = new Uint8Array(sharedBuffer, 4, written);
-    content.set(Uint8Array.from(bufferBytes));
     lck[0] = -1;
-    sendToKernel(["fd_write", { sharedBuffer, fd, content }]);
+    const content = DECODER.decode(Uint8Array.from(bufferBytes));
+    sendToKernel(["fd_write", { sharedBuffer, fd, content } as FdWriteArgs]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -389,7 +395,7 @@ function WASI(): WASICallbacks {
     const sharedBuffer = new SharedArrayBuffer(4);
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    sendToKernel(["fd_close", { sharedBuffer, fd }]);
+    sendToKernel(["fd_close", { sharedBuffer, fd } as FdCloseArgs]);
     Atomics.wait(lck, 0, -1);
 
     return Atomics.load(lck, 0);
@@ -407,7 +413,10 @@ function WASI(): WASICallbacks {
     lck[0] = -1;
     const statBuf = new DataView(sharedBuffer, 4);
 
-    sendToKernel(["fd_filestat_get", { sharedBuffer, fd }]);
+    sendToKernel([
+      "fd_filestat_get",
+      { sharedBuffer, fd } as FdFilestatGetArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -460,7 +469,7 @@ function WASI(): WASICallbacks {
       const readLen = new Int32Array(sharedBuffer, 4, 1);
       const readBuf = new Uint8Array(sharedBuffer, 8, len);
 
-      sendToKernel(["fd_read", { sharedBuffer, fd, len }]);
+      sendToKernel(["fd_read", { sharedBuffer, fd, len } as FdReadArgs]);
       Atomics.wait(lck, 0, -1);
 
       const err = Atomics.load(lck, 0);
@@ -501,7 +510,10 @@ function WASI(): WASICallbacks {
     const bufUsed = new Uint32Array(sharedBuffer, 4, 1);
     const dataBuffer = new Uint8Array(sharedBuffer, 8);
 
-    sendToKernel(["fd_readdir", { sharedBuffer, fd, cookie, bufLen }]);
+    sendToKernel([
+      "fd_readdir",
+      { sharedBuffer, fd, cookie, bufLen } as FdReaddirArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -526,7 +538,10 @@ function WASI(): WASICallbacks {
     lck[0] = -1;
     const file_pos = new BigUint64Array(sharedBuffer, 8, 1);
 
-    sendToKernel(["fd_seek", { sharedBuffer, fd, offset, whence }]);
+    sendToKernel([
+      "fd_seek",
+      { sharedBuffer, fd, offset, whence } as FdSeekArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -554,11 +569,13 @@ function WASI(): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    sendToKernel(["path_create_directory", { sharedBuffer, fd, path }]);
+    sendToKernel([
+      "path_create_directory",
+      { sharedBuffer, fd, path } as PathCreateDirectoryArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
-    const err = Atomics.load(lck, 0);
-    return err;
+    return Atomics.load(lck, 0);
   }
 
   function path_filestat_get(
@@ -590,7 +607,7 @@ function WASI(): WASICallbacks {
 
     sendToKernel([
       "path_filestat_get",
-      { sharedBuffer, fd, path, lookupFlags },
+      { sharedBuffer, fd, path, lookupFlags } as PathFilestatGetArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -664,7 +681,7 @@ function WASI(): WASICallbacks {
         fsRightsBase,
         fsRightsInheriting,
         fdFlags,
-      },
+      } as PathOpenArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -679,8 +696,19 @@ function WASI(): WASICallbacks {
 
   // used solely in path_readlink
   function specialParse(syscallDataJson: string): string {
-    const { command, args, extended_env, background, redirects } =
-      JSON.parse(syscallDataJson);
+    const {
+      command,
+      args,
+      extended_env,
+      background,
+      redirects,
+    }: {
+      command: string;
+      args: string[];
+      extended_env: Record<string, string>;
+      background: boolean;
+      redirects: Redirect[];
+    } = JSON.parse(syscallDataJson);
     switch (command) {
       case "spawn": {
         const sharedBuffer = new SharedArrayBuffer(4);
@@ -695,7 +723,7 @@ function WASI(): WASICallbacks {
             sharedBuffer,
             background,
             redirects,
-          },
+          } as SpawnArgs,
         ]);
         // wait for child process to finish
         Atomics.wait(lck, 0, -1);
@@ -711,7 +739,7 @@ function WASI(): WASICallbacks {
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
         const dir = utils.realpath(args[0]);
-        sendToKernel(["chdir", { dir, sharedBuffer }]);
+        sendToKernel(["chdir", { dir, sharedBuffer } as ChdirArgs]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
@@ -722,7 +750,8 @@ function WASI(): WASICallbacks {
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
-        sendToKernel(["set_env", { args, sharedBuffer }]);
+        const [key, value] = args;
+        sendToKernel(["set_env", { key, value, sharedBuffer } as SetEnvArgs]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
@@ -737,12 +766,17 @@ function WASI(): WASICallbacks {
 
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
+      // TODO: rework this, linux uses "stty -echo"/"stty echo"
+      //  (https://www.thegeeksearch.com/how-to-disable-enable-echo-of-keys-commands-typed-in-linux-shell/)
       case "set_echo": {
         const sharedBuffer = new SharedArrayBuffer(4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
-        sendToKernel(["set_echo", { shouldEcho: args[0], sharedBuffer }]);
+        sendToKernel([
+          "set_echo",
+          { shouldEcho: args[0], sharedBuffer } as SetEchoArgs,
+        ]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b`;
@@ -754,7 +788,7 @@ function WASI(): WASICallbacks {
         const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
         const fd = parseInt(args[0], 10);
 
-        sendToKernel(["isatty", { sharedBuffer, fd }]);
+        sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b${isattyPtr[0]}`;
@@ -765,7 +799,7 @@ function WASI(): WASICallbacks {
         lck[0] = -1;
         const pidPtr = new Int32Array(sharedBuffer, 4, 1);
 
-        sendToKernel(["getpid", { sharedBuffer }]);
+        sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
@@ -823,7 +857,7 @@ function WASI(): WASICallbacks {
         fd,
         path,
         bufferLen,
-      },
+      } as PathReadlinkArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -851,11 +885,13 @@ function WASI(): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    sendToKernel(["path_remove_directory", { sharedBuffer, fd, path }]);
+    sendToKernel([
+      "path_remove_directory",
+      { sharedBuffer, fd, path } as PathRemoveDirectoryArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
-    const err = Atomics.load(lck, 0);
-    return err;
+    return Atomics.load(lck, 0);
   }
 
   function path_rename() {
@@ -875,11 +911,13 @@ function WASI(): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    sendToKernel(["path_unlink_file", { sharedBuffer, fd, path }]);
+    sendToKernel([
+      "path_unlink_file",
+      { sharedBuffer, fd, path } as PathUnlinkFileArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
-    const err = Atomics.load(lck, 0);
-    return err;
+    return Atomics.load(lck, 0);
   }
 
   function sched_yield() {
@@ -898,7 +936,7 @@ function WASI(): WASICallbacks {
     const nameLen = new Int32Array(sharedBuffer, 4, 1);
     const fileType = new Uint8Array(sharedBuffer, 8, 1);
 
-    sendToKernel(["fd_prestat_get", { sharedBuffer, fd }]);
+    sendToKernel(["fd_prestat_get", { sharedBuffer, fd } as FdPrestatGetArgs]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -927,7 +965,10 @@ function WASI(): WASICallbacks {
     lck[0] = -1;
     const path = new Uint8Array(sharedBuffer, 4, pathLen);
 
-    sendToKernel(["fd_prestat_dir_name", { sharedBuffer, fd, pathLen }]);
+    sendToKernel([
+      "fd_prestat_dir_name",
+      { sharedBuffer, fd, pathLen } as FdPrestatDirNameArgs,
+    ]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -981,18 +1022,19 @@ function WASI(): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
 
-    sendToKernel(["path_symlink", { sharedBuffer, oldPath, newFd, newPath }]);
+    sendToKernel([
+      "path_symlink",
+      { sharedBuffer, oldPath, newFd, newPath } as PathSymlinkArgs,
+    ]);
 
     Atomics.wait(lck, 0, -1);
 
-    const err = Atomics.load(lck, 0);
-
-    return err;
+    return Atomics.load(lck, 0);
   }
 
   function path_link(
     oldFd: number,
-    oldFlags: number,
+    oldFlags: LookupFlags,
     oldPathPtr: ptr,
     oldPathLen: number,
     newFd: number,
@@ -1022,7 +1064,14 @@ function WASI(): WASICallbacks {
 
     sendToKernel([
       "path_link",
-      { sharedBuffer, oldFd, oldFlags, oldPath, newFd, newPath },
+      {
+        sharedBuffer,
+        oldFd,
+        oldFlags,
+        oldPath,
+        newFd,
+        newPath,
+      } as PathLinkArgs,
     ]);
 
     Atomics.wait(lck, 0, -1);
@@ -1187,8 +1236,6 @@ function WASI(): WASICallbacks {
 
   return {
     setModuleInstance,
-
-    isatty,
 
     environ_sizes_get,
     args_sizes_get,

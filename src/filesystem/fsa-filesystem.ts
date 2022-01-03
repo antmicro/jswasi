@@ -790,18 +790,15 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     Atomics.notify(lck, 0);
   }
 
-  async write(buffer: Uint8Array): Promise<number> {
-    // data passed to write function cannot have the underlying buffer as shared
-    const data = new ArrayBuffer(buffer.byteLength);
-    new Uint8Array(data).set(new Uint8Array(buffer));
+  async write(buffer: string): Promise<number> {
     await (
       await this.getWriter()
     ).write({
       type: "write",
       position: this.filePosition,
-      data,
+      data: buffer,
     });
-    this.filePosition += buffer.byteLength;
+    this.filePosition += buffer.length;
     return constants.WASI_ESUCCESS;
   }
 
