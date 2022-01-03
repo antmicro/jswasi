@@ -17,8 +17,6 @@ declare global {
   }
 }
 
-const ENCODER = new TextEncoder();
-
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/shell": "resources/shell.wasm",
@@ -325,7 +323,7 @@ function initFsaDropImport(
       }
     };
     const pwd =
-      processManager.processInfos[processManager.currentProcess].env.PWD;
+      processManager.processInfos[processManager.currentProcess].env["PWD"];
     const entryPromises = [];
     for (const item of e.dataTransfer.items) {
       if (item.kind === "file") {

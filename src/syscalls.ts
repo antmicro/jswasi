@@ -41,8 +41,6 @@ import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
-const ENCODER = new TextEncoder();
-
 declare global {
   interface Window {
     exitCode: number;
@@ -80,9 +78,8 @@ export default async function syscallCallback(
       break;
     }
     case "proc_exit": {
-      const dbg = processManager.processInfos[processId].env.DEBUG === "1";
       processManager.terminateProcess(processId, data);
-      if (dbg) {
+      if (processManager.processInfos[processId].env["DEBUG"] === "1") {
         console.log(
           `%c [dbg (%c${processName}:${processId}%c)] %c exited with result code ${data}`,
           "background:black; color: white;",
@@ -250,7 +247,7 @@ export default async function syscallCallback(
             background
           );
           const newProcessName = path.split("/").slice(-1)[0];
-          if (env.DEBUG === "1") {
+          if (env["DEBUG"] === "1") {
             console.log(
               `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
               "background:black; color: white;",
@@ -347,7 +344,7 @@ export default async function syscallCallback(
           if (linkedPath.length > bufferLen) {
             bufferUsed[0] = bufferLen;
           } else {
-            buffer.set(ENCODER.encode(linkedPath), 0);
+            buffer.set(new TextEncoder().encode(linkedPath), 0);
             bufferUsed[0] = linkedPath.length;
           }
         }
@@ -368,7 +365,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds[fd] !== undefined) {
-        path.set(ENCODER.encode((fds[fd] as OpenFile).name()), 0);
+        path.set(new TextEncoder().encode((fds[fd] as OpenFile).name()), 0);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

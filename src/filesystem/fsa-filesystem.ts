@@ -457,7 +457,7 @@ export class FsaDirectory extends FsaEntry implements Directory {
 
 // TODO: extend FsaEntry instead of FsaDirectory
 export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
-  public readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
+  public override readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
 
   declare readonly handle: FileSystemDirectoryHandle;
 
@@ -465,7 +465,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     return false;
   }
 
-  async metadata(): Promise<Metadata> {
+  override async metadata(): Promise<Metadata> {
     if (!this._metadata) {
       const storedData: StoredData = await get(this.path());
       this._metadata = {

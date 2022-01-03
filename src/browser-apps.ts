@@ -5,8 +5,6 @@ import ProcessManager from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
 import { FileOrDir } from "./filesystem/enums.js";
 
-const ENCODER = new TextEncoder();
-
 export async function mount(
   processManager: ProcessManager,
   processId: number,
@@ -37,7 +35,7 @@ export async function mount(
       }
       // handle relative path
       if (!path.startsWith("/")) {
-        path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
+        path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
       }
 
       // check if path exits
@@ -82,7 +80,7 @@ export async function umount(
   let path = args[1];
   // handle relative path
   if (!path.startsWith("/")) {
-    path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
+    path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
   }
 
   if (!processManager.filesystem.isMounted(path)) {
@@ -114,7 +112,7 @@ export async function wget(
     return 1;
   }
   if (!path.startsWith("/")) {
-    path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
+    path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
   }
   const { dir } = await processManager.filesystem.resolveAbsolute(path);
   try {
@@ -143,7 +141,7 @@ export async function download(
   await Promise.all(
     args.slice(1).map(async (path: string) => {
       if (!path.startsWith("/")) {
-        path = `${env.PWD === "/" ? "" : env.PWD}/${path}`;
+        path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
       }
 
       const { err, entry } = await processManager.filesystem

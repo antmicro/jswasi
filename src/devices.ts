@@ -2,8 +2,6 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { Stat } from "./filesystem/enums.js";
 
-const DECODER = new TextDecoder();
-
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
