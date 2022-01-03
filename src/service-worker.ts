@@ -26,16 +26,17 @@ self.addEventListener("install", async () => {
   await cache.addAll(urlsToCache);
 });
 
-self.addEventListener("fetch", (event: FetchEvent) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
+self.addEventListener("fetch", (event: Event) => {
+  const fetchEvent = event as FetchEvent;
+  fetchEvent.respondWith(
+    caches.match(fetchEvent.request).then((response) => {
       // Cache hit - return response
       if (response) {
         // TODO: add some logger, this is good info for development, but spam for production
         // console.log("Returning cached response for: ", response);
         return response;
       }
-      return fetch(event.request);
+      return fetch(fetchEvent.request);
     })
   );
 });

@@ -1307,9 +1307,9 @@ async function importWasmModule(
       // eslint-disable-next-line no-underscore-dangle
       instance.exports._start();
       doExit(0);
-    } catch (e) {
-      workerConsoleLog(`error: ${e}`);
-      sendToKernel(["stderr", `${e.stack}\n`]);
+    } catch (error: any) {
+      workerConsoleLog(`error: ${error}`);
+      sendToKernel(["stderr", `${error.stack}\n`]);
       doExit(255);
     }
   } else {

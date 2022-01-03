@@ -119,7 +119,7 @@ export async function wget(
   const { dir } = await processManager.filesystem.resolveAbsolute(path);
   try {
     await fetchFile(dir.open(), path, address);
-  } catch (error) {
+  } catch (error: any) {
     await stderr.write(
       `wget: could not get resource: ${error.message.toLowerCase()}\n`
     );

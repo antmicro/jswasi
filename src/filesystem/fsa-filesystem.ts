@@ -291,7 +291,7 @@ class FsaFilesystem implements Filesystem {
         ({ entry: dir } = await this.getDirectory(dir.open(), part));
       }
       return { err: constants.WASI_ESUCCESS, name, dir };
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === "NotFoundError") {
         return { err: constants.WASI_ENOENT, name: null, dir: null };
       }
@@ -322,7 +322,7 @@ class FsaFilesystem implements Filesystem {
         // eslint-disable-next-line no-await-in-loop
         ({ entry: dir } = await this.getDirectory(dir.open(), part));
       }
-    } catch (err) {
+    } catch (err: any) {
       if (err.name === "NotFoundError") {
         return { err: constants.WASI_ENOENT, name: null, parent: null };
       }
@@ -650,7 +650,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
             },
             lookupFlags
           );
-        } catch (err) {
+        } catch (err: any) {
           if (err.name === "TypeMismatchError" || err.name === "TypeError") {
             if (!(mode & FileOrDir.Directory)) {
               return { err: constants.WASI_EISDIR, entry: null };
@@ -675,7 +675,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
           fsRightsInheriting,
           fdFlags
         );
-      } catch (err) {
+      } catch (err: any) {
         if (err.name === "TypeMismatchError" || err.name === "TypeError") {
           return { err: constants.WASI_ENOTDIR, entry: null };
         }
