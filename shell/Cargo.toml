@@ -8,8 +8,8 @@ name = "wash"
 version = "0.1.0"
 
 [dependencies]
-clap = "3.0.0-rc.1"
-conch-parser = "0.1.1"
+clap = "3"
+conch-parser = "0.1"
 color-eyre = "0.5"
 lazy_static = "1"
 regex = "1"
