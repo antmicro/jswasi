@@ -92,7 +92,7 @@ export async function fetchFile(
     const response = await fetch(address);
     if (response.status === 200) {
       const writable = await (await entry.open()).writableStream();
-      await response.body.pipeTo(writable);
+      await response.body?.pipeTo(writable);
     } else {
       console.log(`Failed downloading ${filename} from ${address}`);
     }
@@ -325,7 +325,7 @@ function initFsaDropImport(
     const pwd =
       processManager.processInfos[processManager.currentProcess].env["PWD"];
     const entryPromises = [];
-    for (const item of e.dataTransfer.items) {
+    for (const item of e.dataTransfer?.items || []) {
       if (item.kind === "file") {
         entryPromises.push(async () => {
           const entry = await item.getAsFileSystemHandle();
@@ -356,10 +356,9 @@ function initServiceWorker() {
 // you can use it to customize the behavior
 export async function init(
   anchor: HTMLElement,
-  notifyDroppedFileSaved: (
-    path: string,
-    entryName: string
-  ) => void | null = null
+  notifyDroppedFileSaved:
+    | ((path: string, entryName: string) => void)
+    | null = null
 ): Promise<void> {
   if (!navigator.storage.getDirectory) {
     anchor.innerHTML =

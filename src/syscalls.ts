@@ -78,7 +78,6 @@ export default async function syscallCallback(
       break;
     }
     case "proc_exit": {
-      processManager.terminateProcess(processId, data);
       if (processManager.processInfos[processId].env["DEBUG"] === "1") {
         console.log(
           `%c [dbg (%c${processName}:${processId}%c)] %c exited with result code ${data}`,
@@ -88,6 +87,7 @@ export default async function syscallCallback(
           "background:default; color: default;"
         );
       }
+      processManager.terminateProcess(processId, data);
       if (processId === 0) {
         window.alive = false;
         window.exitCode = data;
@@ -429,6 +429,8 @@ export default async function syscallCallback(
           fds.push(await entry.open());
           openedFd[0] = fds.length - 1;
         }
+      } else {
+        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
@@ -607,6 +609,8 @@ export default async function syscallCallback(
         ({ err } = await (fds[fd] as OpenDirectory).deleteEntry(path, {
           recursive: false,
         }));
+      } else {
+        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
@@ -623,6 +627,8 @@ export default async function syscallCallback(
         ({ err } = await (fds[fd] as OpenDirectory).deleteEntry(path, {
           recursive: true,
         }));
+      } else {
+        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);

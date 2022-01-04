@@ -45,7 +45,7 @@ class ProcessInfo {
 export default class ProcessManager {
   public buffer = "";
 
-  public currentProcess: number | null;
+  public currentProcess: number = 0;
 
   public nextProcessId = 0;
 

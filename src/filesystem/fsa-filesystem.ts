@@ -81,8 +81,8 @@ class FsaFilesystem implements Filesystem {
     dir: FsaOpenDirectory,
     name: string,
     options: { create: boolean } = { create: false },
-    lookupFlags?: LookupFlags
-  ): Promise<{ err: number; entry: FsaFile }> {
+    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow
+  ): Promise<{ err: number; entry: FsaFile | null }> {
     const path = `${dir.path()}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
@@ -113,7 +113,7 @@ class FsaFilesystem implements Filesystem {
         err: getParentErr,
         parent,
         name,
-      } = await this.getParent(dir, linkedPath);
+      } = await this.getParent(dir, linkedPath as string);
       if (getParentErr !== constants.WASI_ESUCCESS) {
         return { err: getParentErr, entry: null };
       }
@@ -130,12 +130,12 @@ class FsaFilesystem implements Filesystem {
     dir: FsaOpenDirectory,
     name: string,
     options: { create: boolean } = { create: false },
-    lookupFlags?: LookupFlags,
-    openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: FsaDirectory }> {
+    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
+    openFlags: OpenFlags = OpenFlags.None,
+    fsRightsBase: Rights = Rights.None,
+    fsRightsInheriting: Rights = Rights.None,
+    fdFlags: FdFlags = FdFlags.None
+  ): Promise<{ err: number; entry: FsaDirectory | null }> {
     // TODO: revisit this hack
     if (
       dir.name() === "" &&
@@ -160,10 +160,13 @@ class FsaFilesystem implements Filesystem {
     const components = dir.path().split("/").slice(1);
 
     // if there are many mounts for the same path, we want to return the latest
-    const reversedMounts = [].concat(this.getMounts).reverse();
+    const reversedMounts = this.getMounts().slice().reverse();
     for (const { parts, name: mountName, dir: mountDir } of reversedMounts) {
       if (arraysEqual(parts, components) && mountName === name) {
-        return mountDir;
+        return {
+          err: constants.WASI_ESUCCESS,
+          entry: mountDir as FsaDirectory,
+        };
       }
     }
 
@@ -210,7 +213,7 @@ class FsaFilesystem implements Filesystem {
         return { err, entry: null };
       }
       return dir.getEntry(
-        linkedPath,
+        linkedPath as string,
         FileOrDir.Directory,
         lookupFlags,
         openFlags,
@@ -259,29 +262,22 @@ class FsaFilesystem implements Filesystem {
 
   isMounted(absolutePath: string): boolean {
     const { parts: delParts, name: delName } = parsePath(absolutePath);
-    for (let i = 0; i < this.mounts.length; i += 1) {
-      const { parts, name } = this.mounts[i];
-      if (arraysEqual(parts, delParts) && name === delName) {
-        return true;
-      }
-    }
-    return false;
+    return this.getMounts().some(
+      ({ parts, name }) => arraysEqual(parts, delParts) && name === delName
+    );
   }
 
   removeMount(absolutePath: string) {
     const { parts: delParts, name: delName } = parsePath(absolutePath);
-    for (let i = 0; i < this.mounts.length; i += 1) {
-      const { parts, name } = this.mounts[i];
-      if (arraysEqual(parts, delParts) && name === delName) {
-        this.mounts.splice(i, 1);
-        return;
-      }
-    }
+    const index = this.getMounts().findIndex(
+      ({ parts, name }) => arraysEqual(parts, delParts) && name === delName
+    );
+    this.mounts.splice(index, 1);
   }
 
   async resolveAbsolute(
     path: string
-  ): Promise<{ err: number; name: string; dir: Directory }> {
+  ): Promise<{ err: number; name: string | null; dir: Directory | null }> {
     const { parts, name } = parsePath(path);
     let dir = this.getRootDir();
 
@@ -305,7 +301,11 @@ class FsaFilesystem implements Filesystem {
   async getParent(
     dir: FsaDirectory,
     path: string
-  ): Promise<{ err: number; name: string; parent: FsaDirectory }> {
+  ): Promise<{
+    err: number;
+    name: string | null;
+    parent: FsaDirectory | null;
+  }> {
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (
@@ -340,8 +340,7 @@ class FsaFilesystem implements Filesystem {
 
     const entries: DirEntry[] = [];
 
-    const reversedMounts = [].concat(this.getMounts).reverse();
-    for (const { parts, dir: mountDir } of reversedMounts) {
+    for (const { parts, dir: mountDir } of this.getMounts().reverse()) {
       if (arraysEqual(parts, components)) {
         entries.push(mountDir);
       }
@@ -376,14 +375,14 @@ abstract class FsaEntry implements Entry {
 
   protected storedName: string;
 
-  private readonly storedParent: FsaDirectory;
+  private readonly storedParent: FsaDirectory | null;
 
-  protected _metadata: Metadata;
+  protected _metadata: Metadata | undefined;
 
   constructor(
     path: string,
     public readonly handle: FileSystemDirectoryHandle | FileSystemFileHandle,
-    parent: FsaDirectory,
+    parent: FsaDirectory | null,
     public readonly filesystem: FsaFilesystem
   ) {
     this.storedPath = path;
@@ -399,7 +398,7 @@ abstract class FsaEntry implements Entry {
     return this.storedName;
   }
 
-  parent(): FsaDirectory {
+  parent(): FsaDirectory | null {
     return this.storedParent;
   }
 
@@ -594,7 +593,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     fsRightsBase: Rights = Rights.None,
     fsRightsInheriting: Rights = Rights.None,
     fdFlags: FdFlags = FdFlags.None
-  ): Promise<{ err: number; entry: FsaFile | FsaDirectory }> {
+  ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> {
     const {
       err: getParentErr,
       name,
@@ -639,7 +638,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
     const open = async (
       create: boolean
-    ): Promise<{ err: number; entry: FsaFile | FsaDirectory }> => {
+    ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> => {
       if (mode & FileOrDir.File) {
         try {
           return await this.filesystem.getFile(
@@ -687,7 +686,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     };
 
     let err;
-    let entry: FsaFile | FsaDirectory;
+    let entry;
     if (openFlags & OpenFlags.Create) {
       if (openFlags & OpenFlags.Exclusive) {
         if ((await open(false)).err === constants.WASI_ESUCCESS) {
@@ -740,7 +739,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
 
   public declare readonly handle: FileSystemFileHandle;
 
-  private writer: FileSystemWritableFileStream;
+  private writer: FileSystemWritableFileStream | null = null;
 
   // eslint-disable-next-line class-methods-use-this
   isatty(): boolean {

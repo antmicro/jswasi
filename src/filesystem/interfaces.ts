@@ -17,7 +17,7 @@ export interface Filesystem {
 
   resolveAbsolute(
     path: string
-  ): Promise<{ err: number; name: string; dir: Directory }>;
+  ): Promise<{ err: number; name: string; dir: Directory | null }>;
 
   pathExists(
     dir: Directory,
@@ -39,7 +39,7 @@ export interface Filesystem {
 }
 
 export interface Entry {
-  parent(): Directory;
+  parent(): Directory | null;
 
   path(): string;
 
@@ -67,7 +67,7 @@ export interface OpenDirectory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File }>;
+  ): Promise<{ err: number; entry: File | null }>;
 
   getEntry(
     path: string,
@@ -77,7 +77,7 @@ export interface OpenDirectory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: Directory }>;
+  ): Promise<{ err: number; entry: Directory | null }>;
 
   getEntry(
     path: string,
@@ -87,7 +87,7 @@ export interface OpenDirectory extends Entry {
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
     fdFlags?: FdFlags
-  ): Promise<{ err: number; entry: File | Directory }>;
+  ): Promise<{ err: number; entry: File | Directory | null }>;
 
   getEntry(
     path: string,
@@ -97,7 +97,7 @@ export interface OpenDirectory extends Entry {
     fsRightsBase: Rights,
     fsRightsInheriting: Rights,
     fdFlags: FdFlags
-  ): Promise<{ err: number; entry: File | Directory }>;
+  ): Promise<{ err: number; entry: File | Directory | null }>;
 
   entries(): Promise<DirEntry[]>;
 
