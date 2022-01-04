@@ -24,6 +24,8 @@ import {
   StreamableFile,
 } from "./interfaces.js";
 
+const SYMBOLIC_LINK_DEPTH_LIMIT = 40;
+
 export async function createFsaFilesystem(): Promise<FsaFilesystem> {
   const topHandle = await navigator.storage.getDirectory();
   const rootHandle = await topHandle.getDirectoryHandle("root", {
@@ -81,7 +83,8 @@ class FsaFilesystem implements Filesystem {
     dir: FsaOpenDirectory,
     name: string,
     options: { create: boolean } = { create: false },
-    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow
+    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
+    __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaFile | null }> {
     const path = `${dir.path()}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
@@ -105,6 +108,10 @@ class FsaFilesystem implements Filesystem {
       storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
       lookupFlags & LookupFlags.SymlinkFollow
     ) {
+      __recursiveSymlinksDepth += 1;
+      if (__recursiveSymlinksDepth > SYMBOLIC_LINK_DEPTH_LIMIT) {
+        return { err: constants.WASI_ELOOP, entry: null };
+      }
       const { err: readlinkErr, linkedPath } = await dir.readlink(path);
       if (readlinkErr !== constants.WASI_ESUCCESS) {
         return { err: readlinkErr, entry: null };
@@ -117,7 +124,13 @@ class FsaFilesystem implements Filesystem {
       if (getParentErr !== constants.WASI_ESUCCESS) {
         return { err: getParentErr, entry: null };
       }
-      return this.getFile(parent.open(), name, options, lookupFlags);
+      return this.getFile(
+        parent.open(),
+        name,
+        options,
+        lookupFlags,
+        __recursiveSymlinksDepth
+      );
     }
 
     return {
@@ -134,7 +147,8 @@ class FsaFilesystem implements Filesystem {
     openFlags: OpenFlags = OpenFlags.None,
     fsRightsBase: Rights = Rights.None,
     fsRightsInheriting: Rights = Rights.None,
-    fdFlags: FdFlags = FdFlags.None
+    fdFlags: FdFlags = FdFlags.None,
+    __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaDirectory | null }> {
     // TODO: revisit this hack
     if (
@@ -208,6 +222,10 @@ class FsaFilesystem implements Filesystem {
       storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK &&
       lookupFlags & LookupFlags.SymlinkFollow
     ) {
+      __recursiveSymlinksDepth += 1;
+      if (__recursiveSymlinksDepth > SYMBOLIC_LINK_DEPTH_LIMIT) {
+        return { err: constants.WASI_ELOOP, entry: null };
+      }
       const { err, linkedPath } = await dir.readlink(path);
       if (err !== constants.WASI_ESUCCESS) {
         return { err, entry: null };
@@ -219,7 +237,8 @@ class FsaFilesystem implements Filesystem {
         openFlags,
         fsRightsBase,
         fsRightsInheriting,
-        fdFlags
+        fdFlags,
+        __recursiveSymlinksDepth
       );
     }
 
@@ -559,7 +578,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     openFlags?: OpenFlags,
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
+    fdFlags?: FdFlags,
+    __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaFile }>;
 
   // eslint-disable-next-line no-dupe-class-members
@@ -570,7 +590,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     openFlags?: OpenFlags,
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
+    fdFlags?: FdFlags,
+    __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaDirectory }>;
 
   // eslint-disable-next-line no-dupe-class-members
@@ -581,7 +602,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     openFlags?: OpenFlags,
     fsRightsBase?: Rights,
     fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags
+    fdFlags?: FdFlags,
+    __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaFile | FsaDirectory }>;
 
   // eslint-disable-next-line no-dupe-class-members
@@ -592,7 +614,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     openFlags: OpenFlags = OpenFlags.None,
     fsRightsBase: Rights = Rights.None,
     fsRightsInheriting: Rights = Rights.None,
-    fdFlags: FdFlags = FdFlags.None
+    fdFlags: FdFlags = FdFlags.None,
+    __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> {
     const {
       err: getParentErr,
@@ -647,7 +670,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
             {
               create,
             },
-            lookupFlags
+            lookupFlags,
+            __recursiveSymlinksDepth
           );
         } catch (err: any) {
           if (err.name === "TypeMismatchError" || err.name === "TypeError") {
@@ -672,7 +696,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
           openFlags,
           fsRightsBase,
           fsRightsInheriting,
-          fdFlags
+          fdFlags,
+          __recursiveSymlinksDepth
         );
       } catch (err: any) {
         if (err.name === "TypeMismatchError" || err.name === "TypeError") {
