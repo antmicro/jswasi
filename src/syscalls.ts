@@ -179,7 +179,7 @@ export default async function syscallCallback(
             .getEntry(
               path,
               FileOrDir.File,
-              LookupFlags.NoFollow,
+              LookupFlags.SymlinkFollow,
               OpenFlags.Create
             );
           fds[fd] = await entry.open();
