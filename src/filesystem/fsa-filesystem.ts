@@ -185,24 +185,7 @@ class FsaFilesystem implements Filesystem {
     }
 
     const path = `${dir.path()}/${name}`;
-    // TODO: should also consider getFileHandle in case it's a symlink
-    const handle = await dir.handle.getDirectoryHandle(name, options);
-    // if (lookupFlags & LookupFlags.SymlinkFollow) {
-    //   const storedData: StoredData = await get(path);
-    //   if (storedData.fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
-    //
-    //   }
-    // }
-    // let handle;
-    // try {
-    //   handle = await dir.handle.getDirectoryHandle(name, options);
-    // } catch (err) {
-    //   if (lookupFlags & LookupFlags.SymlinkFollow && (err.name === "TypeMismatchError" || err.name === "TypeError")) {
-    //     return dir.getEntry(path, FileOrDir.Directory, LookupFlags.SymlinkFollow);
-    //   }
-    //
-    //   throw err;
-    // }
+
     let storedData: StoredData = await get(path);
     if (!storedData) {
       storedData = {
@@ -231,7 +214,7 @@ class FsaFilesystem implements Filesystem {
         return { err, entry: null };
       }
       return dir.getEntry(
-        linkedPath as string,
+        linkedPath,
         FileOrDir.Directory,
         lookupFlags,
         openFlags,
@@ -242,6 +225,7 @@ class FsaFilesystem implements Filesystem {
       );
     }
 
+    const handle = await dir.handle.getDirectoryHandle(name, options);
     return {
       err: constants.WASI_ESUCCESS,
       entry: new FsaDirectory(path, handle, dir, this),
