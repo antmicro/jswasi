@@ -499,7 +499,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
-      await del(parent.path() + name);
+      await del(`${parent.path()}/${name}`);
     }
     return { err };
   }
