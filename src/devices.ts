@@ -75,6 +75,10 @@ export class Stdin implements In {
   close(): Promise<void> {
     return Promise.resolve();
   }
+
+  seek(): number {
+    return 0;
+  }
 }
 
 export class Stdout implements Out {
@@ -109,6 +113,10 @@ export class Stdout implements Out {
 
   close(): Promise<void> {
     return Promise.resolve();
+  }
+
+  seek(): number {
+    return 0;
   }
 }
 
@@ -145,5 +153,9 @@ export class Stderr implements Out {
 
   close(): Promise<void> {
     return Promise.resolve();
+  }
+
+  seek(): number {
+    return 0;
   }
 }

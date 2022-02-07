@@ -1,7 +1,7 @@
-# Instalation
+# Installation
 
 Make sure you have Rust and `wasm32-wasi` target installed, as well as node.
-Otherwise run:
+Otherwise, run:
 
 ```
 # install rustc, rustup, cargo
@@ -16,7 +16,7 @@ url -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 nvm install node
 ```
 
-Once your done, make sure you're in the project root directory and run once:
+Once you're done, make sure you're in the project root directory and run once:
 
 ```
 npm install
@@ -41,4 +41,4 @@ If you only want to embed wash run:
 ./setup.sh embedded
 ```
 
-All neccessary files will be generated to `dist` directory.
+All necessary files will be generated to `dist` directory.

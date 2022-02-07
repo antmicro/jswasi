@@ -57,6 +57,10 @@ const OPTIONAL_BINARIES = {
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
   "/usr/local/bin/ruby":
     "https://registry-cdn.wapm.io/contents/Madao/ruby-wasm/1.0.0/ruby.wasm",
+  "/usr/local/bin/clang":
+    "https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm",
+  "/usr/local/bin/wasm-ld":
+    "https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm",
 };
 
 export async function fetchFile(

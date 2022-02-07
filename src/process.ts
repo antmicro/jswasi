@@ -653,13 +653,6 @@ function WASI(): WASICallbacks {
     fdFlags: FdFlags,
     openedFdPtr: ptr
   ) {
-    workerConsoleLog(
-      `path_open(${dirFd}, ${lookupFlags}, 0x${pathPtr.toString(
-        16
-      )}, ${pathLen}, ${openFlags}, ${fsRightsBase}, ${fsRightsInheriting}, ${fdFlags}, 0x${openedFdPtr.toString(
-        16
-      )})`
-    );
     const view = new DataView(
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
     );
@@ -670,7 +663,14 @@ function WASI(): WASICallbacks {
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
     );
-    workerConsoleLog(`path_open: path = ${path}`);
+
+    workerConsoleLog(
+      `path_open(dirFd=${dirFd}, lookupFlags=${lookupFlags}, pathPtr=0x${pathPtr.toString(
+        16
+      )}, pathLen=${pathLen}, openFlags=${openFlags}, fsRightsBase=${fsRightsBase}, fsRightsInheriting=${fsRightsInheriting}, fdFlags=${fdFlags}, openedFdPtr=0x${openedFdPtr.toString(
+        16
+      )}) [path=${path}]`
+    );
 
     const sharedBuffer = new SharedArrayBuffer(4 + 4); // lock, opened fd
     const lck = new Int32Array(sharedBuffer, 0, 1);

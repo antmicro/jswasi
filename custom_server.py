@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #
-# Copyright (c) 2021 Antmicro <www.anmticro.com>
+# Copyright (c) 2021 Antmicro <www.antmicro.com>
 #
 
 import sys
@@ -10,6 +10,7 @@ import base64
 import urllib.request
 import time
 import socketserver
+
 
 class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -35,8 +36,8 @@ if __name__ == '__main__':
         port = int(sys.argv[1])
     else:
         port = 8000
-    httpd = None;
-    while (httpd == None):
+    httpd = None
+    while httpd is None:
         try:
             httpd = socketserver.ForkingTCPServer(('', port), CustomHTTPRequestHandler)
         except:
@@ -44,4 +45,4 @@ if __name__ == '__main__':
             time.sleep(2)
     print("Serving content on :%d" % port)
 
-    httpd.serve_forever();
+    httpd.serve_forever()
