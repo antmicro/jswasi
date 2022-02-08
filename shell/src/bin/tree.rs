@@ -1,16 +1,16 @@
 use std::{env, fs, io};
 
 use std::fs::DirEntry;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+fn visit_dirs(dir: &Path, current_path: &PathBuf, cb: &dyn Fn(&PathBuf, &DirEntry)) -> io::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            cb(&entry);
+            cb(&current_path, &entry);
             if path.is_dir() {
-                visit_dirs(&path, cb)?;
+                visit_dirs(&path, &current_path.join(entry.file_name()), cb)?;
             }
         }
     }
@@ -18,9 +18,9 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let dir = (env::args().nth(1).or_else(|| Some(String::from(".")))).unwrap();
-    visit_dirs(Path::new(&dir), &|entry: &DirEntry| {
-        println!("{}", entry.path().to_str().unwrap());
+    let dir = env::args().nth(1).unwrap_or_else(|| String::from("."));
+    visit_dirs(Path::new(&dir), &PathBuf::new(), &|current_path: &PathBuf, entry: &DirEntry| {
+        println!("{}", current_path.join(entry.file_name()).display());
     })?;
 
     Ok(())
