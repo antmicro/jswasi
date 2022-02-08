@@ -15,7 +15,7 @@ import socketserver
 class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path[0:7] == "/proxy/":
-            real_path = base64.b64decode(self.path[7:].encode('ascii')).decode('ascii')
+            real_path = base64.b64decode(self.path[7:].encode("ascii")).decode("ascii")
             self.send_response(200)
             self.end_headers()
             self.copyfile(urllib.request.urlopen(real_path), self.wfile)
@@ -31,7 +31,7 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
     else:
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     httpd = None
     while httpd is None:
         try:
-            httpd = socketserver.ForkingTCPServer(('', port), CustomHTTPRequestHandler)
+            httpd = socketserver.ForkingTCPServer(("", port), CustomHTTPRequestHandler)
         except:
             httpd = None
             time.sleep(2)

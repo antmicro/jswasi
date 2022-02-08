@@ -23,15 +23,15 @@
     "puppeteer": "^10.4.0"
   },
   "scripts": {
-    "build": "./setup.sh build",
-    "start": "./setup.sh start",
-    "dev": "./setup.sh dev",
-    "pretest": "./setup.sh start 4000 &",
+    "build": "just build",
+    "start": "just start",
+    "dev": "just dev",
+    "pretest": "just start 4000 &",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
     "prettier-check": "npx prettier . --check",
-    "record": "./setup.sh record",
+    "record": "just record",
     "prepare": "husky install"
   },
   "lint-staged": {

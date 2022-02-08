@@ -491,7 +491,7 @@ impl Shell {
             }
         }
 
-        // $ for eg. "!ls", "!.setup.sh" "!wasm2"
+        // $ for eg. "!ls"
         lazy_static! {
             static ref STRING_RE: Regex = Regex::new(r"!(\w+)").unwrap();
         }
