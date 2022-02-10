@@ -472,8 +472,8 @@ export async function init(
       .getRootDir()
       .open()
       .getEntry("/home/ant", FileOrDir.Directory)
-  ).entry;
-  // pwdDir.setAsCwd();
+  ).entry.open();
+  // pwdDir.setAsCwd(); // doesn't make any difference
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -484,7 +484,7 @@ export async function init(
       new Stdout(processManager),
       new Stderr(processManager),
       filesystem.getRootDir().open(),
-      pwdDir.open(),
+      pwdDir,
       // TODO: why must fds[5] be present for ls to work, and what should it be
       filesystem.getRootDir().open(),
     ],
