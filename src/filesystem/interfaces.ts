@@ -122,7 +122,7 @@ export interface File extends Entry {
 export interface StreamableFile {
   arrayBuffer(): Promise<ArrayBufferView | ArrayBuffer>;
 
-  readableStream(): Promise<NodeJS.ReadableStream>;
+  readableStream(): Promise<ReadableStream>;
 
   writableStream(): Promise<WritableStream>;
 }

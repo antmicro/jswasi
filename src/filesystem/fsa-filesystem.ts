@@ -469,7 +469,24 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
   override async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await get(this.path());
+      const storedData: StoredData = await get(this.path()) || {
+        // dummy values for files from locally mounted dirs
+        dev: 0n,
+        ino: 0n,
+        nlink: 1n,
+        rdev: 0,
+        size: 4096n,
+        uid: 0,
+        gid: 0,
+        userMode: 7,
+        groupMode: 7,
+        blockSize: 0,
+        blocks: 0,
+        fileType: constants.WASI_PREOPENTYPE_DIR,
+        atim: 0n,
+        mtim: 0n,
+        ctim: 0n,
+      };
       this._metadata = {
         dev: 0n,
         ino: 0n,
@@ -853,7 +870,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     return (await this.handle.getFile()).arrayBuffer();
   }
 
-  async readableStream(): Promise<NodeJS.ReadableStream> {
+  async readableStream(): Promise<ReadableStream> {
     return (await this.handle.getFile()).stream();
   }
 
