@@ -1,5 +1,3 @@
-// @ts-ignore TODO: port idb-keyval to Typescript with no implicit any
-import { del, get, set } from "../vendor/idb-keyval.js";
 import * as constants from "../constants.js";
 import { arraysEqual, parsePath } from "../utils.js";
 import {
@@ -23,6 +21,7 @@ import {
   OpenFile,
   StreamableFile,
 } from "./interfaces.js";
+import { del_stored_data, set_stored_data, get_stored_data } from "./metadata.js";
 
 const SYMBOLIC_LINK_DEPTH_LIMIT = 40;
 
@@ -31,7 +30,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
   const rootHandle = await topHandle.getDirectoryHandle("root", {
     create: true,
   });
-  let rootStoredData: StoredData = await get("");
+  let rootStoredData: StoredData = await get_stored_data("");
   if (!rootStoredData) {
     rootStoredData = {
       fileType: constants.WASI_FILETYPE_DIRECTORY,
@@ -43,7 +42,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
       mtim: 0n,
       ctim: 0n,
     };
-    await set("", rootStoredData);
+    await set_stored_data("", rootStoredData);
   }
   const metaHandle = await topHandle.getDirectoryHandle("meta", {
     create: true,
@@ -89,7 +88,7 @@ class FsaFilesystem implements Filesystem {
     const path = `${dir.path()}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
-    let storedData: StoredData = await get(path);
+    let storedData: StoredData = await get_stored_data(path);
     if (!storedData) {
       storedData = {
         fileType: constants.WASI_FILETYPE_REGULAR_FILE,
@@ -101,7 +100,7 @@ class FsaFilesystem implements Filesystem {
         mtim: BigInt(file.lastModified) * 1_000_000n,
         ctim: 0n,
       };
-      await set(path, storedData);
+      await set_stored_data(path, storedData);
     }
 
     if (
@@ -186,7 +185,7 @@ class FsaFilesystem implements Filesystem {
 
     const path = `${dir.path()}/${name}`;
 
-    let storedData: StoredData = await get(path);
+    let storedData: StoredData = await get_stored_data(path);
     if (!storedData) {
       storedData = {
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
@@ -198,7 +197,7 @@ class FsaFilesystem implements Filesystem {
         mtim: 0n,
         ctim: 0n,
       };
-      await set(path, storedData);
+      await set_stored_data(path, storedData);
     }
 
     if (
@@ -407,7 +406,7 @@ abstract class FsaEntry implements Entry {
 
   async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await get(this.path());
+      const storedData: StoredData = await get_stored_data(this.path());
       let size;
       if (this.handle.kind === "file") {
         size = BigInt((await this.handle.getFile()).size);
@@ -469,24 +468,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
   override async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await get(this.path()) || {
-        // dummy values for files from locally mounted dirs
-        dev: 0n,
-        ino: 0n,
-        nlink: 1n,
-        rdev: 0,
-        size: 4096n,
-        uid: 0,
-        gid: 0,
-        userMode: 7,
-        groupMode: 7,
-        blockSize: 0,
-        blocks: 0,
-        fileType: constants.WASI_PREOPENTYPE_DIR,
-        atim: 0n,
-        mtim: 0n,
-        ctim: 0n,
-      };
+      const storedData: StoredData = await get_stored_data(this.path());
       this._metadata = {
         dev: 0n,
         ino: 0n,
@@ -519,7 +501,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
-      await del(`${parent.path()}/${name}`);
+      await del_stored_data(`${parent.path()}/${name}`);
     }
     return { err };
   }
@@ -541,7 +523,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
         data: destination,
       });
       await w.close();
-      await set(entry.path(), metadata);
+      await set_stored_data(entry.path(), metadata);
     }
 
     return err;
