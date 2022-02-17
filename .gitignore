@@ -17,3 +17,8 @@ ci/images
 ci/package-lock.json
 
 dist/
+
+# Robot Framework output files
+tests/**/*.html
+tests/**/*.xml
+tests/**/*.png
