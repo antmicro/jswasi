@@ -21,7 +21,7 @@ import {
   OpenFile,
   StreamableFile,
 } from "./interfaces.js";
-import { del_stored_data, set_stored_data, get_stored_data } from "./metadata.js";
+import { delStoredData, setStoredData, getStoredData } from "./metadata.js";
 
 const SYMBOLIC_LINK_DEPTH_LIMIT = 40;
 
@@ -30,7 +30,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
   const rootHandle = await topHandle.getDirectoryHandle("root", {
     create: true,
   });
-  let rootStoredData: StoredData = await get_stored_data("");
+  let rootStoredData: StoredData = await getStoredData("");
   if (!rootStoredData) {
     rootStoredData = {
       fileType: constants.WASI_FILETYPE_DIRECTORY,
@@ -42,7 +42,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
       mtim: 0n,
       ctim: 0n,
     };
-    await set_stored_data("", rootStoredData);
+    await setStoredData("", rootStoredData);
   }
   const metaHandle = await topHandle.getDirectoryHandle("meta", {
     create: true,
@@ -88,7 +88,7 @@ class FsaFilesystem implements Filesystem {
     const path = `${dir.path()}/${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
-    let storedData: StoredData = await get_stored_data(path);
+    let storedData: StoredData = await getStoredData(path);
     if (!storedData) {
       storedData = {
         fileType: constants.WASI_FILETYPE_REGULAR_FILE,
@@ -100,7 +100,7 @@ class FsaFilesystem implements Filesystem {
         mtim: BigInt(file.lastModified) * 1_000_000n,
         ctim: 0n,
       };
-      await set_stored_data(path, storedData);
+      await setStoredData(path, storedData);
     }
 
     if (
@@ -185,7 +185,7 @@ class FsaFilesystem implements Filesystem {
 
     const path = `${dir.path()}/${name}`;
 
-    let storedData: StoredData = await get_stored_data(path);
+    let storedData: StoredData = await getStoredData(path);
     if (!storedData) {
       storedData = {
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
@@ -197,7 +197,7 @@ class FsaFilesystem implements Filesystem {
         mtim: 0n,
         ctim: 0n,
       };
-      await set_stored_data(path, storedData);
+      await setStoredData(path, storedData);
     }
 
     if (
@@ -406,7 +406,7 @@ abstract class FsaEntry implements Entry {
 
   async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await get_stored_data(this.path());
+      const storedData: StoredData = await getStoredData(this.path());
       let size;
       if (this.handle.kind === "file") {
         size = BigInt((await this.handle.getFile()).size);
@@ -468,7 +468,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
   override async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await get_stored_data(this.path());
+      const storedData: StoredData = await getStoredData(this.path());
       this._metadata = {
         dev: 0n,
         ino: 0n,
@@ -501,7 +501,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
       await parent.handle.removeEntry(name, options);
-      await del_stored_data(`${parent.path()}/${name}`);
+      await delStoredData(`${parent.path()}/${name}`);
     }
     return { err };
   }
@@ -523,7 +523,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
         data: destination,
       });
       await w.close();
-      await set_stored_data(entry.path(), metadata);
+      await setStoredData(entry.path(), metadata);
     }
 
     return err;

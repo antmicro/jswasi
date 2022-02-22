@@ -473,7 +473,7 @@ export async function init(
       .open()
       .getEntry("/home/ant", FileOrDir.Directory)
   ).entry.open();
-  // pwdDir.setAsCwd(); // doesn't make any difference
+  pwdDir.setAsCwd(); // doesn't make any difference
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
