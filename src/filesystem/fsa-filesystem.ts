@@ -853,6 +853,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   }
 
   async readableStream(): Promise<ReadableStream> {
+    // @ts-ignore
     return (await this.handle.getFile()).stream();
   }
 
