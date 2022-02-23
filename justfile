@@ -24,7 +24,7 @@ build: build-embedded
 
 default_port := "8000"
 
-start PORT=default_port:
+start PORT=default_port: build
 	cd dist && python3 ../custom_server.py {{PORT}}
 
 dev PORT=default_port:
