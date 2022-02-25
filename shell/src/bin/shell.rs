@@ -7,7 +7,7 @@ use std::os::raw::c_int;
 use std::path::PathBuf;
 use std::process;
 
-use clap::{App, Arg};
+use clap::{Command, Arg};
 use color_eyre::Report;
 
 #[cfg(target_os = "wasi")]
@@ -34,7 +34,7 @@ fn main() {
         path.set_extension("");
         path.file_name().unwrap().to_str().unwrap().to_string()
     };
-    let matches = App::new(name)
+    let matches = Command::new(name)
         .version(&*format!(
             "{}-{} ({})\nCopyright (c) 2021 Antmicro <www.antmicro.com>",
             env!("CARGO_PKG_VERSION"),

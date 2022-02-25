@@ -3,10 +3,8 @@
 .vscode/
 
 shell/target
-shell/Cargo.lock
 
 node_modules/
-package-lock.json
 
 .eslintcache
 
