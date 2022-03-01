@@ -23,6 +23,8 @@ npm install
 ./setup.sh build
 ```
 
+Note: This is not the complete build and needs to be updated. The CI works so it should be a reference. Possibly we can use `tuttest` to keep the CI and README in sync.
+
 ## Local run
 
 Now if you want to run the project at a specific port run:
@@ -32,6 +34,22 @@ Now if you want to run the project at a specific port run:
 ```
 
 and go to http://localhost:8000 (make sure you have localhost mapped to 0.0.0.0 in /etc/hosts).
+
+## Running tests
+
+Install prerequisites:
+
+```
+pip install robotframework PexpectLibrary
+```
+
+Run:
+
+```
+export PATH=$PATH:$(pwd)/shell/target/release/
+cd tests/robot
+robot --variable platform:native -i native test-shell.robot
+```
 
 ## Embedding
 
