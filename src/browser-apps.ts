@@ -198,6 +198,8 @@ export async function ps(
     }\n\r`;
   }
 
+  // for now ps must be added artificially
+  psData += `-1 pts/0    00:00:00 ps\n\r`;
   await stdout.write(psData);
   return 0;
 }
