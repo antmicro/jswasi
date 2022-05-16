@@ -846,8 +846,18 @@ impl Shell {
             }
             "unzip" => {
                 if let Some(filepath) = &args.get(0) {
+                    if !PathBuf::from(filepath).is_file(){
+                        output_device.eprintln(&format!("unzip: cannot find or open {0}, {0}.zip or {0}.ZIP", filepath));
+                        return Ok(EXIT_FAILURE);
+                    }
                     let file = fs::File::open(&PathBuf::from(filepath)).unwrap();
-                    let mut archive = zip::ZipArchive::new(file).unwrap();
+                    let mut archive = match zip::ZipArchive::new(file) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            output_device.eprintln(&format!("unzip: cannot read archive"));
+                            return Ok(EXIT_FAILURE);
+                        }
+                    };
                     for i in 0..archive.len() {
                         let mut file = archive.by_index(i).unwrap();
                         let output_path = file.enclosed_name().to_owned().unwrap();
