@@ -635,7 +635,15 @@ impl Shell {
         background: bool,
         redirects: &mut Vec<Redirect>,
     ) -> Result<i32, Report> {
-        let mut output_device = OutputDevice::new(redirects);
+        let od_result = OutputDevice::new(redirects);
+        let mut output_device: OutputDevice;
+        match od_result {
+            Ok(x) => output_device = x,
+            Err(s) => {
+                eprintln!("shell: {}", s);
+                return Ok(EXIT_FAILURE)
+            }
+        }
         let result: Result<i32, Report> = match command {
             // built in commands
             "clear" => {

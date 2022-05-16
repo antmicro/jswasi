@@ -1,6 +1,7 @@
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::Path;
 
 use color_eyre::Report;
 
@@ -14,12 +15,19 @@ pub struct OutputDevice<'a> {
 }
 
 impl<'a> OutputDevice<'a> {
-    pub fn new(redirects: &'a [Redirect]) -> Self {
-        OutputDevice {
+    pub fn new(redirects: &'a [Redirect]) -> Result<Self, String> {
+        for i in redirects.iter() {
+            match i {
+                Redirect::Write((_, path)) | Redirect::Read((_, path)) | Redirect::Append((_, path)) =>{
+                    if Path::new(path).is_dir() { return Err(format!("{}: Is a directory", path)) }
+                },
+            }
+        }
+        Ok(OutputDevice {
             redirects,
             stdout: String::new(),
             stderr: String::new(),
-        }
+        })
     }
 
     // TODO: ensure this gets called, maybe move it to custom Drop implementation
