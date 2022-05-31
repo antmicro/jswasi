@@ -40,6 +40,7 @@ if __name__ == "__main__":
     while httpd is None:
         try:
             httpd = socketserver.ForkingTCPServer(("", port), CustomHTTPRequestHandler)
+            httpd.allow_reuse_address = True
         except:
             httpd = None
             time.sleep(2)
