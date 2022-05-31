@@ -4,6 +4,8 @@
 # Copyright (c) 2021 Antmicro <www.antmicro.com>
 #
 
+import signal
+from threading import Thread
 import sys
 from http import server
 import base64
@@ -45,5 +47,10 @@ if __name__ == "__main__":
             httpd = None
             time.sleep(2)
     print("Serving content on :%d" % port)
+
+    def kill_httpd(*args):
+        thr = Thread(target=lambda h: h.shutdown(), args=(httpd,))
+        thr.start()
+    signal.signal(signal.SIGINT, kill_httpd)
 
     httpd.serve_forever()
