@@ -1,4 +1,6 @@
-use std::{env, fs, io};
+use std::{fs, io};
+#[cfg(target_os = "wasi")]
+use std::env;
 
 use clap::{Arg, Command, ArgMatches, Values};
 use std::fs::DirEntry;
