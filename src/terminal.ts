@@ -440,9 +440,6 @@ export async function init(
     } else {
       // regular characters
       processManager.pushToBuffer(data);
-      if (window.stdoutAttached) {
-        window.buffer += data;
-      }
     }
 
     if (code === 10 || code >= 32) {
