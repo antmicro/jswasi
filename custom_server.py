@@ -20,7 +20,9 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
             real_path = base64.b64decode(self.path[7:].encode("ascii")).decode("ascii")
             self.send_response(200)
             self.end_headers()
-            self.copyfile(urllib.request.urlopen(real_path), self.wfile)
+            proxy_request = urllib.request.Request(real_path)
+            proxy_request.add_header('User-Agent', 'Ruby')
+            self.copyfile(urllib.request.urlopen(proxy_request), self.wfile)
         else:
             super().do_GET()
 
