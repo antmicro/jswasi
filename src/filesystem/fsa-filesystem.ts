@@ -30,7 +30,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
   const rootHandle = await topHandle.getDirectoryHandle("root", {
     create: true,
   });
-  let rootStoredData: StoredData = await getStoredData("");
+  let rootStoredData: StoredData = await getStoredData("/");
   if (!rootStoredData) {
     rootStoredData = {
       fileType: constants.WASI_FILETYPE_DIRECTORY,
@@ -42,7 +42,7 @@ export async function createFsaFilesystem(): Promise<FsaFilesystem> {
       mtim: 0n,
       ctim: 0n,
     };
-    await setStoredData("", rootStoredData);
+    await setStoredData("/", rootStoredData);
   }
   const metaHandle = await topHandle.getDirectoryHandle("meta", {
     create: true,
@@ -62,8 +62,8 @@ class FsaFilesystem implements Filesystem {
     rootHandle: FileSystemDirectoryHandle,
     metaHandle: FileSystemDirectoryHandle
   ) {
-    this.rootDir = new FsaDirectory("", rootHandle, null, this);
-    this.metaDir = new FsaDirectory("", metaHandle, null, this);
+    this.rootDir = new FsaDirectory("/", rootHandle, null, this);
+    this.metaDir = new FsaDirectory("/", metaHandle, null, this);
   }
 
   getRootDir(): FsaDirectory {
@@ -85,7 +85,7 @@ class FsaFilesystem implements Filesystem {
     lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
     __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaFile | null }> {
-    const path = `${dir.path()}/${name}`;
+    const path = `${dir.path()}${dir.path().endsWith("/") ? "" : "/"}${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
     let storedData: StoredData = await getStoredData(path);
@@ -150,10 +150,7 @@ class FsaFilesystem implements Filesystem {
     __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaDirectory | null }> {
     // TODO: revisit this hack
-    if (
-      dir.name() === "" &&
-      (name === "." || name === ".." || name === "" || name === "/")
-    )
+    if (dir.name() === "/" && (name === "." || name === ".." || name === "/"))
       return { err: constants.WASI_ESUCCESS, entry: this.getRootDir() };
     if (name === ".") {
       return {
@@ -183,7 +180,7 @@ class FsaFilesystem implements Filesystem {
       }
     }
 
-    const path = `${dir.path()}/${name}`;
+    const path = `${dir.path()}${dir.path().endsWith("/") ? "" : "/"}${name}`;
 
     let storedData: StoredData = await getStoredData(path);
     if (!storedData) {
@@ -311,10 +308,11 @@ class FsaFilesystem implements Filesystem {
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (
-      dir.name() === "" &&
+      dir.name() === "/" &&
       (path === "." || path === ".." || path === "" || path === "/")
-    )
-      return { err: constants.WASI_ESUCCESS, name: "", parent: dir };
+    ) {
+      return { err: constants.WASI_ESUCCESS, name: "/", parent: dir };
+    }
     if (path.startsWith("/")) dir = this.getRootDir();
 
     const { parts, name } = parsePath(path);
@@ -363,7 +361,9 @@ class FsaFilesystem implements Filesystem {
         }
       }
       if (!alreadyExists) {
-        const path = `${dir.path()}/${name}`;
+        const path = `${dir.path()}${
+          dir.path().endsWith("/") ? "" : "/"
+        }${name}`;
         entries.push(new FsaDirEntry(path, handle, dir, this));
       }
     }
@@ -388,7 +388,11 @@ abstract class FsaEntry implements Entry {
     public readonly filesystem: FsaFilesystem
   ) {
     this.storedPath = path;
-    this.storedName = path.split("/").slice(-1)[0];
+    if (this.storedPath == "/") {
+      this.storedName = "/";
+    } else {
+      this.storedName = path.split("/").slice(-1)[0];
+    }
     this.storedParent = parent;
   }
 
@@ -608,6 +612,13 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
     if (getParentErr !== constants.WASI_ESUCCESS) {
       return { err: getParentErr, entry: null };
+    }
+
+    if (name === "") {
+      return {
+        err: constants.WASI_ESUCCESS,
+        entry: this.filesystem.getRootDir(),
+      };
     }
 
     if (name === "." || name === "..") {
