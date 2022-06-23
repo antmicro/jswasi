@@ -21,7 +21,7 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             proxy_request = urllib.request.Request(real_path)
-            proxy_request.add_header('User-Agent', 'Ruby')
+            proxy_request.add_header('User-Agent', 'Wget/1.21')
             self.copyfile(urllib.request.urlopen(proxy_request), self.wfile)
         else:
             super().do_GET()
