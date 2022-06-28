@@ -331,6 +331,9 @@ class FsaFilesystem implements Filesystem {
       }
       throw err;
     }
+    if (dir.name() === "/" && (name === "." || name === "..")) {
+      return { err: constants.WASI_ESUCCESS, name: "/", parent: dir };
+    }
 
     return { err: constants.WASI_ESUCCESS, name, parent: dir };
   }

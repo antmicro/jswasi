@@ -27,7 +27,6 @@ export function realpath(path: string): string {
   let tmpPath = path;
   let part = "";
   let level = 0;
-  const rootPath = path[0] === "/";
   while (tmpPath !== "") {
     if (tmpPath.indexOf("/") !== -1) {
       part = tmpPath.substr(0, tmpPath.indexOf("/"));
@@ -38,12 +37,13 @@ export function realpath(path: string): string {
     } else if (part === ".") {
       // do nothing
     } else {
-      result[level] = part;
-      level += 1;
+      if (part != "") {
+        result[level] = part;
+        level += 1;
+      }
     }
   }
-  resultPath = result.slice(0, level).join("/");
-  if (rootPath) if (resultPath === "") return "/";
+  resultPath = `/${result.slice(0, level).join("/")}`;
   resultPath = resultPath.replace("/./", "/");
   return resultPath;
 }
