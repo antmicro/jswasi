@@ -149,7 +149,6 @@ class FsaFilesystem implements Filesystem {
     fdFlags: FdFlags = FdFlags.None,
     __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaDirectory | null }> {
-    // TODO: revisit this hack
     if (dir.name() === "/" && (name === "." || name === ".." || name === "/"))
       return { err: constants.WASI_ESUCCESS, entry: this.getRootDir() };
     if (name === ".") {
@@ -307,12 +306,6 @@ class FsaFilesystem implements Filesystem {
   }> {
     if (path.includes("\\"))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
-    if (
-      dir.name() === "/" &&
-      (path === "." || path === ".." || path === "" || path === "/")
-    ) {
-      return { err: constants.WASI_ESUCCESS, name: "/", parent: dir };
-    }
     if (path.startsWith("/")) dir = this.getRootDir();
 
     const { parts, name } = parsePath(path);
