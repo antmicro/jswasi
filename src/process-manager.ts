@@ -16,6 +16,67 @@ type BufferRequest = {
   sharedBuffer: Uint8Array;
 };
 
+export class FdTable {
+  private fdt: Record<number, FileDescriptor> = {};
+  private freeFds: number[] = [];
+  private topFd: number;
+
+  constructor(fds: Record<number, FileDescriptor>) {
+    this.fdt = { ...fds };
+    this.topFd = Object.keys(fds).length - 1;
+  }
+
+  public clone(): FdTable {
+    var fdTable = new FdTable(this.fdt);
+    fdTable.freeFds = this.freeFds.slice(0);
+    fdTable.topFd = this.topFd;
+    return fdTable;
+  }
+
+  public addFile(entry: FileDescriptor): number {
+    if (entry === undefined) {
+      throw "Entry is undefined";
+    }
+    const fd = this.freeFds.shift();
+    if (fd !== undefined) {
+      this.fdt[fd] = entry;
+      return fd;
+    } else {
+      this.fdt[++this.topFd] = entry;
+      return this.topFd;
+    }
+  }
+
+  public freeFd(fd: number) {
+    if (!(fd in this.fdt)) {
+      throw "descriptor not present in descriptor table";
+    }
+    delete this.fdt[fd];
+    this.freeFds.push(fd);
+  }
+
+  public replaceFd(fd: number, entry: FileDescriptor) {
+    if (!(fd in this.fdt)) {
+      throw "descriptor not present in descriptor table";
+    }
+    if (entry === undefined) {
+      throw "Entry is undefined";
+    }
+    this.fdt[fd] = entry;
+  }
+
+  public getFd(fd: number): FileDescriptor {
+    return this.fdt[fd];
+  }
+  public tearDown() {
+    Promise.all(
+      Object.values(this.fdt).map(async (fileDescriptor) => {
+        await fileDescriptor?.close();
+      })
+    );
+  }
+}
+
 class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
 
@@ -27,8 +88,7 @@ class ProcessInfo {
     public id: number,
     public cmd: string,
     public worker: Worker,
-    // TODO: make this Record<number, FileDescriptor>, or better yet, introduce FileDescriptorTable class
-    public fds: FileDescriptor[],
+    public fds: FdTable,
     public parentId: number | null,
     public parentLock: Int32Array | null,
     public callback: (
@@ -70,7 +130,7 @@ export default class ProcessManager {
       processManager: ProcessManager
     ) => Promise<void>,
     command: string,
-    fds: FileDescriptor[],
+    fds: FdTable,
     args: string[],
     env: Record<string, string>,
     isJob: boolean
@@ -127,11 +187,7 @@ export default class ProcessManager {
     const process = this.processInfos[id];
 
     // close/flush all opened files to make sure written contents are saved to persistent storage
-    Promise.all(
-      process.fds.map(async (fileDescriptor) => {
-        await fileDescriptor?.close();
-      })
-    );
+    process.fds.tearDown();
 
     process.worker.terminate();
     // notify parent that they can resume operation

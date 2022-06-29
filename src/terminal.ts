@@ -1,5 +1,6 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
+import { FdTable } from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
 import {
   createFsaFilesystem,
@@ -504,15 +505,15 @@ export async function init(
     null, // parent_lock
     syscallCallback,
     "/usr/bin/shell",
-    [
-      new Stdin(processManager),
-      new Stdout(processManager),
-      new Stderr(processManager),
-      filesystem.getRootDir().open(),
-      pwdDir,
+    new FdTable({
+      0: new Stdin(processManager),
+      1: new Stdout(processManager),
+      2: new Stderr(processManager),
+      3: filesystem.getRootDir().open(),
+      4: pwdDir,
       // TODO: why must fds[5] be present for ls to work, and what should it be
-      filesystem.getRootDir().open(),
-    ],
+      5: filesystem.getRootDir().open(),
+    }),
     ["/usr/bin/shell"],
     {
       PATH: "/usr/bin:/usr/local/bin",

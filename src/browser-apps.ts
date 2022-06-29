@@ -13,8 +13,8 @@ export async function mount(
 ): Promise<number> {
   console.log(`mount(${processId}, ${args})`);
 
-  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
-  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
+  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
+  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
 
   switch (args.length) {
     case 1: {
@@ -75,7 +75,7 @@ export async function umount(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
+  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
 
   let path = args[1];
   // handle relative path
@@ -98,7 +98,7 @@ export async function wget(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
+  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
 
   let path: string;
   let address: string;
@@ -132,7 +132,7 @@ export async function download(
   args: string[],
   env: Record<string, string>
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds[2] as Stderr;
+  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
 
   if (args.length === 1) {
     await stderr.write("download: help: download <address> [<path>]\n");
@@ -180,7 +180,7 @@ export async function ps(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
+  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
 
   let psData = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
@@ -211,7 +211,7 @@ export async function free(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   env: Record<string, string>
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds[1] as Stdout;
+  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
 
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;
