@@ -304,7 +304,7 @@ class FsaFilesystem implements Filesystem {
     name: string | null;
     parent: FsaDirectory | null;
   }> {
-    if (path.includes("\\"))
+    if (path.includes("\\ "))
       return { err: constants.WASI_EINVAL, name: null, parent: null };
     if (path.startsWith("/")) dir = this.getRootDir();
 
