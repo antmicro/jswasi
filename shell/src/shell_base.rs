@@ -245,6 +245,7 @@ impl Shell {
         let mut c1 = [0];
         let mut escaped = false;
         let mut history_entry_to_display: i32 = -1;
+        let mut insert_mode: bool = false;
 
         loop {
             // this is to handle EOF when piping to shell
@@ -293,7 +294,7 @@ impl Shell {
                                         escaped = false;
                                     }
                                     [0x32, 0x7e] => {
-                                        println!("TODO: INSERT");
+                                        insert_mode = !insert_mode;
                                         escaped = false;
                                     }
                                     // delete key
@@ -463,7 +464,20 @@ impl Shell {
                     }
                     // regular characters
                     _ => {
-                        input.insert(self.cursor_position, c1[0] as char);
+                        if !insert_mode {
+                            input.insert(self.cursor_position, c1[0] as char);
+                        } else {
+                            // in insert mode, when cursor is in the middle, chars are replaced
+                            // instead of being put in the middle while moving next characters further
+                            if self.cursor_position != input.len(){
+                                input.replace_range(
+                                    self.cursor_position..self.cursor_position+1,
+                                    std::str::from_utf8(&[c1[0]]).unwrap());
+                            } else {
+                                // if cursor is at the end, chars are input regularly
+                                input.push(c1[0] as char );
+                            }
+                        }
                         // echo
                         self.echo(&format!(
                             "{}{}",
