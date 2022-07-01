@@ -56,7 +56,7 @@ const OPTIONAL_BINARIES = {
   "/usr/local/bin/rsign2":
     "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
   "/usr/local/bin/ruby":
-    "https://registry-cdn.wapm.io/contents/Madao/ruby-wasm/1.0.0/ruby.wasm",
+    "https://registry-cdn.wapm.io/contents/katei/ruby/0.1.2/dist/ruby.wasm",
   "/usr/local/bin/clang":
     "https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm",
   "/usr/local/bin/wasm-ld":
