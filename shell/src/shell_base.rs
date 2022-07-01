@@ -225,6 +225,18 @@ impl Shell {
         self.handle_input(&fs::read_to_string(script_name.into()).unwrap())
     }
 
+    fn get_cursor_to_end(&mut self, input: &String){
+        self.echo(
+            &input
+                .chars()
+                .skip(self.cursor_position)
+                .collect::<String>(),
+        );
+        for _ in 0..input.len() {
+            self.echo(&format!("{} {}", 8 as char, 8 as char));
+        }
+    }
+
     /// Builds a line from standard input.
     // TODO: maybe wrap in one more loop and only return when non-empty line is produced?
     fn get_line(&mut self, input: &mut String) {
@@ -250,12 +262,34 @@ impl Shell {
                                 let mut c3 = [0];
                                 io::stdin().read_exact(&mut c3).unwrap();
                                 match [c2[0], c3[0]] {
+                                    // PageUp
                                     [0x35, 0x7e] => {
-                                        println!("TODO: PAGE UP");
+                                        if !self.history.is_empty() && history_entry_to_display != 0 {
+                                            if history_entry_to_display == -1 {
+                                                input_stash = input.clone();
+                                            }
+                                            history_entry_to_display = 0;
+                                            // bring cursor to the end so that clearing later starts from
+                                            // proper position
+                                            self.get_cursor_to_end(&input);
+                                            *input =
+                                                self.history[0].clone();
+                                            self.cursor_position = input.len();
+                                            self.echo(input);
+                                        }
                                         escaped = false;
                                     }
+                                    // PageDown
                                     [0x36, 0x7e] => {
-                                        println!("TODO: PAGE DOWN");
+                                        if history_entry_to_display != -1 {
+                                            // bring cursor to the end so that clearing later starts from
+                                            // proper position
+                                            self.get_cursor_to_end(&input);
+                                            *input = input_stash.clone();
+                                            history_entry_to_display = -1;
+                                            self.cursor_position = input.len();
+                                            self.echo(input);
+                                        }
                                         escaped = false;
                                     }
                                     [0x32, 0x7e] => {
@@ -314,15 +348,7 @@ impl Shell {
                                     }
                                     // bring cursor to the end so that clearing later starts from
                                     // proper position
-                                    self.echo(
-                                        &input
-                                            .chars()
-                                            .skip(self.cursor_position)
-                                            .collect::<String>(),
-                                    );
-                                    for _ in 0..input.len() {
-                                        self.echo(&format!("{} {}", 8 as char, 8 as char));
-                                    }
+                                    self.get_cursor_to_end(&input);
                                     *input =
                                         self.history[history_entry_to_display as usize].clone();
                                     self.cursor_position = input.len();
@@ -335,16 +361,7 @@ impl Shell {
                                 if history_entry_to_display != -1 {
                                     // bring cursor to the end so that clearing later starts from
                                     // proper position
-                                    self.echo(
-                                        &input
-                                            .chars()
-                                            .skip(self.cursor_position)
-                                            .collect::<String>(),
-                                    );
-                                    for _ in 0..input.len() {
-                                        self.echo(&format!("{} {}", 8 as char, 8 as char));
-                                        // '\b \b', clear left of cursor
-                                    }
+                                    self.get_cursor_to_end(&input);
                                     if self.history.len() - 1 > (history_entry_to_display as usize)
                                     {
                                         history_entry_to_display += 1;
