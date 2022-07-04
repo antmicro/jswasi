@@ -167,10 +167,12 @@ pub struct Shell {
     history_file: Option<File>,
     should_echo: bool,
     cursor_position: usize,
+    insert_mode: bool
 }
 
 impl Shell {
     pub fn new(should_echo: bool, pwd: &str) -> Self {
+        _ = syscall("hterm", &["cursor-shape", "BLOCK"], &HashMap::new(), false, &[]);
         Shell {
             should_echo,
             pwd: PathBuf::from(pwd),
@@ -179,6 +181,7 @@ impl Shell {
             vars: HashMap::new(),
             last_exit_status: EXIT_SUCCESS,
             cursor_position: 0,
+            insert_mode: false
         }
     }
 
@@ -245,7 +248,10 @@ impl Shell {
         let mut c1 = [0];
         let mut escaped = false;
         let mut history_entry_to_display: i32 = -1;
-        let mut insert_mode: bool = false;
+        if self.insert_mode {
+            _ = syscall("hterm", &["cursor-shape", "BLOCK"], &HashMap::new(), false, &[]);
+            self.insert_mode = false;
+        }
 
         loop {
             // this is to handle EOF when piping to shell
@@ -293,8 +299,10 @@ impl Shell {
                                         }
                                         escaped = false;
                                     }
+                                    // Insert
                                     [0x32, 0x7e] => {
-                                        insert_mode = !insert_mode;
+                                        self.insert_mode = !self.insert_mode;
+                                        _ = syscall("hterm", &["cursor-shape", if self.insert_mode { "UNDERLINE" } else { "BLOCK" }], &HashMap::new(), false, &[]);
                                         escaped = false;
                                     }
                                     // delete key
@@ -464,7 +472,7 @@ impl Shell {
                     }
                     // regular characters
                     _ => {
-                        if !insert_mode {
+                        if !self.insert_mode {
                             input.insert(self.cursor_position, c1[0] as char);
                         } else {
                             // in insert mode, when cursor is in the middle, chars are replaced

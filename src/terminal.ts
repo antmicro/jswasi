@@ -9,6 +9,10 @@ import { Stderr, Stdin, Stdout } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { Filesystem, OpenDirectory } from "./filesystem/interfaces";
 
+// TODO: how to properly import hterm to define variable type or make it constant
+// @ts-ignore
+export var terminal;
+
 declare global {
   interface Window {
     logOutput: boolean;
@@ -396,7 +400,7 @@ export async function init(
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
-  const terminal = new hterm.Terminal();
+  terminal = new hterm.Terminal();
 
   const processManager = new ProcessManager(
     "process.js",

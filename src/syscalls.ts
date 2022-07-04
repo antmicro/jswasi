@@ -23,6 +23,7 @@ import {
   SetEchoArgs,
   SetEnvArgs,
   SpawnArgs,
+  HtermConfArgs,
 } from "./types.js";
 import { OpenDirectory, OpenFile } from "./filesystem/interfaces.js";
 import {
@@ -37,6 +38,7 @@ import {
 import ProcessManager from "./process-manager.js";
 import { In, Out } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
+import { terminal } from "./terminal.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -55,7 +57,6 @@ export default async function syscallCallback(
   const [processId, action, data] = event.data;
   const fullCommand = processManager.processInfos[processId].cmd;
   const processName = fullCommand.substr(fullCommand.lastIndexOf("/") + 1);
-
   switch (action) {
     case "stdout": {
       processManager.terminalOutputCallback(data.replaceAll("\n", "\r\n"));
@@ -92,6 +93,14 @@ export default async function syscallCallback(
         window.alive = false;
         window.exitCode = data;
       }
+      break;
+    }
+    case "hterm": {
+      const { sharedBuffer, attrib, val } = data as HtermConfArgs;
+      const lock = new Int32Array(sharedBuffer, 0, 1);
+      terminal.prefs_.set(attrib, val);
+      Atomics.store(lock, 0, 0);
+      Atomics.notify(lock, 0);
       break;
     }
     case "chdir": {

@@ -27,6 +27,7 @@ import {
   SetEchoArgs,
   SetEnvArgs,
   SpawnArgs,
+  HtermConfArgs,
 } from "./types";
 
 type ptr = number;
@@ -809,6 +810,15 @@ function WASI(): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
+      }
+      case "hterm": {
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        const [attrib, val] = args;
+        lck[0] = -1;
+        sendToKernel(["hterm", { sharedBuffer, attrib, val } as HtermConfArgs]);
+        Atomics.wait(lck, 0, -1);
+        return `${constants.EXIT_SUCCESS}\x1b`;
       }
       default: {
         workerConsoleLog(`Special command ${command} not found.`);

@@ -126,3 +126,9 @@ export type PathLinkArgs = {
   newFd: number;
   newPath: string;
 };
+
+export type HtermConfArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  attrib: string;
+  val: string;
+};
