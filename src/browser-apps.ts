@@ -126,6 +126,7 @@ export async function wget(
   env: Record<string, string>
 ): Promise<number> {
   const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
+  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
 
   let path: string;
   let address: string;
@@ -145,7 +146,7 @@ export async function wget(
   }
   const { dir } = await processManager.filesystem.resolveAbsolute(path);
   try {
-    await fetchFile(dir.open(), path, address);
+    await fetchFile(dir.open(), path, address, true, stdout);
   } catch (error: any) {
     await stderr.write(
       new TextEncoder().encode(

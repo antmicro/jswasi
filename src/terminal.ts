@@ -39,7 +39,8 @@ export async function fetchFile(
   dir: OpenDirectory,
   filename: string,
   address: string,
-  refetch: boolean = true
+  refetch: boolean = true,
+  stdout: Stdout = undefined
 ) {
   const { err, entry } = await dir.getEntry(
     filename,
@@ -66,9 +67,31 @@ export async function fetchFile(
     }
 
     const response = await fetch(address);
+    console.log(response.headers.get("content-length"));
     if (response.status === 200) {
-      const writable = await (await entry.open()).writableStream();
-      await response.body?.pipeTo(writable);
+      const op = await entry.open();
+      const writable = await op.writableStream();
+      const prom = response.body?.pipeTo(writable);
+      if (stdout !== undefined) {
+        for (let i = 0; i < 50; i++) {
+          const fff = (
+            await dir.getEntry(
+              filename,
+              FileOrDir.File,
+              LookupFlags.SymlinkFollow,
+              OpenFlags.None
+            )
+          ).entry;
+          stdout.write(
+            `[${"#".repeat(i)}${"-".repeat(49 - i)}: ${
+              (await fff.metadata()).size
+            }]\r`
+          );
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        stdout.write("\n");
+        await prom;
+      }
     } else {
       console.log(`Failed downloading ${filename} from ${address}`);
     }
