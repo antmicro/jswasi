@@ -174,12 +174,8 @@ export default async function syscallCallback(
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
       args.splice(0, 0, path.split("/").pop());
 
-      // save parent file descriptors table,
-      // replace it with child's for the duration of spawn call
-      // restore parent table before returning
-      // TODO: is shallow copy enough, or should we deep copy?
-      const parentFds = processManager.processInfos[processId].fds.clone();
-      const { fds } = processManager.processInfos[processId];
+      // replace child's descriptor table with shallow copy of parent's
+      const fds = processManager.processInfos[processId].fds.clone();
       await Promise.all(
         redirects.map(async ({ mode, path, fd }) => {
           const { entry } = await processManager.filesystem
@@ -272,9 +268,6 @@ export default async function syscallCallback(
           break;
         }
       }
-
-      // restore parent file descriptor table
-      processManager.processInfos[processId].fds = parentFds;
       break;
     }
     case "fd_prestat_get": {
