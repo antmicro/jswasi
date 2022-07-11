@@ -1170,10 +1170,8 @@ function WASI(): WASICallbacks {
     }
 
     view.setUint32(nEvents, eventCount, true);
-
-    while (utils.msToNs(performance.now()) < waitEnd) {
-      // nothing
-    }
+    const ms = Number(waitEnd) / 1000000 - performance.now();
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
     return constants.WASI_ESUCCESS;
   }
