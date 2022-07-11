@@ -1117,25 +1117,22 @@ function WASI(): WASICallbacks {
       switch (eventType) {
         case constants.WASI_EVENTTYPE_CLOCK: {
           subscriptionsPtr += 7;
-          const identifier = view.getBigUint64(subscriptionsPtr, true);
-          subscriptionsPtr += 8;
           const clockid = view.getUint32(subscriptionsPtr, true);
           subscriptionsPtr += 8;
-          const timestamp = view.getBigUint64(subscriptionsPtr, true);
+          const timeout = view.getBigUint64(subscriptionsPtr, true);
           subscriptionsPtr += 8;
           const precision = view.getBigUint64(subscriptionsPtr, true);
           subscriptionsPtr += 8;
           const subClockFlags = view.getUint16(subscriptionsPtr, true);
-          subscriptionsPtr += 8;
 
           const absolute = subClockFlags === 1;
 
           workerConsoleLog(
-            `identifier = ${identifier}, clockid = ${clockid}, timestamp = ${timestamp}, precision = ${precision}, absolute = ${absolute}`
+            `clockid = ${clockid}, timeout = ${timeout}, precision = ${precision}, absolute = ${absolute}`
           );
 
           const n = utils.now(clockid, CPUTIME_START);
-          const end = absolute ? timestamp : n + timestamp;
+          const end = absolute ? timeout : n + timeout;
           waitEnd = end > waitEnd ? end : waitEnd;
 
           view.setBigUint64(eventsPtr, userdata, true);
