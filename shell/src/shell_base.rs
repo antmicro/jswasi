@@ -90,12 +90,23 @@ pub fn syscall(
     let result = {
         use serde_json::json;
 
+        let working_dir = match std::env::current_dir() {
+            Ok(path) => {
+                path.display().to_string()
+            },
+            Err(e) => {
+                eprintln!("Parsing current directory path error: {}", e);
+                String::from("/")
+            },
+        };
+
         let j = json!({
             "command": command,
             "args": args,
             "env": env,
             "redirects": redirects,
             "background": background,
+            "working_dir": working_dir,
         })
         .to_string();
         let result = fs::read_link(format!("/!{}", j))?

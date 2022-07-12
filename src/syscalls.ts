@@ -169,8 +169,15 @@ export default async function syscallCallback(
       break;
     }
     case "spawn": {
-      const { path, args, env, sharedBuffer, background, redirects } =
-        data as SpawnArgs;
+      const {
+        path,
+        args,
+        env,
+        sharedBuffer,
+        background,
+        redirects,
+        workingDir,
+      } = data as SpawnArgs;
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
       args.splice(0, 0, path.split("/").pop());
 
@@ -249,7 +256,8 @@ export default async function syscallCallback(
             fds,
             args,
             env,
-            background
+            background,
+            workingDir
           );
           const newProcessName = path.split("/").slice(-1)[0];
           if (env["DEBUG"] === "1") {

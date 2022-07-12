@@ -133,7 +133,8 @@ export default class ProcessManager {
     fds: FdTable,
     args: string[],
     env: Record<string, string>,
-    isJob: boolean
+    isJob: boolean,
+    workingDir: string
   ): Promise<number> {
     const id = this.nextProcessId;
     this.nextProcessId += 1;
@@ -178,6 +179,7 @@ export default class ProcessManager {
       id,
       args,
       env,
+      workingDir,
     ]);
 
     return id;

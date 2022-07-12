@@ -65,6 +65,7 @@ export type SpawnArgs = {
   sharedBuffer: SharedArrayBuffer;
   background: boolean;
   redirects: Redirect[];
+  workingDir: string;
 };
 
 export type ChdirArgs = { dir: string; sharedBuffer: SharedArrayBuffer };

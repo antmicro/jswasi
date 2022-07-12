@@ -144,12 +144,13 @@ let mod: string;
 let myself: number;
 let programArgs: string[];
 let env: Record<string, string>;
+let workingDir: string;
 
 onmessage = async (e) => {
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
-      [, mod, myself, programArgs, env] = e.data;
+      [, mod, myself, programArgs, env, workingDir] = e.data;
 
       try {
         await start_wasm();
@@ -709,12 +710,14 @@ function WASI(): WASICallbacks {
       extended_env,
       background,
       redirects,
+      working_dir,
     }: {
       command: string;
       args: string[];
       extended_env: Record<string, string>;
       background: boolean;
       redirects: Redirect[];
+      working_dir: string;
     } = JSON.parse(syscallDataJson);
     switch (command) {
       case "spawn": {
@@ -730,6 +733,7 @@ function WASI(): WASICallbacks {
             sharedBuffer,
             background,
             redirects,
+            workingDir: working_dir,
           } as SpawnArgs,
         ]);
         // wait for child process to finish
@@ -740,6 +744,9 @@ function WASI(): WASICallbacks {
           return `${constants.EXIT_FAILURE}\x1b`;
         }
         return `${constants.EXIT_SUCCESS}\x1b`;
+      }
+      case "get_cwd": {
+        return `${workingDir}`;
       }
       case "chdir": {
         const sharedBuffer = new SharedArrayBuffer(4);
