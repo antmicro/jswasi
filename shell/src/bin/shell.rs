@@ -1,6 +1,7 @@
 #[cfg(target_os = "wasi")]
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::io;
 use std::io::Read;
 use std::os::raw::c_int;
@@ -9,6 +10,7 @@ use std::process;
 
 use clap::{Command, Arg};
 use color_eyre::Report;
+use serde_json::json;
 
 #[cfg(target_os = "wasi")]
 use wash::syscall;
@@ -53,19 +55,33 @@ fn main() {
         )
         .get_matches();
 
+    let mut pwd = String::from("/");
+    let should_echo;
+
+    #[cfg(target_os = "wasi")] {
+        let cmd = json!({
+            "command": "get_cwd",
+        });
+        if let Ok(cwd) = fs::read_link(format!("/!{}", cmd)){
+            pwd = cwd.display().to_string();
+            env::set_current_dir(cwd).unwrap_or_else(|e| {
+                eprintln!("Could not set current working dir: {}", e);
+            });
+        }
+        should_echo = true;
+    }
+    #[cfg(not(target_os = "wasi"))] {
+        pwd = env::var("PWD").unwrap();
+        env::set_current_dir(&pwd).unwrap();
+        should_echo = false;
+    }
+
     if env::var("PWD").is_err() {
-        env::set_var("PWD", "/");
+        env::set_var("PWD", &pwd);
     }
     if env::var("HOME").is_err() {
         env::set_var("HOME", "/");
     }
-    let pwd = env::var("PWD").unwrap();
-    env::set_current_dir(&pwd).unwrap();
-
-    #[cfg(target_os = "wasi")]
-    let should_echo = true;
-    #[cfg(not(target_os = "wasi"))]
-    let should_echo = false;
 
     let mut shell = Shell::new(should_echo, &pwd);
 

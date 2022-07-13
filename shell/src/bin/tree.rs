@@ -6,6 +6,8 @@ use clap::{Arg, Command, ArgMatches, Values};
 use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
+use serde_json::json;
+
 static OPT_ALL: &str = "all";
 static FILES: &str = "files";
 
@@ -40,11 +42,15 @@ fn main() -> io::Result<()> {
             Arg::new(FILES).multiple_values(true)
         ).get_matches();
 
-    #[cfg(target_os = "wasi")]
-    if let Ok(path) = env::var("PWD"){
-        env::set_current_dir(path).unwrap_or_else(|e| {
-            eprintln!("Could not set current working dir: {}", e);
+    #[cfg(target_os = "wasi")] {
+        let cmd = json!({
+            "command": "get_cwd",
         });
+        if let Ok(cwd) = fs::read_link(format!("/!{}", cmd)){
+            env::set_current_dir(cwd).unwrap_or_else(|e| {
+                eprintln!("Could not set current working dir: {}", e);
+            });
+        }
     }
 
     let dirs = matches.values_of(FILES).map_or_else(|| vec!["."], Values::collect);
