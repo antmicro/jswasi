@@ -581,24 +581,39 @@ export default async function syscallCallback(
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name());
 
-          if (dataBufPtr + 8 > bufLen) break;
+          if (dataBufPtr + 8 > bufLen) {
+            dataBufPtr += 8;
+            break;
+          }
           dataBuf.setBigUint64(dataBufPtr, BigInt(i + 1), true);
           dataBufPtr += 8;
 
-          if (dataBufPtr + 8 >= bufLen) break;
+          if (dataBufPtr + 8 >= bufLen) {
+            dataBufPtr += 8;
+            break;
+          }
           dataBuf.setBigUint64(dataBufPtr, stats[i].ino, true);
           dataBufPtr += 8;
 
-          if (dataBufPtr + 4 >= bufLen) break;
+          if (dataBufPtr + 4 >= bufLen) {
+            dataBufPtr += 4;
+            break;
+          }
           dataBuf.setUint32(dataBufPtr, nameBuf.byteLength, true);
           dataBufPtr += 4;
 
-          if (dataBufPtr + 4 >= bufLen) break;
+          if (dataBufPtr + 4 >= bufLen) {
+            dataBufPtr += 4;
+            break;
+          }
           dataBuf.setUint8(dataBufPtr, stats[i].fileType);
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit
-          if (dataBufPtr + nameBuf.byteLength >= bufLen) break;
+          if (dataBufPtr + nameBuf.byteLength >= bufLen) {
+            dataBufPtr += nameBuf.byteLength;
+            break;
+          }
           const dataBuf8 = new Uint8Array(sharedBuffer, 8);
           dataBuf8.set(nameBuf, dataBufPtr);
           dataBufPtr += nameBuf.byteLength;
