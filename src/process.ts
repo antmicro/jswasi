@@ -422,8 +422,8 @@ function WASI(): WASICallbacks {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
-    workerConsoleLog(`fd_filestat_get returned ${err}`);
     if (err !== constants.WASI_ESUCCESS) {
+      workerConsoleLog(`fd_filestat_get returned ${err}`);
       return err;
     }
 
@@ -444,6 +444,9 @@ function WASI(): WASICallbacks {
     view.setBigUint64(buf + 38, atim, true);
     view.setBigUint64(buf + 46, mtim, true);
     view.setBigUint64(buf + 52, ctim, true);
+    workerConsoleLog(
+      `fd_filestat_get returned ${err} {dev: ${dev} ino: ${ino} fileType: ${fileType} nlink: ${nlink} size: ${size} atim: ${atim} mtim: ${mtim} ctim: ${ctim}}`
+    );
 
     return constants.WASI_ESUCCESS;
   }
