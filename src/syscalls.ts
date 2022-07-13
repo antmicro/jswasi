@@ -484,9 +484,9 @@ export default async function syscallCallback(
         buf.setUint8(16, stat.fileType);
         buf.setBigUint64(24, stat.nlink, true);
         buf.setBigUint64(32, stat.size, true);
-        buf.setBigUint64(38, stat.atim, true);
-        buf.setBigUint64(46, stat.mtim, true);
-        buf.setBigUint64(52, stat.ctim, true);
+        buf.setBigUint64(40, stat.atim, true);
+        buf.setBigUint64(48, stat.mtim, true);
+        buf.setBigUint64(56, stat.ctim, true);
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
