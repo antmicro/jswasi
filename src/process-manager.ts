@@ -21,9 +21,14 @@ export class FdTable {
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, FileDescriptor>) {
+  constructor(fds: Record<number, FileDescriptor>, preopen: boolean = true) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
+    if (preopen) {
+      Object.values(this.fdt).map((fd) => {
+        fd.isPreopened = true;
+      });
+    }
   }
 
   public clone(): FdTable {

@@ -286,8 +286,13 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        preopenType[0] = (await fds.getFd(fd).stat()).fileType;
+      if (
+        fds.getFd(fd) !== undefined &&
+        fds.getFd(fd).isPreopened &&
+        (await fds.getFd(fd).stat()).fileType ===
+          constants.WASI_FILETYPE_DIRECTORY
+      ) {
+        preopenType[0] = constants.WASI_PREOPENTYPE_DIR;
         nameLen[0] = (fds.getFd(fd) as OpenFile).name().length;
         err = constants.WASI_ESUCCESS;
       } else {

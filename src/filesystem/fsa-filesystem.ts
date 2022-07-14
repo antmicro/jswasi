@@ -459,6 +459,7 @@ export class FsaDirectory extends FsaEntry implements Directory {
 // TODO: extend FsaEntry instead of FsaDirectory
 export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   public override readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
+  public isPreopened: boolean = false;
 
   declare readonly handle: FileSystemDirectoryHandle;
 
@@ -481,7 +482,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
         groupMode: storedData.groupMode,
         blockSize: 0,
         blocks: 0,
-        fileType: constants.WASI_PREOPENTYPE_DIR,
+        fileType: storedData.fileType,
         atim: storedData.atim,
         mtim: storedData.mtim,
         ctim: storedData.ctim,
@@ -763,6 +764,7 @@ export class FsaFile extends FsaEntry implements File {
 // it is backed by File System Access API through a FileSystemFileHandle handle
 export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
+  public isPreopened: boolean = false;
 
   private filePosition: number = 0;
 
