@@ -315,7 +315,9 @@ function WASI(): WASICallbacks {
     view.setBigUint64(buf + 8, rights_base[0], true);
     view.setBigUint64(buf + 16, rights_inheriting[0], true);
 
-    workerConsoleLog(`fd_fdstat_get returned ${err}`);
+    workerConsoleLog(
+      `fd_fdstat_get returned ${err} {file_type: ${fileType[0]} file_flags: 0 rights_base: ${rights_base[0]} rights_inheriting: ${rights_inheriting}}`
+    );
     return constants.WASI_ESUCCESS;
   }
 

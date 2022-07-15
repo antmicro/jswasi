@@ -8,6 +8,7 @@ const RESET = "\u001b[0m";
 export interface In {
   fileType: number;
   isPreopened: boolean;
+  fdRights: bigint;
   isatty(): boolean;
   stat(): Promise<Stat>;
 
@@ -23,6 +24,7 @@ export interface In {
 export interface Out {
   fileType: number;
   isPreopened: boolean;
+  fdRights: bigint;
   isatty(): boolean;
   stat(): Promise<Stat>;
 
@@ -34,6 +36,7 @@ export interface Out {
 export class Stdin implements In {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
+  fdRights = constants.WASI_RIGHTS_STDIN;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -87,6 +90,7 @@ export class Stdin implements In {
 export class Stdout implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
+  fdRights = constants.WASI_RIGHTS_STDOUT;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -127,6 +131,7 @@ export class Stdout implements Out {
 export class Stderr implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
+  fdRights = constants.WASI_RIGHTS_STDERR;
 
   constructor(private workerTable: ProcessManager) {}
 

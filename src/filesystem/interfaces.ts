@@ -59,6 +59,7 @@ export interface Directory extends Entry {
 export interface OpenDirectory extends Entry {
   isPreopened: boolean;
   isatty(): boolean;
+  fdRights: bigint;
 
   getEntry(
     path: string,
@@ -131,6 +132,7 @@ export interface StreamableFile {
 export interface OpenFile extends Entry {
   isatty(): boolean;
   isPreopened: boolean;
+  fdRights: bigint;
 
   read(len: number): Promise<[Uint8Array, number]>;
 

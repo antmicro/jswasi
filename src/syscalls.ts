@@ -702,17 +702,11 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
         fileType[0] = (await fds.getFd(fd).stat()).fileType;
-        rightsBase[0] =
-          constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (fileType[0] === constants.WASI_FILETYPE_DIRECTORY) {
-          rightsBase[0] |= constants.WASI_RIGHT_FD_READDIR;
-        }
-        rightsInheriting[0] =
-          constants.WASI_RIGHT_FD_WRITE | constants.WASI_RIGHT_FD_READ;
-        if (fileType[0] === constants.WASI_FILETYPE_DIRECTORY) {
-          rightsInheriting[0] |= constants.WASI_RIGHT_FD_READDIR;
-        }
-
+        rightsBase[0] = fds.getFd(fd).fdRights;
+        // for now we return the file rights as rights inheriting
+        // because so far, we give rwx rights to every file
+        // for character devices, rights inheriting are 0 (because wasmer does it that way)
+        rightsInheriting[0] = fd < 3 ? 0n : fds.getFd(fd).fdRights;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

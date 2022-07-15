@@ -460,6 +460,7 @@ export class FsaDirectory extends FsaEntry implements Directory {
 export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   public override readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
   public isPreopened: boolean = false;
+  public readonly fdRights = constants.WASI_RIGHTS_DIRECTORY_OWNER;
 
   declare readonly handle: FileSystemDirectoryHandle;
 
@@ -765,6 +766,7 @@ export class FsaFile extends FsaEntry implements File {
 export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
   public isPreopened: boolean = false;
+  public readonly fdRights = constants.WASI_RIGHTS_FILE_OWNER;
 
   private filePosition: number = 0;
 
