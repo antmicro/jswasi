@@ -18,6 +18,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
+#[cfg(target_os = "wasi")]
+use serde_json::json;
 
 use crate::interpreter::interpret;
 use crate::output_device::OutputDevice;
@@ -88,8 +90,6 @@ pub fn syscall(
 ) -> Result<SyscallResult, Report> {
     #[cfg(target_os = "wasi")]
     let result = {
-        use serde_json::json;
-
         let working_dir = match std::env::current_dir() {
             Ok(path) => {
                 path.display().to_string()
@@ -587,8 +587,22 @@ impl Shell {
             let _ = syscall("set_echo", &["0"], &HashMap::new(), false, &[]);
         }
 
-        // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
-        env::set_current_dir(env::var("PWD").unwrap()).unwrap();
+        #[cfg(target_os = "wasi")] {
+            // TODO: see https://github.com/WebAssembly/wasi-filesystem/issues/24
+            let cmd = json!({
+                "command": "get_cwd",
+            });
+            match fs::read_link(format!("/!{}", cmd)) {
+                Ok(cwd) => {
+                    env::set_current_dir(cwd).unwrap_or_else(|e| {
+                        eprintln!("Could not set current working dir: {}", e);
+                    });
+                },
+                Err(e) => {
+                    eprintln!("Could not obtain current working dir path: {}", e);
+                },
+            }
+        }
 
         let history_path = {
             if PathBuf::from(env::var("HOME").unwrap()).exists() {

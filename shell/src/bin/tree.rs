@@ -6,6 +6,7 @@ use clap::{Arg, Command, ArgMatches, Values};
 use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
+#[cfg(target_os = "wasi")]
 use serde_json::json;
 
 static OPT_ALL: &str = "all";
@@ -46,10 +47,15 @@ fn main() -> io::Result<()> {
         let cmd = json!({
             "command": "get_cwd",
         });
-        if let Ok(cwd) = fs::read_link(format!("/!{}", cmd)){
-            env::set_current_dir(cwd).unwrap_or_else(|e| {
-                eprintln!("Could not set current working dir: {}", e);
-            });
+        match fs::read_link(format!("/!{}", cmd)) {
+            Ok(cwd) => {
+                env::set_current_dir(cwd).unwrap_or_else(|e| {
+                    eprintln!("Could not set current working dir: {}", e);
+                });
+            },
+            Err(e) => {
+                eprintln!("Could not obtain current working dir path: {}", e);
+            },
         }
     }
 

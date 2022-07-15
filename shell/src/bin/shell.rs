@@ -1,6 +1,7 @@
 #[cfg(target_os = "wasi")]
 use std::collections::HashMap;
 use std::env;
+#[cfg(target_os = "wasi")]
 use std::fs;
 use std::io;
 use std::io::Read;
@@ -10,6 +11,7 @@ use std::process;
 
 use clap::{Command, Arg};
 use color_eyre::Report;
+#[cfg(target_os = "wasi")]
 use serde_json::json;
 
 #[cfg(target_os = "wasi")]
@@ -55,24 +57,33 @@ fn main() {
         )
         .get_matches();
 
-    let mut pwd = String::from("/");
+    let pwd;
     let should_echo;
 
     #[cfg(target_os = "wasi")] {
         let cmd = json!({
             "command": "get_cwd",
         });
-        if let Ok(cwd) = fs::read_link(format!("/!{}", cmd)){
-            pwd = cwd.display().to_string();
-            env::set_current_dir(cwd).unwrap_or_else(|e| {
-                eprintln!("Could not set current working dir: {}", e);
-            });
+        match fs::read_link(format!("/!{}", cmd)) {
+            Ok(cwd) => {
+                pwd = cwd.display().to_string();
+                env::set_current_dir(cwd).unwrap_or_else(|e| {
+                    eprintln!("Could not set current working dir: {}", e);
+                });
+            },
+            Err(e) => {
+                pwd = String::from("/");
+                eprintln!("Could not obtain current working dir path: {}", e);
+            },
         }
         should_echo = true;
     }
     #[cfg(not(target_os = "wasi"))] {
-        pwd = env::var("PWD").unwrap();
-        env::set_current_dir(&pwd).unwrap();
+        if let Ok(cwd) = env::current_dir() {
+            pwd = cwd.display().to_string();
+        } else {
+            pwd = String::from("/");
+        }
         should_echo = false;
     }
 
