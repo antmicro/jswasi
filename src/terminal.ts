@@ -396,6 +396,28 @@ export async function init(
         LookupFlags.NoFollow,
         OpenFlags.Create
       );
+  } else if (
+    !(await filesystem.pathExists(filesystem.getMetaDir(), "/usr/bin/shell"))
+  ) {
+    const openedRootDir = filesystem.getRootDir().open();
+    await openedRootDir.getEntry(
+      "/usr",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+    await openedRootDir.getEntry(
+      "/usr/bin",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+    await fetchFile(
+      openedRootDir,
+      "/usr/bin/shell",
+      ALWAYS_FETCH_BINARIES["/usr/bin/shell"],
+      true
+    );
   }
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
