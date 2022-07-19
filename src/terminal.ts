@@ -196,9 +196,7 @@ async function initFs(openedRootDir: OpenDirectory) {
     if ((await shellrc.metadata()).size === 0n) {
       let rc_open = await shellrc.open();
       await rc_open.write(
-        new TextEncoder().encode(
-          "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
-        )
+        new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
       );
       await rc_open.close();
     }
@@ -531,6 +529,7 @@ export async function init(
       LANG: "en_US.UTF-8",
       USER: "ant",
       HOSTNAME: "browser",
+      PYTHONHOME: "/",
       PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
       DEBUG: "1",
     },
