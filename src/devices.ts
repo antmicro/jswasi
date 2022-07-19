@@ -28,7 +28,7 @@ export interface Out {
   isatty(): boolean;
   stat(): Promise<Stat>;
 
-  write(content: string): Promise<number>;
+  write(content: Uint8Array): Promise<number>;
 
   close(): Promise<void>;
 }
@@ -99,9 +99,9 @@ export class Stdout implements Out {
     return true;
   }
 
-  write(content: string): Promise<number> {
+  write(content: Uint8Array): Promise<number> {
     // TODO: maybe blocking on this would fix wrong output order in CI (fast paced command bashing)
-    this.workerTable.terminalOutputCallback(content.replaceAll("\n", "\r\n"));
+    this.workerTable.terminalOutputCallback(new TextDecoder().decode(content));
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -140,9 +140,9 @@ export class Stderr implements Out {
     return true;
   }
 
-  write(content: string): Promise<number> {
+  write(content: Uint8Array): Promise<number> {
     this.workerTable.terminalOutputCallback(
-      `${RED_ANSI}${content.replaceAll("\n", "\r\n")}${RESET}`
+      `${RED_ANSI}${new TextDecoder().decode(content)}${RESET}`
     );
     return Promise.resolve(constants.WASI_ESUCCESS);
   }

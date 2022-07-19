@@ -59,13 +59,11 @@ export default async function syscallCallback(
   const processName = fullCommand.substr(fullCommand.lastIndexOf("/") + 1);
   switch (action) {
     case "stdout": {
-      processManager.terminalOutputCallback(data.replaceAll("\n", "\r\n"));
+      processManager.terminalOutputCallback(data);
       break;
     }
     case "stderr": {
-      processManager.terminalOutputCallback(
-        `${RED_ANSI}${data.replaceAll("\n", "\r\n")}${RESET}`
-      );
+      processManager.terminalOutputCallback(`${RED_ANSI}${data}${RESET}`);
       break;
     }
     case "console": {
@@ -333,7 +331,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(oldFd) !== undefined) {
         err = await (fds.getFd(constants.WASI_STDERR_FILENO) as Out).write(
-          "hard links are not supported"
+          new TextEncoder().encode("hard links are not supported")
         );
       } else {
         err = constants.WASI_EBADF;

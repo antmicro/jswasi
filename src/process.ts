@@ -349,7 +349,7 @@ function WASI(): WASICallbacks {
     const sharedBuffer = new SharedArrayBuffer(4 + written); // lock + content
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
-    const content = new TextDecoder().decode(Uint8Array.from(bufferBytes));
+    let content = Uint8Array.from(bufferBytes);
     sendToKernel(["fd_write", { sharedBuffer, fd, content } as FdWriteArgs]);
     Atomics.wait(lck, 0, -1);
 

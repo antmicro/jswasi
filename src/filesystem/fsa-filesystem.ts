@@ -822,7 +822,7 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     Atomics.notify(lck, 0);
   }
 
-  async write(buffer: string): Promise<number> {
+  async write(buffer: Uint8Array): Promise<number> {
     await (
       await this.getWriter()
     ).write({

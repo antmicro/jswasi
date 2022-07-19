@@ -5,7 +5,7 @@ export type FdFdstatGetArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
 export type FdWriteArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
-  content: string;
+  content: Uint8Array;
 };
 
 export type FdCloseArgs = { sharedBuffer: SharedArrayBuffer; fd: number };

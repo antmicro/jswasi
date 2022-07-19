@@ -18,11 +18,13 @@ export async function mount(
 
   switch (args.length) {
     case 1: {
-      await stdout.write("wasmfs on /\n");
+      await stdout.write(new TextEncoder().encode("wasmfs on /\n"));
       for (const mountPoint of processManager.filesystem.getMounts()) {
         // eslint-disable-next-line no-await-in-loop
         await stdout.write(
-          `fsapi on /${`${mountPoint.parts.join("/")}/${mountPoint.name}`}\n`
+          new TextEncoder().encode(
+            `fsapi on /${mountPoint.parts.join("/")}/${mountPoint.name}}\n`
+          )
         );
       }
       return constants.WASI_ESUCCESS;
@@ -30,7 +32,9 @@ export async function mount(
     case 2: {
       let path = args[1];
       if (path === "/") {
-        await stderr.write(`mount: cannot mount at root directory\n`);
+        await stderr.write(
+          new TextEncoder().encode(`mount: cannot mount at root directory\n`)
+        );
         return 1;
       }
       // handle relative path
@@ -46,7 +50,9 @@ export async function mount(
           FileOrDir.Directory
         ))
       ) {
-        await stdout.write(`mount: ${path}: no such directory\n`);
+        await stdout.write(
+          new TextEncoder().encode(`mount: ${path}: no such directory\n`)
+        );
         return 1;
       }
 
@@ -55,7 +61,9 @@ export async function mount(
         // eslint-disable-next-line no-undef
         mountPoint = await showDirectoryPicker();
       } catch (e) {
-        await stderr.write("mount: failed to open local directory\n");
+        await stderr.write(
+          new TextEncoder().encode("mount: failed to open local directory\n")
+        );
         return constants.EXIT_FAILURE;
       }
 
@@ -63,7 +71,9 @@ export async function mount(
       return 0;
     }
     default: {
-      await stderr.write("mount: help: mount [<mount-point>]\n");
+      await stderr.write(
+        new TextEncoder().encode("mount: help: mount [<mount-point>]\n")
+      );
       return 1;
     }
   }
@@ -84,7 +94,9 @@ export async function umount(
   }
 
   if (!processManager.filesystem.isMounted(path)) {
-    await stderr.write(`umount: ${path}: not mounted\n`);
+    await stderr.write(
+      new TextEncoder().encode(`umount: ${path}: not mounted\n`)
+    );
     return 1;
   }
 
@@ -108,7 +120,9 @@ export async function wget(
   } else if (args.length === 3) {
     [, address, path] = args;
   } else {
-    await stderr.write("wget: help: wget <address> [<path>]\n");
+    await stderr.write(
+      new TextEncoder().encode("wget: help: wget <address> [<path>]\n")
+    );
     return 1;
   }
   if (!path.startsWith("/")) {
@@ -119,7 +133,9 @@ export async function wget(
     await fetchFile(dir.open(), path, address);
   } catch (error: any) {
     await stderr.write(
-      `wget: could not get resource: ${error.message.toLowerCase()}\n`
+      new TextEncoder().encode(
+        `wget: could not get resource: ${error.message.toLowerCase()}\n`
+      )
     );
     return 1;
   }
@@ -135,7 +151,9 @@ export async function download(
   const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
 
   if (args.length === 1) {
-    await stderr.write("download: help: download <address> [<path>]\n");
+    await stderr.write(
+      new TextEncoder().encode("download: help: download <address> [<path>]\n")
+    );
     return 1;
   }
   await Promise.all(
@@ -149,7 +167,9 @@ export async function download(
         .open()
         .getEntry(path, FileOrDir.File);
       if (err !== constants.WASI_ESUCCESS) {
-        await stderr.write(`download: no such file: ${path}\n`);
+        await stderr.write(
+          new TextEncoder().encode(`download: no such file: ${path}\n`)
+        );
         return Promise.resolve();
       }
 
@@ -161,7 +181,9 @@ export async function download(
           suggestedName: path.split("/").slice(-1)[0],
         });
       } catch (e) {
-        await stderr.write("download: unable to save file locally\n");
+        await stderr.write(
+          new TextEncoder().encode("download: unable to save file locally\n")
+        );
         return constants.EXIT_FAILURE;
       }
       const writable = await localHandle.createWritable();
@@ -200,7 +222,7 @@ export async function ps(
 
   // for now ps must be added artificially
   psData += `-1 pts/0    00:00:00 ps\n\r`;
-  await stdout.write(psData);
+  await stdout.write(new TextEncoder().encode(psData));
   return 0;
 }
 
@@ -235,7 +257,7 @@ export async function free(
   )}  ${`          ${usedMemory}`.slice(
     -10
   )}  ${`          ${availableMemory}`.slice(-10)}\n\r`;
-  await stdout.write(freeData);
+  await stdout.write(new TextEncoder().encode(freeData));
 
   return constants.EXIT_SUCCESS;
 }

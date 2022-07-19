@@ -196,7 +196,9 @@ async function initFs(openedRootDir: OpenDirectory) {
     if ((await shellrc.metadata()).size === 0n) {
       let rc_open = await shellrc.open();
       await rc_open.write(
-        "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
+        new TextEncoder().encode(
+          "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
+        )
       );
       await rc_open.close();
     }
@@ -430,9 +432,10 @@ export async function init(
   const processManager = new ProcessManager(
     "process.js",
     (output: string) => {
-      terminal.io.print(output);
+      const replaced = output.replaceAll("\n", "\r\n");
+      terminal.io.print(replaced);
       if (window.stdoutAttached) {
-        window.buffer += output;
+        window.buffer += replaced;
       }
       if (window.logOutput) {
         console.log(`[OUT] ${output}`);
