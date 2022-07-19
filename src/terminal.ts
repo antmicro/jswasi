@@ -22,6 +22,8 @@ declare global {
   }
 }
 
+const DEFAULT_WORK_DIR = "/home/ant";
+
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/shell": "resources/shell.wasm",
@@ -154,7 +156,7 @@ async function initFs(openedRootDir: OpenDirectory) {
   // 2nd level directories creation
   await Promise.all([
     openedRootDir.getEntry(
-      "/home/ant",
+      DEFAULT_WORK_DIR,
       FileOrDir.Directory,
       LookupFlags.SymlinkFollow,
       OpenFlags.Create | OpenFlags.Directory
@@ -185,7 +187,7 @@ async function initFs(openedRootDir: OpenDirectory) {
     // TODO: this should be moved to shell
     const shellrc = (
       await openedRootDir.getEntry(
-        "/home/ant/.shellrc",
+        `${DEFAULT_WORK_DIR}/.shellrc`,
         FileOrDir.File,
         LookupFlags.SymlinkFollow,
         OpenFlags.Create
@@ -497,7 +499,7 @@ export async function init(
     await filesystem
       .getRootDir()
       .open()
-      .getEntry("/home/ant", FileOrDir.Directory)
+      .getEntry(DEFAULT_WORK_DIR, FileOrDir.Directory)
   ).entry.open();
   pwdDir.setAsCwd(); // doesn't make any difference
   await processManager.spawnProcess(
@@ -517,11 +519,11 @@ export async function init(
     ["/usr/bin/shell"],
     {
       PATH: "/usr/bin:/usr/local/bin",
-      PWD: "/home/ant",
-      OLDPWD: "/home/ant",
+      PWD: DEFAULT_WORK_DIR,
+      OLDPWD: DEFAULT_WORK_DIR,
       TMPDIR: "/tmp",
       TERM: "xterm-256color",
-      HOME: "/home/ant",
+      HOME: DEFAULT_WORK_DIR,
       SHELL: "/usr/bin/shell",
       LANG: "en_US.UTF-8",
       USER: "ant",
@@ -530,6 +532,6 @@ export async function init(
       DEBUG: "1",
     },
     false,
-    "/home/ant"
+    DEFAULT_WORK_DIR
   );
 }
