@@ -500,8 +500,22 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   ): Promise<{ err: number }> {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
-      await parent.handle.removeEntry(name, options);
-      await delStoredData(`${parent.path()}/${name}`);
+      // check if the directory is empty before deleting
+      // deleting non-empty directory leaves dangling filesystem entries
+      if (
+        !options.recursive ||
+        // find entry - open entry - get directory contents
+        (
+          await (
+            await (await this.getEntry(path, FileOrDir.Directory)).entry.open()
+          ).entries()
+        ).length === 0
+      ) {
+        await parent.handle.removeEntry(name, options);
+        await delStoredData(`${parent.path()}/${name}`);
+      } else {
+        return { err: constants.WASI_ENOTEMPTY };
+      }
     }
     return { err };
   }
