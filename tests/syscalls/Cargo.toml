@@ -1,6 +1,6 @@
 [package]
 authors = [
-    "Grzegorz Płaczek <gplaczek@internships.antmicro.com"
+    "Grzegorz Płaczek <gplaczek@internships.antmicro.com>"
 ]
 name = "syscalls_test"
 version = "0.1.0"
