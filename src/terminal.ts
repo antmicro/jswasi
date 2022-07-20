@@ -37,6 +37,7 @@ const NECESSARY_BINARIES = {
 
 const OPTIONAL_BINARIES = {
   "/usr/bin/uutils": "resources/uutils.async.wasm",
+  "/usr/local/bin/test": "resources/syscalls_test.wasm",
   "/lib/python36.zip":
     "https://github.com/pgielda/wasmpython-bin/raw/main/python36.zip",
   "/usr/local/bin/duk":
