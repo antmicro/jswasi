@@ -53,13 +53,20 @@ export interface Entry {
 export interface DirEntry extends Entry {}
 
 export interface Directory extends Entry {
-  open(): OpenDirectory;
+  open(
+    rightsBase?: bigint,
+    rightsInheriting?: bigint,
+    fdFlags?: number
+  ): OpenDirectory;
 }
 
 export interface OpenDirectory extends Entry {
+  fileType: number;
   isPreopened: boolean;
   isatty(): boolean;
-  fdRights: bigint;
+  rightsBase: bigint;
+  rightsInheriting: bigint;
+  fdFlags: number;
 
   getEntry(
     path: string,
@@ -120,7 +127,11 @@ export interface OpenDirectory extends Entry {
 }
 
 export interface File extends Entry {
-  open(): Promise<OpenFile & StreamableFile>;
+  open(
+    rightsBase?: bigint,
+    rightsInheriting?: bigint,
+    fdFlags?: number
+  ): Promise<OpenFile & StreamableFile>;
 }
 
 export interface StreamableFile {
@@ -132,9 +143,12 @@ export interface StreamableFile {
 }
 
 export interface OpenFile extends Entry {
+  fileType: number;
   isatty(): boolean;
   isPreopened: boolean;
-  fdRights: bigint;
+  rightsBase: bigint;
+  rightsInheriting: bigint;
+  fdFlags: number;
 
   read(len: number): Promise<[Uint8Array, number]>;
 

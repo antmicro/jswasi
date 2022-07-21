@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { FdFlags, LookupFlags, OpenFlags, Rights } from "./filesystem/enums";
+import { LookupFlags } from "./filesystem/enums";
 import {
   ChdirArgs,
   FdCloseArgs,
@@ -86,13 +86,13 @@ type WASICallbacks = {
   ) => number;
   path_open: (
     dirFd: number,
-    lookupFlags: LookupFlags,
+    lookupFlags: number,
     pathPtr: ptr,
     pathLen: number,
-    openFlags: OpenFlags,
-    fsRightsBase: Rights,
-    fsRightsInheriting: Rights,
-    fdFlags: FdFlags,
+    openFlags: number,
+    fsRightsBase: bigint,
+    fsRightsInheriting: bigint,
+    fdFlags: number,
     openedFdPtr: ptr
   ) => number;
   path_rename: (
@@ -297,12 +297,14 @@ function WASI(): WASICallbacks {
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
     );
 
-    const sharedBuffer = new SharedArrayBuffer(4 + 20); // lock, filetype, rights base, rights inheriting
+    // lock, filetype, rights base, rights inheriting, fd flags
+    const sharedBuffer = new SharedArrayBuffer(4 + 24);
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
     const fileType = new Uint8Array(sharedBuffer, 4, 1);
     const rights_base = new BigUint64Array(sharedBuffer, 8, 1);
     const rights_inheriting = new BigUint64Array(sharedBuffer, 16, 1);
+    const fd_flags = new Uint8Array(sharedBuffer, 24, 1);
 
     sendToKernel(["fd_fdstat_get", { sharedBuffer, fd } as FdFdstatGetArgs]);
     Atomics.wait(lck, 0, -1);
@@ -314,11 +316,7 @@ function WASI(): WASICallbacks {
     }
 
     view.setUint8(buf, fileType[0]);
-    if (fd <= 2) {
-      view.setUint32(buf + 2, constants.WASI_FDFLAG_APPEND, true);
-    } else {
-      view.setUint32(buf + 2, 0, true);
-    }
+    view.setUint32(buf + 2, fd_flags[0], true);
     view.setBigUint64(buf + 8, rights_base[0], true);
     view.setBigUint64(buf + 16, rights_inheriting[0], true);
 
@@ -658,13 +656,13 @@ function WASI(): WASICallbacks {
 
   function path_open(
     dirFd: number,
-    lookupFlags: LookupFlags,
+    lookupFlags: number,
     pathPtr: ptr,
     pathLen: number,
-    openFlags: OpenFlags,
-    fsRightsBase: Rights,
-    fsRightsInheriting: Rights,
-    fdFlags: FdFlags,
+    openFlags: number,
+    fsRightsBase: bigint,
+    fsRightsInheriting: bigint,
+    fdFlags: number,
     openedFdPtr: ptr
   ) {
     const view = new DataView(

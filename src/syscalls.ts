@@ -438,13 +438,10 @@ export default async function syscallCallback(
           path,
           FileOrDir.Any,
           lookupFlags,
-          openFlags,
-          fsRightsBase,
-          fsRightsInheriting,
-          fdFlags
+          openFlags
         ));
         if (err === constants.WASI_ESUCCESS) {
-          const e = await entry.open();
+          const e = await entry.open(fsRightsBase, fsRightsInheriting, fdFlags);
           openedFd[0] = fds.addFile(e);
         }
       } else {
@@ -682,16 +679,15 @@ export default async function syscallCallback(
       const fileType = new Uint8Array(sharedBuffer, 4, 1);
       const rightsBase = new BigUint64Array(sharedBuffer, 8, 1);
       const rightsInheriting = new BigUint64Array(sharedBuffer, 16, 1);
+      const fdFlags = new Uint8Array(sharedBuffer, 24, 1);
 
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
         fileType[0] = (await fds.getFd(fd).stat()).fileType;
-        rightsBase[0] = fds.getFd(fd).fdRights;
-        // for now we return the file rights as rights inheriting
-        // because so far, we give rwx rights to every file
-        // for character devices, rights inheriting are 0 (because wasmer does it that way)
-        rightsInheriting[0] = fd < 3 ? 0n : fds.getFd(fd).fdRights;
+        fdFlags[0] = fds.getFd(fd).fdFlags;
+        rightsBase[0] = fds.getFd(fd).rightsBase;
+        rightsInheriting[0] = fds.getFd(fd).rightsInheriting;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;

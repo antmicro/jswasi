@@ -1,4 +1,4 @@
-import { FdFlags, LookupFlags, OpenFlags, Rights } from "./filesystem/enums";
+import { LookupFlags } from "./filesystem/enums";
 
 export type FdFdstatGetArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
 
@@ -49,11 +49,11 @@ export type PathOpenArgs = {
   sharedBuffer: SharedArrayBuffer;
   dirFd: number;
   path: string;
-  lookupFlags: LookupFlags;
-  openFlags: OpenFlags;
-  fsRightsBase: Rights;
-  fsRightsInheriting: Rights;
-  fdFlags: FdFlags;
+  lookupFlags: number;
+  openFlags: number;
+  fsRightsBase: bigint;
+  fsRightsInheriting: bigint;
+  fdFlags: number;
 };
 
 export type Redirect = { mode: string; path: string; fd: number };

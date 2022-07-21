@@ -8,9 +8,11 @@ const RESET = "\u001b[0m";
 export interface In {
   fileType: number;
   isPreopened: boolean;
-  fdRights: bigint;
   isatty(): boolean;
   stat(): Promise<Stat>;
+  rightsBase: bigint;
+  rightsInheriting: bigint;
+  fdFlags: number;
 
   scheduleRead(
     workerId: number,
@@ -24,9 +26,11 @@ export interface In {
 export interface Out {
   fileType: number;
   isPreopened: boolean;
-  fdRights: bigint;
   isatty(): boolean;
   stat(): Promise<Stat>;
+  rightsBase: bigint;
+  rightsInheriting: bigint;
+  fdFlags: number;
 
   write(content: Uint8Array): Promise<number>;
 
@@ -36,7 +40,9 @@ export interface Out {
 export class Stdin implements In {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  fdRights = constants.WASI_RIGHTS_STDIN;
+  rightsBase = constants.WASI_RIGHTS_STDIN;
+  rightsInheriting = 0n;
+  fdFlags = 0;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -90,7 +96,9 @@ export class Stdin implements In {
 export class Stdout implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  fdRights = constants.WASI_RIGHTS_STDOUT;
+  rightsBase = constants.WASI_RIGHTS_STDOUT;
+  rightsInheriting = 0n;
+  fdFlags = constants.WASI_FDFLAG_APPEND;
 
   constructor(private workerTable: ProcessManager) {}
 
@@ -131,7 +139,9 @@ export class Stdout implements Out {
 export class Stderr implements Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  fdRights = constants.WASI_RIGHTS_STDERR;
+  rightsBase = constants.WASI_RIGHTS_STDERR;
+  rightsInheriting = 0n;
+  fdFlags = constants.WASI_FDFLAG_APPEND;
 
   constructor(private workerTable: ProcessManager) {}
 

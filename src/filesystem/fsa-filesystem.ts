@@ -213,9 +213,6 @@ class FsaFilesystem implements Filesystem {
         FileOrDir.Directory,
         lookupFlags,
         openFlags,
-        fsRightsBase,
-        fsRightsInheriting,
-        fdFlags,
         __recursiveSymlinksDepth
       );
     }
@@ -446,12 +443,19 @@ export class FsaDirectory extends FsaEntry implements Directory {
 
   declare readonly handle: FileSystemDirectoryHandle;
 
-  open(): FsaOpenDirectory {
+  open(
+    rightsBase: bigint = constants.WASI_RIGHTS_ALL,
+    rightsInheriting: bigint = constants.WASI_RIGHTS_ALL,
+    fdFlags: number = 0
+  ): FsaOpenDirectory {
     return new FsaOpenDirectory(
       this.path(),
       this.handle,
       this.parent(),
-      this.filesystem
+      this.filesystem,
+      rightsBase,
+      rightsInheriting,
+      fdFlags
     );
   }
 }
@@ -460,9 +464,18 @@ export class FsaDirectory extends FsaEntry implements Directory {
 export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   public override readonly fileType: number = constants.WASI_PREOPENTYPE_DIR;
   public isPreopened: boolean = false;
-  public readonly fdRights = constants.WASI_RIGHTS_DIRECTORY_OWNER;
 
-  declare readonly handle: FileSystemDirectoryHandle;
+  constructor(
+    path: string,
+    public override readonly handle: FileSystemDirectoryHandle,
+    parent: FsaDirectory | null,
+    public override readonly filesystem: FsaFilesystem,
+    public readonly rightsBase: bigint,
+    public readonly rightsInheriting: bigint,
+    public readonly fdFlags: number
+  ) {
+    super(path, handle, parent, filesystem);
+  }
 
   isatty(): boolean {
     return false;
@@ -634,9 +647,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     mode: FileOrDir.File,
     dirFlags?: LookupFlags,
     openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags,
     __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaFile }>;
 
@@ -646,9 +656,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     mode: FileOrDir.Directory,
     dirFlags?: LookupFlags,
     openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags,
     __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaDirectory }>;
 
@@ -658,9 +665,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     mode: FileOrDir,
     dirFlags?: LookupFlags,
     openFlags?: OpenFlags,
-    fsRightsBase?: Rights,
-    fsRightsInheriting?: Rights,
-    fdFlags?: FdFlags,
     __recursiveSymlinksDepth?: number
   ): Promise<{ err: number; entry: FsaFile | FsaDirectory }>;
 
@@ -670,9 +674,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     mode: FileOrDir,
     lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
     openFlags: OpenFlags = OpenFlags.None,
-    fsRightsBase: Rights = Rights.None,
-    fsRightsInheriting: Rights = Rights.None,
-    fdFlags: FdFlags = FdFlags.None,
     __recursiveSymlinksDepth: number = 0
   ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> {
     const {
@@ -759,9 +760,6 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
           },
           lookupFlags,
           openFlags,
-          fsRightsBase,
-          fsRightsInheriting,
-          fdFlags,
           __recursiveSymlinksDepth
         );
       } catch (err: any) {
@@ -810,12 +808,19 @@ export class FsaFile extends FsaEntry implements File {
 
   declare readonly handle: FileSystemFileHandle;
 
-  async open(): Promise<FsaOpenFile> {
+  async open(
+    rightsBase: bigint = constants.WASI_RIGHTS_ALL,
+    rightsInheriting: bigint = constants.WASI_RIGHTS_ALL,
+    fdFlags: number = 0
+  ): Promise<FsaOpenFile> {
     return new FsaOpenFile(
       this.path(),
       this.handle,
       this.parent(),
-      this.filesystem
+      this.filesystem,
+      rightsBase,
+      rightsInheriting,
+      fdFlags
     );
   }
 }
@@ -825,11 +830,20 @@ export class FsaFile extends FsaEntry implements File {
 export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   public readonly fileType: number = constants.WASI_FILETYPE_REGULAR_FILE;
   public isPreopened: boolean = false;
-  public readonly fdRights = constants.WASI_RIGHTS_FILE_OWNER;
+
+  constructor(
+    path: string,
+    public override readonly handle: FileSystemFileHandle,
+    parent: FsaDirectory | null,
+    public override readonly filesystem: FsaFilesystem,
+    public readonly rightsBase: bigint,
+    public readonly rightsInheriting: bigint,
+    public readonly fdFlags: number
+  ) {
+    super(path, handle, parent, filesystem);
+  }
 
   private filePosition: number = 0;
-
-  public declare readonly handle: FileSystemFileHandle;
 
   private writer: FileSystemWritableFileStream | null = null;
 
