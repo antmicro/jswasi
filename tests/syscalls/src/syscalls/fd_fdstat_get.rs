@@ -1,4 +1,5 @@
 use std::io::{Error, ErrorKind};
+use super::constants;
 
 unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Fdstat) -> std::io::Result<()>{
     match wasi::fd_fdstat_get(desc) {
@@ -29,19 +30,19 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         expect_success(0, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_CHARACTER_DEVICE,
             fs_flags: 0,
-            fs_rights_base: 136315027,
+            fs_rights_base: constants::RIGHTS_STDIN,
             fs_rights_inheriting: 0
         })?;
         expect_success(1, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_CHARACTER_DEVICE,
             fs_flags: wasi::FDFLAGS_APPEND,
-            fs_rights_base: 136315089,
+            fs_rights_base: constants::RIGHTS_STDOUT,
             fs_rights_inheriting: 0
         })?;
         expect_success(2, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_CHARACTER_DEVICE,
             fs_flags: wasi::FDFLAGS_APPEND,
-            fs_rights_base: 136315089,
+            fs_rights_base: constants::RIGHTS_STDERR,
             fs_rights_inheriting: 0
         })?;
 
@@ -51,8 +52,8 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         expect_success(3, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_DIRECTORY,
             fs_flags: 0,
-            fs_rights_base: 0x1fff_ffff,
-            fs_rights_inheriting: 0x1fff_ffff
+            fs_rights_base: constants::RIGHTS_ALL,
+            fs_rights_inheriting: constants::RIGHTS_ALL
         })?;
 
         // test sample directory
