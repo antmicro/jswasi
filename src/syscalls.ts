@@ -441,7 +441,11 @@ export default async function syscallCallback(
           openFlags
         ));
         if (err === constants.WASI_ESUCCESS) {
-          const e = await entry.open(fsRightsBase, fsRightsInheriting, fdFlags);
+          const e = await entry.open(
+            fsRightsBase & (fds.getFd(dirFd) as OpenDirectory).rightsInheriting,
+            fsRightsInheriting,
+            fdFlags
+          );
           openedFd[0] = fds.addFile(e);
         }
       } else {
