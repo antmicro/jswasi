@@ -97,7 +97,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         }
         result?;
 
-        // test symbolic link
+        // test expanded symbolic link
         let path = "link";
         let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
@@ -105,6 +105,22 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         };
         let result = expect_success(desc, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_REGULAR_FILE,
+            fs_flags: fdflags,
+            fs_rights_base: rights_base,
+            fs_rights_inheriting: rights_inheriting,
+        });
+        if let Err(e) = wasi::fd_close(desc){
+            return Err(Error::new(ErrorKind::Other, e));
+        }
+        result?;
+        // test unexpanded symbolic link
+        let dirflags = 0;
+        let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags) {
+            Ok(d) => d,
+            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        };
+        let result = expect_success(desc, wasi::Fdstat{
+            fs_filetype: wasi::FILETYPE_SYMBOLIC_LINK,
             fs_flags: fdflags,
             fs_rights_base: rights_base,
             fs_rights_inheriting: rights_inheriting,
