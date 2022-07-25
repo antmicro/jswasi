@@ -1,4 +1,5 @@
 use std::io::{Error, ErrorKind};
+use super::constants;
 
 unsafe fn expect_success(desc: wasi::Fd, name_len_ex: usize, tag_ex: u8) -> std::io::Result<()> {
     match wasi::fd_prestat_get(desc) {
@@ -50,7 +51,7 @@ pub fn test_fd_prestat_get() -> std::io::Result<()> {
         // check non-preopened directory
         let new_fd = match wasi::path_open(
             4, 0,
-            "tmp", wasi::OFLAGS_DIRECTORY, 520093695, 520093695, 0) {
+            "tmp", wasi::OFLAGS_DIRECTORY, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(fd) => { fd },
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -63,7 +64,7 @@ pub fn test_fd_prestat_get() -> std::io::Result<()> {
         // check non-preopened file
         let new_fd = match wasi::path_open(
             4, 0,
-            "text", 0, 520093695, 520093695, 0) {
+            "text", 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(fd) => { fd },
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -72,6 +73,9 @@ pub fn test_fd_prestat_get() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         result?;
+
+        // check invalid descriptor
+        expect_error(new_fd, wasi::ERRNO_BADF, "attempt to invoke a syscall with invalid file descriptor succeeded")?;
     }
     Ok(())
 }
