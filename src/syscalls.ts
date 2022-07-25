@@ -410,7 +410,19 @@ export default async function syscallCallback(
       const { sharedBuffer, fd, len } = data as FdReadArgs;
 
       const { fds } = processManager.processInfos[processId];
-      await (fds.getFd(fd) as In).scheduleRead(processId, len, sharedBuffer);
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      if (fds.getFd(fd) === undefined) {
+        Atomics.notify(lck, 0);
+        Atomics.store(lck, 0, constants.WASI_EBADF);
+      } else if (
+        (fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_READ) ==
+        0n
+      ) {
+        Atomics.notify(lck, 0);
+        Atomics.store(lck, 0, constants.WASI_EACCES);
+      } else {
+        await (fds.getFd(fd) as In).scheduleRead(processId, len, sharedBuffer);
+      }
 
       // releasing the lock is delegated to read() call
       break;
