@@ -8,5 +8,6 @@ fn main() -> std::io::Result<()>{
     println!("[TEST] fd_fdstat_get: {:?}", fd_fdstat_get::test_fd_fdstat_get());
     println!("[TEST] fd_filestat_get: {:?}", fd_filestat_get::test_fd_filestat_get());
     println!("[TEST] fd_read: {:?}", fd_read::test_fd_read());
+    println!("[TEST] fd_write: {:?}", fd_write::test_fd_write());
     Ok(())
 }
