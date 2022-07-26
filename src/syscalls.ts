@@ -399,7 +399,20 @@ export default async function syscallCallback(
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
-      const err = await (fds.getFd(fd) as OpenFile).write(content);
+      let err;
+      if (
+        fds.getFd(fd) === undefined ||
+        fds.getFd(fd).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+      ) {
+        err = constants.WASI_EBADF;
+      } else if (
+        (fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_WRITE) ===
+        0n
+      ) {
+        err = constants.WASI_EACCES;
+      } else {
+        err = await (fds.getFd(fd) as OpenFile).write(content);
+      }
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
