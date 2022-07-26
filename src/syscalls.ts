@@ -245,6 +245,34 @@ export default async function syscallCallback(
           Atomics.notify(parentLck, 0);
           break;
         }
+        case "/usr/local/bin/test": {
+          const openedPwdDir = (
+            await processManager.filesystem
+              .getRootDir()
+              .open()
+              .getEntry("/home/ant", FileOrDir.Directory)
+          ).entry.open();
+          await openedPwdDir.getEntry(
+            "tmp",
+            FileOrDir.Directory,
+            LookupFlags.SymlinkFollow,
+            OpenFlags.Create | OpenFlags.Directory
+          );
+          const text = await (
+            await openedPwdDir.getEntry(
+              "text",
+              FileOrDir.Any,
+              LookupFlags.SymlinkFollow,
+              OpenFlags.Create
+            )
+          ).entry.open();
+          await (text as OpenFile).write(
+            new TextEncoder().encode("sample text\n")
+          );
+          await text.close();
+          openedPwdDir.addSymlink("link", "text");
+          // no break so that test is spawned normally (default must be below this case)
+        }
         default: {
           const id = await processManager.spawnProcess(
             processId,
