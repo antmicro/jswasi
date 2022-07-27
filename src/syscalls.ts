@@ -430,7 +430,8 @@ export default async function syscallCallback(
       let err;
       if (
         fds.getFd(fd) === undefined ||
-        fds.getFd(fd).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+        (await fds.getFd(fd).stat()).fileType ===
+          constants.WASI_FILETYPE_SYMBOLIC_LINK
       ) {
         err = constants.WASI_EBADF;
       } else if (
