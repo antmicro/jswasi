@@ -44,14 +44,13 @@ pub fn test_fd_prestat_get() -> std::io::Result<()> {
         expect_error(1, wasi::ERRNO_BADF, "Character device cannot be a preopened directory")?;
         expect_error(2, wasi::ERRNO_BADF, "Character device cannot be a preopened directory")?;
 
-        // check preopened directories
-        expect_success(3, 1, 0)?;
-        expect_success(4, 1, 0)?;
+        // check preopened directory
+        expect_success(constants::PWD_DESC, 1, 0)?;
 
         // check non-preopened directory
         let new_fd = match wasi::path_open(
-            4, 0,
-            "tmp", wasi::OFLAGS_DIRECTORY, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+            constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME,
+            wasi::OFLAGS_DIRECTORY, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(fd) => { fd },
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -63,19 +62,21 @@ pub fn test_fd_prestat_get() -> std::io::Result<()> {
 
         // check non-preopened file
         let new_fd = match wasi::path_open(
-            4, 0,
-            "text", 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+            constants::PWD_DESC, 0,
+            constants::SAMPLE_TEXT_FILENAME, 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(fd) => { fd },
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
-        let result = expect_error(new_fd, wasi::ERRNO_BADF, "descriptor should not be preopened");
+        let result = expect_error(new_fd, wasi::ERRNO_BADF, "this descriptor should not be preopened");
         if let Err(e) = wasi::fd_close(new_fd){
             return Err(Error::new(ErrorKind::Other, e));
         }
         result?;
 
         // check invalid descriptor
-        expect_error(new_fd, wasi::ERRNO_BADF, "attempt to invoke a syscall with invalid file descriptor succeeded")?;
+        expect_error(
+            new_fd, wasi::ERRNO_BADF,
+            "attempt to invoke a syscall with invalid file descriptor succeeded")?;
     }
     Ok(())
 }

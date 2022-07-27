@@ -22,9 +22,9 @@ fn main() -> Result<()>{
 
     unsafe {
         // teardown test environment
-        wasi::path_unlink_file(4, "text").unwrap();
-        wasi::path_unlink_file(4, "link").unwrap();
-        wasi::path_remove_directory(4, "tmp").unwrap();
+        wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_TEXT_FILENAME).unwrap();
+        wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_LINK_FILENAME).unwrap();
+        wasi::path_remove_directory(constants::PWD_DESC, constants::SAMPLE_DIR_FILENAME).unwrap();
     }
     println!("[SUMMARY]: {} tests succeeded, {} tests failed",  tests.len() as u32 - fails, fails);
     if fails == 0 {

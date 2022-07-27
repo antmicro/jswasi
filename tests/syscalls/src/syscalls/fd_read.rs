@@ -4,11 +4,12 @@ use super::constants;
 pub fn test_fd_read() -> std::io::Result<()> {
     unsafe {
         let dirflags = 0; // don't follow symlinks
-        let path = "text";
         let oflags = 0;
         let fdflags = wasi::FDFLAGS_SYNC | wasi::FDFLAGS_DSYNC;
 
-        let desc = wasi::path_open(4, dirflags, path, oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags).unwrap();
+        let desc = wasi::path_open(
+            constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME,
+            oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags).unwrap();
 
         const LEN1: usize = constants::SAMPLE_TEXT_LEN / 2;
         const LEN2: usize = constants::SAMPLE_TEXT_LEN - LEN1;
@@ -46,14 +47,15 @@ pub fn test_fd_read() -> std::io::Result<()> {
         }
         wasi::fd_close(desc).unwrap();
 
+        // check if fd_read reads more bytes than it should
         const PAD: usize = 8;
         let mut buf_padding: [u8; constants::SAMPLE_TEXT_LEN + PAD] = [0; constants::SAMPLE_TEXT_LEN + PAD];
         let iovs: wasi::IovecArray = &[
             wasi::Iovec { buf: buf_padding.as_mut_ptr(), buf_len: constants::SAMPLE_TEXT_LEN + PAD }
         ];
-        let desc = wasi::path_open(4, dirflags, path, oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags).unwrap();
-
-        // check if fd_read reads more bytes than it should
+        let desc = wasi::path_open(
+            constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME,
+            oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags).unwrap();
         match wasi::fd_read(desc, iovs) {
             Ok(constants::SAMPLE_TEXT_LEN) => {},
             Ok(len) => {
@@ -69,11 +71,11 @@ pub fn test_fd_read() -> std::io::Result<()> {
         }
         wasi::fd_close(desc).unwrap();
 
+        // attempt to read without read permissions
         let desc = wasi::path_open(
-            4, dirflags, path, oflags,
+            constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME, oflags,
             constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_READ, constants::RIGHTS_ALL, fdflags).unwrap();
 
-        // attempt to read without read permissions
         match wasi::fd_read(desc, iovs) {
             Ok(_) => {
                 return Err(Error::new(

@@ -93,11 +93,12 @@ pub fn test_fd_write() -> std::io::Result<()> {
     unsafe {
         // attempt to write without write permission should fail
         let desc = match wasi::path_open(
-            4, 0, constants::SAMPLE_TEXT_FILENAME, 0,
+            constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME, 0,
             constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_WRITE, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); },
         };
+
         let buf = "something".as_bytes();
 
         let result = expect_error(
@@ -109,13 +110,13 @@ pub fn test_fd_write() -> std::io::Result<()> {
         result?;
 
         // attempt to write to invalid descriptor should fail
-        let result = expect_error(
+        expect_error(
             desc, buf, wasi::ERRNO_BADF,
             "attempt to write to invalid descriptor succeeded")?;
 
         // writing single buffer to a regular file should succeed
         let desc = match wasi::path_open(
-            4, 0, TEMP_FILENAME, wasi::OFLAGS_CREAT,
+            constants::PWD_DESC, 0, TEMP_FILENAME, wasi::OFLAGS_CREAT,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
@@ -125,7 +126,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         if let Err(e) = result {
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
             return Err(e);
@@ -133,7 +134,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
 
         // written buffer should be read correctly
         let desc = match wasi::path_open(
-            4, 0, TEMP_FILENAME, 0,
+            constants::PWD_DESC, 0, TEMP_FILENAME, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
@@ -143,7 +144,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         if let Err(e) = result {
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
             return Err(e);
@@ -156,7 +157,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
 
         // writing to unexpanded symlink should not succeed
         let desc = match wasi::path_open(
-            4, 0, TEMP_SYMLINK, 0,
+            constants::PWD_DESC, 0, TEMP_SYMLINK, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
@@ -168,10 +169,10 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         if let Err(e) = result {
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_SYMLINK) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
             return Err(e);
@@ -179,7 +180,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
 
         // writing to expanded symlink should succeed
         let desc = match wasi::path_open(
-            4, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_SYMLINK,
+            constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_SYMLINK,
             wasi::OFLAGS_TRUNC, constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
@@ -189,10 +190,10 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         if let Err(e) = result {
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_SYMLINK) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
             return Err(e);
@@ -200,7 +201,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
 
         // check if written buffer can be read correctly
         let desc = match wasi::path_open(
-            4, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_FILENAME, 0,
+            constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_FILENAME, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
@@ -210,19 +211,19 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(Error::new(ErrorKind::Other, e));
         }
         if let Err(e) = result {
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
-            if let Err(e) = wasi::path_unlink_file(4, TEMP_SYMLINK) {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
                 return Err(Error::new(ErrorKind::Other, e));
             }
             return Err(e);
         }
 
-        if let Err(e) = wasi::path_unlink_file(4, TEMP_FILENAME) {
+        if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
             return Err(Error::new(ErrorKind::Other, e));
         }
-        if let Err(e) = wasi::path_unlink_file(4, TEMP_SYMLINK) {
+        if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
             return Err(Error::new(ErrorKind::Other, e));
         }
     }

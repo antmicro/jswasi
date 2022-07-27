@@ -253,7 +253,7 @@ export default async function syscallCallback(
               .getEntry("/home/ant", FileOrDir.Directory)
           ).entry.open();
           await openedPwdDir.getEntry(
-            "tmp",
+            "dir",
             FileOrDir.Directory,
             LookupFlags.SymlinkFollow,
             OpenFlags.Create | OpenFlags.Directory

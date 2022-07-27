@@ -46,10 +46,10 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             fs_rights_inheriting: 0
         })?;
 
-        // check fdstats of preopened descriptors
+        // check fdstats of preopened descriptor
         // for now, all preopened descriptors have all rights
         // this doesn't apply to inherited descriptors
-        expect_success(3, wasi::Fdstat{
+        expect_success(constants::PWD_DESC, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_DIRECTORY,
             fs_flags: 0,
             fs_rights_base: constants::RIGHTS_ALL,
@@ -58,12 +58,14 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
 
         // test sample directory
         let dirflags = wasi::LOOKUPFLAGS_SYMLINK_FOLLOW;
-        let path = "tmp";
+        let path = constants::SAMPLE_DIR_FILENAME;
         let oflags = wasi::OFLAGS_DIRECTORY;
-        let rights_base = 123;
+        let rights_base = 123; // dummy values to check if they are read properly
         let rights_inheriting = 321;
         let fdflags = 0;
-        let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags){
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, dirflags, path,
+            oflags, rights_base, rights_inheriting, fdflags){
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -79,10 +81,12 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         result?;
 
         // test regular file
-        let path = "text";
+        let path = constants::SAMPLE_TEXT_FILENAME;
         let oflags = 0;
         let fdflags = wasi::FDFLAGS_APPEND | wasi::FDFLAGS_SYNC | wasi::FDFLAGS_DSYNC;
-        let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, dirflags, path,
+            oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -98,8 +102,9 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
         result?;
 
         // test expanded symbolic link
-        let path = "link";
-        let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, dirflags, constants::SAMPLE_LINK_FILENAME,
+            oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
@@ -113,9 +118,12 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             return Err(Error::new(ErrorKind::Other, e));
         }
         result?;
+
         // test unexpanded symbolic link
         let dirflags = 0;
-        let desc = match wasi::path_open(4, dirflags, path, oflags, rights_base, rights_inheriting, fdflags) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, dirflags, constants::SAMPLE_LINK_FILENAME,
+            oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };

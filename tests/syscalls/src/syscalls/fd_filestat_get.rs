@@ -33,21 +33,25 @@ pub fn test_fd_filestat_get() -> std::io::Result<()> {
         expect_success(1, wasi::FILETYPE_CHARACTER_DEVICE, 0)?;
 
         // check preopened directory
-        expect_success(4, wasi::FILETYPE_DIRECTORY, 4096)?;
+        expect_success(constants::PWD_DESC, wasi::FILETYPE_DIRECTORY, 4096)?;
 
         // check regular file
-        let desc = match wasi::path_open(4, 0, "text", 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME,
+            0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
         };
-        let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, 12);
+        let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, constants::SAMPLE_TEXT_LEN as u64);
         if let Err(e) = wasi::fd_close(desc){
             return Err(Error::new(ErrorKind::Other, e));
         }
         result?;
 
         // check unexpanded symlink
-        let desc = match wasi::path_open(4, 0, "link", 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_LINK_FILENAME,
+            0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
         };
@@ -58,11 +62,13 @@ pub fn test_fd_filestat_get() -> std::io::Result<()> {
         result?;
 
         // check expended symlink
-        let desc = match wasi::path_open(4, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, "link", 0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, constants::SAMPLE_LINK_FILENAME,
+            0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
         };
-        let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, 12);
+        let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, constants::SAMPLE_TEXT_LEN as u64);
         if let Err(e) = wasi::fd_close(desc){
             return Err(Error::new(ErrorKind::Other, e));
         }
