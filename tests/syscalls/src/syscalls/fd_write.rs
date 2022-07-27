@@ -163,7 +163,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
         };
         let result = expect_error(
-            desc, buf, wasi::ERRNO_BADF,
+            desc, buf, wasi::ERRNO_INVAL,
             "attempt to write to unexpanded symlink succeeded");
         if let Err(e) = wasi::fd_close(desc) {
             return Err(Error::new(ErrorKind::Other, e));

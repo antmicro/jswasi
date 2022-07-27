@@ -313,16 +313,16 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (
-        fds.getFd(fd) !== undefined &&
-        fds.getFd(fd).isPreopened &&
-        (await fds.getFd(fd).stat()).fileType ===
-          constants.WASI_FILETYPE_DIRECTORY
+        fds.getFd(fd) === undefined ||
+        (await fds.getFd(fd).stat()).fileType !==
+          constants.WASI_FILETYPE_DIRECTORY ||
+        fds.getFd(fd).isPreopened === false
       ) {
+        err = constants.WASI_EBADF;
+      } else {
         preopenType[0] = constants.WASI_PREOPENTYPE_DIR;
         nameLen[0] = (fds.getFd(fd) as OpenFile).name().length;
         err = constants.WASI_ESUCCESS;
-      } else {
-        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
@@ -428,12 +428,16 @@ export default async function syscallCallback(
 
       const { fds } = processManager.processInfos[processId];
       let err;
-      if (
-        fds.getFd(fd) === undefined ||
-        (await fds.getFd(fd).stat()).fileType ===
-          constants.WASI_FILETYPE_SYMBOLIC_LINK
-      ) {
+      let ftype;
+      if (fds.getFd(fd) !== undefined) {
+        ftype = (await fds.getFd(fd).stat()).fileType;
+      }
+      if (fds.getFd(fd) === undefined) {
         err = constants.WASI_EBADF;
+      } else if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
+        err = constants.WASI_EISDIR;
+      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+        err = constants.WASI_EINVAL;
       } else if (
         (fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_WRITE) ===
         0n
