@@ -220,6 +220,88 @@ pub fn test_fd_write() -> std::io::Result<()> {
             return Err(e);
         }
 
+        // attempt to write to a directory should not succeed
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME, wasi::OFLAGS_DIRECTORY,
+            constants::RIGHTS_ALL, 0, 0) {
+            Ok(d) => d,
+            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        };
+        let result = expect_error(desc, buf, wasi::ERRNO_ISDIR, "attempt to write to directory succeeded");
+        if let Err(e) = wasi::fd_close(desc) {
+            return Err(Error::new(ErrorKind::Other, e));
+        }
+        if let Err(e) = result {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            return Err(e);
+        }
+
+        // we check for ERRNO_ACCESS because by default, stdin doesn't have write rights
+        // attempt to write to stdin should fail
+        if let Err(e) = expect_error(0, buf, wasi::ERRNO_ACCES, "attempt to write to stdin succeeded") {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            return Err(e);
+        }
+
+        // writing multiple buffers should succeed
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, TEMP_FILENAME,
+            wasi::OFLAGS_TRUNC, constants::RIGHTS_ALL, 0, 0) {
+            Ok(d) => d,
+            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        };
+        let buf = "two buffers".as_bytes();
+        let len1 = buf.len() / 2;
+        let len2 = buf.len() - len1;
+        let result = expect_success(
+            desc, &[
+                wasi::Ciovec{ buf: buf[..len1].as_ptr(), buf_len: len1 },
+                wasi::Ciovec{ buf: buf[len1..].as_ptr(), buf_len: len2 }
+            ]);
+        if let Err(e) = wasi::fd_close(desc) {
+            return Err(Error::new(ErrorKind::Other, e));
+        }
+        if let Err(e) = result {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            return Err(e);
+        }
+
+        // check if written buffer can be read correctly
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, TEMP_FILENAME, 0,
+            constants::RIGHTS_ALL, 0, 0) {
+            Ok(d) => d,
+            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        };
+        let result = verify_fd_read(desc, buf, buf.len());
+        if let Err(e) = wasi::fd_close(desc) {
+            return Err(Error::new(ErrorKind::Other, e));
+        }
+        if let Err(e) = result {
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            return Err(e);
+        }
+
         if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
             return Err(Error::new(ErrorKind::Other, e));
         }
