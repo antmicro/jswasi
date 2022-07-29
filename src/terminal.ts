@@ -194,11 +194,11 @@ async function initFs(openedRootDir: OpenDirectory) {
       )
     ).entry;
     if ((await shellrc.metadata()).size === 0n) {
-      await (
-        await shellrc.open()
-      ).write(
+      let rc_open = await shellrc.open();
+      await rc_open.write(
         "export RUST_BACKTRACE=full\nexport DEBUG=1\nexport PYTHONHOME=/lib/python3.6"
       );
+      await rc_open.close();
     }
   })();
 
