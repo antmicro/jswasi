@@ -246,12 +246,7 @@ export default async function syscallCallback(
           break;
         }
         case "/usr/local/bin/test": {
-          const openedPwdDir = (
-            await processManager.filesystem
-              .getRootDir()
-              .open()
-              .getEntry("/home/ant", FileOrDir.Directory)
-          ).entry.open();
+          const openedPwdDir = fds.getFd(4) as OpenDirectory;
           await openedPwdDir.getEntry(
             "dir",
             FileOrDir.Directory,
