@@ -11,6 +11,7 @@ fn main() -> Result<()>{
         ("fd_filestat_get", fd_filestat_get::test_fd_filestat_get as fn() -> Result<()>),
         ("fd_read", fd_read::test_fd_read as fn() -> Result<()>),
         ("fd_write", fd_write::test_fd_write as fn() -> Result<()>),
+        ("fd_prestat_dir_name", fd_prestat_dir_name::test_fd_prestat_dir_name as fn() -> Result<()>),
     ];
 
     let mut fails: u32 = 0;

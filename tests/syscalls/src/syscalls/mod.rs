@@ -7,3 +7,4 @@ pub mod args_sizes_get;
 pub mod fd_filestat_get;
 pub mod fd_read;
 pub mod fd_write;
+pub mod fd_prestat_dir_name;
