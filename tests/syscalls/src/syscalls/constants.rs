@@ -11,3 +11,5 @@ pub const SAMPLE_TEXT: &[u8] = "sample text\n".as_bytes();
 pub const SAMPLE_TEXT_LEN: usize = SAMPLE_TEXT.len();
 
 pub const PWD_DESC: wasi::Fd = 4;
+
+pub const ARGV: [&str; 3] = ["test\0", "wasi\0", "syscalls\0"];

@@ -9,3 +9,4 @@ pub mod fd_read;
 pub mod fd_write;
 pub mod fd_prestat_dir_name;
 pub mod environ_get;
+pub mod args_get;

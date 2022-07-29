@@ -1,16 +1,19 @@
 use std::io::{Error, ErrorKind};
+use super::constants;
 
 pub fn test_args_sizes_get() -> std::io::Result<()> {
     unsafe {
+        let expected_size = constants::ARGV.iter().fold(0, |r, arg| r + arg.len());
         match wasi::args_sizes_get() {
             Ok((n_args, args_size)) => {
-                // args_size depends on binary name, for now it is "test" (\0 at the end is included)
-                if n_args != 1 || args_size != 5 {
+                // for all tests we assume that cli args are ones in constants::ARGV constant
+                if n_args != constants::ARGV.len() || expected_size != args_size {
                     Err(Error::new(
                         ErrorKind::Other,
                         format!(
                             "In args_sizes_get(): expected (argc: {}, argv_buf_size: {}), \
-                            got (argc: {}, argv_buf_size: {})", 1, 5, n_args, args_size)))
+                            got (argc: {}, argv_buf_size: {})", constants::ARGV.len(),
+                            expected_size, n_args, args_size)))
                 } else {
                     Ok(())
                 }
