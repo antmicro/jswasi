@@ -457,6 +457,10 @@ export default async function syscallCallback(
 
       const { fds } = processManager.processInfos[processId];
       const lck = new Int32Array(sharedBuffer, 0, 1);
+      let ftype;
+      if (fds.getFd(fd) !== undefined) {
+        ftype = (await fds.getFd(fd).stat()).fileType;
+      }
       if (fds.getFd(fd) === undefined) {
         Atomics.notify(lck, 0);
         Atomics.store(lck, 0, constants.WASI_EBADF);
@@ -466,6 +470,12 @@ export default async function syscallCallback(
       ) {
         Atomics.notify(lck, 0);
         Atomics.store(lck, 0, constants.WASI_EACCES);
+      } else if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
+        Atomics.notify(lck, 0);
+        Atomics.store(lck, 0, constants.WASI_EISDIR);
+      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+        Atomics.notify(lck, 0);
+        Atomics.store(lck, 0, constants.WASI_EINVAL);
       } else {
         await (fds.getFd(fd) as In).scheduleRead(processId, len, sharedBuffer);
       }
