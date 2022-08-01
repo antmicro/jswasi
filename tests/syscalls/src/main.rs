@@ -14,6 +14,7 @@ fn main() -> Result<()>{
         ("fd_prestat_dir_name", fd_prestat_dir_name::test_fd_prestat_dir_name as fn() -> Result<()>),
         ("environ_get", environ_get::test_environ_get as fn() -> Result<()>),
         ("args_get", args_get::test_args_get as fn() -> Result<()>),
+        ("fd_close", fd_close::test_fd_close as fn() -> Result<()>),
     ];
 
     let mut fails: u32 = 0;
