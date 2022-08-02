@@ -133,3 +133,11 @@ export type HtermConfArgs = {
   attrib: string;
   val: string;
 };
+
+export type PathRenameArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  oldFd: number;
+  oldPath: string;
+  newFd: number;
+  newPath: string;
+};

@@ -112,6 +112,8 @@ export interface OpenDirectory extends Entry {
 
   readlink(path: string): Promise<{ err: number; linkedPath: string | null }>;
 
+  copyEntry(oldFd: OpenDirectory, path: string): Promise<number>;
+
   close(): Promise<void>;
 
   setAsCwd(): void;
@@ -145,6 +147,8 @@ export interface OpenFile extends Entry {
   write(buffer: Uint8Array): Promise<number>;
 
   close(): Promise<void>;
+
+  copyEntry(oldFd: OpenDirectory, path: string): Promise<number>;
 
   seek(offset: number, whence: number): Promise<number>;
 

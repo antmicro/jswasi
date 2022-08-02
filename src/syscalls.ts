@@ -24,6 +24,7 @@ import {
   SetEnvArgs,
   SpawnArgs,
   HtermConfArgs,
+  PathRenameArgs,
 } from "./types.js";
 import { OpenDirectory, OpenFile } from "./filesystem/interfaces.js";
 import {
@@ -709,6 +710,51 @@ export default async function syscallCallback(
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
+      }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "path_rename": {
+      // renaming entries is not supported in filesystem access api yet
+      // in order for programs to work, this syscall has a workaround solution
+      // instead of renaming the file or directory, it is copied and then deleted
+      // more info on move feature in filesystem access api: https://chromestatus.com/feature/5640802622504960
+      const { sharedBuffer, oldFd, oldPath, newFd, newPath } =
+        data as PathRenameArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const { fds } = processManager.processInfos[processId];
+      var err = constants.WASI_ESUCCESS;
+
+      // delete entry at a target path if it already exists
+      // if it doesn't exist, we just ignore error code and move on
+      ((await fds.getFd(newFd)) as OpenDirectory).deleteEntry(newPath, {
+        recursive: true,
+      });
+      const oldEntry = await (fds.getFd(oldFd) as OpenDirectory).getEntry(
+        oldPath,
+        FileOrDir.Any,
+        LookupFlags.NoFollow,
+        OpenFlags.Create
+      );
+      // copy the entry recursively
+      if (oldEntry.err === constants.WASI_ESUCCESS) {
+        let openedOldEntry = await oldEntry.entry.open();
+        let result = await openedOldEntry.copyEntry(
+          fds.getFd(newFd) as OpenDirectory,
+          newPath
+        );
+        if (result === constants.WASI_ESUCCESS) {
+          // close and remove old entry
+          await openedOldEntry.close();
+          ((await fds.getFd(oldFd)) as OpenDirectory).deleteEntry(oldPath, {
+            recursive: true,
+          });
+        } else {
+          err = result;
+        }
+      } else {
+        err = oldEntry.err;
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

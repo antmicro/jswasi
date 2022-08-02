@@ -502,21 +502,48 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   ): Promise<{ err: number }> {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
     if (err === constants.WASI_ESUCCESS) {
-      // check if the directory is empty before deleting
-      // deleting non-empty directory leaves dangling filesystem entries
-      if (
-        !options.recursive ||
-        // find entry - open entry - get directory contents
-        (
-          await (
-            await (await this.getEntry(path, FileOrDir.Directory)).entry.open()
-          ).entries()
-        ).length === 0
-      ) {
+      const targetEntry = await this.getEntry(
+        path,
+        FileOrDir.Directory,
+        LookupFlags.NoFollow,
+        OpenFlags.None
+      );
+      // if the entry is directory, check if it is empty or if 'recursive' flag is set
+      if (targetEntry.err === constants.WASI_ESUCCESS) {
+        const openEntry = await targetEntry.entry.open();
+        const targetEntries = await (openEntry as OpenDirectory).entries();
+        if (options.recursive) {
+          await Promise.all(
+            targetEntries.map(async (entry) => {
+              if (
+                (await entry.stat()).fileType ===
+                constants.WASI_FILETYPE_DIRECTORY
+              ) {
+                // call the function recursively if directory contains subdirectories
+                await (openEntry as OpenDirectory).deleteEntry(
+                  entry.name(),
+                  options
+                );
+              } else {
+                // delete handle and database entry if it is a file
+                await (openEntry as FsaOpenDirectory).handle.removeEntry(
+                  entry.name(),
+                  options
+                );
+                await delStoredData(entry.path());
+              }
+            })
+          );
+        } else if (targetEntries.length !== 0) {
+          // return error if recursive flag is not set and directory is not empty
+          return { err: constants.WASI_ENOTEMPTY };
+        }
+        await openEntry.close();
+      } else if (err != constants.WASI_EEXIST) {
+        // deleting file handles recursively is not enough as it only
+        // deletes handles and leaves dangling fs entries in database
         await parent.handle.removeEntry(name, options);
         await delStoredData(`${parent.path()}/${name}`);
-      } else {
-        return { err: constants.WASI_ENOTEMPTY };
       }
     }
     return { err };
@@ -542,6 +569,37 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
       await setStoredData(entry.path(), metadata);
     }
 
+    return err;
+  }
+
+  async copyEntry(rootFd: FsaOpenDirectory, path: string): Promise<number> {
+    // this function is created solely to allow workaround path_rename implementation
+    const { err, entry } = await rootFd.getEntry(
+      path,
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    );
+    if (err === constants.WASI_ESUCCESS) {
+      const targetRoot = await entry.open();
+      await Promise.all(
+        (
+          await this.entries()
+        ).map(async (entry) => {
+          const openEntry = await (
+            await this.getEntry(
+              entry.name(),
+              FileOrDir.Any,
+              LookupFlags.NoFollow,
+              OpenFlags.None
+            )
+          ).entry.open();
+          await openEntry.copyEntry(targetRoot, entry.name());
+          await openEntry.close();
+        })
+      );
+      await targetRoot.close();
+    }
     return err;
   }
 
@@ -786,6 +844,40 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
       });
     }
     return this.writer;
+  }
+
+  async copyEntry(rootFd: FsaOpenDirectory, target: string): Promise<number> {
+    // this function is created solely to allow workaround path_rename implementation
+    const size = (await this.stat()).size;
+    const bufLen = 4096;
+    const { err, entry } = await rootFd.getEntry(
+      target,
+      FileOrDir.File,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Exclusive
+    );
+    if (err === constants.WASI_ESUCCESS) {
+      const opened = await entry.open();
+      for (let i = size; i >= 0n; i -= BigInt(bufLen)) {
+        let readLen: number;
+        if (readLen > 4096n) {
+          readLen = 4096;
+        } else {
+          readLen = Number(i);
+        }
+        const buffer = await this.read(readLen);
+        await opened.write(buffer[0]);
+      }
+      await opened.close();
+      if (
+        (await this.stat()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+      ) {
+        const metadata = await entry.metadata();
+        metadata.fileType = constants.WASI_FILETYPE_SYMBOLIC_LINK;
+        await setStoredData(entry.path(), metadata);
+      }
+    }
+    return err;
   }
 
   async read(len: number): Promise<[Uint8Array, number]> {

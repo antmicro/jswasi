@@ -28,6 +28,7 @@ import {
   SetEnvArgs,
   SpawnArgs,
   HtermConfArgs,
+  PathRenameArgs,
 } from "./types";
 
 type ptr = number;
@@ -95,7 +96,14 @@ type WASICallbacks = {
     fdFlags: FdFlags,
     openedFdPtr: ptr
   ) => number;
-  path_rename: any;
+  path_rename: (
+    oldFd: number,
+    oldPathPtr: ptr,
+    oldPathLen: number,
+    newFd: number,
+    newPathPtr: ptr,
+    newPathLen: number
+  ) => number;
   path_create_directory: (fd: number, pathPtr: ptr, pathLen: number) => number;
   path_remove_directory: (fd: number, pathPtr: ptr, pathLen: number) => number;
   path_link: (
@@ -926,8 +934,38 @@ function WASI(): WASICallbacks {
     return Atomics.load(lck, 0);
   }
 
-  function path_rename() {
-    return placeholder();
+  function path_rename(
+    oldFd: number,
+    oldPathPtr: ptr,
+    oldPathLen: number,
+    newFd: number,
+    newPathPtr: ptr,
+    newPathLen: number
+  ) {
+    const view8 = new Uint8Array(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+    );
+    const oldPath = new TextDecoder().decode(
+      view8.slice(oldPathPtr, oldPathPtr + oldPathLen)
+    );
+    const newPath = new TextDecoder().decode(
+      view8.slice(newPathPtr, newPathPtr + newPathLen)
+    );
+
+    workerConsoleLog(
+      `path_rename(${oldFd}, ${oldPath}, ${oldPathLen}, ${newFd}, ${newPath}, ${newPathLen})`
+    );
+
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+
+    sendToKernel([
+      "path_rename",
+      { sharedBuffer, oldFd, oldPath, newFd, newPath } as PathRenameArgs,
+    ]);
+    Atomics.wait(lck, 0, -1);
+    return Atomics.load(lck, 0);
   }
 
   function path_unlink_file(fd: number, pathPtr: ptr, pathLen: number) {
