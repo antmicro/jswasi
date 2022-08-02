@@ -2,7 +2,7 @@
 .vs/
 .vscode/
 
-shell/target
+wash/target
 
 node_modules/
 

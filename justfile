@@ -3,17 +3,17 @@ alias b := build
 alias s := start
 alias r := record
 
-shell:
-	cargo build --manifest-path=./shell/Cargo.toml --target wasm32-wasi --release
-	cp ./shell/target/wasm32-wasi/release/*.wasm ./dist/resources
+wash:
+	cargo build --manifest-path=./wash/Cargo.toml --target wasm32-wasi --release
+	cp ./wash/target/wasm32-wasi/release/*.wasm ./dist/resources
 
 build-embedded:
 	if [ -d dist ]; then touch dist/dummy.txt; rm dist/*.*; fi
 	if [ -d dist/resources ]; then rm -rf dist/resources; fi
 	mkdir -p dist/resources
 	cp -r vendor/ dist/
-	cargo build --manifest-path=shell/Cargo.toml --target wasm32-wasi --release
-	cp shell/target/wasm32-wasi/release/*.wasm dist/resources
+	cargo build --manifest-path=wash/Cargo.toml --target wasm32-wasi --release
+	cp wash/target/wasm32-wasi/release/*.wasm dist/resources
 	cp wasm_binaries/*.wasm dist/resources
 	cp src/motd.txt dist/resources
 	npx tsc || echo "there were some errors while compiling, ignoring them"

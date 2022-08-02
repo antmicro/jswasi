@@ -46,7 +46,7 @@ pip install robotframework PexpectLibrary
 Run:
 
 ```
-export PATH=$PATH:$(pwd)/shell/target/release/
+export PATH=$PATH:$(pwd)/wash/target/release/
 cd tests/robot
 robot --variable platform:native -i native test-shell.robot
 ```

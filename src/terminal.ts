@@ -26,7 +26,7 @@ const DEFAULT_WORK_DIR = "/home/ant";
 
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
-  "/usr/bin/shell": "resources/shell.wasm",
+  "/usr/bin/wash": "resources/wash.wasm",
 };
 
 const NECESSARY_BINARIES = {
@@ -183,18 +183,18 @@ async function initFs(openedRootDir: OpenDirectory) {
     OpenFlags.Create | OpenFlags.Directory
   );
 
-  const shellRcPromise = (async () => {
+  const washRcPromise = (async () => {
     // TODO: this should be moved to shell
-    const shellrc = (
+    const washrc = (
       await openedRootDir.getEntry(
-        `${DEFAULT_WORK_DIR}/.shellrc`,
+        `${DEFAULT_WORK_DIR}/.washrc`,
         FileOrDir.File,
         LookupFlags.SymlinkFollow,
         OpenFlags.Create
       )
     ).entry;
-    if ((await shellrc.metadata()).size === 0n) {
-      let rc_open = await shellrc.open();
+    if ((await washrc.metadata()).size === 0n) {
+      let rc_open = await washrc.open();
       await rc_open.write(
         new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
       );
@@ -270,7 +270,7 @@ async function initFs(openedRootDir: OpenDirectory) {
   ]);
 
   await usrLocalBinPromise;
-  await shellRcPromise;
+  await washRcPromise;
   await dummyBinariesPromise;
   await symlinkCreationPromise;
 
@@ -400,7 +400,7 @@ export async function init(
         OpenFlags.Create
       );
   } else if (
-    !(await filesystem.pathExists(filesystem.getMetaDir(), "/usr/bin/shell"))
+    !(await filesystem.pathExists(filesystem.getMetaDir(), "/usr/bin/wash"))
   ) {
     const openedRootDir = filesystem.getRootDir().open();
     await openedRootDir.getEntry(
@@ -417,8 +417,8 @@ export async function init(
     );
     await fetchFile(
       openedRootDir,
-      "/usr/bin/shell",
-      ALWAYS_FETCH_BINARIES["/usr/bin/shell"],
+      "/usr/bin/wash",
+      ALWAYS_FETCH_BINARIES["/usr/bin/wash"],
       true
     );
   }
@@ -507,7 +507,7 @@ export async function init(
     null, // parent_id
     null, // parent_lock
     syscallCallback,
-    "/usr/bin/shell",
+    "/usr/bin/wash",
     new FdTable({
       0: new Stdin(processManager),
       1: new Stdout(processManager),
@@ -517,7 +517,7 @@ export async function init(
       // TODO: why must fds[5] be present for ls to work, and what should it be
       5: filesystem.getRootDir().open(),
     }),
-    ["/usr/bin/shell"],
+    ["/usr/bin/wash"],
     {
       PATH: "/usr/bin:/usr/local/bin",
       PWD: DEFAULT_WORK_DIR,
@@ -525,7 +525,7 @@ export async function init(
       TMPDIR: "/tmp",
       TERM: "xterm-256color",
       HOME: DEFAULT_WORK_DIR,
-      SHELL: "/usr/bin/shell",
+      SHELL: "/usr/bin/wash",
       LANG: "en_US.UTF-8",
       USER: "ant",
       HOSTNAME: "browser",

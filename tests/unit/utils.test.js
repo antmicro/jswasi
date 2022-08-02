@@ -1,9 +1,9 @@
 import * as utils from "../../dist/utils.js";
 
 test("parsePath on regular path", () => {
-  expect(utils.parsePath("/usr/bin/shell")).toStrictEqual({
+  expect(utils.parsePath("/usr/bin/wash")).toStrictEqual({
     parts: ["usr", "bin"],
-    name: "shell",
+    name: "wash",
   });
 });
 

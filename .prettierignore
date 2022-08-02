@@ -1,7 +1,7 @@
 .idea/
 .vs/
 
-shell/target
+wash/target
 
 node_modules
 

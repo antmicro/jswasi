@@ -15,7 +15,7 @@ const urlsToCache = [
 
   "hterm_all.js",
   "resources/motd.txt",
-  "resources/shell.wasm",
+  "resources/wash.wasm",
 
   "https://cdn.jsdelivr.net/npm/safari-14-idb-fix@3.0.0/+esm",
 ];
