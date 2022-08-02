@@ -32,7 +32,6 @@ const ALWAYS_FETCH_BINARIES = {
 const NECESSARY_BINARIES = {
   "/usr/bin/coreutils": "resources/coreutils.async.wasm",
   "/usr/bin/tree": "resources/tree.wasm",
-  "/usr/bin/purge": "resources/purge.wasm",
   "/usr/bin/nohup": "resources/nohup.wasm",
 };
 
