@@ -92,13 +92,7 @@ export type PathReadlinkArgs = {
   bufferLen: number;
 };
 
-export type PathRemoveDirectoryArgs = {
-  sharedBuffer: SharedArrayBuffer;
-  fd: number;
-  path: string;
-};
-
-export type PathUnlinkFileArgs = {
+export type PathRemoveEntryArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
   path: string;

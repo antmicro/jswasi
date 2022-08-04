@@ -539,7 +539,8 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
           return { err: constants.WASI_ENOTEMPTY };
         }
         await openEntry.close();
-      } else if (err != constants.WASI_EEXIST) {
+      }
+      if (targetEntry.err != constants.WASI_ENOENT) {
         // deleting file handles recursively is not enough as it only
         // deletes handles and leaves dangling fs entries in database
         await parent.handle.removeEntry(name, options);

@@ -17,9 +17,8 @@ import {
   PathLinkArgs,
   PathOpenArgs,
   PathReadlinkArgs,
-  PathRemoveDirectoryArgs,
+  PathRemoveEntryArgs,
   PathSymlinkArgs,
-  PathUnlinkFileArgs,
   SetEchoArgs,
   SetEnvArgs,
   SpawnArgs,
@@ -633,34 +632,20 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
-    case "path_unlink_file": {
-      const { sharedBuffer, fd, path } = data as PathUnlinkFileArgs;
-      const lck = new Int32Array(sharedBuffer, 0, 1);
-
-      let err;
-      const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        // TODO: should this be separate OpenDirectory.unlink() function?
-        ({ err } = await (fds.getFd(fd) as OpenDirectory).deleteEntry(path, {
-          recursive: false,
-        }));
-      } else {
-        err = constants.WASI_EBADF;
-      }
-
-      Atomics.store(lck, 0, err);
-      Atomics.notify(lck, 0);
-      break;
-    }
+    case "path_unlink_file":
     case "path_remove_directory": {
-      const { sharedBuffer, fd, path } = data as PathRemoveDirectoryArgs;
+      // path_unlink_file and path_remove_directory are handled the same way
+      const { sharedBuffer, fd, path } = data as PathRemoveEntryArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
         ({ err } = await (fds.getFd(fd) as OpenDirectory).deleteEntry(path, {
-          recursive: true,
+          // recursive flag is only meant for internal purposes
+          // from outside, path_remove_directory can only delete empty directory
+          // to remove non-empty directory, all files need to be removed from directory using different syscalls
+          recursive: false,
         }));
       } else {
         err = constants.WASI_EBADF;

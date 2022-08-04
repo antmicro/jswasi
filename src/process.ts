@@ -20,9 +20,8 @@ import {
   PathLinkArgs,
   PathOpenArgs,
   PathReadlinkArgs,
-  PathRemoveDirectoryArgs,
+  PathRemoveEntryArgs,
   PathSymlinkArgs,
-  PathUnlinkFileArgs,
   Redirect,
   SetEchoArgs,
   SetEnvArgs,
@@ -927,7 +926,7 @@ function WASI(): WASICallbacks {
 
     sendToKernel([
       "path_remove_directory",
-      { sharedBuffer, fd, path } as PathRemoveDirectoryArgs,
+      { sharedBuffer, fd, path } as PathRemoveEntryArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -985,7 +984,7 @@ function WASI(): WASICallbacks {
 
     sendToKernel([
       "path_unlink_file",
-      { sharedBuffer, fd, path } as PathUnlinkFileArgs,
+      { sharedBuffer, fd, path } as PathRemoveEntryArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
