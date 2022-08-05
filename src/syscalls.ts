@@ -497,19 +497,29 @@ export default async function syscallCallback(
       let entry;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(dirFd) !== undefined) {
-        ({ err, entry } = await (fds.getFd(dirFd) as OpenDirectory).getEntry(
-          path,
-          FileOrDir.Any,
-          lookupFlags,
-          openFlags
-        ));
-        if (err === constants.WASI_ESUCCESS) {
-          const e = await entry.open(
-            fsRightsBase & (fds.getFd(dirFd) as OpenDirectory).rightsInheriting,
-            fsRightsInheriting,
-            fdFlags
-          );
-          openedFd[0] = fds.addFile(e);
+        if (
+          !(
+            openFlags & constants.WASI_O_CREAT &&
+            openFlags & constants.WASI_O_DIRECTORY
+          )
+        ) {
+          ({ err, entry } = await (fds.getFd(dirFd) as OpenDirectory).getEntry(
+            path,
+            FileOrDir.Any,
+            lookupFlags,
+            openFlags
+          ));
+          if (err === constants.WASI_ESUCCESS) {
+            const e = await entry.open(
+              fsRightsBase &
+                (fds.getFd(dirFd) as OpenDirectory).rightsInheriting,
+              fsRightsInheriting,
+              fdFlags
+            );
+            openedFd[0] = fds.addFile(e);
+          }
+        } else {
+          err = constants.WASI_EINVAL;
         }
       } else {
         err = constants.WASI_EBADF;
