@@ -135,3 +135,8 @@ export type PathRenameArgs = {
   newFd: number;
   newPath: string;
 };
+
+export type FdTellArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+};

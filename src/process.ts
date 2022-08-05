@@ -12,6 +12,7 @@ import {
   FdReadArgs,
   FdReaddirArgs,
   FdSeekArgs,
+  FdTellArgs,
   FdWriteArgs,
   GetPidArgs,
   IsAttyArgs,
@@ -69,7 +70,7 @@ type WASICallbacks = {
   fd_allocate: any;
   fd_fdstat_set_flags: any;
   fd_fdstat_set_rights: any;
-  fd_tell: any;
+  fd_tell: (fd: number, pos: ptr) => number;
   fd_filestat_set_times: any;
   fd_pread: any;
   fd_advice: any;
@@ -1264,8 +1265,28 @@ function WASI(): WASICallbacks {
     return placeholder();
   }
 
-  function fd_tell() {
-    return placeholder();
+  function fd_tell(fd: number, pos: ptr) {
+    workerConsoleLog(`fd_tell(${fd}, 0x${pos.toString(16)})`);
+    const view = new DataView(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+    );
+
+    const sharedBuffer = new SharedArrayBuffer(8 + 4); // offset, lock
+    const offset = new BigInt64Array(sharedBuffer, 0, 1);
+    const lck = new Int32Array(sharedBuffer, 8, 1);
+    lck[0] = -1;
+
+    sendToKernel(["fd_tell", { sharedBuffer, fd } as FdTellArgs]);
+    Atomics.wait(lck, 0, -1);
+
+    const err = Atomics.load(lck, 0);
+    if (err === constants.WASI_ESUCCESS) {
+      view.setBigUint64(pos, offset[0], true);
+      workerConsoleLog(`fd_tell returned offset: ${offset[0]}`);
+    } else {
+      workerConsoleLog(`fd_tell returned error: ${err}`);
+    }
+    return err;
   }
 
   function path_filestat_set_times() {

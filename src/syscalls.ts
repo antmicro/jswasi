@@ -9,6 +9,7 @@ import {
   FdReadArgs,
   FdReaddirArgs,
   FdSeekArgs,
+  FdTellArgs,
   FdWriteArgs,
   GetPidArgs,
   IsAttyArgs,
@@ -827,6 +828,43 @@ export default async function syscallCallback(
         }
       } else {
         err = oldEntry.err;
+      }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "fd_tell": {
+      const { sharedBuffer, fd } = data as FdTellArgs;
+      const offset = new BigInt64Array(sharedBuffer, 0, 1);
+      const lck = new Int32Array(sharedBuffer, 8, 1);
+
+      const { fds } = processManager.processInfos[processId];
+      let err;
+      if (fds.getFd(fd) !== undefined) {
+        console.log((await fds.getFd(fd).stat()).fileType);
+        if ((fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_TELL) !== 0n) {
+          const ftype = (await fds.getFd(fd).stat()).fileType;
+          if (
+            ftype === constants.WASI_FILETYPE_REGULAR_FILE ||
+            ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK
+          ) {
+            offset[0] = BigInt(
+              (
+                await (fds.getFd(fd) as OpenFile).seek(
+                  0,
+                  constants.WASI_WHENCE_CUR
+                )
+              ).pos
+            );
+            err = constants.WASI_ESUCCESS;
+          } else {
+            err = constants.WASI_EBADF;
+          }
+        } else {
+          err = constants.WASI_EACCES;
+        }
+      } else {
+        err = constants.WASI_EBADF;
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
