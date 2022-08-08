@@ -16,6 +16,7 @@ fn main() -> Result<()>{
         ("args_get", args_get::test_args_get as fn() -> Result<()>),
         ("fd_close", fd_close::test_fd_close as fn() -> Result<()>),
         ("path_open", path_open::test_path_open as fn() -> Result<()>),
+        ("fd_seek", fd_seek::test_fd_seek as fn() -> Result<()>),
     ];
 
     let mut fails: u32 = 0;
