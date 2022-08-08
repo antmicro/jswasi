@@ -584,6 +584,7 @@ export default async function syscallCallback(
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name());
 
+          // TODO: check if these breaks can lead to null byte runtime errors
           if (dataBufPtr + 8 > bufLen) {
             dataBufPtr += 8;
             break;
@@ -613,7 +614,7 @@ export default async function syscallCallback(
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit
-          if (dataBufPtr + nameBuf.byteLength >= bufLen) {
+          if (dataBufPtr + nameBuf.byteLength > bufLen) {
             dataBufPtr += nameBuf.byteLength;
             break;
           }
