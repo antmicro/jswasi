@@ -164,7 +164,7 @@ export interface OpenFile extends Entry {
 
   copyEntry(oldFd: OpenDirectory, path: string): Promise<number>;
 
-  seek(offset: number, whence: number): Promise<number>;
+  seek(offset: number, whence: number): Promise<{ err: number; pos: number }>;
 
   truncate(size: number): Promise<void>;
 }

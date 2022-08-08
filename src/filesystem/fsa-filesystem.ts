@@ -941,29 +941,49 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     return constants.WASI_ESUCCESS;
   }
 
-  async seek(offset: number, whence: number): Promise<number> {
+  async seek(
+    offset: number,
+    whence: number
+  ): Promise<{ err: number; pos: number }> {
+    let err;
     switch (whence) {
       case constants.WASI_WHENCE_SET: {
-        this.filePosition = offset;
+        if (offset < 0) {
+          err = constants.WASI_EINVAL;
+        } else {
+          this.filePosition = offset;
+          err = constants.WASI_ESUCCESS;
+        }
         break;
       }
       case constants.WASI_WHENCE_CUR: {
-        this.filePosition += offset;
+        if (this.filePosition + offset < 0) {
+          err = constants.WASI_EINVAL;
+        } else {
+          this.filePosition += offset;
+          err = constants.WASI_ESUCCESS;
+        }
         break;
       }
       case constants.WASI_WHENCE_END: {
-        this.filePosition = Number((await this.metadata()).size) + offset;
+        const _offset = Number((await this.metadata()).size) + offset;
+        if (_offset < 0) {
+          err = constants.WASI_EINVAL;
+        } else {
+          this.filePosition = _offset;
+          err = constants.WASI_ESUCCESS;
+        }
         break;
       }
       default: {
-        throw Error("Unhandled whence case");
+        err = constants.WASI_EINVAL;
       }
     }
 
     await this.writer?.write({ type: "seek", position: this.filePosition });
     await this.flush();
 
-    return this.filePosition;
+    return { err, pos: this.filePosition };
   }
 
   async truncate(size: number = 0) {
