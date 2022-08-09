@@ -457,20 +457,20 @@ export default async function syscallCallback(
         ftype = (await fds.getFd(fd).stat()).fileType;
       }
       if (fds.getFd(fd) === undefined) {
-        Atomics.notify(lck, 0);
         Atomics.store(lck, 0, constants.WASI_EBADF);
+        Atomics.notify(lck, 0);
       } else if (
         (fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_READ) ==
         0n
       ) {
-        Atomics.notify(lck, 0);
         Atomics.store(lck, 0, constants.WASI_EACCES);
+        Atomics.notify(lck, 0);
       } else if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
-        Atomics.notify(lck, 0);
         Atomics.store(lck, 0, constants.WASI_EISDIR);
-      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
         Atomics.notify(lck, 0);
+      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
         Atomics.store(lck, 0, constants.WASI_EINVAL);
+        Atomics.notify(lck, 0);
       } else {
         await (fds.getFd(fd) as In).scheduleRead(processId, len, sharedBuffer);
       }
