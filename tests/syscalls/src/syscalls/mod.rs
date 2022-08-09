@@ -13,3 +13,4 @@ pub mod args_get;
 pub mod fd_close;
 pub mod path_open;
 pub mod fd_seek;
+pub mod fd_tell;
