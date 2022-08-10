@@ -192,7 +192,13 @@ function doExit(exitCode: number) {
   self.close();
 }
 
-function WASI(): WASICallbacks {
+const whenceMap: Record<number, number> = {
+  0: constants.WASI_WHENCE_CUR,
+  1: constants.WASI_WHENCE_END,
+  2: constants.WASI_WHENCE_SET,
+};
+
+function WASI(oldWhences: boolean = false): WASICallbacks {
   let moduleInstanceExports: WebAssembly.Exports;
 
   function setModuleInstance(instance: WebAssembly.Instance): void {
@@ -550,10 +556,11 @@ function WASI(): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
     const file_pos = new BigUint64Array(sharedBuffer, 8, 1);
+    const whence_ = oldWhences ? whenceMap[whence] : whence;
 
     sendToKernel([
       "fd_seek",
-      { sharedBuffer, fd, offset, whence } as FdSeekArgs,
+      { sharedBuffer, fd, offset, whence: whence_ } as FdSeekArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -1375,9 +1382,12 @@ function WASI(): WASICallbacks {
 
 async function importWasmModule(
   module: WebAssembly.Module,
-  wasiCallbacksConstructor: () => WASICallbacks
+  wasiCallbacksConstructor: (oldWhences: boolean) => WASICallbacks
 ) {
-  const wasiCallbacks = wasiCallbacksConstructor();
+  let imps = WebAssembly.Module.imports(module);
+  const wasiCallbacks = wasiCallbacksConstructor(
+    imps[0].module === "wasi_unstable"
+  );
   const moduleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,
