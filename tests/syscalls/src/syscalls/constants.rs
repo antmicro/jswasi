@@ -13,3 +13,6 @@ pub const SAMPLE_TEXT_LEN: usize = SAMPLE_TEXT.len();
 pub const PWD_DESC: wasi::Fd = 4;
 
 pub const ARGV: [&str; 3] = ["test\0", "wasi\0", "syscalls\0"];
+
+pub const SAMPLE_DIRENTRY_NAME: &str = "ent";
+pub const N_DIRENTRIES: u32 = 25;

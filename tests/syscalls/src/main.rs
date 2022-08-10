@@ -18,6 +18,7 @@ fn main() -> Result<()>{
         ("path_open", path_open::test_path_open as fn() -> Result<()>),
         ("fd_seek", fd_seek::test_fd_seek as fn() -> Result<()>),
         ("fd_tell", fd_tell::test_fd_tell as fn() -> Result<()>),
+        ("fd_readdir", fd_readdir::test_fd_readdir as fn() -> Result<()>),
     ];
 
     let mut fails: u32 = 0;
@@ -31,6 +32,15 @@ fn main() -> Result<()>{
         // teardown test environment
         wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_TEXT_FILENAME).unwrap();
         wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_LINK_FILENAME).unwrap();
+        let desc = match wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME,
+            0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+            Ok(d) => d,
+            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+        };
+        for name in fd_readdir::wasi_ls(desc, 256)? {
+            wasi::path_unlink_file(desc, &name).unwrap();
+        }
         wasi::path_remove_directory(constants::PWD_DESC, constants::SAMPLE_DIR_FILENAME).unwrap();
     }
     println!("[SUMMARY]: {} tests succeeded, {} tests failed",  tests.len() as u32 - fails, fails);

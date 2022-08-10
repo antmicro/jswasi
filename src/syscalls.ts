@@ -267,6 +267,14 @@ export default async function syscallCallback(
           );
           await text.close();
           openedPwdDir.addSymlink("link", "text");
+          for (let i = 0; i < 25; i++) {
+            await openedPwdDir.getEntry(
+              `dir/ent${i}`,
+              FileOrDir.File,
+              LookupFlags.SymlinkFollow,
+              OpenFlags.Create
+            );
+          }
           // no break so that test is spawned normally (default must be below this case)
         }
         default: {
