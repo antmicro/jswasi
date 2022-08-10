@@ -162,19 +162,24 @@ export default class ProcessManager {
 
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
-    if (!this.compiledModules[command]) {
-      const { err, entry } = await this.filesystem
-        .getRootDir()
-        .open()
-        .getEntry(command, FileOrDir.File);
-      if (err !== constants.WASI_ESUCCESS) {
-        console.error(`No such binary: ${command}`);
-        return err;
-      }
+    try {
+      if (!this.compiledModules[command]) {
+        const { err, entry } = await this.filesystem
+          .getRootDir()
+          .open()
+          .getEntry(command, FileOrDir.File);
+        if (err !== constants.WASI_ESUCCESS) {
+          console.error(`No such binary: ${command}`);
+          return err;
+        }
 
-      this.compiledModules[command] = await WebAssembly.compile(
-        await (await entry.open()).arrayBuffer()
-      );
+        this.compiledModules[command] = await WebAssembly.compile(
+          await (await entry.open()).arrayBuffer()
+        );
+      }
+    } catch (_) {
+      this.terminateProcess(id, constants.WASI_ENOEXEC);
+      throw Error("invalid binary");
     }
 
     // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)

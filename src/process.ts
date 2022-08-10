@@ -759,6 +759,10 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
         const err = Atomics.load(lck, 0);
         if (err !== constants.WASI_ESUCCESS) {
           workerConsoleLog(`error: spawned process returned ${err}`);
+          if (err === constants.WASI_ENOEXEC) {
+            // If the program can't be executed, return additional output message
+            return `${constants.EXIT_FAILURE}\x1bcannot execute binary file: Exec format error`;
+          }
           return `${constants.EXIT_FAILURE}\x1b`;
         }
         return `${constants.EXIT_SUCCESS}\x1b`;
@@ -1385,9 +1389,14 @@ async function importWasmModule(
   wasiCallbacksConstructor: (oldWhences: boolean) => WASICallbacks
 ) {
   let imps = WebAssembly.Module.imports(module);
-  const wasiCallbacks = wasiCallbacksConstructor(
-    imps[0].module === "wasi_unstable"
-  );
+  let wasiCallbacks;
+  if (imps[0].module === "wasi_unstable") {
+    wasiCallbacks = wasiCallbacksConstructor(true);
+  } else if (imps[0].module === "wasi_snapshot_preview1") {
+    wasiCallbacks = wasiCallbacksConstructor(false);
+  } else {
+    throw Error("Unsupported wasm format");
+  }
   const moduleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,

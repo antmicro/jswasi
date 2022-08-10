@@ -279,26 +279,31 @@ export default async function syscallCallback(
           // no break so that test is spawned normally (default must be below this case)
         }
         default: {
-          const id = await processManager.spawnProcess(
-            processId,
-            background ? null : parentLck,
-            syscallCallback,
-            path,
-            fds,
-            args,
-            env,
-            background,
-            workingDir
-          );
-          const newProcessName = path.split("/").slice(-1)[0];
-          if (env["DEBUG"] === "1") {
-            console.log(
-              `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
-              "background:black; color: white;",
-              "background:black; color:yellow;",
-              "background: black; color:white;",
-              "background:default; color: default;"
+          try {
+            const id = await processManager.spawnProcess(
+              processId,
+              background ? null : parentLck,
+              syscallCallback,
+              path,
+              fds,
+              args,
+              env,
+              background,
+              workingDir
             );
+            const newProcessName = path.split("/").slice(-1)[0];
+            if (env["DEBUG"] === "1") {
+              console.log(
+                `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
+                "background:black; color: white;",
+                "background:black; color:yellow;",
+                "background: black; color:white;",
+                "background:default; color: default;"
+              );
+            }
+          } catch (_) {
+            console.log("Failed spawning process");
+            break;
           }
           if (background) {
             Atomics.store(parentLck, 0, 0);
