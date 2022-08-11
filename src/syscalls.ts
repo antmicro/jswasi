@@ -303,7 +303,6 @@ export default async function syscallCallback(
             }
           } catch (_) {
             console.log("Failed spawning process");
-            break;
           }
           if (background) {
             Atomics.store(parentLck, 0, 0);

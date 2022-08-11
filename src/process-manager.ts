@@ -177,8 +177,17 @@ export default class ProcessManager {
           await (await entry.open()).arrayBuffer()
         );
       }
-    } catch (_) {
-      this.terminateProcess(id, constants.WASI_ENOEXEC);
+    } catch (e) {
+      let errno;
+      if (
+        (e as Error).message ===
+        "WebAssembly.compile(): BufferSource argument is empty"
+      ) {
+        errno = constants.WASI_ESUCCESS;
+      } else {
+        errno = constants.WASI_ENOEXEC;
+      }
+      this.terminateProcess(id, errno);
       throw Error("invalid binary");
     }
 
