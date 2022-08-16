@@ -132,6 +132,7 @@ type WASICallbacks = {
   ) => number;
   path_unlink_file: (fd: number, pathPtr: ptr, pathLen: number) => number;
 
+  sock_accept: any;
   sock_recv: any;
   sock_send: any;
   sock_shutdown: any;
@@ -1308,6 +1309,10 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
     return placeholder();
   }
 
+  function sock_accept() {
+    return placeholder();
+  }
+
   function sock_recv() {
     return placeholder();
   }
@@ -1378,6 +1383,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
     fd_renumber,
     path_filestat_set_times,
     proc_raise,
+    sock_accept,
     sock_recv,
     sock_send,
     sock_shutdown,
