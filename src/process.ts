@@ -856,13 +856,54 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
         return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
       }
       case "hterm": {
-        const sharedBuffer = new SharedArrayBuffer(4);
-        const lck = new Int32Array(sharedBuffer, 0, 1);
-        const [attrib, val] = args;
-        lck[0] = -1;
-        sendToKernel(["hterm", { sharedBuffer, attrib, val } as HtermConfArgs]);
-        Atomics.wait(lck, 0, -1);
-        return `${constants.EXIT_SUCCESS}\x1b`;
+        const [method, attrib, val] = args;
+        if (method === "get") {
+          var bufferSize = 64;
+          while (true) {
+            const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufferSize);
+            const lck = new Int32Array(sharedBuffer, 0, 1);
+            const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
+            const buffer = new Int8Array(sharedBuffer, 8, bufferSize);
+
+            lck[0] = -1;
+            bufferUsed[0] = bufferSize;
+
+            sendToKernel([
+              "hterm",
+              { sharedBuffer, method, attrib, val } as HtermConfArgs,
+            ]);
+            Atomics.wait(lck, 0, -1);
+
+            // In case buffer size was not enought resize buffer and call syscall again
+            if (bufferUsed[0] <= bufferSize) {
+              const value = new TextDecoder().decode(
+                buffer.slice(0, bufferUsed[0])
+              );
+
+              return `${constants.EXIT_SUCCESS}\x1b${value}`;
+            }
+
+            while (bufferSize < bufferUsed[0]) {
+              bufferSize *= 2;
+            }
+          }
+        } else if (method === "set") {
+          const sharedBuffer = new SharedArrayBuffer(4);
+          const lck = new Int32Array(sharedBuffer, 0, 1);
+
+          lck[0] = -1;
+
+          sendToKernel([
+            "hterm",
+            { sharedBuffer, method, attrib, val } as HtermConfArgs,
+          ]);
+          Atomics.wait(lck, 0, -1);
+
+          return `${constants.EXIT_SUCCESS}\x1b`;
+        } else {
+          workerConsoleLog(`Special command ${command} has wrong method name.`);
+          throw Error(`Special command ${command} has wrong method name.`);
+        }
       }
       default: {
         workerConsoleLog(`Special command ${command} not found.`);

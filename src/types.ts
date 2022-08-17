@@ -124,6 +124,7 @@ export type PathLinkArgs = {
 
 export type HtermConfArgs = {
   sharedBuffer: SharedArrayBuffer;
+  method: string;
   attrib: string;
   val: string;
 };

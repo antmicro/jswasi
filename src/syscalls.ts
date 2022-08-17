@@ -95,9 +95,36 @@ export default async function syscallCallback(
       break;
     }
     case "hterm": {
-      const { sharedBuffer, attrib, val } = data as HtermConfArgs;
+      const { sharedBuffer, method, attrib, val } = data as HtermConfArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
-      terminal.prefs_.set(attrib, val);
+      if (method === "get") {
+        const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
+        const buffer = new Int8Array(sharedBuffer, 8, bufferUsed[0]);
+        const fields = attrib.split(".");
+
+        let data;
+        if (fields[0] === "prefs_") {
+          data = terminal.prefs_.get(fields[1]);
+        } else {
+          var param = terminal;
+          for (var field of fields) {
+            param = param[field];
+          }
+          data = param;
+        }
+
+        const value = String(data);
+        if (value.length <= bufferUsed[0]) {
+          buffer.set(new TextEncoder().encode(value), 0);
+        }
+
+        bufferUsed[0] = value.length;
+      } else if (method === "set") {
+        terminal.prefs_.set(attrib, val);
+      } else {
+        throw new Error(`Syscall ${action}: enhandled method`);
+      }
+
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
