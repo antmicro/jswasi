@@ -30,6 +30,7 @@ const ALWAYS_FETCH_BINARIES = {
   "/usr/bin/wash": "resources/wash.wasm",
   "/usr/bin/init": "resources/init.sh",
   "/usr/bin/coreutils": "resources/coreutils.async.wasm",
+
 };
 
 export async function fetchFile(
