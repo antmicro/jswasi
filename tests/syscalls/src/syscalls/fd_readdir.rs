@@ -3,7 +3,11 @@ use std::convert::TryInto;
 use std::collections::HashSet;
 use super::constants;
 
-pub unsafe fn wasi_ls(desc: wasi::Fd, buf_len: usize) -> std::io::Result<Vec<String>> {
+pub unsafe fn wasi_ls(
+    desc: wasi::Fd,
+    buf_len: usize,
+    read_all: bool
+) -> std::io::Result<Vec<String>> {
     let mut filenames: Vec<String> = Vec::new();
     let mut buf: Vec<u8> = Vec::with_capacity(buf_len);
     buf.set_len(buf_len);
@@ -11,7 +15,10 @@ pub unsafe fn wasi_ls(desc: wasi::Fd, buf_len: usize) -> std::io::Result<Vec<Str
     loop {
         let n_read = match wasi::fd_readdir(desc, buf.as_mut_ptr(), buf_len, cookie) {
             Ok(r) => r,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(Error::new(ErrorKind::Other, format!(
+                "In fd_readdir({}, {:?}, {}, {}): {:?}",
+                desc, buf.as_mut_ptr(), buf_len, cookie, e)))
+            }
         };
         let mut offset = 0;
         'inner: loop {
@@ -39,11 +46,34 @@ pub unsafe fn wasi_ls(desc: wasi::Fd, buf_len: usize) -> std::io::Result<Vec<Str
             cookie = cookie_tmp;
             filenames.push(String::from(filename));
         }
-        if n_read != buf_len {
+        if n_read != buf_len || !read_all {
             break;
         }
     }
     Ok(filenames)
+}
+
+unsafe fn expect_matching_entries(
+    desc: wasi::Fd,
+    buffer_size: usize,
+    read_all: bool,
+    expected: &HashSet<String>
+) -> std::io::Result<()> {
+    match wasi_ls(desc, buffer_size, read_all){
+        Err(e) => {
+            return Err(Error::new(ErrorKind::Other, e));
+        },
+        Ok(entries) => {
+            let entry_set = entries.into_iter().collect::<HashSet<String>>();
+            if &entry_set == expected {
+                Ok(())
+            } else {
+                Err(Error::new(
+                    ErrorKind::Other, format!("Unexpected directory contents (expected {:#?}, got {:#?})",
+                    expected, entry_set)))
+            }
+        }
+    }
 }
 
 pub fn test_fd_readdir() -> std::io::Result<()> {
@@ -57,11 +87,13 @@ pub fn test_fd_readdir() -> std::io::Result<()> {
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
         };
-        let ls = wasi_ls(desc, 256)?;
-        if ls.iter().collect::<HashSet<&String>>() == direntries.iter().collect() {
-            Ok(())
-        } else {
-            Err(Error::new(ErrorKind::Other, "Wrong directory entries"))
-        }
+        // check if test directory contents match for different buffer sizes
+        expect_matching_entries(desc, 128, true, &direntries)?;
+        expect_matching_entries(desc, 256, true, &direntries)?;
+        expect_matching_entries(desc, 512, true, &direntries)?;
+
+        // look for errors when buffer overflows
+        expect_matching_entries(desc, 512, true, &direntries)?;
     }
+    Ok(())
 }

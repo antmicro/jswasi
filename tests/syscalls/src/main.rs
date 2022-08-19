@@ -38,7 +38,7 @@ fn main() -> Result<()>{
             Ok(d) => d,
             Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
         };
-        for name in fd_readdir::wasi_ls(desc, 256)? {
+        for name in fd_readdir::wasi_ls(desc, 256, true)? {
             wasi::path_unlink_file(desc, &name).unwrap();
         }
         wasi::path_remove_directory(constants::PWD_DESC, constants::SAMPLE_DIR_FILENAME).unwrap();
