@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
 unsafe fn expect_error(
@@ -6,21 +5,16 @@ unsafe fn expect_error(
     iovs: wasi::IovecArray,
     errno: wasi::Errno,
     msg: &str
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     match wasi::fd_read(desc, iovs) {
         Ok(_) => {
-            Err(Error::new(ErrorKind::Other,
-                format!("In fd_read({}): {}",desc, msg)
-            ))
+            Err(format!("In fd_read({}): {}",desc, msg))
         },
         Err(e) => {
             if e != errno {
-                Err(Error::new(ErrorKind::Other,
-                    format!(
-                        "In fd_read({}): wrong error code (expected {}, got {})",
-                        desc, errno.raw(), e.raw()
-                    )
-                ))
+                Err(format!(
+                    "In fd_read({}): wrong error code (expected {}, got {})",
+                    desc, errno.raw(), e.raw()))
             } else {
                 Ok(())
             }
@@ -34,32 +28,28 @@ unsafe fn check_read(
     bufs: &[&[u8]],
     expected: &[&[u8]],
     length: usize
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     match wasi::fd_read(desc, iovs) {
         Ok(len) => {
             if len == length {
                 if bufs.iter().zip(expected).any(|(got, exp)| got != exp) {
-                    Err(Error::new(
-                        ErrorKind::Other,
-                        format!(
-                            "In fd_read({}): invalid read value (expected {:?}, got {:?})",
-                            desc, expected, bufs)))
+                    Err(format!(
+                        "In fd_read({}): invalid read value (expected {:?}, got {:?})",
+                        desc, expected, bufs))
                 } else {
                     Ok(())
                 }
             } else {
-                Err(Error::new(ErrorKind::Other,
-                    format!(
-                        "In fd_read({}): invalid read length (expected {}, got {})",
-                        desc, length, len)
-                ))
+                Err(format!(
+                    "In fd_read({}): invalid read length (expected {}, got {})",
+                    desc, length, len))
             }
         },
-        Err(e) => { Err(Error::new(ErrorKind::Other, e)) }
+        Err(e) => { Err(format!("In fd_read({}): {}", desc, e)) }
     }
 }
 
-pub fn test_fd_read() -> std::io::Result<()> {
+pub fn test_fd_read() -> Result<(), String> {
     unsafe {
         let dirflags = 0; // don't follow symlinks
         let oflags = 0;
@@ -69,7 +59,7 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME,
             oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
 
         let len1: usize = constants::SAMPLE_TEXT_LEN / 2;
@@ -88,7 +78,7 @@ pub fn test_fd_read() -> std::io::Result<()> {
             &[&constants::SAMPLE_TEXT[0..len1], &constants::SAMPLE_TEXT[len1..]],
             constants::SAMPLE_TEXT_LEN);
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -103,12 +93,12 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME,
             oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         // empty expected buffer arrays mean that we don't check if buffers are correct
         let result = check_read(desc, iovs, &[], &[], constants::SAMPLE_TEXT_LEN);
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -117,13 +107,13 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, dirflags, constants::SAMPLE_TEXT_FILENAME, oflags,
             constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_READ, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_error(
             desc, iovs, wasi::ERRNO_ACCES,
             "attempt to read without read permission succeeded");
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -137,13 +127,13 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, dirflags, constants::SAMPLE_DIR_FILENAME,
             wasi::OFLAGS_DIRECTORY, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_error(
             desc, iovs, wasi::ERRNO_ISDIR,
             "attempt to read from directory succeeded");
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -152,13 +142,13 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, dirflags, constants::SAMPLE_LINK_FILENAME,
             oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_error(
             desc, iovs, wasi::ERRNO_INVAL,
             "attempt to read from unexpanded symlink succeeded");
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -167,13 +157,13 @@ pub fn test_fd_read() -> std::io::Result<()> {
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, constants::SAMPLE_LINK_FILENAME,
             oflags, constants::RIGHTS_ALL, constants::RIGHTS_ALL, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = check_read(
             desc, iovs, &[&buf_padding[..constants::SAMPLE_TEXT_LEN]],
             &[&constants::SAMPLE_TEXT], constants::SAMPLE_TEXT_LEN);
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 

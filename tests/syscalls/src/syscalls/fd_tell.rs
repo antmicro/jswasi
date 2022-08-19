@@ -1,49 +1,44 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
-unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Filesize, close: bool) -> std::io::Result<()> {
+unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Filesize, close: bool) -> Result<(), String> {
     // close - close the descriptor in case the test fails
     match wasi::fd_tell(desc) {
         Ok(n) => {
             if n != expected {
                 if close { if let Err(e) = wasi::fd_close(desc) {
-                    return Err(Error::new(ErrorKind::Other, e));
+                    return Err(e.to_string());
                 }}
-                Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_tell({}): invalid file position (expected {}, got {})",
-                        desc, expected, n)))
+                Err(format!(
+                    "In fd_tell({}): invalid file position (expected {}, got {})",
+                    desc, expected, n))
             } else {
                 Ok(())
             }
         }
         Err(e) => {
             if close { if let Err(e) = wasi::fd_close(desc) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }}
-            Err(Error::new(ErrorKind::Other, format!("In fd_tell({}): {:?}", desc, e)))
+            Err(format!("In fd_tell({}): {:?}", desc, e))
         }
     }
 }
 
-unsafe fn expect_error(desc: wasi::Fd, errno: wasi::Errno, msg: &str, close: bool) -> std::io::Result<()> {
+unsafe fn expect_error(desc: wasi::Fd, errno: wasi::Errno, msg: &str, close: bool) -> Result<(), String> {
     // close - close the descriptor in case the test fails
     match wasi::fd_tell(desc) {
         Ok(_) => {
             if close { if let Err(e) = wasi::fd_close(desc) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }}
-            Err(Error::new(ErrorKind::Other, format!("In fd_tell({}): {}", desc, msg)))
+            Err(format!("In fd_tell({}): {}", desc, msg))
         },
         Err(e) => {
             if e != errno {
                 if close { if let Err(e) = wasi::fd_close(desc) {
-                    return Err(Error::new(ErrorKind::Other, e));
+                    return Err(e.to_string());
                 }}
-                Err(Error::new(
-                    ErrorKind::Other,
-                    format!("In fd_tell({}): wrong error code (expected {} got {})", desc, errno.raw(), e.raw())))
+                Err(format!("In fd_tell({}): wrong error code (expected {} got {})", desc, errno.raw(), e.raw()))
             } else {
                 Ok(())
             }
@@ -51,7 +46,7 @@ unsafe fn expect_error(desc: wasi::Fd, errno: wasi::Errno, msg: &str, close: boo
     }
 }
 
-pub fn test_fd_tell() -> std::io::Result<()> {
+pub fn test_fd_tell() -> Result<(), String> {
     unsafe {
         // attempt to fd_tell a directory should fail
         expect_error(constants::PWD_DESC, wasi::ERRNO_BADF, "attempt to fd_tell a directory succeeded", false)?;
@@ -66,20 +61,20 @@ pub fn test_fd_tell() -> std::io::Result<()> {
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, constants::SAMPLE_TEXT_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0){
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, format!("In path open() {}", e))); }
+            Err(e) => { return Err(e.to_string()); }
         };
         expect_success(desc, 0, true)?;
 
         // fd_tell should point a different position after reading
         let chr: *mut u8 = &mut 0;
         if let Err(e) = wasi::fd_read(desc, &[wasi::Iovec { buf: chr, buf_len: 1 }]) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         expect_success(desc, 1, true)?;
 
         //fd_tell should not work on invalid descriptor
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         expect_error(desc, wasi::ERRNO_BADF, "attemt to fd_tell an invalid descriptor succeeded", false)?;
 
@@ -89,11 +84,11 @@ pub fn test_fd_tell() -> std::io::Result<()> {
             0, constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_TELL,
             constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_TELL, 0){
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         expect_error(desc, wasi::ERRNO_ACCES, "attempt to fd_tell without permission succeeded", true)?;
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
 
         // attempt to fd_tell unexpanded symlink should succeed
@@ -101,11 +96,11 @@ pub fn test_fd_tell() -> std::io::Result<()> {
             constants::PWD_DESC, 0, constants::SAMPLE_LINK_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0){
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, format!("In path open() {}", e))); }
+            Err(e) => { return Err(e.to_string()); }
         };
         expect_success(desc, 0, true)?;
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
     }
     Ok(())

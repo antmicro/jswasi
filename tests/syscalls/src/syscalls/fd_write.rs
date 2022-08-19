@@ -1,64 +1,52 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
 const TEMP_FILENAME: &str = "write_file";
 const TEMP_SYMLINK: &str = "write_symlink";
 
-unsafe fn expect_success(desc: wasi::Fd, iovs: wasi::CiovecArray) -> std::io::Result<()> {
+unsafe fn expect_success(desc: wasi::Fd, iovs: wasi::CiovecArray) -> Result<(), String> {
     let mut expected_len = 0;
     // maybe we souldn't calculate it each call
     for i in iovs { expected_len += i.buf_len; }
     match wasi::fd_write(desc, iovs) {
         Ok(n) => {
             if n != expected_len {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_write({}): invalid write length (expected {}, got {})",
-                        desc, expected_len, n
-                    )
-                ));
+                return Err(format!(
+                    "In fd_write({}): invalid write length (expected {}, got {})",
+                    desc, expected_len, n));
             }
         }
-        Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        Err(e) => { return Err(e.to_string()); }
     }
     Ok(())
 }
 
-unsafe fn expect_error(desc: wasi::Fd, buf: &[u8], errno: wasi::Errno, msg: &str) -> std::io::Result<()> {
+unsafe fn expect_error(desc: wasi::Fd, buf: &[u8], errno: wasi::Errno, msg: &str) -> Result<(), String> {
     let iovs: wasi::CiovecArray = &[
         wasi::Ciovec { buf: buf.as_ptr(), buf_len: buf.len() }
     ];
     match wasi::fd_write(desc, iovs) {
         Ok(_) => {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "In fd_write({}): {}",
-                    desc, msg
-                )
-            ));
+            Err(format!(
+                "In fd_write({}): {}",
+                desc, msg))
         }
         Err(e) => {
             if e != errno {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_write({}): wrong error code (expected {}, got {})",
-                        desc, errno.raw(), e.raw()
-                    )
-                ));
+                Err(format!(
+                    "In fd_write({}): wrong error code (expected {}, got {})",
+                    desc, errno.raw(), e.raw()))
+            } else {
+                Ok(())
             }
         },
     }
-    Ok(())
 }
 
 unsafe fn verify_fd_read(
     desc: wasi::Fd,
     buf_expected: &[u8],
     len_expected: usize
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     // +1 - padding to check if fd_read reads more than it should
     let mut buf_read: Vec<u8> = vec![0; len_expected+1];
     let iovs: wasi::IovecArray = &[
@@ -67,36 +55,29 @@ unsafe fn verify_fd_read(
     match wasi::fd_read(desc, iovs) {
         Ok(n) => {
             if n != len_expected {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_read({}): invalid read length (expected {}, got {})",
-                        desc, len_expected, n
-                    )
-                ));
+                Err(format!(
+                    "In fd_read({}): invalid read length (expected {}, got {})",
+                    desc, len_expected, n))
             } else if &buf_read[..len_expected] != buf_expected {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_read({}): invalid read value (expected {:?}, got {:?})",
-                        desc, buf_expected, &buf_read[..len_expected]
-                    )
-                ));
+                Err(format!(
+                    "In fd_read({}): invalid read value (expected {:?}, got {:?})",
+                    desc, buf_expected, &buf_read[..len_expected]))
+            } else {
+                Ok(())
             }
         }
-        Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+        Err(e) => { Err(format!("In fd_read({}): {:?}", desc, e)) }
     }
-    Ok(())
 }
 
-pub fn test_fd_write() -> std::io::Result<()> {
+pub fn test_fd_write() -> Result<(), String> {
     unsafe {
         // attempt to write without write permission should fail
         let desc = match wasi::path_open(
             constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME, 0,
             constants::RIGHTS_ALL ^ wasi::RIGHTS_FD_WRITE, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); },
+            Err(e) => { return Err(e.to_string()); },
         };
 
         let buf = "something".as_bytes();
@@ -105,7 +86,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
             desc, buf, wasi::ERRNO_ACCES,
             "attempt to write without write permission succeeded");
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -119,15 +100,15 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, TEMP_FILENAME, wasi::OFLAGS_CREAT,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, &[wasi::Ciovec{ buf: buf.as_ptr(), buf_len: buf.len() }]);
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -137,22 +118,22 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, TEMP_FILENAME, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = verify_fd_read(desc, buf, buf.len());
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
 
         let buf = "symlink write".as_bytes();
         if let Err(e) = wasi::path_symlink(TEMP_FILENAME, 4, TEMP_SYMLINK) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
 
         // writing to unexpanded symlink should not succeed
@@ -160,20 +141,20 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, TEMP_SYMLINK, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_error(
             desc, buf, wasi::ERRNO_INVAL,
             "attempt to write to unexpanded symlink succeeded");
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -183,18 +164,18 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_SYMLINK,
             wasi::OFLAGS_TRUNC, constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, &[wasi::Ciovec{ buf: buf.as_ptr(), buf_len: buf.len() }]);
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -204,18 +185,18 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, TEMP_FILENAME, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = verify_fd_read(desc, buf, buf.len());
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -225,18 +206,18 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME, wasi::OFLAGS_DIRECTORY,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_error(desc, buf, wasi::ERRNO_ISDIR, "attempt to write to directory succeeded");
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -245,10 +226,10 @@ pub fn test_fd_write() -> std::io::Result<()> {
         // attempt to write to stdin should fail
         if let Err(e) = expect_error(0, buf, wasi::ERRNO_ACCES, "attempt to write to stdin succeeded") {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -258,7 +239,7 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, TEMP_FILENAME,
             wasi::OFLAGS_TRUNC, constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let buf = "two buffers".as_bytes();
         let len1 = buf.len() / 2;
@@ -269,14 +250,14 @@ pub fn test_fd_write() -> std::io::Result<()> {
                 wasi::Ciovec{ buf: buf[len1..].as_ptr(), buf_len: len2 }
             ]);
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
@@ -286,27 +267,27 @@ pub fn test_fd_write() -> std::io::Result<()> {
             constants::PWD_DESC, 0, TEMP_FILENAME, 0,
             constants::RIGHTS_ALL, 0, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = verify_fd_read(desc, buf, buf.len());
         if let Err(e) = wasi::fd_close(desc) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = result {
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-                return Err(Error::new(ErrorKind::Other, e));
+                return Err(e.to_string());
             }
             return Err(e);
         }
 
         if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_FILENAME) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         if let Err(e) = wasi::path_unlink_file(constants::PWD_DESC, TEMP_SYMLINK) {
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
     }
     Ok(())

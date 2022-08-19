@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
 const DUMMY_FILE: &str = "dummy_file";
@@ -19,18 +18,16 @@ unsafe fn expect_success(
     rights_inheriting: wasi::Rights,
     fdflags: wasi::Fdflags,
     msg: &str
-) -> std::io::Result<wasi::Fd> {
+) -> Result<wasi::Fd, String> {
     match wasi::path_open(
         desc, dirflags, path,
         open_flags, rights_base, rights_inheriting, fdflags
     ) {
         Ok(desc) => Ok(desc),
         Err(e) => {
-            Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "In path_open({}, {}, {}, {}, {}, {}, {}): {} ({})",
-                    desc, dirflags, path, open_flags, rights_base, rights_inheriting, fdflags, msg, e)))
+            Err(format!(
+                "In path_open({}, {}, {}, {}, {}, {}, {}): {} ({})",
+                desc, dirflags, path, open_flags, rights_base, rights_inheriting, fdflags, msg, e))
         }
     }
 }
@@ -45,7 +42,7 @@ unsafe fn expect_error(
     fdflags: wasi::Fdflags,
     errno: wasi::Errno,
     msg: &str
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     match wasi::path_open(
         desc, dirflags, path,
         open_flags, rights_base, rights_inheriting, fdflags
@@ -53,52 +50,51 @@ unsafe fn expect_error(
         Ok(desc) => {
             if let Err(_) = wasi::path_unlink_file(desc, path) {}
             if let Err(e) = wasi::fd_close(desc) {
-                Err(Error::new(ErrorKind::Other, e))
+                Err(e.to_string())
             } else {
-                Err(Error::new(ErrorKind::Other, format!("In path_open({}, {}, {}, {}, {}, {}, {}): {}",
-                    desc, dirflags, path, open_flags, rights_base, rights_inheriting, fdflags, msg)))
+                Err(format!("In path_open({}, {}, {}, {}, {}, {}, {}): {}",
+                    desc, dirflags, path, open_flags, rights_base, rights_inheriting, fdflags, msg))
             }
         },
         Err(e) => {
             if e != errno {
-                Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In path_open({}, {}, {}, {}, {}, {}, {}): unexpected error code (expected {}, got {})",
-                        desc, dirflags, path, open_flags, rights_base, rights_inheriting, fdflags, errno.raw(), e.raw())))
+                Err(format!(
+                    "In path_open({}, {}, {}, {}, {}, {}, {}): unexpected error code (expected {}, got {})",
+                    desc, dirflags, path, open_flags, rights_base,
+                    rights_inheriting, fdflags, errno.raw(), e.raw()))
             } else { Ok(()) }
         }
     }
 }
-pub fn test_path_open() -> std::io::Result<()> {
+pub fn test_path_open() -> Result<(), String> {
     unsafe {
         // attempt to open a directory should succeed
         let desc = expect_success(
             constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME,
             wasi::OFLAGS_DIRECTORY, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0,
             "Attempt to open a regular directory failed")?;
-        if let Err(e) = wasi::fd_close(desc) { return Err(Error::new(ErrorKind::Other, e)); }
+        if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
 
         // attempt to open a regular file should succeed
         let desc = expect_success(
             constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0,
             "Attempt to open a regular file failed")?;
-        if let Err(e) = wasi::fd_close(desc) { return Err(Error::new(ErrorKind::Other, e)); }
+        if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
 
         // attempt to open and expand symlink should succeed
         let desc = expect_success(
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, constants::SAMPLE_LINK_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0,
             "Attempt to open and expand symlink failed")?;
-        if let Err(e) = wasi::fd_close(desc) { return Err(Error::new(ErrorKind::Other, e)); }
+        if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
 
         // attempt to open symlink should succeed
         let desc = expect_success(
             constants::PWD_DESC, 0, constants::SAMPLE_LINK_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0,
             "Attempt to open a symlink failed")?;
-        if let Err(e) = wasi::fd_close(desc) { return Err(Error::new(ErrorKind::Other, e)); }
+        if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
 
         // attempt to open nonexistent file without CREAT flag should fail
         expect_error(
@@ -129,7 +125,7 @@ pub fn test_path_open() -> std::io::Result<()> {
                 return Err(e);
             }
         };
-        if let Err(e) = wasi::fd_close(desc) { return Err(Error::new(ErrorKind::Other, e)); }
+        if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
 
         // attempt to create a directory using CREAT and DIRECTORY flags should fail
         if let Err(e) = expect_error(

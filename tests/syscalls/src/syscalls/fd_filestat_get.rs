@@ -1,26 +1,22 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
-unsafe fn expect_success(desc: wasi::Fd, filetype_e: wasi::Filetype, size_e: u64) -> std::io::Result<()> {
+unsafe fn expect_success(desc: wasi::Fd, filetype_e: wasi::Filetype, size_e: u64) -> Result<(), String> {
     match wasi::fd_filestat_get(desc) {
         Ok(filestat) => {
             if filestat.filetype != filetype_e || filestat.size != size_e {
-                Err(Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "In fd_filestat_get({}): ivalid syscall output (expected {{filetype: {}, size: {}}} \
-                        got {{filetype: {}, size: {}}})", desc, filetype_e.raw(), size_e,
-                        filestat.filetype.raw(), filestat.size)))
-
+                Err(format!(
+                    "In fd_filestat_get({}): ivalid syscall output (expected {{filetype: {}, size: {}}} \
+                    got {{filetype: {}, size: {}}})", desc, filetype_e.raw(), size_e,
+                    filestat.filetype.raw(), filestat.size))
             } else {
                 Ok(())
             }
         }
-        Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+        Err(e) => { Err(format!("In fd_filestat_get({}): {:?}", desc, e)) }
     }
 }
 
-pub fn test_fd_filestat_get() -> std::io::Result<()> {
+pub fn test_fd_filestat_get() -> Result<(), String> {
     /* filestat struct in fact has more fields than we test here
      * all fields: (dev, ino, filetype, nlink, size, atim, mtim, ctim)
      * we only test filetype and size
@@ -40,11 +36,11 @@ pub fn test_fd_filestat_get() -> std::io::Result<()> {
             constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, constants::SAMPLE_TEXT_LEN as u64);
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -53,11 +49,11 @@ pub fn test_fd_filestat_get() -> std::io::Result<()> {
             constants::PWD_DESC, 0, constants::SAMPLE_LINK_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_success(desc, wasi::FILETYPE_SYMBOLIC_LINK, 4);
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -66,11 +62,11 @@ pub fn test_fd_filestat_get() -> std::io::Result<()> {
             constants::PWD_DESC, wasi::LOOKUPFLAGS_SYMLINK_FOLLOW, constants::SAMPLE_LINK_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)) }
+            Err(e) => { return Err(e.to_string()) }
         };
         let result = expect_success(desc, wasi::FILETYPE_REGULAR_FILE, constants::SAMPLE_TEXT_LEN as u64);
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
     }

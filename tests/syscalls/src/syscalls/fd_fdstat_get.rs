@@ -1,30 +1,29 @@
-use std::io::{Error, ErrorKind};
 use super::constants;
 
-unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Fdstat) -> std::io::Result<()>{
+unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Fdstat) -> Result<(), String>{
     match wasi::fd_fdstat_get(desc) {
         Ok(fdstat) => {
             if expected.fs_filetype != fdstat.fs_filetype || expected.fs_flags != fdstat.fs_flags
                 || expected.fs_rights_base != fdstat.fs_rights_base || expected.fs_rights_inheriting != fdstat.fs_rights_inheriting {
-                Err(Error::new(ErrorKind::Other, format!(
+                Err(format!(
                     "In fd_fdstat_get({:?}): invalid syscall output (\
                     expected {{fs_filetype: {:?}, fs_flags: {:?}, fs_rights_base: {:?}, fs_rights_inheriting: {:?}}}, \
                     got {{fs_filetype: {:?}, fs_flags: {:?}, fs_rights_base: {:?}, fs_rights_inheriting: {:?}}})",
                     desc,
                     expected.fs_filetype.raw(), expected.fs_flags, expected.fs_rights_base, expected.fs_rights_inheriting,
                     fdstat.fs_filetype.raw(), fdstat.fs_flags, fdstat.fs_rights_base, fdstat.fs_rights_inheriting)
-                ))
+                )
             } else {
                 Ok(())
             }
         }
         Err(e) => {
-            Err(Error::new(ErrorKind::Other, e))
+            Err(format!("In fd_fdstat_get({}): {:?}", desc, e))
         }
     }
 }
 
-pub fn test_fd_fdstat_get() -> std::io::Result<()>{
+pub fn test_fd_fdstat_get() -> Result<(), String>{
     unsafe {
         // check character devices
         expect_success(0, wasi::Fdstat{
@@ -67,7 +66,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             constants::PWD_DESC, dirflags, path,
             oflags, rights_base, rights_inheriting, fdflags){
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_DIRECTORY,
@@ -76,7 +75,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             fs_rights_inheriting: rights_inheriting,
         });
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -88,7 +87,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             constants::PWD_DESC, dirflags, path,
             oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_REGULAR_FILE,
@@ -97,7 +96,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             fs_rights_inheriting: rights_inheriting,
         });
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -106,7 +105,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             constants::PWD_DESC, dirflags, constants::SAMPLE_LINK_FILENAME,
             oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_REGULAR_FILE,
@@ -115,7 +114,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             fs_rights_inheriting: rights_inheriting,
         });
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
 
@@ -125,7 +124,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             constants::PWD_DESC, dirflags, constants::SAMPLE_LINK_FILENAME,
             oflags, rights_base, rights_inheriting, fdflags) {
             Ok(d) => d,
-            Err(e) => { return Err(Error::new(ErrorKind::Other, e)); }
+            Err(e) => { return Err(e.to_string()); }
         };
         let result = expect_success(desc, wasi::Fdstat{
             fs_filetype: wasi::FILETYPE_SYMBOLIC_LINK,
@@ -134,7 +133,7 @@ pub fn test_fd_fdstat_get() -> std::io::Result<()>{
             fs_rights_inheriting: rights_inheriting,
         });
         if let Err(e) = wasi::fd_close(desc){
-            return Err(Error::new(ErrorKind::Other, e));
+            return Err(e.to_string());
         }
         result?;
     }
