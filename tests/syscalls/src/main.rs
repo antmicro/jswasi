@@ -37,7 +37,8 @@ fn main() -> Result<(), String>{
             Ok(d) => d,
             Err(e) => { return Err(format!("Couldn't tear down test environment: {}", e)) }
         };
-        for name in fd_readdir::wasi_ls(desc, 256, true)? {
+        let (dirents, _) = fd_readdir::wasi_ls(desc, 256, 0, true)?;
+        for name in dirents.keys() {
             wasi::path_unlink_file(desc, &name).unwrap();
         }
         wasi::path_remove_directory(constants::PWD_DESC, constants::SAMPLE_DIR_FILENAME).unwrap();

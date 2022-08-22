@@ -267,7 +267,8 @@ export default async function syscallCallback(
           );
           await text.close();
           openedPwdDir.addSymlink("link", "text");
-          for (let i = 0; i < 25; i++) {
+          openedPwdDir.addSymlink("dir_link", "dir");
+          for (let i = 0; i < 10; i++) {
             await openedPwdDir.getEntry(
               `dir/ent${i}`,
               FileOrDir.File,
