@@ -725,19 +725,33 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
   function specialParse(syscallDataJson: string): string {
     const {
       command,
+      buf_len,
+      buf_ptr,
+    }: {
+      command: string;
+      buf_len: number;
+      buf_ptr: number;
+    } = JSON.parse(syscallDataJson);
+    const json = new TextDecoder().decode(
+      new Uint8Array(
+        (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
+        buf_ptr,
+        buf_len
+      )
+    );
+    const {
       args,
       extended_env,
       background,
       redirects,
       working_dir,
     }: {
-      command: string;
       args: string[];
       extended_env: Record<string, string>;
       background: boolean;
       redirects: Redirect[];
       working_dir: string;
-    } = JSON.parse(syscallDataJson);
+    } = JSON.parse(json);
     switch (command) {
       case "spawn": {
         const sharedBuffer = new SharedArrayBuffer(4);
@@ -769,7 +783,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
       case "get_cwd": {
-        return `${workingDir}`;
+        return `${constants.EXIT_SUCCESS}\x1b${workingDir}`;
       }
       case "chdir": {
         const sharedBuffer = new SharedArrayBuffer(4);
