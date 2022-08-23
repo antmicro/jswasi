@@ -673,7 +673,11 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
+      if (
+        fds.getFd(fd) !== undefined &&
+        (await fds.getFd(fd).stat()).fileType ===
+          constants.WASI_FILETYPE_DIRECTORY
+      ) {
         const entries = await (fds.getFd(fd) as OpenDirectory).entries();
         const stats = await Promise.all(
           entries.map(async (entry) => entry.stat())
