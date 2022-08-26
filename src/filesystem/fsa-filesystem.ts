@@ -621,14 +621,19 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
   async readlink(
     path: string
   ): Promise<{ err: number; linkedPath: string | null }> {
-    const { err, entry } = await this.getEntry(
+    let { err, entry } = await this.getEntry(
       path,
       FileOrDir.File,
       LookupFlags.NoFollow,
       OpenFlags.None
     );
-    if (err === constants.WASI_ESUCCESS) {
+    if (
+      err === constants.WASI_ESUCCESS &&
+      (await entry.stat()).fileType === constants.WASI_FILETYPE_SYMBOLIC_LINK
+    ) {
       return { err, linkedPath: await (await entry.handle.getFile()).text() };
+    } else {
+      err = constants.WASI_EINVAL;
     }
     return { err, linkedPath: null };
   }

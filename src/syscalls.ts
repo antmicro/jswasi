@@ -399,6 +399,8 @@ export default async function syscallCallback(
             buffer.set(new TextEncoder().encode(linkedPath), 0);
             bufferUsed[0] = linkedPath.length;
           }
+        } else {
+          err = constants.WASI_EINVAL;
         }
       } else {
         err = constants.WASI_EBADF;
