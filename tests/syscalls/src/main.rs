@@ -21,6 +21,7 @@ fn main() -> Result<(), String>{
         ("path_filestat_get", path_filestat_get::test_path_filestat_get as fn() -> Result<(), String>),
         ("random_get", random_get::test_random_get as fn() -> Result<(), String>),
         ("clock_time_get", clock_time_get::test_clock_time_get as fn() -> Result<(), String>),
+        ("path_readlink", path_readlink::test_path_readlink as fn() -> Result<(), String>),
     ];
 
     let mut fails: u32 = 0;
