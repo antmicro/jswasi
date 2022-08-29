@@ -599,21 +599,29 @@ export default async function syscallCallback(
       if (path[0] !== "!") {
         const { fds } = processManager.processInfos[processId];
         if (fds.getFd(fd) !== undefined) {
-          ({ err, entry } = await (fds.getFd(fd) as OpenDirectory).getEntry(
-            path,
-            FileOrDir.Any,
-            lookupFlags
-          ));
-          if (err === constants.WASI_ESUCCESS) {
-            const stat = await entry.stat();
-            buf.setBigUint64(0, stat.dev, true);
-            buf.setBigUint64(8, stat.ino, true);
-            buf.setUint8(16, stat.fileType);
-            buf.setBigUint64(24, stat.nlink, true);
-            buf.setBigUint64(32, stat.size, true);
-            buf.setBigUint64(40, stat.atim, true);
-            buf.setBigUint64(48, stat.mtim, true);
-            buf.setBigUint64(56, stat.ctim, true);
+          if (
+            (fds.getFd(fd).rightsBase &
+              constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
+            0n
+          ) {
+            ({ err, entry } = await (fds.getFd(fd) as OpenDirectory).getEntry(
+              path,
+              FileOrDir.Any,
+              lookupFlags
+            ));
+            if (err === constants.WASI_ESUCCESS) {
+              const stat = await entry.stat();
+              buf.setBigUint64(0, stat.dev, true);
+              buf.setBigUint64(8, stat.ino, true);
+              buf.setUint8(16, stat.fileType);
+              buf.setBigUint64(24, stat.nlink, true);
+              buf.setBigUint64(32, stat.size, true);
+              buf.setBigUint64(40, stat.atim, true);
+              buf.setBigUint64(48, stat.mtim, true);
+              buf.setBigUint64(56, stat.ctim, true);
+            }
+          } else {
+            err = constants.WASI_EACCES;
           }
         } else {
           err = constants.WASI_EBADF;
