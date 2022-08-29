@@ -15,3 +15,4 @@ pub mod path_open;
 pub mod fd_seek;
 pub mod fd_tell;
 pub mod fd_readdir;
+pub mod path_filestat_get;

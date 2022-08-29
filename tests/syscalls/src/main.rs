@@ -18,6 +18,7 @@ fn main() -> Result<(), String>{
         ("fd_seek", fd_seek::test_fd_seek as fn() -> Result<(), String>),
         ("fd_tell", fd_tell::test_fd_tell as fn() -> Result<(), String>),
         ("fd_readdir", fd_readdir::test_fd_readdir as fn() -> Result<(), String>),
+        ("path_filestat_get", path_filestat_get::test_path_filestat_get as fn() -> Result<(), String>),
     ];
 
     let mut fails: u32 = 0;

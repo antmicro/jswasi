@@ -18,3 +18,5 @@ pub const ARGV: [&str; 3] = ["test\0", "wasi\0", "syscalls\0"];
 pub const SAMPLE_DIRENTRY_NAME: &str = "ent";
 pub const SAMPLE_DIRENTRY_NAME_LEN: usize = 4;
 pub const N_DIRENTRIES: u32 = 10;
+
+pub const DIR_SIZE: usize = 4096;
