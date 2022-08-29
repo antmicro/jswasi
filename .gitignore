@@ -4,6 +4,7 @@
 
 wash/target
 tests/syscalls/target
+rust/
 
 node_modules/
 
