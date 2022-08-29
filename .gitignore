@@ -4,7 +4,11 @@
 
 wash/target
 tests/syscalls/target
-rust/
+
+rust/*.tar.bz2
+rust/*.zip
+rust/*.svg
+rust/build/
 
 node_modules/
 
