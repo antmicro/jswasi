@@ -29,7 +29,7 @@ pub fn test_fd_filestat_get() -> Result<(), String> {
         expect_success(1, wasi::FILETYPE_CHARACTER_DEVICE, 0)?;
 
         // check preopened directory
-        expect_success(constants::PWD_DESC, wasi::FILETYPE_DIRECTORY, 4096)?;
+        expect_success(constants::PWD_DESC, wasi::FILETYPE_DIRECTORY, constants::DIR_SIZE as u64)?;
 
         // check regular file
         let desc = match wasi::path_open(
