@@ -62,6 +62,20 @@ pub fn test_path_readlink() -> Result<(), String> {
         expect_error(
             constants::PWD_DESC, INVALID_PATH, wasi::ERRNO_INVAL,
             "Attempt to read a text file as a symlink succeeded")?;
+
+        // readlink on invalid descriptor should fail
+        let dummy_fd = match wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME,
+            0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
+            Ok(d) => {
+                if let Err(e) = wasi::fd_close(d) { return Err(e.to_string()) }
+                d
+            },
+            Err(e) => return Err(e.to_string())
+        };
+        expect_error(
+            dummy_fd, INVALID_PATH, wasi::ERRNO_BADF,
+            "Attemt to read link from invalid descriptor succeeded")?;
     }
     Ok(())
 }
