@@ -16,3 +16,4 @@ pub mod fd_seek;
 pub mod fd_tell;
 pub mod fd_readdir;
 pub mod path_filestat_get;
+pub mod random_get;
