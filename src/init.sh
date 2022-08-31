@@ -4,7 +4,7 @@ wget resources/tree.wasm /usr/bin/tree
 echo "downloading nohup..."
 wget resources/nohup.wasm /usr/bin/nohup
 echo "downloading ox..."
-wget resources/ox.async.wasm /usr/bin/ox
+wget resources/ox.wasm /usr/bin/ox
 echo "downloading uutils..."
 wget resources/uutils.async.wasm /usr/bin/uutils
 echo "downloading syscalls_test..."

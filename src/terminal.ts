@@ -29,8 +29,7 @@ const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/wash": "resources/wash.wasm",
   "/usr/bin/init": "resources/init.sh",
-  "/usr/bin/coreutils": "resources/coreutils.async.wasm",
-
+  "/usr/bin/coreutils": "resources/coreutils.wasm",
 };
 
 export async function fetchFile(
