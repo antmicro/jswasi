@@ -8,9 +8,9 @@ wget resources/uutils.async.wasm /usr/bin/uutils
 echo "downloading syscalls_test..."
 wget resources/syscalls_test.wasm /usr/local/bin/syscalls_test
 echo "downloading python..."
-wget https://registry-cdn.wapm.io/contents/_/python/0.1.0/bin/python.wasm /usr/local/bin/python
+wget resources/python.wasm /usr/local/bin/python
 echo "downloading python libs..."
-wget https://github.com/pgielda/wasmpython-bin/raw/main/python36.zip /lib/python.zip
+wget resources/python.zip /lib/python.zip
 echo "downloading duk..."
 wget https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm /usr/local/bin/duk
 echo "downloading cowsay..."
