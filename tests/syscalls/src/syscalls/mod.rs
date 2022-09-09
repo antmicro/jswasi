@@ -19,3 +19,4 @@ pub mod path_filestat_get;
 pub mod random_get;
 pub mod clock_time_get;
 pub mod path_readlink;
+pub mod path_symlink;
