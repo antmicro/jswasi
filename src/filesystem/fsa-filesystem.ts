@@ -182,7 +182,7 @@ class FsaFilesystem implements Filesystem {
     const path = `${dir.path()}${dir.path().endsWith("/") ? "" : "/"}${name}`;
 
     let storedData: StoredData = await getStoredData(path);
-    if (!storedData) {
+    if (!storedData && options.create) {
       storedData = {
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
         userMode: 7,
@@ -194,6 +194,8 @@ class FsaFilesystem implements Filesystem {
         ctim: 0n,
       };
       await setStoredData(path, storedData);
+    } else if (!storedData) {
+      return { err: constants.WASI_ENOENT, entry: null };
     }
 
     if (
@@ -310,7 +312,11 @@ class FsaFilesystem implements Filesystem {
     try {
       for (const part of parts) {
         // eslint-disable-next-line no-await-in-loop
-        ({ entry: dir } = await this.getDirectory(dir.open(), part));
+        let err;
+        ({ err, entry: dir } = await this.getDirectory(await dir.open(), part));
+        if (err !== constants.WASI_ESUCCESS) {
+          return { err, name: null, parent: null };
+        }
       }
     } catch (err: any) {
       if (err.name === "NotFoundError") {
