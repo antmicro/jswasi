@@ -902,7 +902,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
           return `${constants.EXIT_SUCCESS}\x1b`;
         } else {
           workerConsoleLog(`Special command ${command} has wrong method name.`);
-          throw Error(`Special command ${command} has wrong method name.`);
+          return `${constants.WASI_EINVAL}\x1bSpecial command ${command} has wrong method name.`;
         }
       }
       default: {
