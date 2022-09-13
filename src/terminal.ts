@@ -28,47 +28,8 @@ const DEFAULT_WORK_DIR = "/home/ant";
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/wash": "resources/wash.wasm",
-};
-
-const NECESSARY_BINARIES = {
+  "/usr/bin/init": "resources/init.sh",
   "/usr/bin/coreutils": "resources/coreutils.async.wasm",
-  "/usr/bin/tree": "resources/tree.wasm",
-  "/usr/bin/nohup": "resources/nohup.wasm",
-};
-
-const OPTIONAL_BINARIES = {
-  "/usr/bin/uutils": "resources/uutils.async.wasm",
-  "/usr/local/bin/test": "resources/syscalls_test.wasm",
-  "/lib/python36.zip":
-    "https://github.com/pgielda/wasmpython-bin/raw/main/python36.zip",
-  "/usr/local/bin/duk":
-    "https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm",
-  "/usr/local/bin/cowsay":
-    "https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm",
-  "/usr/local/bin/qjs":
-    "https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm",
-  "/usr/local/bin/viu":
-    "https://registry-cdn.wapm.io/contents/_/viu/0.2.3/target/wasm32-wasi/release/viu.wasm",
-  "/usr/local/bin/rustpython":
-    "https://registry-cdn.wapm.io/contents/_/rustpython/0.1.3/target/wasm32-wasi/release/rustpython.wasm",
-  "/usr/local/bin/grep":
-    "https://registry-cdn.wapm.io/contents/liftm/rg/12.1.1-1/rg.wasm",
-  "/usr/local/bin/python":
-    "https://registry-cdn.wapm.io/contents/_/python/0.1.0/bin/python.wasm",
-  "/usr/local/bin/find":
-    "https://registry-cdn.wapm.io/contents/liftm/fd/8.2.1-1/fd.wasm",
-  "/usr/local/bin/du":
-    "https://registry-cdn.wapm.io/contents/liftm/dust-wasi/0.5.4-3/dust.wasm",
-  "/usr/local/bin/llc":
-    "https://registry-cdn.wapm.io/contents/rapidlua/llc/0.0.4/llc.wasm",
-  "/usr/local/bin/rsign2":
-    "https://registry-cdn.wapm.io/contents/jedisct1/rsign2/0.6.1/rsign.wasm",
-  "/usr/local/bin/ruby":
-    "https://registry-cdn.wapm.io/contents/katei/ruby/0.1.2/dist/ruby.wasm",
-  "/usr/local/bin/clang":
-    "https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm",
-  "/usr/local/bin/wasm-ld":
-    "https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm",
 };
 
 export async function fetchFile(
@@ -278,18 +239,8 @@ async function initFs(openedRootDir: OpenDirectory) {
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
     ([filename, address]) => fetchFile(openedRootDir, filename, address, true)
   );
-  const necessaryPromises = Object.entries(NECESSARY_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
-  );
-  const optionalPromises = Object.entries(OPTIONAL_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, false)
-  );
 
-  await Promise.all([
-    ...alwaysFetchPromises,
-    ...necessaryPromises,
-    ...optionalPromises,
-  ]);
+  await Promise.all(alwaysFetchPromises);
 }
 
 function initFsaDropImport(
