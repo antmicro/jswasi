@@ -246,7 +246,7 @@ export default async function syscallCallback(
           Atomics.notify(parentLck, 0);
           break;
         }
-        case "/usr/local/bin/test": {
+        case "/usr/local/bin/syscalls_test": {
           const openedPwdDir = fds.getFd(4) as OpenDirectory;
           await openedPwdDir.getEntry(
             "dir",
