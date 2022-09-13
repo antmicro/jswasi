@@ -1,4 +1,6 @@
 import * as constants from "./constants.js";
+import { OpenFile } from "./filesystem/interfaces.js";
+import { Md5 } from "./md5.js";
 
 export function arraysEqual(a: any[], b: any[]) {
   if (a === b) return true;
@@ -68,6 +70,19 @@ export function now(clockId: number, cpuTimeStart: bigint): bigint {
       // TODO: that a temporary fix as we get clockId = 10^9
       return msToNs(performance.now()) - cpuTimeStart;
   }
+}
+
+export async function md5sum(
+  file: OpenFile,
+  chunkLen: number
+): Promise<string | Int32Array> {
+  var chunk = await file.read(chunkLen);
+  var md5 = new Md5();
+  while (chunk[0].length !== 0) {
+    md5.appendByteArray(chunk[0]);
+    chunk = await file.read(chunkLen);
+  }
+  return md5.end();
 }
 
 export function humanReadable(bytes: number): string {
