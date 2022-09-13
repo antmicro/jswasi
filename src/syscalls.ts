@@ -344,15 +344,15 @@ export default async function syscallCallback(
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
+      let err;
       if (fds.getFd(newFd) === undefined) {
-        Atomics.store(lck, 0, constants.WASI_EBADF);
-        Atomics.notify(lck, 0);
+        err = constants.WASI_EBADF;
+      } else {
+        err = await (fds.getFd(newFd) as OpenDirectory).addSymlink(
+          newPath,
+          oldPath
+        );
       }
-
-      const err = await (fds.getFd(newFd) as OpenDirectory).addSymlink(
-        newPath,
-        oldPath
-      );
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
