@@ -782,7 +782,13 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     let entry;
     if (openFlags & OpenFlags.Create) {
       if (openFlags & OpenFlags.Exclusive) {
-        if ((await open(false)).err === constants.WASI_ESUCCESS) {
+        if (
+          [
+            constants.WASI_ESUCCESS,
+            constants.WASI_EISDIR,
+            constants.WASI_ENOTDIR,
+          ].includes((await open(false)).err)
+        ) {
           return { err: constants.WASI_EEXIST, entry: null };
         }
       }
