@@ -871,8 +871,7 @@ export default async function syscallCallback(
       const oldEntry = await (fds.getFd(oldFd) as OpenDirectory).getEntry(
         oldPath,
         FileOrDir.Any,
-        LookupFlags.NoFollow,
-        OpenFlags.Create
+        LookupFlags.NoFollow
       );
       // copy the entry recursively
       if (oldEntry.err === constants.WASI_ESUCCESS) {
