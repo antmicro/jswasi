@@ -537,53 +537,43 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     options: { recursive: boolean } = { recursive: false }
   ): Promise<{ err: number }> {
     const { err, name, parent } = await this.filesystem.getParent(this, path);
-    if (err === constants.WASI_ESUCCESS) {
-      const targetEntry = await this.getEntry(
+    if (err !== constants.WASI_ESUCCESS) {
+      return { err };
+    }
+    return (async function _deleteEntry(
+      currentDir: OpenDirectory,
+      path: string
+    ): Promise<{ err: number }> {
+      const { err, entry } = await (currentDir as FsaOpenDirectory).getEntry(
         path,
-        FileOrDir.Directory,
+        FileOrDir.Any,
         LookupFlags.NoFollow,
         OpenFlags.None
       );
-      // if the entry is directory, check if it is empty or if 'recursive' flag is set
-      if (targetEntry.err === constants.WASI_ESUCCESS) {
-        const openEntry = await targetEntry.entry.open();
-        const targetEntries = await (openEntry as OpenDirectory).entries();
-        if (options.recursive) {
-          await Promise.all(
-            targetEntries.map(async (entry) => {
-              if (
-                (await entry.stat()).fileType ===
-                constants.WASI_FILETYPE_DIRECTORY
-              ) {
-                // call the function recursively if directory contains subdirectories
-                await (openEntry as OpenDirectory).deleteEntry(
-                  entry.name(),
-                  options
-                );
-              } else {
-                // delete handle and database entry if it is a file
-                await (openEntry as FsaOpenDirectory).handle.removeEntry(
-                  entry.name(),
-                  options
-                );
-                await delStoredData(entry.path());
-              }
-            })
-          );
-        } else if (targetEntries.length !== 0) {
-          // return error if recursive flag is not set and directory is not empty
-          return { err: constants.WASI_ENOTEMPTY };
+      if (err !== constants.WASI_ESUCCESS) {
+        return { err };
+      }
+      if (
+        (await entry.stat()).fileType === constants.WASI_FILETYPE_DIRECTORY &&
+        options.recursive
+      ) {
+        const openTargetEntry = (await entry.open()) as OpenDirectory;
+        const entryContents = await openTargetEntry.entries();
+        for (const i of entryContents) {
+          _deleteEntry(openTargetEntry, i.name());
         }
-        await openEntry.close();
       }
-      if (targetEntry.err != constants.WASI_ENOENT) {
-        // deleting file handles recursively is not enough as it only
-        // deletes handles and leaves dangling fs entries in database
-        await parent.handle.removeEntry(name, options);
-        await delStoredData(`${parent.path()}/${name}`);
+      try {
+        await (currentDir as FsaOpenDirectory).handle.removeEntry(
+          path,
+          options
+        );
+        await delStoredData(entry.path());
+        return { err: constants.WASI_ESUCCESS };
+      } catch (e) {
+        return { err: constants.WASI_ENOTEMPTY };
       }
-    }
-    return { err };
+    })(await parent.open(), name);
   }
 
   async addSymlink(source: string, destination: string): Promise<number> {
