@@ -857,6 +857,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
       }
       case "hterm": {
         const [method, attrib, val] = args;
+        let returnCode;
         if (method === "get") {
           var bufferSize = 64;
           while (true) {
@@ -873,18 +874,23 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
               { sharedBuffer, method, attrib, val } as HtermConfArgs,
             ]);
             Atomics.wait(lck, 0, -1);
+            returnCode = Atomics.load(lck, 0);
 
-            // In case buffer size was not enought resize buffer and call syscall again
-            if (bufferUsed[0] <= bufferSize) {
-              const value = new TextDecoder().decode(
-                buffer.slice(0, bufferUsed[0])
-              );
+            if (returnCode == constants.WASI_ESUCCESS) {
+              // In case buffer size was not enought then resize buffer and call syscall again
+              if (bufferUsed[0] <= bufferSize) {
+                const value = new TextDecoder().decode(
+                  buffer.slice(0, bufferUsed[0])
+                );
 
-              return `${constants.EXIT_SUCCESS}\x1b${value}`;
-            }
+                return `${constants.EXIT_SUCCESS}\x1b${value}`;
+              }
 
-            while (bufferSize < bufferUsed[0]) {
-              bufferSize *= 2;
+              while (bufferSize < bufferUsed[0]) {
+                bufferSize *= 2;
+              }
+            } else {
+              return `${returnCode}\x1b`;
             }
           }
         } else if (method === "set") {
@@ -899,7 +905,8 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
           ]);
           Atomics.wait(lck, 0, -1);
 
-          return `${constants.EXIT_SUCCESS}\x1b`;
+          returnCode = Atomics.load(lck, 0);
+          return `${returnCode}\x1b`;
         } else {
           workerConsoleLog(`Special command ${command} has wrong method name.`);
           return `${constants.WASI_EINVAL}\x1bSpecial command ${command} has wrong method name.`;

@@ -97,35 +97,45 @@ export default async function syscallCallback(
     case "hterm": {
       const { sharedBuffer, method, attrib, val } = data as HtermConfArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
+
+      let err = constants.WASI_ESUCCESS;
       if (method === "get") {
         const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
         const buffer = new Int8Array(sharedBuffer, 8, bufferUsed[0]);
         const fields = attrib.split(".");
 
         let data;
-        if (fields[0] === "prefs_") {
-          data = terminal.prefs_.get(fields[1]);
-        } else {
-          var param = terminal;
-          for (var field of fields) {
-            param = param[field];
+        try {
+          if (fields[0] === "prefs_") {
+            data = terminal.prefs_.get(fields[1]);
+          } else {
+            var param = terminal;
+            for (var field of fields) {
+              param = param[field];
+            }
+            data = param;
           }
-          data = param;
-        }
 
-        const value = String(data);
-        if (value.length <= bufferUsed[0]) {
-          buffer.set(new TextEncoder().encode(value), 0);
-        }
+          const value = String(data);
+          if (value.length <= bufferUsed[0]) {
+            buffer.set(new TextEncoder().encode(value), 0);
+          }
 
-        bufferUsed[0] = value.length;
+          bufferUsed[0] = value.length;
+        } catch (error) {
+          err = constants.WASI_EINVAL;
+        }
       } else if (method === "set") {
-        terminal.prefs_.set(attrib, val);
+        try {
+          terminal.prefs_.set(attrib, val);
+        } catch (error) {
+          err = constants.WASI_EINVAL;
+        }
       } else {
-        throw new Error(`Syscall ${action}: enhandled method`);
+        err = constants.WASI_EINVAL;
       }
 
-      Atomics.store(lock, 0, 0);
+      Atomics.store(lock, 0, err);
       Atomics.notify(lock, 0);
       break;
     }
