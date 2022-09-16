@@ -17,7 +17,8 @@ export interface In {
   scheduleRead(
     workerId: number,
     requestedLen: number,
-    sharedBuffer: SharedArrayBuffer
+    sharedBuffer: SharedArrayBuffer,
+    pread?: bigint
   ): Promise<void>;
 
   close(): Promise<void>;
@@ -54,7 +55,8 @@ export class Stdin implements In {
   scheduleRead(
     workerId: number,
     requestedLen: number,
-    sbuf: SharedArrayBuffer
+    sbuf: SharedArrayBuffer,
+    pread?: bigint
   ): Promise<void> {
     const lck = new Int32Array(sbuf, 0, 1);
     const readLen = new Int32Array(sbuf, 4, 1);

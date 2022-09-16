@@ -499,9 +499,9 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
-
+    case "fd_pread":
     case "fd_read": {
-      const { sharedBuffer, fd, len } = data as FdReadArgs;
+      const { sharedBuffer, fd, len, pread } = data as FdReadArgs;
 
       const { fds } = processManager.processInfos[processId];
       const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -525,7 +525,12 @@ export default async function syscallCallback(
         Atomics.store(lck, 0, constants.WASI_EINVAL);
         Atomics.notify(lck, 0);
       } else {
-        await (fds.getFd(fd) as In).scheduleRead(processId, len, sharedBuffer);
+        await (fds.getFd(fd) as In).scheduleRead(
+          processId,
+          len,
+          sharedBuffer,
+          pread
+        );
       }
 
       // releasing the lock is delegated to read() call

@@ -919,17 +919,27 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
     return err;
   }
 
-  async read(len: number): Promise<[Uint8Array, number]> {
+  async read(
+    len: number,
+    pread: bigint = undefined
+  ): Promise<[Uint8Array, number]> {
     await this.flush();
+    let offset;
+    // TODO: should offset be bigint?
+    if (pread !== undefined) {
+      offset = Number(pread);
+    } else {
+      offset = this.filePosition;
+    }
 
-    if (this.filePosition < (await this.metadata()).size) {
+    if (offset < (await this.metadata()).size) {
       const file = await this.handle.getFile();
-      let data = await file
-        .slice(this.filePosition, this.filePosition + len)
-        .arrayBuffer();
+      let data = await file.slice(offset, offset + len).arrayBuffer();
       data = data.slice(0);
       const slice = new Uint8Array(data);
-      this.filePosition += slice.byteLength;
+      if (pread === undefined) {
+        this.filePosition += slice.byteLength;
+      }
       return [slice, 0];
     }
     return [new Uint8Array(0), 0];
@@ -938,13 +948,16 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
   async scheduleRead(
     workerId: number,
     requestedLen: number,
-    sbuf: SharedArrayBuffer
+    sbuf: SharedArrayBuffer,
+    pread: bigint = undefined
   ): Promise<void> {
+    // pread tells where to start reading instead of using filePosition
+    // this parameter stores offset when passed from fd_pread and undefined when passed from fd_read
     const lck = new Int32Array(sbuf, 0, 1);
     const readLen = new Int32Array(sbuf, 4, 1);
     const readBuf = new Uint8Array(sbuf, 8, requestedLen);
 
-    const [data, err] = await this.read(requestedLen);
+    const [data, err] = await this.read(requestedLen, pread);
     if (err === 0) {
       readLen[0] = data.byteLength;
       readBuf.set(data);

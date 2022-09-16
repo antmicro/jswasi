@@ -72,7 +72,13 @@ type WASICallbacks = {
   fd_fdstat_set_rights: any;
   fd_tell: (fd: number, pos: ptr) => number;
   fd_filestat_set_times: any;
-  fd_pread: any;
+  fd_pread: (
+    fd: number,
+    iovs: ptr,
+    iovsLen: number,
+    offset: bigint,
+    nRead: ptr
+  ) => number;
   fd_advice: any;
   fd_pwrite: any;
   fd_renumber: any;
@@ -500,7 +506,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       const readLen = new Int32Array(sharedBuffer, 4, 1);
       const readBuf = new Uint8Array(sharedBuffer, 8, len);
 
-      sendToKernel(["fd_read", { sharedBuffer, fd, len } as FdReadArgs]);
+      sendToKernel([
+        "fd_read",
+        { sharedBuffer, fd, len, pread: undefined } as FdReadArgs,
+      ]);
       Atomics.wait(lck, 0, -1);
 
       const err = Atomics.load(lck, 0);
@@ -512,6 +521,52 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       read += readLen[0];
     }
     if (fd > 2) workerConsoleLog(`fd_read read ${read} bytes.`);
+    view.setUint32(nRead, read, true);
+
+    return constants.WASI_ESUCCESS;
+  }
+  function fd_pread(
+    fd: number,
+    iovs: ptr,
+    iovsLen: number,
+    offset: bigint,
+    nRead: ptr
+  ) {
+    if (fd > 2)
+      workerConsoleLog(`fd_pread(${fd}, ${iovs}, ${iovsLen}, ${nRead})`);
+
+    const view = new DataView(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+    );
+    const view8 = new Uint8Array(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+    );
+
+    let read = 0;
+    for (let i = 0; i < iovsLen; i += 1) {
+      const addr = view.getUint32(iovs + 8 * i, true);
+      const len = view.getUint32(iovs + 8 * i + 4, true);
+
+      const sharedBuffer = new SharedArrayBuffer(4 + 4 + len); // lock, read length, read buffer
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      lck[0] = -1;
+      const readLen = new Int32Array(sharedBuffer, 4, 1);
+      const readBuf = new Uint8Array(sharedBuffer, 8, len);
+      sendToKernel([
+        "fd_pread",
+        { sharedBuffer, fd, len, pread: offset } as FdReadArgs,
+      ]);
+      Atomics.wait(lck, 0, -1);
+
+      const err = Atomics.load(lck, 0);
+      if (err !== constants.WASI_ESUCCESS) {
+        return err;
+      }
+
+      view8.set(readBuf, addr);
+      read += readLen[0];
+    }
+    if (fd > 2) workerConsoleLog(`fd_pread read ${read} bytes.`);
     view.setUint32(nRead, read, true);
 
     return constants.WASI_ESUCCESS;
@@ -1413,10 +1468,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   function fd_filestat_set_times() {
-    return placeholder();
-  }
-
-  function fd_pread() {
     return placeholder();
   }
 

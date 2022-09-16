@@ -150,12 +150,13 @@ export interface OpenFile extends Entry {
   rightsInheriting: bigint;
   fdFlags: number;
 
-  read(len: number): Promise<[Uint8Array, number]>;
+  read(len: number, pread?: bigint): Promise<[Uint8Array, number]>;
 
   scheduleRead(
     workerId: number,
     requestedLen: number,
-    sbuf: SharedArrayBuffer
+    sbuf: SharedArrayBuffer,
+    pread?: bigint
   ): Promise<void>;
 
   write(buffer: Uint8Array): Promise<number>;
