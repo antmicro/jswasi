@@ -199,7 +199,7 @@ const whenceMap: Record<number, number> = {
   2: constants.WASI_WHENCE_SET,
 };
 
-function WASI(oldWhences: boolean = false): WASICallbacks {
+function WASI(snapshot0: boolean = false): WASICallbacks {
   let moduleInstanceExports: WebAssembly.Exports;
 
   function setModuleInstance(instance: WebAssembly.Instance): void {
@@ -557,7 +557,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
     const file_pos = new BigUint64Array(sharedBuffer, 8, 1);
-    const whence_ = oldWhences ? whenceMap[whence] : whence;
+    const whence_ = snapshot0 ? whenceMap[whence] : whence;
 
     sendToKernel([
       "fd_seek",
@@ -1454,7 +1454,7 @@ function WASI(oldWhences: boolean = false): WASICallbacks {
 
 async function importWasmModule(
   module: WebAssembly.Module,
-  wasiCallbacksConstructor: (oldWhences: boolean) => WASICallbacks
+  wasiCallbacksConstructor: (snapshot0: boolean) => WASICallbacks
 ) {
   let imps = WebAssembly.Module.imports(module);
   let wasiCallbacks;
