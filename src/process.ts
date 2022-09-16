@@ -447,18 +447,29 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const fileType = statBuf.getUint8(16);
     const nlink = statBuf.getBigUint64(24, true);
     const size = statBuf.getBigUint64(32, true);
-    const atim = statBuf.getBigUint64(38, true);
-    const mtim = statBuf.getBigUint64(46, true);
-    const ctim = statBuf.getBigUint64(52, true);
-
-    view.setBigUint64(buf, dev, true);
-    view.setBigUint64(buf + 8, ino, true);
-    view.setUint8(buf + 16, fileType);
-    view.setBigUint64(buf + 24, nlink, true);
-    view.setBigUint64(buf + 32, size, true);
-    view.setBigUint64(buf + 38, atim, true);
-    view.setBigUint64(buf + 46, mtim, true);
-    view.setBigUint64(buf + 52, ctim, true);
+    const atim = statBuf.getBigUint64(40, true);
+    const mtim = statBuf.getBigUint64(48, true);
+    const ctim = statBuf.getBigUint64(56, true);
+    if (snapshot0) {
+      // in snapshot0, filetype padding is 3 bytes and nlink is u32 instead of u64
+      view.setBigUint64(buf, dev, true);
+      view.setBigUint64(buf + 8, ino, true);
+      view.setUint8(buf + 16, fileType);
+      view.setUint32(buf + 20, Number(nlink), true);
+      view.setBigUint64(buf + 24, size, true);
+      view.setBigUint64(buf + 32, atim, true);
+      view.setBigUint64(buf + 40, mtim, true);
+      view.setBigUint64(buf + 48, ctim, true);
+    } else {
+      view.setBigUint64(buf, dev, true);
+      view.setBigUint64(buf + 8, ino, true);
+      view.setUint8(buf + 16, fileType);
+      view.setBigUint64(buf + 24, nlink, true);
+      view.setBigUint64(buf + 32, size, true);
+      view.setBigUint64(buf + 40, atim, true);
+      view.setBigUint64(buf + 48, mtim, true);
+      view.setBigUint64(buf + 56, ctim, true);
+    }
     workerConsoleLog(
       `fd_filestat_get returned ${err} {dev: ${dev} ino: ${ino} fileType: ${fileType} nlink: ${nlink} size: ${size} atim: ${atim} mtim: ${mtim} ctim: ${ctim}}`
     );
@@ -651,15 +662,25 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const mtim = statBuf.getBigUint64(48, true);
     const ctim = statBuf.getBigUint64(56, true);
 
-    view.setBigUint64(buf, dev, true);
-    view.setBigUint64(buf + 8, ino, true);
-    view.setUint8(buf + 16, fileType);
-    view.setBigUint64(buf + 24, nlink, true);
-    view.setBigUint64(buf + 32, size, true);
-    view.setBigUint64(buf + 40, atim, true);
-    view.setBigUint64(buf + 48, mtim, true);
-    view.setBigUint64(buf + 56, ctim, true);
-
+    if (snapshot0) {
+      view.setBigUint64(buf, dev, true);
+      view.setBigUint64(buf + 8, ino, true);
+      view.setUint8(buf + 16, fileType);
+      view.setUint32(buf + 20, Number(nlink), true);
+      view.setBigUint64(buf + 24, size, true);
+      view.setBigUint64(buf + 32, atim, true);
+      view.setBigUint64(buf + 40, mtim, true);
+      view.setBigUint64(buf + 48, ctim, true);
+    } else {
+      view.setBigUint64(buf, dev, true);
+      view.setBigUint64(buf + 8, ino, true);
+      view.setUint8(buf + 16, fileType);
+      view.setBigUint64(buf + 24, nlink, true);
+      view.setBigUint64(buf + 32, size, true);
+      view.setBigUint64(buf + 40, atim, true);
+      view.setBigUint64(buf + 48, mtim, true);
+      view.setBigUint64(buf + 56, ctim, true);
+    }
     return constants.WASI_ESUCCESS;
   }
 
