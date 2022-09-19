@@ -86,21 +86,36 @@ export async function umount(
   env: Record<string, string>
 ): Promise<number> {
   const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
+  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stderr;
 
-  let path = args[1];
+  let arg = args[1];
   // handle relative path
-  if (!path.startsWith("/")) {
-    path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
-  }
+  if (arg === "-a") {
+    // remove all mounts
+    for (const mountPoint of processManager.filesystem.getMounts()) {
+      processManager.filesystem.removeMount(
+        `${mountPoint.parts.join("/")}/${mountPoint.name}`
+      );
+    }
+  } else if (arg !== undefined && arg !== "--help") {
+    if (!arg.startsWith("/")) {
+      arg = `${env["PWD"] === "/" ? "" : env["PWD"]}/${arg}`;
+    }
 
-  if (!processManager.filesystem.isMounted(path)) {
-    await stderr.write(
-      new TextEncoder().encode(`umount: ${path}: not mounted\n`)
+    if (!processManager.filesystem.isMounted(arg)) {
+      await stderr.write(
+        new TextEncoder().encode(`umount: ${arg}: not mounted\n`)
+      );
+      return 1;
+    }
+    processManager.filesystem.removeMount(arg);
+  } else {
+    await stdout.write(
+      new TextEncoder().encode(
+        "Usage:\n\tumount -a\t\tumount all filesystems\n\tumount <path>\t\tremove mount point at given path\n"
+      )
     );
-    return 1;
   }
-
-  processManager.filesystem.removeMount(path);
   return 0;
 }
 
