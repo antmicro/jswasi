@@ -409,30 +409,47 @@ abstract class FsaEntry implements Entry {
 
   async metadata(): Promise<Metadata> {
     if (!this._metadata) {
-      const storedData: StoredData = await getStoredData(this.path());
+      let storedData: StoredData = await getStoredData(this.path());
       let size;
+      let fileType;
       if (this.handle.kind === "file") {
         size = BigInt((await this.handle.getFile()).size);
+        fileType = constants.WASI_FILETYPE_REGULAR_FILE;
       } else {
         size = 4096n;
+        fileType = constants.WASI_FILETYPE_DIRECTORY;
       }
-      this._metadata = {
-        dev: 0n,
-        ino: 0n,
-        nlink: 1n,
-        rdev: 0,
-        size,
-        gid: storedData.gid,
-        uid: storedData.uid,
-        userMode: storedData.userMode,
-        groupMode: storedData.groupMode,
-        blockSize: 0,
-        blocks: 0,
-        fileType: storedData.fileType,
-        atim: storedData.atim,
-        mtim: storedData.mtim,
-        ctim: storedData.ctim,
-      };
+      if (!storedData) {
+        storedData = {
+          fileType,
+          userMode: 7,
+          groupMode: 7,
+          uid: 0,
+          gid: 0,
+          atim: 0n,
+          mtim: 0n,
+          ctim: 0n,
+        };
+      }
+      if (storedData !== undefined) {
+        this._metadata = {
+          dev: 0n,
+          ino: 0n,
+          nlink: 1n,
+          rdev: 0,
+          size,
+          gid: storedData.gid,
+          uid: storedData.uid,
+          userMode: storedData.userMode,
+          groupMode: storedData.groupMode,
+          blockSize: 0,
+          blocks: 0,
+          fileType: storedData.fileType,
+          atim: storedData.atim,
+          mtim: storedData.mtim,
+          ctim: storedData.ctim,
+        };
+      }
     }
     return this._metadata;
   }
