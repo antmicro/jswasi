@@ -39,3 +39,5 @@ echo "downloading clang..."
 wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm /usr/local/bin/clang
 echo "downloading wasm-ld..."
 wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm /usr/local/bin/wasm-ld
+echo "downloading clang sysroot..."
+wget resources/sysroot.zip /usr/sysroot.zip
