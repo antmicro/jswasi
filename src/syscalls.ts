@@ -25,6 +25,7 @@ import {
   SpawnArgs,
   HtermConfArgs,
   PathRenameArgs,
+  FdFilestatSetTimesArgs,
 } from "./types.js";
 import { OpenDirectory, OpenFile } from "./filesystem/interfaces.js";
 import {
@@ -40,6 +41,7 @@ import ProcessManager from "./process-manager.js";
 import { In, Out } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { terminal } from "./terminal.js";
+import { msToNs } from "./utils.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -927,6 +929,60 @@ export default async function syscallCallback(
             err = constants.WASI_ESUCCESS;
           } else {
             err = constants.WASI_EBADF;
+          }
+        } else {
+          err = constants.WASI_EACCES;
+        }
+      } else {
+        err = constants.WASI_EBADF;
+      }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "fd_filestat_set_times": {
+      const { sharedBuffer, fd, st_atim, st_mtim, fst_flags } =
+        data as FdFilestatSetTimesArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      let err;
+
+      const { fds } = processManager.processInfos[processId];
+
+      if (fds.getFd(fd) !== undefined) {
+        if (
+          (fds.getFd(fd).rightsBase &
+            constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) !==
+          0n
+        ) {
+          if (
+            !(
+              (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
+              (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0
+            ) &&
+            !(
+              (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
+              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
+            )
+          ) {
+            let metadata = await fds.getFd(fd).stat();
+            if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
+              metadata.atim = st_atim;
+            } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
+              metadata.atim = msToNs(performance.now());
+            }
+            if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
+              metadata.mtim = st_mtim;
+            } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
+              metadata.mtim = msToNs(performance.now());
+            }
+            try {
+              // setting times of character devices makes no sense for now
+              await (
+                fds.getFd(fd) as OpenFile | OpenDirectory
+              ).updateMetadata();
+            } catch (_: any) {}
+          } else {
+            err = constants.WASI_EINVAL;
           }
         } else {
           err = constants.WASI_EACCES;

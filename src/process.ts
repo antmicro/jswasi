@@ -29,6 +29,7 @@ import {
   SpawnArgs,
   HtermConfArgs,
   PathRenameArgs,
+  FdFilestatSetTimesArgs,
 } from "./types";
 
 type ptr = number;
@@ -71,13 +72,18 @@ type WASICallbacks = {
   fd_fdstat_set_flags: any;
   fd_fdstat_set_rights: any;
   fd_tell: (fd: number, pos: ptr) => number;
-  fd_filestat_set_times: any;
   fd_pread: (
     fd: number,
     iovs: ptr,
     iovsLen: number,
     offset: bigint,
     nRead: ptr
+  ) => number;
+  fd_filestat_set_times: (
+    fd: number,
+    st_atim: bigint,
+    st_mtim: bigint,
+    fst_flags: number
   ) => number;
   fd_advice: any;
   fd_pwrite: any;
@@ -1467,8 +1473,32 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return placeholder();
   }
 
-  function fd_filestat_set_times() {
-    return placeholder();
+  function fd_filestat_set_times(
+    fd: number,
+    st_atim: bigint,
+    st_mtim: bigint,
+    fst_flags: number
+  ) {
+    workerConsoleLog(
+      `fd_filestat_set_times(${fd}, ${st_atim}, ${st_mtim}, ${fst_flags})`
+    );
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+    sendToKernel([
+      "fd_filestat_set_times",
+      {
+        sharedBuffer,
+        fd,
+        st_atim,
+        st_mtim,
+        fst_flags,
+      } as FdFilestatSetTimesArgs,
+    ]);
+    Atomics.wait(lck, 0, -1);
+    const err = Atomics.load(lck, 0);
+    workerConsoleLog(`fd_filestat_set_times returned ${err}`);
+    return err;
   }
 
   return {

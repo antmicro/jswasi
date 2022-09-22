@@ -142,3 +142,11 @@ export type FdTellArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
 };
+
+export type FdFilestatSetTimesArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+  st_atim: bigint;
+  st_mtim: bigint;
+  fst_flags: number;
+};
