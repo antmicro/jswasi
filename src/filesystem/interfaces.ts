@@ -47,6 +47,8 @@ export interface Entry {
 
   metadata(): Promise<Metadata>;
 
+  updateMetadata(): any;
+
   stat(): Promise<Stat>;
 }
 

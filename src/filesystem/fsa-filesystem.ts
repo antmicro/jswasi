@@ -454,6 +454,10 @@ abstract class FsaEntry implements Entry {
     return this._metadata;
   }
 
+  async updateMetadata() {
+    await setStoredData(this.path(), (await this.metadata()) as StoredData);
+  }
+
   async stat(): Promise<Stat> {
     return this.metadata();
   }
