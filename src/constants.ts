@@ -228,3 +228,8 @@ export const WASI_STDERR_FILENO = 2;
 export const WASI_WHENCE_SET = 0;
 export const WASI_WHENCE_CUR = 1;
 export const WASI_WHENCE_END = 2;
+
+export const WASI_FSTFLAGS_ATIM = 0x0001;
+export const WASI_FSTFLAGS_ATIM_NOW = 0x0002;
+export const WASI_FSTFLAGS_MTIM = 0x0004;
+export const WASI_FSTFLAGS_MTIM_NOW = 0x0008;
