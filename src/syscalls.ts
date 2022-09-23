@@ -26,8 +26,14 @@ import {
   HtermConfArgs,
   PathRenameArgs,
   FdFilestatSetTimesArgs,
+  PathFilestatSetTimesArgs,
 } from "./types.js";
-import { OpenDirectory, OpenFile } from "./filesystem/interfaces.js";
+import {
+  Directory,
+  File,
+  OpenDirectory,
+  OpenFile,
+} from "./filesystem/interfaces.js";
 import {
   download,
   free,
@@ -940,55 +946,66 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
+    case "path_filestat_set_times":
     case "fd_filestat_set_times": {
-      const { sharedBuffer, fd, st_atim, st_mtim, fst_flags } =
+      const { sharedBuffer, st_atim, st_mtim, fst_flags } =
         data as FdFilestatSetTimesArgs;
-      const lck = new Int32Array(sharedBuffer, 0, 1);
+      let file;
       let err;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
-
-      if (fds.getFd(fd) !== undefined) {
+      if (action === "fd_filestat_set_times") {
+        const { fd } = data as FdFilestatGetArgs;
+        file = fds.getFd(fd);
         if (
-          (fds.getFd(fd).rightsBase &
-            constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) !==
-          0n
+          file &&
+          (file.rightsBase & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) === 0n
         ) {
-          if (
-            (!(
-              (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
-              (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0
-            ) &&
-              !(
-                (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
-                (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
-              )) ||
-            fds.getFd(fd).fileType === constants.WASI_FILETYPE_CHARACTER_DEVICE
-          ) {
-            let metadata = await (
-              fds.getFd(fd) as OpenFile | OpenDirectory
-            ).metadata();
-            if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
-              metadata.atim = st_atim;
-            } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
-              metadata.atim = msToNs(performance.now());
-            }
-            if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
-              metadata.mtim = st_mtim;
-            } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
-              metadata.mtim = msToNs(performance.now());
-            }
-            try {
-              // setting times of character devices makes no sense for now
-              await (fds.getFd(fd) as OpenFile | OpenDirectory).updateMetadata(
-                metadata
-              );
-            } catch (_: any) {}
-          } else {
-            err = constants.WASI_EINVAL;
+          Atomics.store(lck, 0, constants.WASI_EACCES);
+          Atomics.notify(lck, 0);
+          break;
+        }
+      } else {
+        const { fd, path, flags } = data as PathFilestatSetTimesArgs;
+        file = (
+          await (fds.getFd(fd) as OpenDirectory).getEntry(
+            path,
+            FileOrDir.Any,
+            flags
+          )
+        ).entry;
+      }
+
+      if (file !== undefined) {
+        if (
+          (!(
+            (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
+            (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0
+          ) &&
+            !(
+              (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
+              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
+            )) ||
+          file.fileType === constants.WASI_FILETYPE_CHARACTER_DEVICE
+        ) {
+          let metadata = await (file as File | Directory).metadata();
+          if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
+            metadata.atim = st_atim;
+          } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
+            metadata.atim = msToNs(performance.now());
           }
+          if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
+            metadata.mtim = st_mtim;
+          } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
+            metadata.mtim = msToNs(performance.now());
+          }
+          try {
+            // setting times of character devices makes no sense for now
+            await (file as File | Directory).updateMetadata(metadata);
+          } catch (e: any) {}
         } else {
-          err = constants.WASI_EACCES;
+          err = constants.WASI_EINVAL;
         }
       } else {
         err = constants.WASI_EBADF;

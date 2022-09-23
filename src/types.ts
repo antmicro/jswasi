@@ -150,3 +150,13 @@ export type FdFilestatSetTimesArgs = {
   st_mtim: bigint;
   fst_flags: number;
 };
+
+export type PathFilestatSetTimesArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+  flags: LookupFlags;
+  path: string;
+  st_atim: bigint;
+  st_mtim: bigint;
+  fst_flags: number;
+};

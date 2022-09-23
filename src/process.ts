@@ -30,6 +30,7 @@ import {
   HtermConfArgs,
   PathRenameArgs,
   FdFilestatSetTimesArgs,
+  PathFilestatSetTimesArgs,
 } from "./types";
 
 type ptr = number;
@@ -89,7 +90,15 @@ type WASICallbacks = {
   fd_pwrite: any;
   fd_renumber: any;
 
-  path_filestat_set_times: any;
+  path_filestat_set_times: (
+    fd: number,
+    flags: LookupFlags,
+    path: ptr,
+    path_len: number,
+    st_atim: bigint,
+    st_mtim: bigint,
+    fst_flags: number
+  ) => number;
   path_filestat_get: (
     fd: number,
     lookupFlags: LookupFlags,
@@ -1445,8 +1454,42 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return err;
   }
 
-  function path_filestat_set_times() {
-    return placeholder();
+  function path_filestat_set_times(
+    fd: number,
+    flags: LookupFlags,
+    path: ptr,
+    path_len: number,
+    st_atim: bigint,
+    st_mtim: bigint,
+    fst_flags: number
+  ) {
+    workerConsoleLog(
+      `path_filestat_set_times(${fd}, ${flags}, ${path}, ${path_len}, ${st_atim}, ${st_mtim}, ${fst_flags})`
+    );
+    const view8 = new Uint8Array(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+    );
+
+    const path_ = new TextDecoder().decode(view8.slice(path, path + path_len));
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+    sendToKernel([
+      "path_filestat_set_times",
+      {
+        sharedBuffer,
+        fd,
+        flags,
+        path: path_,
+        st_atim,
+        st_mtim,
+        fst_flags,
+      } as PathFilestatSetTimesArgs,
+    ]);
+    Atomics.wait(lck, 0, -1);
+    const err = Atomics.load(lck, 0);
+    workerConsoleLog(`path_filestat_set_times returned ${err}`);
+    return err;
   }
 
   function proc_raise() {

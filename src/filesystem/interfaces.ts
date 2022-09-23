@@ -56,6 +56,7 @@ export interface Entry {
 export interface DirEntry extends Entry {}
 
 export interface Directory extends Entry {
+  fileType: number;
   open(
     rightsBase?: bigint,
     rightsInheriting?: bigint,
@@ -130,6 +131,7 @@ export interface OpenDirectory extends Entry {
 }
 
 export interface File extends Entry {
+  fileType: number;
   open(
     rightsBase?: bigint,
     rightsInheriting?: bigint,
