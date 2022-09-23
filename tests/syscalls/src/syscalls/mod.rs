@@ -20,3 +20,4 @@ pub mod random_get;
 pub mod clock_time_get;
 pub mod path_readlink;
 pub mod path_symlink;
+pub mod fd_filestat_set_times;
