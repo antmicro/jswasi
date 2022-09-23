@@ -30,16 +30,16 @@ impl Test {
         // changing times on one descriptor should change times on all descriptors
         for (fds, path) in [(&self.file_fds, &self.file_path), (&self.dir_fds, &self.dir_path)] {
             expect_success(fds[0], 0u64, 0u64, wasi::FSTFLAGS_MTIM | wasi::FSTFLAGS_ATIM)?;
-            check_times(fds[0], Some(0u64), Some(0u64))?;
-            check_times(fds[1], Some(0u64), Some(0u64))?;
+            fd_check_times(fds[0], Some(0u64), Some(0u64))?;
+            fd_check_times(fds[1], Some(0u64), Some(0u64))?;
 
             // setting only mtim or only mtim or only atim of a regular file should work
             expect_success(fds[0], 123u64, 123u64, wasi::FSTFLAGS_ATIM)?;
-            check_times(fds[0], Some(123u64), Some(0u64))?;
-            check_times(fds[1], Some(123u64), Some(0u64))?;
+            fd_check_times(fds[0], Some(123u64), Some(0u64))?;
+            fd_check_times(fds[1], Some(123u64), Some(0u64))?;
             expect_success(fds[1], 0u64, 123u64, wasi::FSTFLAGS_MTIM)?;
-            check_times(fds[0], Some(123u64), Some(123u64))?;
-            check_times(fds[1], Some(123u64), Some(123u64))?;
+            fd_check_times(fds[0], Some(123u64), Some(123u64))?;
+            fd_check_times(fds[1], Some(123u64), Some(123u64))?;
 
             // changed times should be readable from a new descriptor
             match wasi::path_open(
@@ -48,7 +48,7 @@ impl Test {
             ) {
                 Ok(desc) => {
                     expect_success(fds[1], 321u64, 321u64, wasi::FSTFLAGS_MTIM | wasi::FSTFLAGS_ATIM)?;
-                    check_times(desc, Some(321u64), Some(321u64))?;
+                    fd_check_times(desc, Some(321u64), Some(321u64))?;
                     if let Err(e) = wasi::fd_close(desc) { return Err(e.to_string()); }
                 },
                 Err(e) => { return Err(e.to_string()); }
@@ -80,8 +80,8 @@ impl Test {
             // verifying if these times are set correctly is problematic
             expect_success(fds[0], 0u64, 0u64, wasi::FSTFLAGS_ATIM_NOW | wasi::FSTFLAGS_MTIM_NOW)?;
 
-            // attempt to set times without permissions should fail
         }
+        // attempt to set times without permissions should fail
         expect_error(
             self.no_permission_fd, 0u64, 0u64, wasi::FSTFLAGS_ATIM,
             wasi::ERRNO_ACCES, "attempt to set times with no permissions succeeded")?;
@@ -128,15 +128,11 @@ unsafe fn expect_error(
     }
 }
 
-unsafe fn check_times(
-    fd: wasi::Fd,
+pub unsafe fn check_times(
+    filestat: wasi::Filestat,
     atim_ex: Option<wasi::Timestamp>,
-    mtim_ex: Option<wasi::Timestamp>,
+    mtim_ex: Option<wasi::Timestamp>
 ) -> Result<(), String> {
-    let filestat = match wasi::fd_filestat_get(fd) {
-        Ok(filestat) => filestat,
-        Err(e) => { return Err(e.to_string()) }
-    };
     if let Some(m) = mtim_ex {
         if m != filestat.mtim {
             return Err(format!(
@@ -152,6 +148,17 @@ unsafe fn check_times(
         }
     }
     Ok(())
+}
+
+pub unsafe fn fd_check_times(
+    fd: wasi::Fd,
+    atim_ex: Option<wasi::Timestamp>,
+    mtim_ex: Option<wasi::Timestamp>
+) -> Result<(), String> {
+    check_times(match wasi::fd_filestat_get(fd) {
+        Ok(filestat) => filestat,
+        Err(e) => { return Err(e.to_string()) }
+    }, atim_ex, mtim_ex)
 }
 
 pub fn test_fd_filestat_set_times() -> Result<(), String> {

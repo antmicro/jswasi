@@ -24,6 +24,7 @@ fn main() -> Result<(), String>{
         ("path_readlink", path_readlink::test_path_readlink as fn() -> Result<(), String>),
         ("path_symlink", path_symlink::test_path_symlink as fn() -> Result<(), String>),
         ("fd_filestat_set_times", fd_filestat_set_times::test_fd_filestat_set_times as fn() -> Result<(), String>),
+        ("path_filestat_set_times", path_filestat_set_times::test_path_filestat_set_times as fn() -> Result<(), String>),
     ];
 
     let mut fails: u32 = 0;
