@@ -6,6 +6,7 @@ import {
   OpenFlags,
   Rights,
   Stat,
+  StoredData,
 } from "./enums";
 
 export type Mount = { parts: string[]; name: string; dir: Directory };
@@ -47,7 +48,7 @@ export interface Entry {
 
   metadata(): Promise<Metadata>;
 
-  updateMetadata(): any;
+  updateMetadata(metadata: StoredData): any;
 
   stat(): Promise<Stat>;
 }

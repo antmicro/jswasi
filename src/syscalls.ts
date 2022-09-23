@@ -955,16 +955,19 @@ export default async function syscallCallback(
           0n
         ) {
           if (
-            !(
+            (!(
               (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
               (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0
             ) &&
-            !(
-              (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
-              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
-            )
+              !(
+                (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
+                (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
+              )) ||
+            fds.getFd(fd).fileType === constants.WASI_FILETYPE_CHARACTER_DEVICE
           ) {
-            let metadata = await fds.getFd(fd).stat();
+            let metadata = await (
+              fds.getFd(fd) as OpenFile | OpenDirectory
+            ).metadata();
             if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
               metadata.atim = st_atim;
             } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
@@ -977,9 +980,9 @@ export default async function syscallCallback(
             }
             try {
               // setting times of character devices makes no sense for now
-              await (
-                fds.getFd(fd) as OpenFile | OpenDirectory
-              ).updateMetadata();
+              await (fds.getFd(fd) as OpenFile | OpenDirectory).updateMetadata(
+                metadata
+              );
             } catch (_: any) {}
           } else {
             err = constants.WASI_EINVAL;
