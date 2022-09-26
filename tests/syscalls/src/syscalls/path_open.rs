@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 struct Test {
     fds: Vec<wasi::Fd>,

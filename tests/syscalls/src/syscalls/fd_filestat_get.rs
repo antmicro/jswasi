@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 unsafe fn expect_success(desc: wasi::Fd, filetype_e: wasi::Filetype, size_e: u64) -> Result<(), String> {
     match wasi::fd_filestat_get(desc) {

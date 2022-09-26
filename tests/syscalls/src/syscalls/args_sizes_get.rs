@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 pub fn test_args_sizes_get() -> Result<(), String> {
     unsafe {

@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::collections::HashMap;
 use std::mem::size_of;
-use super::constants;
+use constants;
 
 #[derive(Debug)]
 pub struct Dirent {

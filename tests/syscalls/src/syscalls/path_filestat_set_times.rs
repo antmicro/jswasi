@@ -1,6 +1,5 @@
-use super::constants;
-use super::fd_filestat_set_times::check_times;
-use super::fd_filestat_set_times::fd_check_times;
+use constants;
+use utils::{fd_check_times, path_check_times};
 
 struct Test {
     root_fd: wasi::Fd,
@@ -95,20 +94,6 @@ impl Test {
         Ok(())
     }
 }
-
-unsafe fn path_check_times(
-    fd: wasi::Fd,
-    lookupflags: wasi::Lookupflags,
-    path: &str,
-    atim_ex: Option<wasi::Timestamp>,
-    mtim_ex: Option<wasi::Timestamp>
-) -> Result<(), String> {
-    check_times(match wasi::path_filestat_get(fd, lookupflags, path) {
-        Ok(filestat) => filestat,
-        Err(e) => { return Err(e.to_string()); }
-    }, atim_ex, mtim_ex)
-}
-
 
 unsafe fn expect_success(
     fd: wasi::Fd,

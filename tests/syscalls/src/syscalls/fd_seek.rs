@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 unsafe fn expect_success(
     desc: wasi::Fd,

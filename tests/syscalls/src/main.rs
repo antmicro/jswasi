@@ -1,4 +1,7 @@
 mod syscalls;
+mod constants;
+mod utils;
+
 use syscalls::*;
 
 fn main() -> Result<(), String>{

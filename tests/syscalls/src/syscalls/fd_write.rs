@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 const TEMP_FILENAME: &str = "write_file";
 const TEMP_SYMLINK: &str = "write_symlink";

@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 pub fn test_fd_prestat_dir_name() -> Result<(), String> {
     unsafe {

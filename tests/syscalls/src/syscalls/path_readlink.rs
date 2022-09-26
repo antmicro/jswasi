@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 use std::str;
 
 const BUF_SIZE: usize = 128;

@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 pub fn test_fd_close() -> Result<(), String> {
     unsafe {

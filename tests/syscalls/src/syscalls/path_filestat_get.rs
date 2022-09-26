@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 const INVALID_PATH: &str = "invalid";
 

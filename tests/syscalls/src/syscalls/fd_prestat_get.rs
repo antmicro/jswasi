@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 unsafe fn expect_success(desc: wasi::Fd, name_len_ex: usize, tag_ex: u8) -> Result<(), String> {
     match wasi::fd_prestat_get(desc) {

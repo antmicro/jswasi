@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 use std::str;
 
 struct Test<'a> {

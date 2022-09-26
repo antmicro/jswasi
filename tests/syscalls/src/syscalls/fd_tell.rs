@@ -1,4 +1,4 @@
-use super::constants;
+use constants;
 
 unsafe fn expect_success(desc: wasi::Fd, expected: wasi::Filesize, close: bool) -> Result<(), String> {
     // close - close the descriptor in case the test fails
