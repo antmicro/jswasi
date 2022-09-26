@@ -41,6 +41,7 @@ fn main() -> Result<(), String>{
         // teardown test environment
         wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_TEXT_FILENAME).unwrap();
         wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_LINK_FILENAME).unwrap();
+        wasi::path_unlink_file(constants::PWD_DESC, constants::SAMPLE_DIR_LINK_FILENAME).unwrap();
         let desc = match wasi::path_open(
             constants::PWD_DESC, 0, constants::SAMPLE_DIR_FILENAME,
             0, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) {
