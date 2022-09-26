@@ -951,33 +951,39 @@ export default async function syscallCallback(
       const { sharedBuffer, st_atim, st_mtim, fst_flags } =
         data as FdFilestatSetTimesArgs;
       let file;
-      let err;
+      let err = constants.WASI_ESUCCESS;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
       if (action === "fd_filestat_set_times") {
         const { fd } = data as FdFilestatGetArgs;
         file = fds.getFd(fd);
-        if (
-          file &&
-          (file.rightsBase & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) === 0n
+        if (!file) {
+          err = constants.WASI_EBADF;
+        } else if (
+          (file.rightsBase & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) ===
+          0n
         ) {
-          Atomics.store(lck, 0, constants.WASI_EACCES);
-          Atomics.notify(lck, 0);
-          break;
+          err = constants.WASI_EACCES;
         }
       } else {
         const { fd, path, flags } = data as PathFilestatSetTimesArgs;
-        file = (
-          await (fds.getFd(fd) as OpenDirectory).getEntry(
-            path,
-            FileOrDir.Any,
-            flags
-          )
-        ).entry;
+        if (fds.getFd(fd) === undefined) {
+          err = constants.WASI_EBADF;
+        } else {
+          file = (
+            await (fds.getFd(fd) as OpenDirectory).getEntry(
+              path,
+              FileOrDir.Any,
+              flags
+            )
+          ).entry;
+          if (!file) {
+            err = constants.WASI_EINVAL;
+          }
+        }
       }
-
-      if (file !== undefined) {
+      if (err === constants.WASI_ESUCCESS) {
         if (
           (!(
             (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
@@ -1007,8 +1013,6 @@ export default async function syscallCallback(
         } else {
           err = constants.WASI_EINVAL;
         }
-      } else {
-        err = constants.WASI_EBADF;
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
