@@ -485,7 +485,7 @@ export async function init(
       // TODO: why must fds[5] be present for ls to work, and what should it be
       5: filesystem.getRootDir().open(),
     }),
-    ["/usr/bin/wash"],
+    ["/usr/bin/wash", "/usr/bin/init"],
     {
       PATH: "/usr/bin:/usr/local/bin",
       PWD: DEFAULT_WORK_DIR,
