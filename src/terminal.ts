@@ -226,6 +226,7 @@ async function initFs(openedRootDir: OpenDirectory) {
     openedRootDir.addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
+    openedRootDir.addSymlink("/usr/bin/test", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/true", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
