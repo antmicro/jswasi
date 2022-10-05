@@ -233,3 +233,8 @@ export const WASI_FSTFLAGS_ATIM = 0x0001;
 export const WASI_FSTFLAGS_ATIM_NOW = 0x0002;
 export const WASI_FSTFLAGS_MTIM = 0x0004;
 export const WASI_FSTFLAGS_MTIM_NOW = 0x0008;
+
+export const WASI_POLL_BUF_STATUS_NVALID = -1;
+export const WASI_POLL_BUF_STATUS_VALID = 0;
+export const WASI_POLL_BUF_STATUS_READY = 1;
+export const WASI_POLL_BUF_STATUS_ERR = 2;

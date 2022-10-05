@@ -27,6 +27,8 @@ import {
   PathRenameArgs,
   FdFilestatSetTimesArgs,
   PathFilestatSetTimesArgs,
+  PollOneoffArgs,
+  FdReadSub,
 } from "./types.js";
 import {
   Directory,
@@ -44,7 +46,7 @@ import {
   wget,
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
-import { In, Out } from "./devices.js";
+import { In, Stdin, Out } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { terminal } from "./terminal.js";
 import { msToNs } from "./utils.js";
@@ -1016,6 +1018,94 @@ export default async function syscallCallback(
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
+
+      break;
+    }
+    case "poll_oneoff": {
+      const { sharedBuffer, subs, events } = data as PollOneoffArgs;
+      const lock = new Int32Array(sharedBuffer, 0, 2);
+
+      const { fds } = processManager.processInfos[processId];
+      var isEvent = false;
+
+      for (var i = 0; i < subs.length; i++) {
+        let sub = subs[i];
+        const event = new Int32Array(events[i], 0, 2);
+
+        let fdNum = (sub.event as FdReadSub).fd;
+        let fd = fds.getFd(fdNum);
+        let stat = await fd.stat();
+
+        switch (sub.eventType) {
+          case constants.WASI_EVENTTYPE_FD_READ: {
+            if (stat.fileType == constants.WASI_FILETYPE_CHARACTER_DEVICE) {
+              if (fd instanceof Stdin) {
+                let stdin = fd as Stdin;
+                let bytes = await stdin.availableBytes(processId);
+                if (bytes > 0) {
+                  event[0] = constants.WASI_POLL_BUF_STATUS_READY;
+                  event[1] = bytes;
+                  isEvent = true;
+                }
+              } else {
+                event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+                event[1] = constants.WASI_EBADF;
+                isEvent = true;
+              }
+              // TODO: cover more cases
+            } else {
+              event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+              event[1] = constants.WASI_ENOTSUP;
+              isEvent = true;
+            }
+
+            break;
+          }
+          case constants.WASI_EVENTTYPE_FD_WRITE:
+          default: {
+            event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+            event[1] = constants.WASI_ENOTSUP;
+            isEvent = true;
+          }
+        }
+      }
+
+      if (isEvent) {
+        Atomics.store(lock, 0, 0);
+        Atomics.store(lock, 1, 0);
+        Atomics.notify(lock, 0);
+
+        break;
+      }
+
+      for (var i = 0; i < subs.length; i++) {
+        let sub = subs[i];
+        const buffer = new Int32Array(events[i], 0, 2);
+        let fdNum = (sub.event as FdReadSub).fd;
+        let fd = fds.getFd(fdNum);
+        let stat = await fd.stat();
+
+        switch (stat.fileType) {
+          case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
+            if (fd instanceof Stdin) {
+              let stdin = fd as Stdin;
+              await stdin.pushPollEntry(processId, lock, buffer);
+            } else {
+              // TODO: cover more cases
+              //! We have processed data earlier, it should be not executed
+            }
+
+            break;
+          }
+          default: {
+            //! We have processed data earlier, it should be not executed
+          }
+        }
+      }
+
+      Atomics.store(lock, 0, 0);
+      Atomics.notify(lock, 0);
+
       break;
     }
     default: {

@@ -16,6 +16,11 @@ type BufferRequest = {
   sharedBuffer: Uint8Array;
 };
 
+type PollEntry = {
+  lck: Int32Array;
+  data: Int32Array;
+};
+
 export class FdTable {
   private fdt: Record<number, FileDescriptor> = {};
   private freeFds: number[] = [];
@@ -84,6 +89,7 @@ export class FdTable {
 
 class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
+  public pollQueue: Array<PollEntry> = [];
 
   public shouldEcho = true;
 
@@ -247,9 +253,9 @@ export default class ProcessManager {
     // each process has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
     // now that buffer was filled, look if there are pending buffer requests from current foreground worker
     if (this.currentProcess != null) {
+      const process = this.processInfos[this.currentProcess];
       while (
-        this.processInfos[this.currentProcess].bufferRequestQueue.length !==
-          0 &&
+        process.bufferRequestQueue.length !== 0 &&
         this.buffer.length !== 0
       ) {
         const { requestedLen, lck, readLen, sharedBuffer } =
@@ -261,6 +267,21 @@ export default class ProcessManager {
           readLen,
           sharedBuffer
         );
+      }
+
+      if (this.buffer.length !== 0 && process.pollQueue.length > 0) {
+        while (process.pollQueue.length > 0) {
+          const entry = process.pollQueue.shift();
+
+          if (
+            Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID
+          ) {
+            Atomics.store(entry.data, 1, this.buffer.length);
+            Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
+            Atomics.store(entry.lck, 1, 0);
+            Atomics.notify(entry.lck, 1);
+          }
+        }
       }
     }
   }

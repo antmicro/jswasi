@@ -93,6 +93,37 @@ export class Stdin implements In {
   seek(): number {
     return 0;
   }
+
+  availableBytes(workerId: number): Promise<number> {
+    let availableBytes = this.workerTable.buffer.length;
+    let pendingBytes = 0;
+
+    if (availableBytes > 0) {
+      // check wheter left some bytes
+      const queue = this.workerTable.processInfos[workerId].bufferRequestQueue;
+      for (let request of queue) {
+        availableBytes -= request.requestedLen;
+        if (availableBytes <= 0) {
+          break;
+        }
+      }
+      pendingBytes = availableBytes > 0 ? availableBytes : 0;
+    }
+
+    return Promise.resolve(pendingBytes);
+  }
+
+  pushPollEntry(
+    workerId: number,
+    userLock: Int32Array,
+    userBuffer: Int32Array
+  ): Promise<void> {
+    this.workerTable.processInfos[workerId].pollQueue.push({
+      lck: userLock,
+      data: userBuffer,
+    });
+    return Promise.resolve();
+  }
 }
 
 export class Stdout implements Out {
@@ -130,6 +161,7 @@ export class Stdout implements Out {
   }
 
   close(): Promise<void> {
+    // TODO: handle pollQueue
     return Promise.resolve();
   }
 

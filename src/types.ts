@@ -160,3 +160,31 @@ export type PathFilestatSetTimesArgs = {
   st_mtim: bigint;
   fst_flags: number;
 };
+
+export type ClockEvent = {
+  userdata: bigint;
+  clockId: number;
+  timeout: bigint;
+  precision: bigint;
+  flags: number;
+};
+
+export type FdReadSub = {
+  fd: number;
+};
+
+export type FdWriteSub = {
+  fd: number;
+};
+
+export type EventSub = {
+  userdata: bigint;
+  eventType: number;
+  event: FdReadSub | FdWriteSub;
+};
+
+export type PollOneoffArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  subs: Array<EventSub>;
+  events: Array<SharedArrayBuffer>;
+};

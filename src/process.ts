@@ -31,6 +31,11 @@ import {
   PathRenameArgs,
   FdFilestatSetTimesArgs,
   PathFilestatSetTimesArgs,
+  ClockEvent,
+  FdReadSub,
+  FdWriteSub,
+  EventSub,
+  PollOneoffArgs,
 } from "./types";
 
 type ptr = number;
@@ -1330,17 +1335,23 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
     );
 
-    let eventCount = 0;
-    let waitEnd = 0n;
+    var minWaitEnd = BigInt(Number.MAX_SAFE_INTEGER);
+
+    const fdSubs = new Array<EventSub>();
+    const events = new Array<SharedArrayBuffer>();
+    var lastClock: null | ClockEvent;
+
     for (let i = 0; i < nSubscriptions; i += 1) {
       const userdata = view.getBigUint64(subscriptionsPtr, true);
       subscriptionsPtr += 8;
       const eventType = view.getUint8(subscriptionsPtr);
       subscriptionsPtr += 1;
+
+      let fdSub;
       switch (eventType) {
         case constants.WASI_EVENTTYPE_CLOCK: {
           subscriptionsPtr += 7;
-          const clockid = view.getUint32(subscriptionsPtr, true);
+          const clockId = view.getUint32(subscriptionsPtr, true);
           subscriptionsPtr += 8;
           const timeout = view.getBigUint64(subscriptionsPtr, true);
           subscriptionsPtr += 8;
@@ -1351,50 +1362,128 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           const absolute = subClockFlags === 1;
 
           workerConsoleLog(
-            `clockid = ${clockid}, timeout = ${timeout}, precision = ${precision}, absolute = ${absolute}`
+            `clockId = ${clockId}, timeout = ${timeout}, precision = ${precision}, absolute = ${absolute}`
           );
 
-          const n = utils.now(clockid, CPUTIME_START);
+          const n = utils.now(clockId, CPUTIME_START);
           const end = absolute ? timeout : n + timeout;
-          waitEnd = end > waitEnd ? end : waitEnd;
 
-          view.setBigUint64(eventsPtr, userdata, true);
-          eventsPtr += 8;
-          view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true); // error
-          eventsPtr += 2; // pad offset 2
-          view.setUint8(eventsPtr, constants.WASI_EVENTTYPE_CLOCK);
-          eventsPtr += 6; // pad offset 3
+          if (minWaitEnd > end) {
+            minWaitEnd = end;
+            lastClock = {
+              userdata,
+              clockId,
+              timeout,
+              precision,
+              flags: subClockFlags,
+            } as ClockEvent;
+          }
+          continue;
+        }
+        case constants.WASI_EVENTTYPE_FD_READ: {
+          subscriptionsPtr += 7; // padding
+          const fd = view.getUint32(subscriptionsPtr, true);
+          workerConsoleLog(`read data from fd = ${fd}`);
 
-          eventCount += 1;
+          fdSub = { fd } as FdReadSub;
 
           break;
         }
-        case constants.WASI_EVENTTYPE_FD_READ:
         case constants.WASI_EVENTTYPE_FD_WRITE: {
-          subscriptionsPtr += 3; // padding
-          view.getUint32(subscriptionsPtr, true);
-          subscriptionsPtr += 4;
+          subscriptionsPtr += 7; // padding
+          const fd = view.getUint32(subscriptionsPtr, true);
+          workerConsoleLog(`write data to fd = ${fd}`);
 
-          view.setBigUint64(eventsPtr, userdata, true);
-          eventsPtr += 8;
-          view.setUint16(eventsPtr, constants.WASI_ENOSYS, true); // error
-          eventsPtr += 2; // pad offset 2
-          view.setUint8(eventsPtr, eventType);
-          eventsPtr += 1; // pad offset 3
-          eventsPtr += 5; // padding to 8
-
-          eventCount += 1;
+          fdSub = { fd } as FdWriteSub;
 
           break;
         }
         default:
+          // There is no more event types
           return constants.WASI_EINVAL;
+      }
+
+      fdSubs.push({ userdata, eventType, event: fdSub });
+
+      // status + data
+      // status: -1 not valid, 0 valid, 1 ready, 2 error
+      const buffer = new SharedArrayBuffer(4 + 4);
+      const array = new Int32Array(buffer, 0, 2);
+      array[0] = array[1] = 0;
+      events.push(buffer);
+    }
+
+    // 2 locks
+    const sharedBuffer = new SharedArrayBuffer(2 * 4);
+    const lock = new Int32Array(sharedBuffer, 0, 2);
+    lock[0] = lock[1] = -1;
+
+    if (fdSubs.length > 0) {
+      sendToKernel([
+        "poll_oneoff",
+        { sharedBuffer, subs: fdSubs, events } as PollOneoffArgs,
+      ]);
+      Atomics.wait(lock, 0, -1);
+    }
+
+    if (minWaitEnd < BigInt(Number.MAX_SAFE_INTEGER)) {
+      // Wait with timeout
+      const ms = Number(minWaitEnd) / 1000000 - performance.now();
+      if (Atomics.wait(lock, 1, -1, ms) === "timed-out") {
+        // Timeout is reached, there is not more events
+        view.setBigUint64(eventsPtr, lastClock.userdata, true);
+        eventsPtr += 8;
+        view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
+        eventsPtr += 2;
+        view.setUint8(eventsPtr, constants.WASI_EVENTTYPE_CLOCK);
+        eventsPtr += 6;
+
+        view.setUint32(nEvents, 1, true);
+
+        for (var i = 0; i < events.length; i++) {
+          const buffer = new Int32Array(events[i], 0, 2);
+          Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
+        }
+
+        return constants.WASI_ESUCCESS;
+      }
+    } else {
+      // Wait without timeout
+      Atomics.wait(lock, 1, -1);
+    }
+
+    var gotEvents = 0;
+    for (var i = 0; i < events.length; i++) {
+      const buffer = new Int32Array(events[i], 0, 2);
+
+      let status = Atomics.load(buffer, 0);
+      let data = Atomics.load(buffer, 1);
+
+      Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
+
+      if (status == constants.WASI_POLL_BUF_STATUS_READY) {
+        view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
+        eventsPtr += 8;
+        view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
+        eventsPtr += 2; // pad offset 2
+        view.setUint8(eventsPtr, fdSubs[i].eventType);
+        eventsPtr += 6;
+        view.setUint8(eventsPtr, data);
+        // TODO: Event flags
+
+        gotEvents += 1;
+      } else if (status == constants.WASI_POLL_BUF_STATUS_ERR) {
+        view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
+        eventsPtr += 8;
+        view.setUint16(eventsPtr, data, true);
+        eventsPtr += 2; // pad offset 2
+        view.setUint8(eventsPtr, fdSubs[i].eventType);
+
+        gotEvents += 1;
       }
     }
 
-    view.setUint32(nEvents, eventCount, true);
-    const ms = Number(waitEnd) / 1000000 - performance.now();
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    view.setInt32(nEvents, gotEvents, true);
 
     return constants.WASI_ESUCCESS;
   }
