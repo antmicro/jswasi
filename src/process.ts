@@ -1341,23 +1341,31 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const events = new Array<SharedArrayBuffer>();
     var lastClock: null | ClockEvent;
 
+    function invalidateEventBuffers() {
+      for (var i = 0; i < events.length; i++) {
+        const buffer = new Int32Array(events[i], 0, 2);
+        Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
+      }
+    }
+
     for (let i = 0; i < nSubscriptions; i += 1) {
       const userdata = view.getBigUint64(subscriptionsPtr, true);
-      subscriptionsPtr += 8;
+      subscriptionsPtr += 8; // userdata offset
       const eventType = view.getUint8(subscriptionsPtr);
-      subscriptionsPtr += 1;
+      subscriptionsPtr += 1; // tag offset
 
       let fdSub;
       switch (eventType) {
         case constants.WASI_EVENTTYPE_CLOCK: {
-          subscriptionsPtr += 7;
+          subscriptionsPtr += 7; // padding to 8
           const clockId = view.getUint32(subscriptionsPtr, true);
-          subscriptionsPtr += 8;
+          subscriptionsPtr += 8; // clockId offset
           const timeout = view.getBigUint64(subscriptionsPtr, true);
-          subscriptionsPtr += 8;
+          subscriptionsPtr += 8; // timeout offset
           const precision = view.getBigUint64(subscriptionsPtr, true);
-          subscriptionsPtr += 8;
+          subscriptionsPtr += 8; // precision offset
           const subClockFlags = view.getUint16(subscriptionsPtr, true);
+          subscriptionsPtr += 8; // flags offset + padding to 8
 
           const absolute = subClockFlags === 1;
 
@@ -1381,8 +1389,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           continue;
         }
         case constants.WASI_EVENTTYPE_FD_READ: {
-          subscriptionsPtr += 7; // padding
+          subscriptionsPtr += 7; // padding to 8
           const fd = view.getUint32(subscriptionsPtr, true);
+          subscriptionsPtr += 32; // file descriptor offset + subscription padding
+
           workerConsoleLog(`read data from fd = ${fd}`);
 
           fdSub = { fd } as FdReadSub;
@@ -1390,8 +1400,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           break;
         }
         case constants.WASI_EVENTTYPE_FD_WRITE: {
-          subscriptionsPtr += 7; // padding
+          subscriptionsPtr += 7; // padding to 8
           const fd = view.getUint32(subscriptionsPtr, true);
+          subscriptionsPtr += 32; // file descriptor offset + subscription padding
           workerConsoleLog(`write data to fd = ${fd}`);
 
           fdSub = { fd } as FdWriteSub;
@@ -1432,18 +1443,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       if (Atomics.wait(lock, 1, -1, ms) === "timed-out") {
         // Timeout is reached, there is not more events
         view.setBigUint64(eventsPtr, lastClock.userdata, true);
-        eventsPtr += 8;
+        eventsPtr += 8; // userdata offset
         view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
-        eventsPtr += 2;
+        eventsPtr += 2; // errno offset
         view.setUint8(eventsPtr, constants.WASI_EVENTTYPE_CLOCK);
-        eventsPtr += 6;
+        eventsPtr += 22; // type, nbytes, flags offsets + padding to 8
 
+        invalidateEventBuffers();
         view.setUint32(nEvents, 1, true);
-
-        for (var i = 0; i < events.length; i++) {
-          const buffer = new Int32Array(events[i], 0, 2);
-          Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
-        }
 
         return constants.WASI_ESUCCESS;
       }
@@ -1463,28 +1470,31 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
       if (status == constants.WASI_POLL_BUF_STATUS_READY) {
         view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
-        eventsPtr += 8;
+        eventsPtr += 8; // userdata offset
         view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
-        eventsPtr += 2; // pad offset 2
+        eventsPtr += 2; // errno offset
         view.setUint8(eventsPtr, fdSubs[i].eventType);
-        eventsPtr += 6;
+        eventsPtr += 6; // type offset + padding to 8
         view.setUint8(eventsPtr, data);
+        eventsPtr += 8; // nbytes offset
         // TODO: Event flags
+        eventsPtr += 8; // flags offset + padding to 8
 
         gotEvents += 1;
       } else if (status == constants.WASI_POLL_BUF_STATUS_ERR) {
         view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
-        eventsPtr += 8;
+        eventsPtr += 8; // userdata offset
         view.setUint16(eventsPtr, data, true);
-        eventsPtr += 2; // pad offset 2
+        eventsPtr += 2; // errno offset
         view.setUint8(eventsPtr, fdSubs[i].eventType);
+        eventsPtr += 22; // type, nbytes, flags offsets + padding to 8
 
         gotEvents += 1;
       }
     }
 
+    invalidateEventBuffers();
     view.setInt32(nEvents, gotEvents, true);
-
     return constants.WASI_ESUCCESS;
   }
 

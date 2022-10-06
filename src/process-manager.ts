@@ -278,8 +278,8 @@ export default class ProcessManager {
           ) {
             Atomics.store(entry.data, 1, this.buffer.length);
             Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
-            Atomics.store(entry.lck, 1, 0);
-            Atomics.notify(entry.lck, 1);
+            Atomics.store(entry.lck, 0, 0);
+            Atomics.notify(entry.lck, 0);
           }
         }
       }
