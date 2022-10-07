@@ -25,10 +25,13 @@ declare global {
 
 const DEFAULT_WORK_DIR = "/home/ant";
 
+// binaries which need to be verified
+const CHECKSUM_BINARIES = {
+  "/usr/bin/wash": ["resources/wash.wasm", "resources/wash.md5"],
+  "/usr/bin/init": ["resources/init.sh", "resources/init.md5"],
+};
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
-  "/usr/bin/wash": "resources/wash.wasm",
-  "/usr/bin/init": "resources/init.sh",
   "/usr/bin/coreutils": "resources/coreutils.wasm",
 };
 
@@ -333,20 +336,6 @@ export async function init(
   }
 
   const filesystem: Filesystem = await createFsaFilesystem();
-  const wash = await await filesystem
-    .getRootDir()
-    .open()
-    .getEntry("/usr/bin/wash", FileOrDir.File);
-  let match_sum = false;
-  if (wash.err === constants.EXIT_SUCCESS) {
-    const open_wash = await wash.entry.open();
-    // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
-    let actual_sum = await md5sum(open_wash, 1 << (16 + 1));
-    let exp_sum = new TextDecoder().decode(
-      (await (await fetch("resources/wash.md5")).arrayBuffer()).slice(0, 32)
-    );
-    match_sum = actual_sum === exp_sum;
-  }
 
   initServiceWorker();
   if (
@@ -366,30 +355,43 @@ export async function init(
         LookupFlags.NoFollow,
         OpenFlags.Create
       );
-  } else if (
-    !(await filesystem.pathExists(filesystem.getMetaDir(), "/usr/bin/wash")) ||
-    !match_sum
-  ) {
-    const openedRootDir = filesystem.getRootDir().open();
-    await openedRootDir.getEntry(
-      "/usr",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    );
-    await openedRootDir.getEntry(
-      "/usr/bin",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    );
-    await fetchFile(
-      openedRootDir,
-      "/usr/bin/wash",
-      ALWAYS_FETCH_BINARIES["/usr/bin/wash"],
-      true
-    );
   }
+
+  // verify if wash and init are up to date and refetch them if they are not
+  const openedRootDir = filesystem.getRootDir().open();
+  await openedRootDir.getEntry(
+    "/usr",
+    FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  await openedRootDir.getEntry(
+    "/usr/bin",
+    FileOrDir.Directory,
+    LookupFlags.SymlinkFollow,
+    OpenFlags.Create | OpenFlags.Directory
+  );
+  const checksumPromises = Object.entries(CHECKSUM_BINARIES).map(
+    async ([filename, [address, checksum]]) => {
+      const file = await filesystem
+        .getRootDir()
+        .open()
+        .getEntry(filename, FileOrDir.File);
+      if (file.err === constants.EXIT_SUCCESS) {
+        const open_file = await file.entry.open();
+        // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
+        let actual_sum = await md5sum(open_file, 1 << (16 + 1));
+        let exp_sum = new TextDecoder().decode(
+          (await (await fetch(checksum)).arrayBuffer()).slice(0, 32)
+        );
+        if (actual_sum === exp_sum) {
+          return undefined;
+        }
+      }
+      return fetchFile(openedRootDir, filename, address, true);
+    }
+  );
+  await Promise.all(checksumPromises);
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
