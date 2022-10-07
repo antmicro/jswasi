@@ -222,8 +222,11 @@ export default class ProcessManager {
   }
 
   sendSigInt(id: number) {
-    if (this.currentProcess === 0) {
-      console.log("Ctrl-C sent to PROCESS 0");
+    if (
+      this.currentProcess === 0 ||
+      this.processInfos[this.currentProcess].cmd === "/usr/bin/wash"
+    ) {
+      console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
     } else {
       this.terminateProcess(id);
     }
