@@ -95,6 +95,10 @@ export class Stdin implements In {
   }
 
   availableBytes(workerId: number): Promise<number> {
+    if (this.workerTable.currentProcess !== workerId) {
+      return Promise.resolve(0);
+    }
+
     let availableBytes = this.workerTable.buffer.length;
     let pendingBytes = 0;
 

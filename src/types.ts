@@ -188,3 +188,8 @@ export type PollOneoffArgs = {
   subs: Array<EventSub>;
   events: Array<SharedArrayBuffer>;
 };
+
+export type PollEntry = {
+  lck: Int32Array;
+  data: Int32Array;
+};

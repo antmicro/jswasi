@@ -1034,6 +1034,14 @@ export default async function syscallCallback(
 
         let fdNum = (sub.event as FdReadSub).fd;
         let fd = fds.getFd(fdNum);
+        if (fd === null) {
+          event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+          event[1] = constants.WASI_EBADF;
+          isEvent = true;
+
+          continue;
+        }
+
         let stat = await fd.stat();
 
         switch (sub.eventType) {
@@ -1056,6 +1064,12 @@ export default async function syscallCallback(
                 }
 
                 break;
+              }
+              case constants.WASI_FILETYPE_DIRECTORY:
+              case constants.WASI_FILETYPE_REGULAR_FILE: {
+                event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+                event[1] = constants.WASI_EPERM;
+                isEvent = true;
               }
               default: {
                 event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
@@ -1108,6 +1122,8 @@ export default async function syscallCallback(
 
             break;
           }
+          case constants.WASI_FILETYPE_DIRECTORY:
+          case constants.WASI_FILETYPE_REGULAR_FILE:
           default: {
             //! We have processed data earlier, it should be not executed
           }

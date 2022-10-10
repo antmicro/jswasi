@@ -6,6 +6,7 @@ import {
   OpenFile,
 } from "./filesystem/interfaces.js";
 import { FileOrDir } from "./filesystem/enums.js";
+import { PollEntry } from "./types.js";
 
 type FileDescriptor = In | Out | OpenFile | OpenDirectory;
 
@@ -14,11 +15,6 @@ type BufferRequest = {
   lck: Int32Array;
   readLen: Int32Array;
   sharedBuffer: Uint8Array;
-};
-
-type PollEntry = {
-  lck: Int32Array;
-  data: Int32Array;
 };
 
 export class FdTable {
