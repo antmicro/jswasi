@@ -66,10 +66,14 @@ export type SpawnArgs = {
   sharedBuffer: SharedArrayBuffer;
   background: boolean;
   redirects: Redirect[];
-  workingDir: string;
 };
 
 export type ChdirArgs = { dir: string; sharedBuffer: SharedArrayBuffer };
+
+export type GetCwdArgs = {
+  bufLen: number;
+  sharedBuffer: SharedArrayBuffer;
+};
 
 export type SetEnvArgs = {
   key: string;

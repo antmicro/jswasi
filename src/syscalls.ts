@@ -1,6 +1,7 @@
 import * as constants from "./constants.js";
 import {
   ChdirArgs,
+  GetCwdArgs,
   FdCloseArgs,
   FdFdstatGetArgs,
   FdFilestatGetArgs,
@@ -166,6 +167,25 @@ export default async function syscallCallback(
       Atomics.notify(lock, 0);
       break;
     }
+    case "getcwd": {
+      const { bufLen, sharedBuffer } = data as GetCwdArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const cwd_len = new Uint32Array(sharedBuffer, 4, 1);
+      const cwd = new Uint8Array(sharedBuffer, 8, bufLen);
+
+      let err;
+      const cwd_path = processManager.processInfos[processId].cwd;
+      if (bufLen < cwd_path.length) {
+        cwd_len[0] = bufLen;
+        err = constants.WASI_ENOBUFS;
+      } else {
+        cwd_len[0] = cwd_path.length;
+        cwd.set(new TextEncoder().encode(cwd_path), 0);
+      }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
     case "isatty": {
       const { sharedBuffer, fd } = data as IsAttyArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -215,15 +235,8 @@ export default async function syscallCallback(
       break;
     }
     case "spawn": {
-      const {
-        path,
-        args,
-        env,
-        sharedBuffer,
-        background,
-        redirects,
-        workingDir,
-      } = data as SpawnArgs;
+      const { path, args, env, sharedBuffer, background, redirects } =
+        data as SpawnArgs;
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
       args.splice(0, 0, path.split("/").pop());
 
@@ -336,7 +349,7 @@ export default async function syscallCallback(
               args,
               env,
               background,
-              workingDir
+              processManager.processInfos[processId].cwd
             );
             const newProcessName = path.split("/").slice(-1)[0];
             if (env["DEBUG"] === "1") {
@@ -432,7 +445,7 @@ export default async function syscallCallback(
       const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
       const buffer = new Uint8Array(sharedBuffer, 8, bufferLen);
 
-      let err;
+      let err = constants.WASI_ESUCCESS;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
         let linkedPath;

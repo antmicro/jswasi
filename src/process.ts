@@ -4,6 +4,7 @@ import * as utils from "./utils.js";
 import { LookupFlags } from "./filesystem/enums";
 import {
   ChdirArgs,
+  GetCwdArgs,
   FdCloseArgs,
   FdFdstatGetArgs,
   FdFilestatGetArgs,
@@ -179,13 +180,12 @@ let mod: string;
 let myself: number;
 let programArgs: string[];
 let env: Record<string, string>;
-let workingDir: string;
 
 onmessage = async (e) => {
   if (!started) {
     if (e.data[0] === "start") {
       started = true;
-      [, mod, myself, programArgs, env, workingDir] = e.data;
+      [, mod, myself, programArgs, env] = e.data;
 
       try {
         await start_wasm();
@@ -835,36 +835,38 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         buf_len
       )
     );
-    const {
-      args,
-      extended_env,
-      background,
-      redirects,
-      working_dir,
-    }: {
-      args: string[];
-      extended_env: Record<string, string>;
-      background: boolean;
-      redirects: Redirect[];
-      working_dir: string;
-    } = JSON.parse(json);
     switch (command) {
       case "spawn": {
         const sharedBuffer = new SharedArrayBuffer(4);
+
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
+        const {
+          path,
+          args,
+          extended_env,
+          redirects,
+          background,
+        }: {
+          path: string;
+          args: string[];
+          extended_env: Record<string, string>;
+          background: boolean;
+          redirects: Redirect[];
+        } = JSON.parse(json);
+
         sendToKernel([
           "spawn",
           {
-            path: args[0],
-            args: args.slice(1),
+            path,
+            args,
             env: { ...env, ...extended_env },
             sharedBuffer,
             background,
             redirects,
-            workingDir: working_dir,
           } as SpawnArgs,
         ]);
+
         // wait for child process to finish
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
@@ -878,35 +880,61 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         }
         return `${constants.EXIT_SUCCESS}\x1b`;
       }
-      case "get_cwd": {
-        return `${constants.EXIT_SUCCESS}\x1b${workingDir}`;
-      }
+
       case "chdir": {
         const sharedBuffer = new SharedArrayBuffer(4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
-        const dir = utils.realpath(args[0]);
-        sendToKernel(["chdir", { dir, sharedBuffer } as ChdirArgs]);
+
+        const { dir }: { dir: string } = JSON.parse(json);
+        const dir_ = utils.realpath(dir);
+
+        sendToKernel(["chdir", { dir: dir_, sharedBuffer } as ChdirArgs]);
+
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        return `${err}\x1b${dir}`;
+      }
+
+      case "getcwd": {
+        const { buf_len }: { buf_len: number } = JSON.parse(json);
+
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        const cwd_len = new Uint32Array(sharedBuffer, 4, 1);
+        const cwd_buf = new Uint8Array(sharedBuffer, 8, buf_len);
+        lck[0] = -1;
+
+        sendToKernel([
+          "getcwd",
+          { bufLen: buf_len, sharedBuffer } as GetCwdArgs,
+        ]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
-        return `${err}\x1b${dir}`;
+        const output =
+          err === constants.EXIT_SUCCESS
+            ? new TextDecoder().decode(cwd_buf.slice(0, cwd_len[0]))
+            : "";
+        workerConsoleLog(`getcwd returned ${output}`);
+        return `${err}\x1b${output}`;
       }
+
       case "set_env": {
         const sharedBuffer = new SharedArrayBuffer(4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
-        const [key, value] = args;
+        const { key, value }: { key: string; value: string } = JSON.parse(json);
         sendToKernel(["set_env", { key, value, sharedBuffer } as SetEnvArgs]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
         if (err === constants.WASI_ESUCCESS) {
-          if (args.length === 1) {
-            delete env[args[0]];
+          if (value === undefined) {
+            delete env[key];
           } else {
-            const [key, value] = args;
             env[key] = value;
           }
         }
@@ -920,9 +948,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
 
+        const { echo }: { echo: string } = JSON.parse(json);
+
         sendToKernel([
           "set_echo",
-          { shouldEcho: args[0], sharedBuffer } as SetEchoArgs,
+          { shouldEcho: echo, sharedBuffer } as SetEchoArgs,
         ]);
         Atomics.wait(lck, 0, -1);
 
@@ -932,8 +962,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
+
         const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
-        const fd = parseInt(args[0], 10);
+        const { fd }: { fd: number } = JSON.parse(json);
 
         sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
@@ -952,9 +983,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
       }
       case "hterm": {
-        const [method, attrib, val] = args;
+        const { attrib, val }: { attrib: string; val: string } =
+          JSON.parse(json);
         let returnCode;
-        if (method === "get") {
+        if (val === undefined) {
           var bufferSize = 64;
           while (true) {
             const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufferSize);
@@ -967,7 +999,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
             sendToKernel([
               "hterm",
-              { sharedBuffer, method, attrib, val } as HtermConfArgs,
+              { sharedBuffer, method: "get", attrib, val } as HtermConfArgs,
             ]);
             Atomics.wait(lck, 0, -1);
             returnCode = Atomics.load(lck, 0);
@@ -989,7 +1021,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
               return `${returnCode}\x1b`;
             }
           }
-        } else if (method === "set") {
+        } else {
           const sharedBuffer = new SharedArrayBuffer(4);
           const lck = new Int32Array(sharedBuffer, 0, 1);
 
@@ -997,15 +1029,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
           sendToKernel([
             "hterm",
-            { sharedBuffer, method, attrib, val } as HtermConfArgs,
+            { sharedBuffer, method: "set", attrib, val } as HtermConfArgs,
           ]);
           Atomics.wait(lck, 0, -1);
 
           returnCode = Atomics.load(lck, 0);
           return `${returnCode}\x1b`;
-        } else {
-          workerConsoleLog(`Special command ${command} has wrong method name.`);
-          return `${constants.WASI_EINVAL}\x1bSpecial command ${command} has wrong method name.`;
         }
       }
       default: {

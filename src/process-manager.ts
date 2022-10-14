@@ -103,6 +103,7 @@ class ProcessInfo {
       processManager: ProcessManager
     ) => Promise<void>,
     public env: Record<string, string>,
+    public cwd: string,
     public isJob: boolean
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
@@ -158,6 +159,7 @@ export default class ProcessManager {
       parentLock,
       syscallCallback,
       env,
+      workingDir,
       isJob
     );
     worker.onmessage = (event) => syscallCallback(event, this);
@@ -200,7 +202,6 @@ export default class ProcessManager {
       id,
       args,
       env,
-      workingDir,
     ]);
 
     return id;
