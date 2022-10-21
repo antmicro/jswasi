@@ -162,6 +162,7 @@ export default async function syscallCallback(
       const openedPwd = entry.open() as OpenDirectory;
       openedPwd.setAsCwd();
       fds.replaceFd(4, openedPwd);
+      processManager.processInfos[processId].cwd = dir;
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
