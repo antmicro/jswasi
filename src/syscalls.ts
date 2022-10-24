@@ -1070,6 +1070,8 @@ export default async function syscallCallback(
                 event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
                 event[1] = constants.WASI_EPERM;
                 isEvent = true;
+
+                break;
               }
               default: {
                 event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
@@ -1084,6 +1086,8 @@ export default async function syscallCallback(
             event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
             event[1] = constants.WASI_ENOTSUP;
             isEvent = true;
+
+            break;
           }
           default: {
             event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
