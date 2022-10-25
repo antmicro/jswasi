@@ -818,7 +818,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   // used solely in path_readlink
-  function specialParse(syscallDataJson: string): string {
+  function specialParse(syscallDataJson: string): {
+    exit_status: number;
+    output: string;
+  } {
     const {
       command,
       buf_len,
@@ -854,6 +857,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           background: boolean;
           redirects: Redirect[];
         } = JSON.parse(json);
+        workerConsoleLog(
+          `${path} ${args} ${extended_env} ${background} ${redirects}`
+        );
 
         sendToKernel([
           "spawn",
@@ -874,11 +880,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           workerConsoleLog(`error: spawned process returned ${err}`);
           if (err === constants.WASI_ENOEXEC) {
             // If the program can't be executed, return additional output message
-            return `${constants.EXIT_FAILURE}\x1bcannot execute binary file: Exec format error`;
+            return {
+              exit_status: constants.EXIT_FAILURE,
+              output: `cannot execute binary file: Exec format error`,
+            };
           }
-          return `${constants.EXIT_FAILURE}\x1b`;
+          return { exit_status: constants.EXIT_FAILURE, output: undefined };
         }
-        return `${constants.EXIT_SUCCESS}\x1b`;
+        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
       }
 
       case "chdir": {
@@ -894,11 +903,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
-        return `${err}\x1b${dir}`;
+        return { exit_status: err, output: dir };
       }
 
       case "getcwd": {
-        const { buf_len }: { buf_len: number } = JSON.parse(json);
+        const { buf_len }: { buf: ptr; buf_len: number } = JSON.parse(json);
 
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -916,9 +925,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const output =
           err === constants.EXIT_SUCCESS
             ? new TextDecoder().decode(cwd_buf.slice(0, cwd_len[0]))
-            : "";
+            : undefined;
         workerConsoleLog(`getcwd returned ${output}`);
-        return `${err}\x1b${output}`;
+        return { exit_status: err, output };
       }
 
       case "set_env": {
@@ -939,7 +948,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           }
         }
 
-        return `${constants.EXIT_SUCCESS}\x1b`;
+        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
       }
       // TODO: rework this, linux uses "stty -echo"/"stty echo"
       //  (https://www.thegeeksearch.com/how-to-disable-enable-echo-of-keys-commands-typed-in-linux-shell/)
@@ -956,7 +965,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         ]);
         Atomics.wait(lck, 0, -1);
 
-        return `${constants.EXIT_SUCCESS}\x1b`;
+        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
       }
       case "isatty": {
         const sharedBuffer = new SharedArrayBuffer(8);
@@ -969,7 +978,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
 
-        return `${constants.EXIT_SUCCESS}\x1b${isattyPtr[0]}`;
+        return {
+          exit_status: constants.EXIT_SUCCESS,
+          output: `${isattyPtr[0]}`,
+        };
       }
       case "getpid": {
         const sharedBuffer = new SharedArrayBuffer(8);
@@ -980,7 +992,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
-        return `${constants.EXIT_SUCCESS}\x1b${pidPtr[0]}`;
+        return { exit_status: constants.EXIT_SUCCESS, output: `${pidPtr[0]}` };
       }
       case "hterm": {
         const { attrib, val }: { attrib: string; val: string } =
@@ -1011,14 +1023,17 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
                   buffer.slice(0, bufferUsed[0])
                 );
 
-                return `${constants.EXIT_SUCCESS}\x1b${value}`;
+                return {
+                  exit_status: constants.EXIT_SUCCESS,
+                  output: `${value}`,
+                };
               }
 
               while (bufferSize < bufferUsed[0]) {
                 bufferSize *= 2;
               }
             } else {
-              return `${returnCode}\x1b`;
+              return { exit_status: returnCode, output: undefined };
             }
           }
         } else {
@@ -1034,7 +1049,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           Atomics.wait(lck, 0, -1);
 
           returnCode = Atomics.load(lck, 0);
-          return `${returnCode}\x1b`;
+          return { exit_status: returnCode, output: undefined };
         }
       }
       default: {
@@ -1072,12 +1087,13 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         view.setUint32(bufferUsedPtr, bufferLen, true);
         return constants.WASI_ESUCCESS;
       }
-      const result = new TextEncoder().encode(specialParse(path.slice(1)));
+      const { exit_status, output } = specialParse(path.slice(1));
+      const result = new TextEncoder().encode(output);
       let count = result.byteLength;
       if (count > 1024) count = 1024;
       view8.set(result.slice(0, count), bufferPtr);
       view.setUint32(bufferUsedPtr, count, true);
-      return constants.WASI_ESUCCESS;
+      return exit_status;
     }
 
     const sharedBuffer = new SharedArrayBuffer(4 + bufferLen + 4); // lock, path buffer, buffer used
