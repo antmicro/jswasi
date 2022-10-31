@@ -2,6 +2,7 @@
 test ! -f /usr/bin/tree && echo "downloading tree..." && wget resources/tree.wasm /usr/bin/tree
 test ! -f /usr/bin/nohup && echo "downloading nohup..." && wget resources/nohup.wasm /usr/bin/nohup
 test ! -f /usr/bin/ox && echo "downloading ox..." && wget resources/ox.wasm /usr/bin/ox
+test ! -f /home/ant/.config/ox/ox.ron && echo "downloading ox config..." && wget resources/ox.ron /home/ant/.config/ox/ox.ron
 test ! -f /usr/bin/uutils && echo "downloading uutils..." && wget resources/uutils.async.wasm /usr/bin/uutils
 test ! -f /usr/local/bin/syscalls_test && echo "downloading syscalls_test..." && wget resources/syscalls_test.wasm /usr/local/bin/syscalls_test
 test ! -f /usr/local/bin/python && echo "downloading python..." && wget resources/python.wasm /usr/local/bin/python

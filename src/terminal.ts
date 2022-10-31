@@ -141,12 +141,30 @@ async function initFs(openedRootDir: OpenDirectory) {
   ]);
 
   // 3rd level directories/files/symlinks creation
-  const usrLocalBinPromise = openedRootDir.getEntry(
-    "/usr/local/bin",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await Promise.all([
+    openedRootDir.getEntry(
+      "/usr/local/bin",
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+    openedRootDir.getEntry(
+      `${DEFAULT_WORK_DIR}/.config`,
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+  ]);
+
+  // 4th level directories/files/symlinks creation
+  await Promise.all([
+    openedRootDir.getEntry(
+      `${DEFAULT_WORK_DIR}/.config/ox`,
+      FileOrDir.Directory,
+      LookupFlags.SymlinkFollow,
+      OpenFlags.Create | OpenFlags.Directory
+    ),
+  ]);
 
   const washRcPromise = (async () => {
     // TODO: this should be moved to shell
@@ -235,7 +253,6 @@ async function initFs(openedRootDir: OpenDirectory) {
     openedRootDir.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
   ]);
 
-  await usrLocalBinPromise;
   await washRcPromise;
   await dummyBinariesPromise;
   await symlinkCreationPromise;
