@@ -882,12 +882,18 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             // If the program can't be executed, return additional output message
             return {
               exit_status: constants.EXIT_FAILURE,
-              output: `cannot execute binary file: Exec format error`,
+              output: `${constants.WASI_ENOEXEC}`,
             };
           }
-          return { exit_status: constants.EXIT_FAILURE, output: undefined };
+          return {
+            exit_status: constants.EXIT_FAILURE,
+            output: `${constants.EXIT_SUCCESS}`,
+          };
         }
-        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
+        return {
+          exit_status: constants.EXIT_SUCCESS,
+          output: `${constants.EXIT_SUCCESS}`,
+        };
       }
 
       case "chdir": {
@@ -907,7 +913,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       }
 
       case "getcwd": {
-        const { buf_len }: { buf: ptr; buf_len: number } = JSON.parse(json);
+        const { buf_len }: { buf_len: number } = JSON.parse(json);
+        workerConsoleLog(`getcwd(${buf_len}`);
 
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -1082,11 +1089,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(`path is ${path}, buffer_len = ${bufferLen}, fd = ${fd}`);
     // special case, path_readlink is used for spawning subprocesses
     if (path[0] === "!") {
-      if (bufferLen < 1024) {
-        // we need enough buffer to execute the function only once
-        view.setUint32(bufferUsedPtr, bufferLen, true);
-        return constants.WASI_ESUCCESS;
-      }
       const { exit_status, output } = specialParse(path.slice(1));
       const result = new TextEncoder().encode(output);
       let count = result.byteLength;
