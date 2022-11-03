@@ -12,6 +12,43 @@ fn event_eq(s1: &wasi::Event, s2: &wasi::Event) -> bool {
     }
 }
 
+fn expected_errno_returned(
+    result: Result<wasi::Size, wasi::Errno>,
+    expected: Result<wasi::Size, wasi::Errno>,
+) -> Result<(), String> {
+    match (result, expected) {
+        (Ok(res), Ok(exp)) => if res != exp {
+            return Err(format!(
+                "In poll_oneoff(): invalid syscall output \
+                (expected {{events number: {}}})\
+                got {{events number: {}}}", exp, res
+            ))
+        },
+        (Err(res), Err(exp)) => if res != exp {
+            return Err(format!(
+                "In poll_oneoff(): invalid syscall output \
+                (expected {{errno: {}}})\
+                got {{errno: {}}}", exp, res
+            ))
+        },
+        (Err(res), Ok(num)) => {
+            return Err(format!(
+                "In poll_oneoff(): invalid syscall output \
+                (expected success {{events number: {}}})\
+                got fail {{errno: {}}}", num, res
+            ))
+        },
+        (Ok(res), Err(err)) => {
+            return Err(format!(
+                "In poll_oneoff(): invalid syscall output \
+                (expected fail {{errno: {}}})\
+                got success {{: {}}}", err, res
+            ))
+        },
+    }
+    Ok(())
+}
+
 unsafe fn expect_success(
     in_: *const wasi::Subscription,
     nsubscriptions: wasi::Size,
@@ -19,23 +56,11 @@ unsafe fn expect_success(
 ) -> Result<(), String> {
     let expected = events.len();
     let mut out: Vec<wasi::Event> = vec![mem::zeroed(); nsubscriptions];
+    
+    let result = wasi::poll_oneoff(in_, out.as_mut_ptr(), nsubscriptions);
+    expected_errno_returned(result, Ok(expected))?;
 
-    let got = match wasi::poll_oneoff(in_, out.as_mut_ptr(), nsubscriptions) {
-        Ok(n) => {
-            if n != expected {
-                return Err(
-                    format!(
-                        "In poll_oneoff({:?}): invalid syscall output \
-                        (expected {{occured events: {}}})\
-                        got {{occured events: {}}}", in_, expected, n
-                    )
-                );
-            } else { n }
-        }
-        Err(e) => return Err(
-            format!("In poll_oneoff({:?}): {:?}", in_, e)
-        ),
-    };
+    let got = result.unwrap();
 
     for i in 0..got {
         if !event_eq(&out[i], &events[i]) {
@@ -50,6 +75,15 @@ unsafe fn expect_success(
     }
 
     Ok(())
+}
+
+unsafe fn expect_error_event(
+    in_: *const wasi::Subscription,
+    nsubscriptions: wasi::Size,
+    events: &Vec<wasi::Event>
+) -> Result<(), String> {
+    // Syscall return Ok(nevents) but in event buffor schould be errno code
+    expect_success(in_, nsubscriptions, events)
 }
 
 pub fn test_poll_oneoff() -> Result<(), String> {
@@ -80,6 +114,18 @@ pub fn test_poll_oneoff() -> Result<(), String> {
         }
     };
 
+    let stdout_sub = wasi::Subscription {
+        userdata: 2,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_WRITE.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: 1
+                }
+            }
+        }
+    };
+
     unsafe {
         // test one clock subscribion
         let in_ = [ clock_sub ];
@@ -98,6 +144,19 @@ pub fn test_poll_oneoff() -> Result<(), String> {
             clock_sub, stdin_sub
         ];
         expect_success(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+            clock_sub, stdout_sub
+        ];
+        let events = vec![
+            wasi::Event {
+                userdata: 2,
+                error: wasi::ERRNO_NOTSUP,
+                type_: wasi::EVENTTYPE_FD_WRITE,
+                fd_readwrite: mem::zeroed()
+            }
+        ];
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
     }
     Ok(())
 }
