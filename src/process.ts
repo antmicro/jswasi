@@ -902,6 +902,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         lck[0] = -1;
 
         const { dir }: { dir: string } = JSON.parse(json);
+        workerConsoleLog(`chdir(${dir})`);
         const dir_ = utils.realpath(dir);
 
         sendToKernel(["chdir", { dir: dir_, sharedBuffer } as ChdirArgs]);
@@ -909,12 +910,13 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         const err = Atomics.load(lck, 0);
+        workerConsoleLog(`chdir returned ${err}`);
         return { exit_status: err, output: dir };
       }
 
       case "getcwd": {
         const { buf_len }: { buf_len: number } = JSON.parse(json);
-        workerConsoleLog(`getcwd(${buf_len}`);
+        workerConsoleLog(`getcwd(${buf_len})`);
 
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
