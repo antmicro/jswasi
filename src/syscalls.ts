@@ -1034,7 +1034,7 @@ export default async function syscallCallback(
 
         let fdNum = (sub.event as FdReadSub).fd;
         let fd = fds.getFd(fdNum);
-        if (fd === null) {
+        if (fd === undefined) {
           event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
           event[1] = constants.WASI_EBADF;
           isEvent = true;
@@ -1120,8 +1120,8 @@ export default async function syscallCallback(
               let stdin = fd as Stdin;
               await stdin.pushPollEntry(processId, endLock, buffer);
             } else {
-              // TODO: cover more cases
               //! We have processed data earlier, it should be not executed
+              console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);
             }
 
             break;
@@ -1130,6 +1130,7 @@ export default async function syscallCallback(
           case constants.WASI_FILETYPE_REGULAR_FILE:
           default: {
             //! We have processed data earlier, it should be not executed
+            console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);
           }
         }
       }

@@ -1,5 +1,7 @@
 use std::mem;
 
+use constants;
+
 fn event_eq(s1: &wasi::Event, s2: &wasi::Event) -> bool {
     if s1.type_ == wasi::EVENTTYPE_CLOCK {
         (s1.userdata, s1.error, s1.type_)
@@ -42,7 +44,7 @@ fn expected_errno_returned(
             return Err(format!(
                 "In poll_oneoff(): invalid syscall output \
                 (expected fail {{errno: {}}})\
-                got success {{: {}}}", err, res
+                got success {{events number: {}}}", err, res
             ))
         },
     }
@@ -82,8 +84,19 @@ unsafe fn expect_error_event(
     nsubscriptions: wasi::Size,
     events: &Vec<wasi::Event>
 ) -> Result<(), String> {
-    // Syscall return Ok(nevents) but in event buffor schould be errno code
+    // Syscall return Ok(nevents) but in events buffor schould be errno code
     expect_success(in_, nsubscriptions, events)
+}
+
+unsafe fn expect_error(
+    in_: *const wasi::Subscription,
+    nsubscriptions: wasi::Size,
+    errno: wasi::Errno
+) -> Result<(), String> {
+    let mut out: Vec<wasi::Event> = vec![mem::zeroed(); nsubscriptions];
+
+    let result = wasi::poll_oneoff(in_, out.as_mut_ptr(), nsubscriptions);
+    expected_errno_returned(result, Err(errno))
 }
 
 pub fn test_poll_oneoff() -> Result<(), String> {
@@ -126,6 +139,123 @@ pub fn test_poll_oneoff() -> Result<(), String> {
         }
     };
 
+    let file_fd = unsafe {
+        let dirflags = 0;
+        let oflags = 0;
+        let fdflags = wasi::FDFLAGS_SYNC | wasi::FDFLAGS_DSYNC;
+
+        match wasi::path_open(
+            constants::PWD_DESC, dirflags,
+            constants::SAMPLE_TEXT_FILENAME,
+            oflags,
+            constants::RIGHTS_ALL,
+            constants::RIGHTS_ALL,
+            fdflags
+        ) {
+            Ok(d) => d,
+            Err(e) => { return Err(e.to_string()) }
+        }
+    };
+
+    let file_read_sub = wasi::Subscription {
+        userdata: 3,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_READ.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: file_fd
+                }
+            }
+        }
+    };
+
+    let file_write_sub = wasi::Subscription {
+        userdata: 4,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_WRITE.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: file_fd
+                }
+            }
+        }
+    };
+
+    let dir_fd = unsafe {
+        let dirflags = 0;
+        let oflags = 0;
+        let fdflags = 0;
+
+        match wasi::path_open(
+            constants::PWD_DESC,
+            dirflags,
+            constants::SAMPLE_DIR_FILENAME,
+            oflags,
+            constants::RIGHTS_ALL,
+            constants::RIGHTS_ALL,
+            fdflags
+        ) {
+            Ok(d) => d,
+            Err(e) => { return Err(e.to_string()) }
+        }
+    };
+
+    let dir_read_sub = wasi::Subscription {
+        userdata: 5,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_READ.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: dir_fd
+                }
+            }
+        }
+    };
+
+    let dir_write_sub = wasi::Subscription {
+        userdata: 6,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_WRITE.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: dir_fd
+                }
+            }
+        }
+    };
+
+    let bad_fd_read_sub = wasi::Subscription {
+        userdata: 7,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_READ.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: 1024
+                }
+            }
+        }
+    };
+
+    let bad_fd_write_sub = wasi::Subscription {
+        userdata: 8,
+        u: wasi::SubscriptionU {
+            tag: wasi::EVENTTYPE_FD_WRITE.raw(),
+            u: wasi::SubscriptionUU {
+                fd_read: wasi::SubscriptionFdReadwrite {
+                    file_descriptor: 1024
+                }
+            }
+        }
+    };
+
+    let invalid_sub = wasi::Subscription {
+        userdata: 9,
+        u: wasi::SubscriptionU {
+            tag: 0xff,
+            u: unsafe { mem::zeroed() }
+        }
+    };
+
     unsafe {
         // test one clock subscribion
         let in_ = [ clock_sub ];
@@ -135,18 +265,18 @@ pub fn test_poll_oneoff() -> Result<(), String> {
                 error: wasi::ERRNO_SUCCESS,
                 type_: wasi::EVENTTYPE_CLOCK,
                 fd_readwrite: mem::zeroed()
-            }
+            },
         ];
         expect_success(in_.as_ptr(), in_.len(), &events)?;
 
         // test waiting for stdin with timeout - timeout exceed
         let in_ = [
-            clock_sub, stdin_sub
+            clock_sub, stdin_sub,
         ];
         expect_success(in_.as_ptr(), in_.len(), &events)?;
 
         let in_ = [
-            clock_sub, stdout_sub
+            stdout_sub, file_write_sub,
         ];
         let events = vec![
             wasi::Event {
@@ -154,9 +284,110 @@ pub fn test_poll_oneoff() -> Result<(), String> {
                 error: wasi::ERRNO_NOTSUP,
                 type_: wasi::EVENTTYPE_FD_WRITE,
                 fd_readwrite: mem::zeroed()
-            }
+            },
+            wasi::Event {
+                userdata: 4,
+                error: wasi::ERRNO_NOTSUP,
+                type_: wasi::EVENTTYPE_FD_WRITE,
+                fd_readwrite: mem::zeroed()
+            },
         ];
+
+        // Writing to any file type is unsupported right now
         expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+    
+        let in_ = [
+           clock_sub, stdout_sub, file_write_sub,
+        ];
+
+        // With clock sub output should be the same for writing
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+           file_read_sub,
+        ];
+
+        let events = vec![
+            wasi::Event {
+                userdata: 3,
+                error: wasi::ERRNO_PERM,
+                type_: wasi::EVENTTYPE_FD_READ,
+                fd_readwrite: mem::zeroed()
+            },
+        ];
+
+        // Read sub for regular files is not permited
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+            clock_sub, file_read_sub,
+        ];
+
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+           dir_read_sub, dir_write_sub,
+        ];
+
+        let events = vec![
+            wasi::Event {
+                userdata: 5,
+                error: wasi::ERRNO_PERM,
+                type_: wasi::EVENTTYPE_FD_READ,
+                fd_readwrite: mem::zeroed()
+            },
+            wasi::Event {
+                userdata: 6,
+                error: wasi::ERRNO_NOTSUP,
+                type_: wasi::EVENTTYPE_FD_WRITE,
+                fd_readwrite: mem::zeroed()
+            },
+        ];
+
+        // Any operation on directiories are not permited/supported
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+            clock_sub, dir_read_sub, dir_write_sub,
+        ];
+
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+           bad_fd_read_sub, bad_fd_write_sub,
+        ];
+
+        let events = vec![
+            wasi::Event {
+                userdata: 7,
+                error: wasi::ERRNO_BADF,
+                type_: wasi::EVENTTYPE_FD_READ,
+                fd_readwrite: mem::zeroed()
+            },
+            wasi::Event {
+                userdata: 8,
+                error: wasi::ERRNO_BADF,
+                type_: wasi::EVENTTYPE_FD_WRITE,
+                fd_readwrite: mem::zeroed()
+            },
+        ];
+
+        // When user passes unopened file descriptor then syscall should returns errno
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+            clock_sub, bad_fd_read_sub, bad_fd_write_sub,
+        ];
+
+        expect_error_event(in_.as_ptr(), in_.len(), &events)?;
+
+        let in_ = [
+           invalid_sub,
+        ];
+
+        // User used undefined tag for event subscription
+        expect_error(in_.as_ptr(), in_.len(), wasi::ERRNO_INVAL)?;
     }
+    
     Ok(())
 }
