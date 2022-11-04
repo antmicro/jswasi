@@ -7,3 +7,9 @@ version = "0.1.0"
 
 [dependencies]
 wasi = "0.11.0"
+
+[target.'cfg(target_os = "wasi")'.dependencies]
+wasi_ext_lib = { git = "https://github.com/antmicro/wasm_ext_lib.git", branch = "clib", features = ["hterm"] }
+
+[build]
+target = "wasm32-wasi"

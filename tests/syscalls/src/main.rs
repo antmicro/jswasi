@@ -1,8 +1,10 @@
 mod syscalls;
 mod constants;
 mod utils;
+mod custom_syscall_api;
 
 use syscalls::*;
+use custom_syscall_api::*;
 
 fn main() -> Result<(), String>{
     let tests: Vec<(&str, fn() -> Result<(), String>)> = vec![
@@ -29,6 +31,7 @@ fn main() -> Result<(), String>{
         ("fd_filestat_set_times", fd_filestat_set_times::test_fd_filestat_set_times as fn() -> Result<(), String>),
         ("path_filestat_set_times", path_filestat_set_times::test_path_filestat_set_times as fn() -> Result<(), String>),
         ("poll_oneoff", poll_oneoff::test_poll_oneoff as fn() -> Result<(), String>),
+        ("isatty", isatty::test_isatty as fn() -> Result<(), String>),
     ];
 
     let mut fails: u32 = 0;
