@@ -986,9 +986,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
+        let err = Atomics.load(lck, 0);
 
         return {
-          exit_status: constants.EXIT_SUCCESS,
+          exit_status: err,
           output: `${isattyPtr[0]}`,
         };
       }
