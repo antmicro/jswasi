@@ -85,7 +85,7 @@ export class FdTable {
 
 class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
-  public pollQueue: Array<PollEntry> = [];
+  public stdinPollSub: PollEntry | null = null;
 
   public shouldEcho = true;
 
@@ -265,18 +265,16 @@ export default class ProcessManager {
         );
       }
 
-      if (this.buffer.length !== 0 && process.pollQueue.length > 0) {
-        while (process.pollQueue.length > 0) {
-          const entry = process.pollQueue.shift();
-
-          if (
-            Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID
-          ) {
-            Atomics.store(entry.data, 1, this.buffer.length);
-            Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
-            Atomics.store(entry.lck, 0, 0);
-            Atomics.notify(entry.lck, 0);
-          }
+      if (this.buffer.length !== 0 && process.stdinPollSub !== null) {
+        const entry = process.stdinPollSub;
+        process.stdinPollSub = null;
+        if (
+          Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID
+        ) {
+          Atomics.store(entry.data, 1, this.buffer.length);
+          Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
+          Atomics.store(entry.lck, 0, 0);
+          Atomics.notify(entry.lck, 0);
         }
       }
     }

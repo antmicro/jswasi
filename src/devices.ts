@@ -117,15 +117,15 @@ export class Stdin implements In {
     return Promise.resolve(pendingBytes);
   }
 
-  pushPollEntry(
+  setPollEntry(
     workerId: number,
     userLock: Int32Array,
     userBuffer: Int32Array
   ): Promise<void> {
-    this.workerTable.processInfos[workerId].pollQueue.push({
+    this.workerTable.processInfos[workerId].stdinPollSub = {
       lck: userLock,
       data: userBuffer,
-    });
+    };
     return Promise.resolve();
   }
 }

@@ -1118,7 +1118,7 @@ export default async function syscallCallback(
           case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
             if (fd instanceof Stdin) {
               let stdin = fd as Stdin;
-              await stdin.pushPollEntry(processId, endLock, buffer);
+              await stdin.setPollEntry(processId, endLock, buffer);
             } else {
               //! We have processed data earlier, it should be not executed
               console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);
