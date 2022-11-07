@@ -174,7 +174,7 @@ export default async function syscallCallback(
       const cwd_len = new Uint32Array(sharedBuffer, 4, 1);
       const cwd = new Uint8Array(sharedBuffer, 8, bufLen);
 
-      let err;
+      let err = constants.WASI_ESUCCESS;
       const cwd_path = processManager.processInfos[processId].cwd;
       if (bufLen < cwd_path.length) {
         cwd_len[0] = bufLen;

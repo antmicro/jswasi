@@ -1092,11 +1092,13 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     // special case, path_readlink is used for spawning subprocesses
     if (path[0] === "!") {
       const { exit_status, output } = specialParse(path.slice(1));
-      const result = new TextEncoder().encode(output);
-      let count = result.byteLength;
-      if (count > 1024) count = 1024;
-      view8.set(result.slice(0, count), bufferPtr);
-      view.setUint32(bufferUsedPtr, count, true);
+      if (exit_status !== constants.WASI_ENOBUFS) {
+        const result = new TextEncoder().encode(output);
+        let count = result.byteLength;
+        view8.set(result.slice(0, count), bufferPtr);
+        view8.set([0], bufferPtr + count);
+        view.setUint32(bufferUsedPtr, count, true);
+      }
       return exit_status;
     }
 
