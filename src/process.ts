@@ -35,7 +35,7 @@ import {
   ClockEvent,
   FdReadSub,
   FdWriteSub,
-  EventSub,
+  FdEventSub,
   PollOneoffArgs,
 } from "./types";
 
@@ -1391,7 +1391,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
     var minWaitEnd = BigInt(Number.MAX_SAFE_INTEGER);
 
-    const fdSubs = new Array<EventSub>();
+    const fdSubs = new Array<FdEventSub>();
     const events = new Array<SharedArrayBuffer>();
     var lastClock: null | ClockEvent;
 

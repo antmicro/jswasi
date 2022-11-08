@@ -6,7 +6,7 @@ import {
   OpenFile,
 } from "./filesystem/interfaces.js";
 import { FileOrDir } from "./filesystem/enums.js";
-import { PollEntry } from "./types.js";
+import { PollEntry, HtermEventSub } from "./types.js";
 
 type FileDescriptor = In | Out | OpenFile | OpenDirectory;
 
@@ -110,6 +110,58 @@ class ProcessInfo {
   }
 }
 
+class PubSubEvent {
+  // subsTable is indexed with events number
+  public subsTable: Array<Set<HtermEventSub>> = new Array<Set<HtermEventSub>>(
+    constants.WASI_EVENTS_NUM
+  );
+
+  constructor(private processes: Record<number, ProcessInfo>) {}
+
+  subscribeEvent(processId: number, eventSourceFd: number, events: bigint) {
+    for (var i = 0; i < this.subsTable.length; i++) {
+      if ((events & (1n << BigInt(i))) != 0n) {
+        this.subsTable[i].add({ processId, eventSourceFd } as HtermEventSub);
+      }
+    }
+  }
+
+  unsubscribeEvent(processId: number, eventSourceFd: number, events: bigint) {
+    for (var i = 0; i < this.subsTable.length; i++) {
+      if ((events & (1n << BigInt(i))) != 0n) {
+        if (
+          !this.subsTable[i].delete({
+            processId,
+            eventSourceFd,
+          } as HtermEventSub)
+        ) {
+          //! {processId, eventSourceFd} or events are not valid
+        }
+      }
+    }
+  }
+
+  publishEvent(events: bigint) {
+    for (var i = 0; i < this.subsTable.length; i++) {
+      if ((events & (1n << BigInt(i))) != 0n) {
+        for (let { processId, eventSourceFd } of this.subsTable[i]) {
+          let process = this.processes[processId];
+          if (process === undefined) {
+            //! process is not found
+          }
+
+          let fd = process.fds.getFd(eventSourceFd);
+          if (fd instanceof EventSource) {
+            // TODO: bitor event flag
+          } else {
+            //! passed wrong file descriptor
+          }
+        }
+      }
+    }
+  }
+}
+
 export default class ProcessManager {
   public buffer = "";
 
@@ -120,6 +172,8 @@ export default class ProcessManager {
   public processInfos: Record<number, ProcessInfo> = {};
 
   public compiledModules: Record<string, WebAssembly.Module> = {};
+
+  private events: PubSubEvent = new PubSubEvent(this.processInfos);
 
   constructor(
     private readonly scriptName: string,
@@ -307,5 +361,9 @@ export default class ProcessManager {
       Atomics.store(lck, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lck, 0);
     }
+  }
+
+  publishEvent(event: bigint) {
+    this.events.publishEvent(event);
   }
 }

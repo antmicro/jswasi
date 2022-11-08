@@ -238,3 +238,7 @@ export const WASI_POLL_BUF_STATUS_NVALID = -1;
 export const WASI_POLL_BUF_STATUS_VALID = 0;
 export const WASI_POLL_BUF_STATUS_READY = 1;
 export const WASI_POLL_BUF_STATUS_ERR = 2;
+
+// Window resize event
+export const WASI_EVENTS_NUM = 1;
+export const WASI_EVENT_WINCH = BigInt(0x0000000000000001);

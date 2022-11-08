@@ -181,7 +181,7 @@ export type FdWriteSub = {
   fd: number;
 };
 
-export type EventSub = {
+export type FdEventSub = {
   userdata: bigint;
   eventType: number;
   event: FdReadSub | FdWriteSub;
@@ -189,11 +189,16 @@ export type EventSub = {
 
 export type PollOneoffArgs = {
   sharedBuffer: SharedArrayBuffer;
-  subs: Array<EventSub>;
+  subs: Array<FdEventSub>;
   events: Array<SharedArrayBuffer>;
 };
 
 export type PollEntry = {
   lck: Int32Array;
   data: Int32Array;
+};
+
+export type HtermEventSub = {
+  processId: number;
+  eventSourceFd: number;
 };

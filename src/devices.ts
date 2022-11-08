@@ -217,3 +217,77 @@ export class Stderr implements Out {
     return 0;
   }
 }
+
+// EventSource implements write end fifo features
+export class EventSource implements In {
+  // In unix, crossterm uses pipe as event source
+  // Wasi doesn't define filetype pipe/fifo so it's defined as char device
+  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
+  isPreopened = true;
+  rightsBase = constants.WASI_RIGHTS_STDIN;
+  rightsInheriting = 0n;
+  fdFlags = 0;
+
+  constructor(private workerTable: ProcessManager) {
+    // TODO: Get subscribed events and push sub to internal sub-pub object
+  }
+
+  isatty() {
+    return false;
+  }
+
+  scheduleRead(
+    workerId: number,
+    requestedLen: number,
+    sbuf: SharedArrayBuffer,
+    pread?: bigint
+  ): Promise<void> {
+    const lck = new Int32Array(sbuf, 0, 1);
+    const readLen = new Int32Array(sbuf, 4, 1);
+    const readBuf = new Uint8Array(sbuf, 8, requestedLen);
+    // TODO: read event mask field
+    lck;
+    readLen;
+    readBuf;
+    this.workerTable;
+
+    return Promise.resolve();
+  }
+
+  // TODO: fill dummy values with something meaningful
+  stat(): Promise<Stat> {
+    return Promise.resolve({
+      dev: 0n,
+      ino: 0n,
+      fileType: this.fileType,
+      nlink: 0n,
+      size: 0n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    });
+  }
+
+  close(): Promise<void> {
+    // TODO: Release sub from internal pub-sub object
+    return Promise.resolve();
+  }
+
+  seek(): number {
+    return 0;
+  }
+
+  availableBytes(workerId: number): Promise<number> {
+    // TODO: check process sub object has any event
+
+    return Promise.resolve(0);
+  }
+
+  setPollEntry(
+    workerId: number,
+    userLock: Int32Array,
+    userBuffer: Int32Array
+  ): Promise<void> {
+    return Promise.resolve();
+  }
+}

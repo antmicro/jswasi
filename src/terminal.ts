@@ -542,7 +542,9 @@ export async function init(
 
   // TODO: maybe save all output and rewrite it on adjusted size?
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  io.onTerminalResize = (columns: number, rows: number) => {};
+  io.onTerminalResize = (columns: number, rows: number) => {
+    processManager.publishEvent(constants.WASI_EVENT_WINCH);
+  };
 
   // drag and drop support (save dragged files and folders to current directory)
   // hterm creates iframe child of provided anchor, we assume there's only one of those
