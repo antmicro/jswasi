@@ -31,12 +31,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "cc"
-version = "1.0.74"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "581f5dba903aac52ea3feb5ec4810848460ee833876f1f9b0fdeab1f19091574"
-
-[[package]]
 name = "cexpr"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -224,10 +218,9 @@ checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 [[package]]
 name = "wasi_ext_lib"
 version = "0.1.0"
-source = "git+https://github.com/antmicro/wasm_ext_lib.git?branch=clib#fd6345c681edf5851edb9b3bd9d0a0c4ed64c50a"
+source = "git+https://github.com/antmicro/wasm_ext_lib.git?branch=master#61c6dc34b8f4edb095c309042002426a36c272ea"
 dependencies = [
  "bindgen",
- "cc",
  "wasi",
 ]
 
