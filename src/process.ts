@@ -1093,7 +1093,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     // special case, path_readlink is used for spawning subprocesses
     if (path[0] === "!") {
       const { exit_status, output } = specialParse(path.slice(1));
-      if (exit_status !== constants.WASI_ENOBUFS) {
+      // ensure that syscall output doesn't exceed buffer size and the buffer pointer is not NULL
+      if (exit_status !== constants.WASI_ENOBUFS && bufferPtr !== 0) {
         const result = new TextEncoder().encode(output);
         let count = result.byteLength;
         view8.set(result.slice(0, count), bufferPtr);
