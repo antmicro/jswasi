@@ -12,6 +12,8 @@ rust/build/
 
 node_modules/
 
+**/venv
+
 .eslintcache
 
 ci/output.txt
