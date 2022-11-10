@@ -6,7 +6,6 @@ test ! -f /home/ant/.config/ox/ox.ron && echo "downloading ox config..." && wget
 test ! -f /usr/bin/uutils && echo "downloading uutils..." && wget resources/uutils.async.wasm /usr/bin/uutils
 test ! -f /usr/local/bin/syscalls_test && echo "downloading syscalls_test..." && wget resources/syscalls_test.wasm /usr/local/bin/syscalls_test
 test ! -f /usr/local/bin/python && echo "downloading python..." && wget resources/python.wasm /usr/local/bin/python
-test ! -f /lib/python.zip && echo "downloading python libs..." && wget resources/python.zip /lib/python.zip
 test ! -f /usr/local/bin/duk && echo "downloading duk..." && wget https://registry-cdn.wapm.io/contents/_/duktape/0.0.3/build/duk.wasm /usr/local/bin/duk
 test ! -f /usr/local/bin/cowsay && echo "downloading cowsay..." && wget https://registry-cdn.wapm.io/contents/_/cowsay/0.2.0/target/wasm32-wasi/release/cowsay.wasm /usr/local/bin/cowsay
 test ! -f /usr/local/bin/qjs && echo "downloading qjs..." && wget https://registry-cdn.wapm.io/contents/adamz/quickjs/0.20210327.0/build/qjs.wasm /usr/local/bin/qjs
@@ -20,6 +19,24 @@ test ! -f /usr/local/bin/rsign2 && echo "downloading rsign2..." && wget https://
 test ! -f /usr/local/bin/ruby && echo "downloading ruby..." && wget https://registry-cdn.wapm.io/contents/katei/ruby/0.1.2/dist/ruby.wasm /usr/local/bin/ruby
 test ! -f /usr/local/bin/clang && echo "downloading clang..." && wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm /usr/local/bin/clang
 test ! -f /usr/local/bin/wasm-ld && echo "downloading wasm-ld..." && wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm /usr/local/bin/wasm-ld
-test ! -f /usr/sysroot.zip && echo "downloading clang sysroot..." && wget resources/sysroot.zip /usr/sysroot.zip
 test ! -f /usr/local/bin/tar && echo "downloading tar..." && wget resources/tar.wasm /usr/local/bin/tar
+
+if test ! -d /lib/python3.10; then
+    echo "downloading python libs..."
+    wget resources/python.zip /lib/python.zip
+    cd /lib
+    unzip python.zip
+    rm python.zip
+fi
+
+if test ! -d /usr/lib || test ! -d /usr/local || test ! -d /usr/share; then
+    echo "downloading clang sysroot..."
+    wget resources/sysroot.zip /usr/sysroot.zip
+    cd /usr
+    unzip sysroot.zip
+    rm sysroot.zip
+fi
+
+cd $HOME
+
 wash
