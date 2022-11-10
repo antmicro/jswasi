@@ -33,6 +33,7 @@ fn main() -> Result<(), String>{
         ("poll_oneoff", poll_oneoff::test_poll_oneoff as fn() -> Result<(), String>),
         ("isatty", isatty::test_isatty as fn() -> Result<(), String>),
         ("getcwd_chdir", getcwd_chdir::test_getcwd_chdir as fn() -> Result<(), String>),
+        ("set_env", set_env::test_set_env as fn() -> Result<(), String>),
     ];
 
     let mut fails: u32 = 0;
