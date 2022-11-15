@@ -1,5 +1,12 @@
 import { LookupFlags } from "./filesystem/enums";
 
+export type BufferRequest = {
+  requestedLen: number;
+  lck: Int32Array;
+  readLen: Int32Array;
+  sharedBuffer: Uint8Array;
+};
+
 export type FdFdstatGetArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
 
 export type FdWriteArgs = {

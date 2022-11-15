@@ -1,22 +1,14 @@
 import * as constants from "./constants.js";
-import { In, Out } from "./devices.js";
+import { In, Out, EventSource } from "./devices.js";
 import {
   Filesystem,
   OpenDirectory,
   OpenFile,
 } from "./filesystem/interfaces.js";
 import { FileOrDir } from "./filesystem/enums.js";
-import { PollEntry, HtermEventSub } from "./types.js";
+import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 
 type FileDescriptor = In | Out | OpenFile | OpenDirectory;
-
-type BufferRequest = {
-  requestedLen: number;
-  lck: Int32Array;
-  readLen: Int32Array;
-  sharedBuffer: Uint8Array;
-};
-
 export class FdTable {
   private fdt: Record<number, FileDescriptor> = {};
   private freeFds: number[] = [];
@@ -111,12 +103,14 @@ class ProcessInfo {
 }
 
 class PubSubEvent {
-  // subsTable is indexed with events number
-  public subsTable: Array<Set<HtermEventSub>> = new Array<Set<HtermEventSub>>(
-    constants.WASI_EVENTS_NUM
-  );
+  public subsTable: Array<Set<HtermEventSub>>;
 
-  constructor(private processes: Record<number, ProcessInfo>) {}
+  constructor(private processTable: Record<number, ProcessInfo>) {
+    this.subsTable = new Array<Set<HtermEventSub>>(constants.WASI_EVENTS_NUM);
+    for (var i = 0; i < this.subsTable.length; i++) {
+      this.subsTable[i] = new Set<HtermEventSub>([]);
+    }
+  }
 
   subscribeEvent(processId: number, eventSourceFd: number, events: bigint) {
     for (var i = 0; i < this.subsTable.length; i++) {
@@ -135,7 +129,9 @@ class PubSubEvent {
             eventSourceFd,
           } as HtermEventSub)
         ) {
-          //! {processId, eventSourceFd} or events are not valid
+          console.log(
+            `PubSubEvent: attemp to unsubscribe process=${process} fd=${eventSourceFd} that wasn't subcribed`
+          );
         }
       }
     }
@@ -144,17 +140,22 @@ class PubSubEvent {
   publishEvent(events: bigint) {
     for (var i = 0; i < this.subsTable.length; i++) {
       if ((events & (1n << BigInt(i))) != 0n) {
-        for (let { processId, eventSourceFd } of this.subsTable[i]) {
-          let process = this.processes[processId];
+        for (const { processId, eventSourceFd } of this.subsTable[i]) {
+          let process = this.processTable[processId];
           if (process === undefined) {
-            //! process is not found
+            console.log(
+              `PubSubEvent: there is process=${process} that doesn't exist in processInfo table`
+            );
+            continue;
           }
 
           let fd = process.fds.getFd(eventSourceFd);
           if (fd instanceof EventSource) {
-            // TODO: bitor event flag
+            fd.sendEvents(events);
           } else {
-            //! passed wrong file descriptor
+            console.log(
+              `PubSubEvent: there is fd=${fd} that doesn't is not EventSource in fds table of process=${process}`
+            );
           }
         }
       }
@@ -173,7 +174,7 @@ export default class ProcessManager {
 
   public compiledModules: Record<string, WebAssembly.Module> = {};
 
-  private events: PubSubEvent = new PubSubEvent(this.processInfos);
+  public events: PubSubEvent = new PubSubEvent(this.processInfos);
 
   constructor(
     private readonly scriptName: string,
@@ -361,9 +362,5 @@ export default class ProcessManager {
       Atomics.store(lck, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lck, 0);
     }
-  }
-
-  publishEvent(event: bigint) {
-    this.events.publishEvent(event);
   }
 }

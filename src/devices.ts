@@ -1,6 +1,7 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { Stat } from "./filesystem/enums.js";
+import { BufferRequest, PollEntry } from "./types.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -228,8 +229,17 @@ export class EventSource implements In {
   rightsInheriting = 0n;
   fdFlags = 0;
 
-  constructor(private workerTable: ProcessManager) {
-    // TODO: Get subscribed events and push sub to internal sub-pub object
+  occuredEvents = constants.WASI_NO_EVENT;
+  bufferRequestQueue: BufferRequest[] = [];
+  poolSub: PollEntry | null = null;
+
+  constructor(
+    private workerTable: ProcessManager,
+    private processId: number,
+    private fdNum: number,
+    private subscribedEvents: bigint
+  ) {
+    this.workerTable.events.subscribeEvent(processId, fdNum, subscribedEvents);
   }
 
   isatty() {
@@ -245,11 +255,8 @@ export class EventSource implements In {
     const lck = new Int32Array(sbuf, 0, 1);
     const readLen = new Int32Array(sbuf, 4, 1);
     const readBuf = new Uint8Array(sbuf, 8, requestedLen);
-    // TODO: read event mask field
-    lck;
-    readLen;
-    readBuf;
-    this.workerTable;
+
+    this.sendBufferToProcess(requestedLen, lck, readLen, readBuf);
 
     return Promise.resolve();
   }
@@ -269,7 +276,11 @@ export class EventSource implements In {
   }
 
   close(): Promise<void> {
-    // TODO: Release sub from internal pub-sub object
+    this.workerTable.events.unsubscribeEvent(
+      this.processId,
+      this.fdNum,
+      this.subscribedEvents
+    );
     return Promise.resolve();
   }
 
@@ -277,17 +288,70 @@ export class EventSource implements In {
     return 0;
   }
 
-  availableBytes(workerId: number): Promise<number> {
-    // TODO: check process sub object has any event
+  sendBufferToProcess(
+    requestedLen: number,
+    lck: Int32Array,
+    readLen: Int32Array,
+    buf: Uint8Array
+  ): void {
+    if (this.occuredEvents === constants.WASI_NO_EVENT) {
+      this.bufferRequestQueue.push({
+        requestedLen,
+        lck,
+        readLen,
+        sharedBuffer: buf,
+      });
+    } else {
+      readLen[0] =
+        requestedLen < constants.WASI_EVENT_MASK_SIZE
+          ? requestedLen
+          : constants.WASI_EVENT_MASK_SIZE;
 
-    return Promise.resolve(0);
+      let mask = 0xffn;
+      for (let i = 0; i < readLen[0]; i++) {
+        let val = this.occuredEvents & (mask << BigInt(i * 8));
+        buf[i] = Number(val >> BigInt(i * 8));
+      }
+
+      Atomics.store(lck, 0, constants.WASI_ESUCCESS);
+      Atomics.notify(lck, 0);
+    }
   }
 
-  setPollEntry(
-    workerId: number,
-    userLock: Int32Array,
-    userBuffer: Int32Array
-  ): Promise<void> {
+  sendEvents(events: bigint): void {
+    this.occuredEvents |= events;
+
+    while (
+      this.occuredEvents !== constants.WASI_NO_EVENT &&
+      this.bufferRequestQueue.length !== 0
+    ) {
+      const { requestedLen, lck, readLen, sharedBuffer } =
+        this.bufferRequestQueue.shift();
+      this.sendBufferToProcess(requestedLen, lck, readLen, sharedBuffer);
+    }
+
+    if (this.occuredEvents !== constants.WASI_NO_EVENT) {
+      const entry = this.poolSub;
+      this.poolSub = null;
+      if (Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID) {
+        Atomics.store(entry.data, 1, constants.WASI_EVENT_MASK_SIZE);
+        Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
+        Atomics.store(entry.lck, 0, 0);
+        Atomics.notify(entry.lck, 0);
+      }
+    }
+  }
+
+  availableBytes(workerId: number): Promise<number> {
+    return Promise.resolve(
+      this.occuredEvents != constants.WASI_NO_EVENT
+        ? constants.WASI_EVENT_MASK_SIZE
+        : 0
+    );
+  }
+
+  setPollEntry(userLock: Int32Array, userBuffer: Int32Array): Promise<void> {
+    this.poolSub = { lck: userLock, data: userBuffer } as PollEntry;
     return Promise.resolve();
   }
 }
