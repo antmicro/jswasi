@@ -43,7 +43,15 @@ Install prerequisites:
 pip install robotframework PexpectLibrary
 ```
 
-Run:
+Run (browser tests):
+
+```
+cd tests/robot
+node shell-driver/shell-driver.js --cache-dir=/tmp/ci-cache-base --exit # prepare base cache directory
+robot --variable platform:browser -i browser .
+```
+
+Run (native tests):
 
 ```
 export PATH=$PATH:$(pwd)/wash/target/release/
