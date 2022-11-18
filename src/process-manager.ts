@@ -266,6 +266,7 @@ export default class ProcessManager {
       }
 
       if (this.buffer.length !== 0 && process.stdinPollSub !== null) {
+        // TODO: this could potentially create race conditions
         const entry = process.stdinPollSub;
         process.stdinPollSub = null;
         if (
