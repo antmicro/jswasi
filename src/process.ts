@@ -945,6 +945,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         lck[0] = -1;
 
         const { key, value }: { key: string; value: string } = JSON.parse(json);
+        workerConsoleLog(`set_env(${key}, ${value})`);
         sendToKernel(["set_env", { key, value, sharedBuffer } as SetEnvArgs]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
