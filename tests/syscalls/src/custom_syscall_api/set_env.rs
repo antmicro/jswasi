@@ -10,21 +10,21 @@ fn expect_success(key: &str, val: Option<&str>) -> Result<(), String> {
 
 fn check_env(key: &str, val: Option<&str>) -> Result<(), String> {
     let actual = env::var(key);
-    match actual {
+    match &actual {
         Ok(var) => {
             if val.is_some() && val.unwrap() == var {
                 Ok(())
             } else {
                 Err(format!(
-                    "Unexpected variable value (expected {}, got {})",
-                    val.unwrap(), var))
+                    "Unexpected variable value (expected {:?}, got {:?})",
+                    val, actual))
             }
         }
         Err(env::VarError::NotPresent) => {
             if let None = val { Ok(()) }
             else { Err(format!(
                 "Unexpected variable value (expected {:?}, got {:?})",
-                val.unwrap(), None::<&str>))
+                val, None::<&str>))
             }
         }
         Err(e) => Err(format!("Unexpected error ({:?})", e))
