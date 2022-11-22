@@ -182,7 +182,7 @@ class FsaFilesystem implements Filesystem {
     const path = `${dir.path()}${dir.path().endsWith("/") ? "" : "/"}${name}`;
 
     let storedData: StoredData = await getStoredData(path);
-    if (!storedData && options.create) {
+    if (!storedData) {
       storedData = {
         fileType: constants.WASI_FILETYPE_DIRECTORY, // file type
         userMode: 7,
@@ -194,8 +194,6 @@ class FsaFilesystem implements Filesystem {
         ctim: 0n,
       };
       await setStoredData(path, storedData);
-    } else if (!storedData) {
-      return { err: constants.WASI_ENOENT, entry: null };
     }
 
     if (
