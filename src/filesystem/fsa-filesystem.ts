@@ -250,6 +250,7 @@ class FsaFilesystem implements Filesystem {
         OpenFlags.None
       );
     const path = `/${parts.join("/")}/${name}`;
+    // TODO: add dummy metadata to mounted filesystems recursively
     const dir = new FsaDirectory(path, mountedHandle, parent.entry, this);
     this.mounts.push({ parts, name, dir });
     return constants.WASI_ESUCCESS;
