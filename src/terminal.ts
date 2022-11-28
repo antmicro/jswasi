@@ -51,25 +51,25 @@ export async function fetchFile(
           transform(data, controller) {
 	      position += data.length;
 	      if (size == -1) {
-	          stdout.write(`\r[${".".repeat(50)}: ${position}]`);
+	          stdout?.write(`\r[${".".repeat(50)}: ${position}]`);
 	      } else if (position == size) {
-	          stdout.write(`\r[${"#".repeat(50)}: ${size}]`);
+	          stdout?.write(`\r[${"#".repeat(50)}: ${size}]`);
 	      } else if (Math.round((position / size) * 50) != bar_position) {
                   bar_position = Math.round((position / size) * 50);
-                  stdout.write(`\r[${"#".repeat(bar_position)}${"-".repeat(50 - bar_position)}: ${size}]`);
+                  stdout?.write(`\r[${"#".repeat(bar_position)}${"-".repeat(50 - bar_position)}: ${size}]`);
 	      }
 	      controller.enqueue(data);
 	  },
 	  flush() {
 	      size = position;
-	      stdout.write(`\r[${"#".repeat(50)}: ${size}]\n`);
+	      stdout?.write(`\r[${"#".repeat(50)}: ${size}]\n`);
 	  }
       });
 
       let stdout_writer = new WritableStream({
           write(data) {
 	      position += data.length;
-	      stdout.write(`Content until ${position}\n`);
+	      stdout?.write(`Content until ${position}\n`);
 	  }
       });
 
@@ -99,24 +99,24 @@ export async function fetchFile(
   );
   if (err !== constants.WASI_ESUCCESS) {
     console.warn(`Unable to resolve path for ${dir.name} and ${filename}`);
-    stderr.write("Error: Cannot resolve path.\n");
+    stderr?.write("Error: Cannot resolve path.\n");
     return;
   }
 
   // only fetch binary if not yet present
   if (refetch || (await entry.metadata()).size === 0n) {
-    stdout.write("Downloading...\n");
+    stdout?.write("Downloading...\n");
     const response = await fetch(address);
     if (response.status != 200) {
-        stderr.write("Error: returned "+response.status+"\n");
+        stderr?.write("Error: returned "+response.status+"\n");
     } else {
 	let clen = response.headers.get("content-length");
 	if (clen != null) size = clen;
         const op = await entry.open();
         const writable = await op.writableStream();
-        stdout.write(`[${"-".repeat(50)}: ${size}]\r`);
+        stdout?.write(`[${"-".repeat(50)}: ${size}]\r`);
         await response.body?.pipeThrough(progress).pipeTo(writable);
-        stdout.write("Download finished.\n");
+        stdout?.write("Download finished.\n");
     }
   }
 }
