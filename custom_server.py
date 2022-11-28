@@ -19,10 +19,13 @@ class CustomHTTPRequestHandler(server.SimpleHTTPRequestHandler):
         if self.path[0:7] == "/proxy/":
             real_path = base64.b64decode(self.path[7:].encode("ascii")).decode("ascii")
             self.send_response(200)
-            self.end_headers()
             proxy_request = urllib.request.Request(real_path)
             proxy_request.add_header('User-Agent', 'Wget/1.21')
-            self.copyfile(urllib.request.urlopen(proxy_request), self.wfile)
+            url = urllib.request.urlopen(proxy_request)
+            if url.headers['content-length'] != None:
+                self.send_header('content-length', url.headers['content-length'])
+            self.end_headers()
+            self.copyfile(url, self.wfile)
         else:
             super().do_GET()
 

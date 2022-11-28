@@ -40,8 +40,57 @@ export async function fetchFile(
   filename: string,
   address: string,
   refetch: boolean = true,
-  stdout: Stdout = undefined
+  stdout: Stdout = undefined,
+  stderr: Stderr = undefined,
+  to_stdout: boolean = false
 ) {
+      let position = 0;
+      let bar_position = 0;
+      let size = -1;
+      let progress = new TransformStream({
+          transform(data, controller) {
+	      position += data.length;
+	      if (size == -1) {
+	          stdout.write(`\r[${".".repeat(50)}: ${position}]`);
+	      } else if (position == size) {
+	          stdout.write(`\r[${"#".repeat(50)}: ${size}]`);
+	      } else if (Math.round((position / size) * 50) != bar_position) {
+                  bar_position = Math.round((position / size) * 50);
+                  stdout.write(`\r[${"#".repeat(bar_position)}${"-".repeat(50 - bar_position)}: ${size}]`);
+	      }
+	      controller.enqueue(data);
+	  },
+	  flush() {
+	      size = position;
+	      stdout.write(`\r[${"#".repeat(50)}: ${size}]\n`);
+	  }
+      });
+
+      let stdout_writer = new WritableStream({
+          write(data) {
+	      position += data.length;
+	      stdout.write(`Content until ${position}\n`);
+	  }
+      });
+
+      if (!( !(address.startsWith("http://") || address.startsWith("https://")) || address.startsWith(location.origin))) {
+          // files requested from cross-origin that require proxy server
+          // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
+          address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
+      }
+
+      if (to_stdout) {
+        const response = await fetch(address);
+        if (response.status != 200) {
+            stdout.write("Error: returned "+response.status+"\n");
+	    return;
+        }
+	let clen = response.headers.get("content-length");
+	if (clen != null) size = clen;
+	await response.body?.pipeTo(stdout_writer);
+        return;
+      }
+
   const { err, entry } = await dir.getEntry(
     filename,
     FileOrDir.File,
@@ -50,50 +99,24 @@ export async function fetchFile(
   );
   if (err !== constants.WASI_ESUCCESS) {
     console.warn(`Unable to resolve path for ${dir.name} and ${filename}`);
+    stderr.write("Error: Cannot resolve path.\n");
     return;
   }
 
   // only fetch binary if not yet present
   if (refetch || (await entry.metadata()).size === 0n) {
-    if (
-      !(
-        !(address.startsWith("http://") || address.startsWith("https://")) ||
-        address.startsWith(location.origin)
-      )
-    ) {
-      // files requested from cross-origin that require proxy server
-      // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
-      address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
-    }
-
+    stdout.write("Downloading...\n");
     const response = await fetch(address);
-    console.log(response.headers.get("content-length"));
-    if (response.status === 200) {
-      const op = await entry.open();
-      const writable = await op.writableStream();
-      const prom = response.body?.pipeTo(writable);
-      if (stdout !== undefined) {
-        for (let i = 0; i < 50; i++) {
-          const fff = (
-            await dir.getEntry(
-              filename,
-              FileOrDir.File,
-              LookupFlags.SymlinkFollow,
-              OpenFlags.None
-            )
-          ).entry;
-          stdout.write(
-            `[${"#".repeat(i)}${"-".repeat(49 - i)}: ${
-              (await fff.metadata()).size
-            }]\r`
-          );
-          await new Promise((r) => setTimeout(r, 50));
-        }
-        stdout.write("\n");
-        await prom;
-      }
+    if (response.status != 200) {
+        stderr.write("Error: returned "+response.status+"\n");
     } else {
-      console.log(`Failed downloading ${filename} from ${address}`);
+	let clen = response.headers.get("content-length");
+	if (clen != null) size = clen;
+        const op = await entry.open();
+        const writable = await op.writableStream();
+        stdout.write(`[${"-".repeat(50)}: ${size}]\r`);
+        await response.body?.pipeThrough(progress).pipeTo(writable);
+        stdout.write("Download finished.\n");
     }
   }
 }
