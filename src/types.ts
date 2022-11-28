@@ -1,4 +1,5 @@
 import { LookupFlags } from "./filesystem/enums";
+import { EventSource } from "./devices.js";
 
 export type BufferRequest = {
   requestedLen: number;
@@ -207,5 +208,10 @@ export type PollEntry = {
 
 export type HtermEventSub = {
   processId: number;
-  eventSourceFd: number;
+  eventSourceFd: EventSource;
+};
+
+export type EventSourceArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  eventMask: bigint;
 };

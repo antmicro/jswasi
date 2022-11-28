@@ -30,6 +30,7 @@ import {
   PathFilestatSetTimesArgs,
   PollOneoffArgs,
   FdReadSub,
+  EventSourceArgs,
 } from "./types.js";
 import {
   Directory,
@@ -47,7 +48,7 @@ import {
   wget,
 } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
-import { In, Stdin, Out } from "./devices.js";
+import { In, Stdin, Out, EventSource } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { terminal } from "./terminal.js";
 import { msToNs } from "./utils.js";
@@ -1151,6 +1152,21 @@ export default async function syscallCallback(
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
+
+      break;
+    }
+    case "event_source_fd": {
+      const { sharedBuffer, eventMask } = data as EventSourceArgs;
+
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
+
+      let eventSource = new EventSource(processManager, processId, eventMask);
+
+      var fd = processManager.processInfos[processId].fds.addFile(eventSource);
+      Atomics.store(fileDescriptor, 0, fd);
+      Atomics.store(lck, 0, 0);
+      Atomics.notify(lck, 0);
 
       break;
     }

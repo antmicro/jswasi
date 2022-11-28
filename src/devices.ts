@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { Stat } from "./filesystem/enums.js";
-import { BufferRequest, PollEntry } from "./types.js";
+import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -231,15 +231,16 @@ export class EventSource implements In {
 
   occuredEvents = constants.WASI_NO_EVENT;
   bufferRequestQueue: BufferRequest[] = [];
+  eventSub: HtermEventSub;
   poolSub: PollEntry | null = null;
 
   constructor(
     private workerTable: ProcessManager,
-    private processId: number,
-    private fdNum: number,
+    processId: number,
     private subscribedEvents: bigint
   ) {
-    this.workerTable.events.subscribeEvent(processId, fdNum, subscribedEvents);
+    this.eventSub = { processId, eventSourceFd: this } as HtermEventSub;
+    this.workerTable.events.subscribeEvent(this.eventSub, subscribedEvents);
   }
 
   isatty() {
@@ -277,8 +278,7 @@ export class EventSource implements In {
 
   close(): Promise<void> {
     this.workerTable.events.unsubscribeEvent(
-      this.processId,
-      this.fdNum,
+      this.eventSub,
       this.subscribedEvents
     );
     return Promise.resolve();
@@ -311,6 +311,7 @@ export class EventSource implements In {
       for (let i = 0; i < readLen[0]; i++) {
         let val = this.occuredEvents & (mask << BigInt(i * 8));
         buf[i] = Number(val >> BigInt(i * 8));
+        this.occuredEvents ^= val;
       }
 
       Atomics.store(lck, 0, constants.WASI_ESUCCESS);
@@ -330,7 +331,10 @@ export class EventSource implements In {
       this.sendBufferToProcess(requestedLen, lck, readLen, sharedBuffer);
     }
 
-    if (this.occuredEvents !== constants.WASI_NO_EVENT) {
+    if (
+      this.occuredEvents !== constants.WASI_NO_EVENT &&
+      this.poolSub !== null
+    ) {
       const entry = this.poolSub;
       this.poolSub = null;
       if (Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID) {

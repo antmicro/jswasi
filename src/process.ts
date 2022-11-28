@@ -37,6 +37,7 @@ import {
   FdWriteSub,
   FdEventSub,
   PollOneoffArgs,
+  EventSourceArgs,
 } from "./types";
 
 type ptr = number;
@@ -1062,6 +1063,31 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           returnCode = Atomics.load(lck, 0);
           return { exit_status: returnCode, output: undefined };
         }
+      }
+      case "event_source_fd": {
+        const { event_mask: eventMask }: { event_mask: bigint } =
+          JSON.parse(json);
+        const sharedBuffer = new SharedArrayBuffer(4 + 4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
+
+        if (
+          eventMask === 0n ||
+          eventMask >= BigInt(1n) << BigInt(constants.WASI_EVENTS_NUM)
+        ) {
+          return { exit_status: constants.WASI_EINVAL, output: undefined };
+        }
+
+        lck[0] = -1;
+
+        sendToKernel([
+          "event_source_fd",
+          { sharedBuffer, eventMask } as EventSourceArgs,
+        ]);
+        Atomics.wait(lck, 0, -1);
+
+        let returnCode = Atomics.load(lck, 0);
+        return { exit_status: returnCode, output: `${fileDescriptor[0]}` };
       }
       default: {
         workerConsoleLog(`Special command ${command} not found.`);

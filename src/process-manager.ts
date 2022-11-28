@@ -8,7 +8,7 @@ import {
 import { FileOrDir } from "./filesystem/enums.js";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 
-type FileDescriptor = In | Out | OpenFile | OpenDirectory;
+type FileDescriptor = In | Out | OpenFile | OpenDirectory | EventSource;
 export class FdTable {
   private fdt: Record<number, FileDescriptor> = {};
   private freeFds: number[] = [];
@@ -105,32 +105,28 @@ class ProcessInfo {
 class PubSubEvent {
   public subsTable: Array<Set<HtermEventSub>>;
 
-  constructor(private processTable: Record<number, ProcessInfo>) {
+  constructor() {
     this.subsTable = new Array<Set<HtermEventSub>>(constants.WASI_EVENTS_NUM);
     for (var i = 0; i < this.subsTable.length; i++) {
       this.subsTable[i] = new Set<HtermEventSub>([]);
     }
   }
 
-  subscribeEvent(processId: number, eventSourceFd: number, events: bigint) {
+  subscribeEvent(sub: HtermEventSub, events: bigint) {
     for (var i = 0; i < this.subsTable.length; i++) {
-      if ((events & (1n << BigInt(i))) != 0n) {
-        this.subsTable[i].add({ processId, eventSourceFd } as HtermEventSub);
+      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) !== 0n) {
+        this.subsTable[i].add(sub as HtermEventSub);
       }
     }
   }
 
-  unsubscribeEvent(processId: number, eventSourceFd: number, events: bigint) {
+  unsubscribeEvent(sub: HtermEventSub, events: bigint) {
     for (var i = 0; i < this.subsTable.length; i++) {
-      if ((events & (1n << BigInt(i))) != 0n) {
-        if (
-          !this.subsTable[i].delete({
-            processId,
-            eventSourceFd,
-          } as HtermEventSub)
-        ) {
+      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) !== 0n) {
+        if (!this.subsTable[i].delete(sub)) {
+          var { processId, eventSourceFd } = sub;
           console.log(
-            `PubSubEvent: attemp to unsubscribe process=${process} fd=${eventSourceFd} that wasn't subcribed`
+            `PubSubEvent: attemp to unsubscribe process=${processId} fd=${eventSourceFd} that wasn't subcribed`
           );
         }
       }
@@ -139,22 +135,14 @@ class PubSubEvent {
 
   publishEvent(events: bigint) {
     for (var i = 0; i < this.subsTable.length; i++) {
-      if ((events & (1n << BigInt(i))) != 0n) {
+      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) != 0n) {
         for (const { processId, eventSourceFd } of this.subsTable[i]) {
-          let process = this.processTable[processId];
-          if (process === undefined) {
-            console.log(
-              `PubSubEvent: there is process=${process} that doesn't exist in processInfo table`
-            );
-            continue;
-          }
-
-          let fd = process.fds.getFd(eventSourceFd);
+          let fd = eventSourceFd;
           if (fd instanceof EventSource) {
             fd.sendEvents(events);
           } else {
             console.log(
-              `PubSubEvent: there is fd=${fd} that doesn't is not EventSource in fds table of process=${process}`
+              `PubSubEvent: there is fd=${fd} that is not EventSource object in fds table of process=${processId}`
             );
           }
         }
@@ -174,7 +162,7 @@ export default class ProcessManager {
 
   public compiledModules: Record<string, WebAssembly.Module> = {};
 
-  public events: PubSubEvent = new PubSubEvent(this.processInfos);
+  public events: PubSubEvent = new PubSubEvent();
 
   constructor(
     private readonly scriptName: string,
