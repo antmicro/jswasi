@@ -139,8 +139,12 @@ export async function wget(
   } else if (args.length === 4) {
     [, address, operator, path] = args;
     if (operator != "-O") {
-        await stderr.write("wget: help: wget <address> [<path>] or wget <addres> -O <path>\n");
-        return 1;
+      await stderr.write(
+        new TextEncoder().encode(
+          "wget: help: wget <address> [<path>] or wget <addres> -O <path>\n"
+        )
+      );
+      return 1;
     }
   } else {
     await stderr.write(
@@ -149,13 +153,17 @@ export async function wget(
     return 1;
   }
   if (path == "-") {
-      try {
-          await fetchFile(null, null, address, true, stdout, stderr, true);
-      } catch (error: any) {
-          await stderr.write(`wget: could not get resource: ${error.message.toLowerCase()}\n`);
-	  return 1;
-      }
-      return 0;
+    try {
+      await fetchFile(null, null, address, true, stdout, stderr, true);
+    } catch (error: any) {
+      await stderr.write(
+        new TextEncoder().encode(
+          `wget: could not get resource: ${error.message.toLowerCase()}\n`
+        )
+      );
+      return 1;
+    }
+    return 0;
   }
   if (!path.startsWith("/")) {
     path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
