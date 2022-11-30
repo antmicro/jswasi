@@ -19,6 +19,7 @@ test ! -f /usr/local/bin/clang && echo "downloading clang..." && wget https://re
 test ! -f /usr/local/bin/wasm-ld && echo "downloading wasm-ld..." && wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm /usr/local/bin/wasm-ld
 test ! -f /usr/local/bin/tar && echo "downloading tar..." && wget resources/tar.wasm /usr/local/bin/tar
 test ! -f /usr/local/bin/wasibox && echo "downloading wasibox..." && wget resources/wasibox.wasm /usr/local/bin/wasibox
+test ! -f /usr/local/bin/kibi && echo "downloading kibi..." && wget resources/kibi.wasm /usr/local/bin/kibi
 
 if test ! -d /lib/python3.10; then
     echo "downloading python libs..."
