@@ -1065,7 +1065,16 @@ export default async function syscallCallback(
               case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
                 if (fd instanceof Stdin) {
                   let stdin = fd as Stdin;
-                  let bytes = await stdin.availableBytes(processId);
+                  let bytes = stdin.availableBytes(processId);
+
+                  if (bytes > 0) {
+                    event[0] = constants.WASI_POLL_BUF_STATUS_READY;
+                    event[1] = bytes;
+                    isEvent = true;
+                  }
+                } else if (fd instanceof EventSource) {
+                  let eventSource = fd as EventSource;
+                  let bytes = eventSource.availableBytes(processId);
 
                   if (bytes > 0) {
                     event[0] = constants.WASI_POLL_BUF_STATUS_READY;
@@ -1133,7 +1142,10 @@ export default async function syscallCallback(
           case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
             if (fd instanceof Stdin) {
               let stdin = fd as Stdin;
-              await stdin.setPollEntry(processId, endLock, buffer);
+              stdin.setPollEntry(processId, endLock, buffer);
+            } else if (fd instanceof EventSource) {
+              let eventSource = fd as EventSource;
+              eventSource.setPollEntry(endLock, buffer);
             } else {
               //! We have processed data earlier, it should be not executed
               console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);

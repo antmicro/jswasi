@@ -95,9 +95,9 @@ export class Stdin implements In {
     return 0;
   }
 
-  availableBytes(workerId: number): Promise<number> {
+  availableBytes(workerId: number): number {
     if (this.workerTable.currentProcess !== workerId) {
-      return Promise.resolve(0);
+      return 0;
     }
 
     let availableBytes = this.workerTable.buffer.length;
@@ -115,19 +115,14 @@ export class Stdin implements In {
       pendingBytes = availableBytes > 0 ? availableBytes : 0;
     }
 
-    return Promise.resolve(pendingBytes);
+    return pendingBytes;
   }
 
-  setPollEntry(
-    workerId: number,
-    userLock: Int32Array,
-    userBuffer: Int32Array
-  ): Promise<void> {
+  setPollEntry(workerId: number, userLock: Int32Array, userBuffer: Int32Array) {
     this.workerTable.processInfos[workerId].stdinPollSub = {
       lck: userLock,
       data: userBuffer,
     };
-    return Promise.resolve();
   }
 }
 
@@ -346,16 +341,13 @@ export class EventSource implements In {
     }
   }
 
-  availableBytes(workerId: number): Promise<number> {
-    return Promise.resolve(
-      this.occuredEvents != constants.WASI_NO_EVENT
-        ? constants.WASI_EVENT_MASK_SIZE
-        : 0
-    );
+  availableBytes(workerId: number): number {
+    return this.occuredEvents != constants.WASI_NO_EVENT
+      ? constants.WASI_EVENT_MASK_SIZE
+      : 0;
   }
 
-  setPollEntry(userLock: Int32Array, userBuffer: Int32Array): Promise<void> {
+  setPollEntry(userLock: Int32Array, userBuffer: Int32Array): void {
     this.poolSub = { lck: userLock, data: userBuffer } as PollEntry;
-    return Promise.resolve();
   }
 }

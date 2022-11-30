@@ -1401,7 +1401,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return Atomics.load(lck, 0);
   }
 
-  // TODO: it doesn't work for now
   function poll_oneoff(
     subscriptionsPtr: ptr,
     eventsPtr: ptr,
