@@ -320,6 +320,8 @@ async function initFs(openedRootDir: OpenDirectory) {
     openedRootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/true", "/usr/bin/coreutils"),
     openedRootDir.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
+
+    openedRootDir.addSymlink("/usr/local/bin/unzip", "/usr/local/bin/wasibox"),
   ]);
 
   await washRcPromise;
