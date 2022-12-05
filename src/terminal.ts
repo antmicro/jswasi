@@ -323,6 +323,10 @@ async function initFs(openedRootDir: OpenDirectory) {
     openedRootDir.addSymlink("/usr/bin/sleep", "/usr/bin/coreutils"),
 
     openedRootDir.addSymlink("/usr/local/bin/unzip", "/usr/local/bin/wasibox"),
+    openedRootDir.addSymlink(
+      "/usr/local/bin/hexdump",
+      "/usr/local/bin/wasibox"
+    ),
   ]);
 
   await washRcPromise;
