@@ -135,7 +135,9 @@ export async function fetchFile(
       if (clen != null) size = +clen;
       const op = await entry.open();
       const writable = await op.writableStream();
-      stdout?.write(new TextEncoder().encode(`[${"-".repeat(50)}: ${size}]\r`));
+      stdout?.write(
+        new TextEncoder().encode(`[${"-".repeat(50)}: ${position}]\r`)
+      );
       await response.body?.pipeThrough(progress).pipeTo(writable);
       stdout?.write(new TextEncoder().encode("Download finished.\n"));
     }
