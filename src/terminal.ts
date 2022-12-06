@@ -328,6 +328,7 @@ async function initFs(openedRootDir: OpenDirectory) {
       "/usr/local/bin/wasibox"
     ),
     openedRootDir.addSymlink("/usr/local/bin/imgcat", "/usr/local/bin/wasibox"),
+    openedRootDir.addSymlink("/usr/local/bin/purge", "/usr/local/bin/wasibox"),
   ]);
 
   await washRcPromise;
