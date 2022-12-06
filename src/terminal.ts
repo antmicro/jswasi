@@ -327,6 +327,7 @@ async function initFs(openedRootDir: OpenDirectory) {
       "/usr/local/bin/hexdump",
       "/usr/local/bin/wasibox"
     ),
+    openedRootDir.addSymlink("/usr/local/bin/imgcat", "/usr/local/bin/wasibox"),
   ]);
 
   await washRcPromise;
