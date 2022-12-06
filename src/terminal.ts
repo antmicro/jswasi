@@ -33,7 +33,6 @@ const CHECKSUM_BINARIES = {
 const ALWAYS_FETCH_BINARIES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/coreutils": "resources/coreutils.wasm",
-  "/usr/bin/test_prog": "resources/test_prog.wasm",
 };
 
 export async function fetchFile(
