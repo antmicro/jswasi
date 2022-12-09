@@ -100,7 +100,9 @@ class FsaFilesystem implements Filesystem {
         mtim: BigInt(file.lastModified) * 1_000_000n,
         ctim: 0n,
       };
-      await setStoredData(path, storedData);
+      if (options.create && this.getMounts().length == 0) {
+        await setStoredData(path, storedData);
+      }
     }
 
     if (
@@ -193,7 +195,9 @@ class FsaFilesystem implements Filesystem {
         mtim: 0n,
         ctim: 0n,
       };
-      await setStoredData(path, storedData);
+      if (options.create && reversedMounts.length == 0) {
+        await setStoredData(path, storedData);
+      }
     }
 
     if (
