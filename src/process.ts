@@ -38,6 +38,7 @@ import {
   FdEventSub,
   PollOneoffArgs,
   EventSourceArgs,
+  CleanInodesArgs,
 } from "./types";
 
 type ptr = number;
@@ -1088,6 +1089,15 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         let returnCode = Atomics.load(lck, 0);
         return { exit_status: returnCode, output: `${fileDescriptor[0]}` };
+      }
+      case "clean_inodes": {
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        workerConsoleLog("clean_inodes()");
+        lck[0] = -1;
+        sendToKernel(["clean_inodes", { sharedBuffer } as CleanInodesArgs]);
+        Atomics.wait(lck, 0, -1);
+        return { exit_status: Atomics.load(lck, 0), output: undefined };
       }
       default: {
         workerConsoleLog(`Special command ${command} not found.`);

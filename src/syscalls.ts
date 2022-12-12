@@ -31,6 +31,7 @@ import {
   PollOneoffArgs,
   FdReadSub,
   EventSourceArgs,
+  CleanInodesArgs,
 } from "./types.js";
 import {
   Directory,
@@ -52,6 +53,7 @@ import { In, Stdin, Out, EventSource } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
 import { terminal } from "./terminal.js";
 import { msToNs } from "./utils.js";
+import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -1180,6 +1182,29 @@ export default async function syscallCallback(
       Atomics.store(lck, 0, 0);
       Atomics.notify(lck, 0);
 
+      break;
+    }
+    case "clean_inodes": {
+      // This syscall removes indexedDB entries that don't correspond to any file or directory
+      const { sharedBuffer } = data as CleanInodesArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      let keys = await listStoredKeys();
+      let rootFd = processManager.filesystem.getRootDir().open();
+
+      for (let key of keys) {
+        const { err, entry: _entry } = await (rootFd as OpenDirectory).getEntry(
+          key,
+          FileOrDir.Any,
+          LookupFlags.NoFollow
+        );
+        if (err === constants.WASI_ENOENT) {
+          delStoredData(key);
+        }
+      }
+
+      Atomics.store(lck, 0, 0);
+      Atomics.notify(lck, 0);
       break;
     }
     default: {

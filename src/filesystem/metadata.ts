@@ -1,5 +1,5 @@
 // @ts-ignore TODO: port idb-keyval to Typescript with no implicit any
-import { del, get, set } from "../vendor/idb-keyval.js";
+import { del, get, set, keys } from "../vendor/idb-keyval.js";
 import { StoredData } from "./enums.js";
 
 export async function delStoredData(path: string) {
@@ -12,4 +12,8 @@ export async function getStoredData(path: string): Promise<StoredData> {
 
 export async function setStoredData(path: string, storedData: StoredData) {
   set(path, storedData);
+}
+
+export async function listStoredKeys(): Promise<string[]> {
+  return keys();
 }

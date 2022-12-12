@@ -215,3 +215,7 @@ export type EventSourceArgs = {
   sharedBuffer: SharedArrayBuffer;
   eventMask: bigint;
 };
+
+export type CleanInodesArgs = {
+  sharedBuffer: SharedArrayBuffer;
+};
