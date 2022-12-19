@@ -23,9 +23,9 @@ if test ! -f /usr/local/bin/kibi; then
     echo "downloading kibi..."
     wget resources/kibi.wasm /usr/local/bin/kibi
     mkdir -p /home/ant/.config/kibi/
-    wget resources/kibi/config.ini /home/ant/.config/kibi/config.ini
+    wget resources/config.ini /home/ant/.config/kibi/config.ini
     mkdir -p /home/ant/.local/share/kibi/
-    wget resources/kibi/syntax.d.zip /home/ant/.local/share/kibi/syntax.d.zip
+    wget resources/syntax.d.zip /home/ant/.local/share/kibi/syntax.d.zip
     cd /home/ant/.local/share/kibi/
     unzip syntax.d.zip
     rm syntax.d.zip
