@@ -79,12 +79,12 @@ class FsaFilesystem implements Filesystem {
   }
 
   async getFile(
-    dir: FsaOpenDirectory,
+    dir: OpenDirectory,
     name: string,
     options: { create: boolean } = { create: false },
     lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
     __recursiveSymlinksDepth: number = 0
-  ): Promise<{ err: number; entry: FsaFile | null }> {
+  ): Promise<{ err: number; entry: OpenFile | null }> {
     const path = `${dir.path()}${dir.path().endsWith("/") ? "" : "/"}${name}`;
     const handle = await dir.handle.getFileHandle(name, options);
     const file = await handle.getFile();
@@ -141,7 +141,7 @@ class FsaFilesystem implements Filesystem {
   }
 
   async getDirectory(
-    dir: FsaOpenDirectory,
+    dir: OpenDirectory,
     name: string,
     options: { create: boolean } = { create: false },
     lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
@@ -150,18 +150,13 @@ class FsaFilesystem implements Filesystem {
     fsRightsInheriting: Rights = Rights.None,
     fdFlags: FdFlags = FdFlags.None,
     __recursiveSymlinksDepth: number = 0
-  ): Promise<{ err: number; entry: FsaDirectory | null }> {
+  ): Promise<{ err: number; entry: Directory | null }> {
     if (dir.name() === "/" && (name === "." || name === ".." || name === "/"))
       return { err: constants.WASI_ESUCCESS, entry: this.getRootDir() };
     if (name === ".") {
       return {
         err: constants.WASI_ESUCCESS,
-        entry: new FsaDirectory(
-          dir.path(),
-          dir.handle,
-          dir.parent(),
-          dir.filesystem
-        ),
+        entry: await dir.inner(),
       };
     }
     if (name === "..") {
@@ -240,10 +235,7 @@ class FsaFilesystem implements Filesystem {
     return err === constants.WASI_ESUCCESS;
   }
 
-  async addMount(
-    absolutePath: string,
-    mountedHandle: FileSystemDirectoryHandle
-  ): Promise<number> {
+  async addMount(absolutePath: string, mountedDir: Directory): Promise<number> {
     const { parts, name } = parsePath(absolutePath);
     const parent = await this.getRootDir()
       .open()
@@ -255,8 +247,7 @@ class FsaFilesystem implements Filesystem {
       );
     const path = `/${parts.join("/")}/${name}`;
     // TODO: add dummy metadata to mounted filesystems recursively
-    const dir = new FsaDirectory(path, mountedHandle, parent.entry, this);
-    this.mounts.push({ parts, name, dir });
+    this.mounts.push({ parts, name, dir: mountedDir });
     return constants.WASI_ESUCCESS;
   }
 
@@ -279,7 +270,7 @@ class FsaFilesystem implements Filesystem {
     path: string
   ): Promise<{ err: number; name: string | null; dir: Directory | null }> {
     const { parts, name } = parsePath(path);
-    let dir = this.getRootDir();
+    let dir: Directory = this.getRootDir();
 
     try {
       for (const part of parts) {
@@ -672,7 +663,7 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     dirFlags?: LookupFlags,
     openFlags?: OpenFlags,
     __recursiveSymlinksDepth?: number
-  ): Promise<{ err: number; entry: FsaDirectory }>;
+  ): Promise<{ err: number; entry: Directory }>;
 
   // eslint-disable-next-line no-dupe-class-members
   getEntry(
@@ -681,59 +672,21 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     dirFlags?: LookupFlags,
     openFlags?: OpenFlags,
     __recursiveSymlinksDepth?: number
-  ): Promise<{ err: number; entry: FsaFile | FsaDirectory }>;
+  ): Promise<{ err: number; entry: File | Directory }>;
 
   // eslint-disable-next-line no-dupe-class-members
   async getEntry(
     path: string,
     mode: FileOrDir,
-    lookupFlags: LookupFlags = LookupFlags.SymlinkFollow,
-    openFlags: OpenFlags = OpenFlags.None,
-    __recursiveSymlinksDepth: number = 0
-  ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> {
-    const {
-      err: getParentErr,
-      name,
-      parent,
-    } = await this.filesystem.getParent(this, path);
-
-    if (getParentErr !== constants.WASI_ESUCCESS) {
-      return { err: getParentErr, entry: null };
+    dirFlags?: LookupFlags,
+    openFlags?: OpenFlags,
+    __recursiveSymlinksDepth?: number
+  ): Promise<{ err: number; entry: File | Directory | null }> {
+    if (path === ".") {
+      return { err: constants.WASI_ESUCCESS, entry: this };
     }
-
-    if (name === "") {
-      return {
-        err: constants.WASI_ESUCCESS,
-        entry: this.filesystem.getRootDir(),
-      };
-    }
-
-    if (name === "." || name === "..") {
-      if (openFlags & (OpenFlags.Create | OpenFlags.Exclusive)) {
-        return { err: constants.WASI_EEXIST, entry: null };
-      }
-      if (openFlags & OpenFlags.Truncate) {
-        return { err: constants.WASI_EISDIR, entry: null };
-      }
-
-      if (name === ".") {
-        const entry = new FsaDirectory(
-          parent.path(),
-          parent.handle,
-          parent.parent(),
-          parent.filesystem
-        );
-        return { err: constants.WASI_ESUCCESS, entry };
-      }
-      if (name === "..") {
-        const entry = new FsaDirectory(
-          parent.parent().path(),
-          parent.parent().handle,
-          parent.parent().parent(),
-          parent.parent().filesystem
-        );
-        return { err: constants.WASI_ESUCCESS, entry };
-      }
+    if (path === "..") {
+      return { err: constants.WASI_ESUCCESS, entry: this.parent() };
     }
 
     if (openFlags & OpenFlags.Directory) {
@@ -742,16 +695,14 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
 
     const open = async (
       create: boolean
-    ): Promise<{ err: number; entry: FsaFile | FsaDirectory | null }> => {
+    ): Promise<{ err: number; entry: File | Directory | null }> => {
       if (mode & FileOrDir.File) {
         try {
           return await this.filesystem.getFile(
-            parent.open(),
-            name,
-            {
-              create,
-            },
-            lookupFlags,
+            this,
+            path,
+            { create },
+            dirFlags,
             __recursiveSymlinksDepth
           );
         } catch (err: any) {
@@ -812,15 +763,23 @@ export class FsaOpenDirectory extends FsaDirectory implements OpenDirectory {
     }
 
     if (openFlags & OpenFlags.Truncate) {
-      if (entry.handle.kind === "directory") {
+      if ((await entry.stat()).fileType === constants.WASI_FILETYPE_DIRECTORY) {
         return { err: constants.WASI_EISDIR, entry: null };
       }
-      const writable = await entry.handle.createWritable();
-      await writable.write({ type: "truncate", size: 0 });
-      await writable.close();
+      const opened = await (entry as File).open();
+      await opened.truncate(0);
     }
 
     return { err, entry };
+  }
+
+  async inner(): Promise<FsaDirectory> {
+    return new FsaDirectory(
+      this.path(),
+      this.handle,
+      this.parent(),
+      this.filesystem
+    );
   }
 }
 
@@ -1045,5 +1004,14 @@ export class FsaOpenFile extends FsaEntry implements OpenFile, StreamableFile {
 
   async writableStream(): Promise<WritableStream> {
     return this.handle.createWritable();
+  }
+
+  async inner(): Promise<File> {
+    return new FsaFile(
+      this.path(),
+      this.handle,
+      this.parent(),
+      this.filesystem
+    ) as File;
   }
 }

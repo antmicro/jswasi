@@ -8,7 +8,6 @@ import {
 import { FileOrDir } from "./filesystem/enums.js";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 
-type FileDescriptor = In | Out | OpenFile | OpenDirectory | EventSource;
 export class FdTable {
   private fdt: Record<number, FileDescriptor> = {};
   private freeFds: number[] = [];
