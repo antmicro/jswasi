@@ -7,6 +7,8 @@ export type FileDescriptor = In | Out | OpenFile | OpenDirectory | EventSource;
 class TopLevelFs {
   private topLevelFilesystem: Filesystem;
 
+  private mounts: Record<string, Filesystem>;
+
   async getEntry(
     fd: OpenDirectory,
     dirflags: LookupFlags,
