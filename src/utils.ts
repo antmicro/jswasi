@@ -14,6 +14,16 @@ export function arraysEqual(a: any[], b: any[]) {
   return true;
 }
 
+export function pathSeparators(path: string): number[] {
+  let indices: number[] = [];
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] === "/") {
+      indices.push(i);
+    }
+  }
+  return indices;
+}
+
 export function parsePath(path: string): { parts: string[]; name: string } {
   const parts = path.split("/").filter((part) => part !== "");
   const name = parts.pop() || "";

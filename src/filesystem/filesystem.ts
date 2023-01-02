@@ -70,11 +70,11 @@ export interface Descriptor {
 }
 
 export interface Filesystem {
-  getMounts(): Record<string, Mount>;
+  getMounts(): Record<string, Filesystem>;
   addMount(path: string, mountedFs: Filesystem): Promise<number>;
   removeMount(absolutePath: string): Promise<number>;
 
-  createDir(path: String): Promise<number>;
+  createDir(path: Uint8Array): Promise<number>;
   getFilestat(path: string, buffer: DataView): Promise<number>;
   setFilestatTimes(
     path: string,
