@@ -10,44 +10,70 @@ class FsaFilesystem implements Filesystem {
     ).getDirectoryHandle("root", { create: false });
   }
 
+  private async getHandle(
+    path: string,
+    isDir: boolean
+  ): Promise<{ index: number; err: number; handle: FileSystemHandle }> {
+    const indices = pathSeparators(path);
+    let handle = await this.getRootHandle();
+    let index;
+    try {
+      for (index = 0; index < indices.length - 1; index++) {
+        handle = await handle.getDirectoryHandle(
+          path.slice(indices[index] + 1, indices[index + 1])
+        );
+      }
+      let h: FileSystemHandle;
+      if (isDir) {
+        h = await handle.getDirectoryHandle(path.slice(indices[index]));
+      } else {
+        h = await handle.getFileHandle(path.slice(indices[index]));
+      }
+      return { handle: h, err: constants.WASI_ESUCCESS, index: undefined };
+    } catch (e) {
+      let err = constants.WASI_EINVAL;
+      if (e instanceof DOMException) {
+        switch (e.name) {
+          case "NotAllowedError":
+            err = constants.WASI_EACCES;
+            break;
+          case "TypeMismatchError":
+            if (isDir) {
+              err = constants.WASI_ENOTDIR;
+            } else {
+              err = constants.WASI_EISDIR;
+            }
+          case "NotFoundError":
+            err = constants.WASI_ENOENT;
+            break;
+        }
+      }
+      return { index, err, handle };
+    }
+  }
+
   getMounts(): Record<string, Filesystem> {
     return this.mounts;
   }
 
   async addMount(path: string, filesystem: Filesystem): Promise<number> {
-    const indices = pathSeparators(path);
-    let handle = await this.getRootHandle();
-    for (let i = 0; i < indices.length - 1; i++) {
-      try {
-        handle = await handle.getDirectoryHandle(
-          path.slice(indices[i] + 1, indices[i + 1])
-        );
-      } catch (e) {
-        if (e instanceof DOMException) {
-          switch (e.name) {
-            case "NotAllowedError":
-              return constants.WASI_EACCES;
-            case "TypeMismatchError":
-              return constants.WASI_ENOTDIR;
-            case "NotFoundError":
-              const __path = path.slice(0, indices[i]);
-              let mountPoint = this.mounts[__path];
-              if (mountPoint === undefined) {
-                return constants.WASI_ENOENT;
-              } else {
-                return mountPoint.addMount(path.slice(indices[i]), filesystem);
-              }
-          }
-        } else {
-          return constants.WASI_EINVAL;
-        }
+    let { index, err, handle } = await this.getHandle(path, true);
+    if (err === constants.WASI_ENOENT) {
+      let mountPoint = this.mounts[path.slice(0, index)];
+      if (mountPoint === undefined) {
+        return constants.WASI_ENOENT;
+      } else {
+        return mountPoint.addMount(path.slice(index + 1), filesystem);
       }
-    }
-    if (handle.entries().next() !== undefined) {
-      this.mounts[path] = filesystem;
-      return constants.WASI_ESUCCESS;
+    } else if (err !== constants.WASI_ESUCCESS) {
+      return err;
     } else {
-      return constants.WASI_ENOTEMPTY;
+      if ((handle as FileSystemDirectoryHandle).entries().next === undefined) {
+        this.mounts[path] = filesystem;
+        return constants.WASI_ESUCCESS;
+      } else {
+        return constants.WASI_ENOTEMPTY;
+      }
     }
   }
 
