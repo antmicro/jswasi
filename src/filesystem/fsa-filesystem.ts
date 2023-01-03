@@ -51,12 +51,11 @@ class FsaFilesystem implements Filesystem {
     }
   }
 
-  async removeMount(path: Uint8Array): Promise<number> {
-    const decoded = new TextDecoder().decode(path);
-    if (this.mounts[decoded] == undefined) {
+  async removeMount(path: string): Promise<number> {
+    if (this.mounts[path] == undefined) {
       return constants.WASI_EINVAL;
     } else {
-      delete this.mounts[decoded];
+      delete this.mounts[path];
       return constants.WASI_ESUCCESS;
     }
   }
