@@ -10,6 +10,18 @@ class FsaFilesystem implements Filesystem {
     ).getDirectoryHandle("root", { create: false });
   }
 
+  /**
+   * Returns a handle using relative or absolute path
+   *
+   * @param path - path that is absolute or relative to the given handle
+   * @param isDir - tells if the demanded path corresponds to a file or a directory
+   * @param handle - handle from which to start searching if the given path is relative
+   *
+   * @returns an object holding three values:
+   * index - index of the last processed path separator, if the search failed this separator is the one after the component that failed, if the search succeeded it is the last separator in the path
+   * err - wasi error code
+   * handle - a demanded handle, if the search failed this field holds the last succesfully found handle
+   */
   private async getHandle(
     path: string,
     isDir: boolean,
