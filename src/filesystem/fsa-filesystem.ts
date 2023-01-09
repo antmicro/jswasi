@@ -3,7 +3,6 @@ import * as constants from "../constants";
 import { getStoredData, setStoredData } from "./metadata";
 
 class FsaFilesystem implements Filesystem {
-  private mounts: Record<string, Filesystem>;
   private async getRootHandle(): Promise<FileSystemDirectoryHandle> {
     return await (
       await navigator.storage.getDirectory()
@@ -11,40 +10,59 @@ class FsaFilesystem implements Filesystem {
   }
 
   /**
+   * Returns wasi error code corresponding to a given DOMException
+   *
+   * @param e - DOMException instance
+   * @param isDir - some error variants differ depending on whether a directory or a file was requested
+   *
+   * @returns wasi error code
+   */
+  private static mapErr(e: DOMException, isDir: boolean): number {
+    switch (e.name) {
+      case "NotAllowedError":
+        return constants.WASI_EACCES;
+      case "TypeMismatchError":
+        if (isDir) {
+          return constants.WASI_ENOTDIR;
+        } else {
+          return constants.WASI_EISDIR;
+        }
+      case "NotFoundError":
+        return constants.WASI_ENOENT;
+      default:
+        return constants.WASI_EINVAL;
+    }
+  }
+
+  /**
    * Returns a handle using relative or absolute path
    *
    * @param path - path that is absolute or relative to the given handle
    * @param isDir - tells if the demanded path corresponds to a file or a directory
-   * @param handle - handle from which to start searching if the given path is relative
+   * @param start_handle - handle from which to start searching if the given path is relative
    *
    * @returns an object holding three values:
-   * index - index of the last processed path separator, if the search failed this separator is the one after the component that failed, if the search succeeded it is the last separator in the path
+   * index - index of the last processed path separator, if the search failed this separator is the one after the component that failed, however if the search succeeded it is equal to -1
    * err - wasi error code
    * handle - a demanded handle, if the search failed this field holds the last succesfully found handle
    */
   private async getHandle(
     path: string,
     isDir: boolean,
-    handle: FileSystemDirectoryHandle = undefined
+    start_handle: FileSystemDirectoryHandle
   ): Promise<{ index: number; err: number; handle: FileSystemHandle }> {
     let start, stop;
-    if (path.startsWith("/")) {
-      handle = await this.getRootHandle();
-      start = 1;
-    } else {
-      if (handle === undefined) {
-        handle = await this.getRootHandle();
-      } else {
-        handle = handle;
-      }
-      start = 0;
-    }
+    let handle =
+      start_handle === undefined ? await this.getRootHandle() : start_handle;
+    start = 1;
     try {
       stop = path.indexOf("/", start);
       while (true) {
+        // TODO: can fsa api handle .. and .?
         handle = await handle.getDirectoryHandle(path.slice(start, stop));
         stop = path.indexOf("/", start);
         if (stop === -1) {
+          start = -1;
           break;
         }
         start = stop + 1;
@@ -58,162 +76,62 @@ class FsaFilesystem implements Filesystem {
       return {
         handle: __handle,
         err: constants.WASI_ESUCCESS,
-        index: undefined,
+        index: -1,
       };
     } catch (e) {
       let err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
-        switch (e.name) {
-          case "NotAllowedError":
-            err = constants.WASI_EACCES;
-            break;
-          case "TypeMismatchError":
-            if (isDir) {
-              err = constants.WASI_ENOTDIR;
-            } else {
-              err = constants.WASI_EISDIR;
-            }
-          case "NotFoundError":
-            err = constants.WASI_ENOENT;
-            break;
-        }
+        err = FsaFilesystem.mapErr(e, isDir);
       }
       return { index: start, err, handle };
-    }
-  }
-
-  /*
-   * Check if the path is mounted
-   * This function iterates over all path components to check if any prefix is a mount point
-   *
-   * @note This function is not recursive - it only returns the first mount point in the path
-   *
-   * @param path - path to examine
-   *
-   * @returns
-   * index - path slice that corresponds to a mount point, if the path is not mounted this value is undefined
-   * filesystem - mounted filesystem
-   */
-  async getMount(
-    path: string
-  ): Promise<{ index: number; filesystem: Filesystem }> {
-    let stop = 1;
-    while (true) {
-      stop = path.indexOf("/", stop);
-      if (stop === -1) {
-        break;
-      }
-      let mntPoint = path.slice(0, stop);
-      if (this.mounts[mntPoint] !== undefined) {
-        return { index: stop, filesystem: this.mounts[mntPoint] };
-      }
-    }
-    if (this.mounts[path]) {
-      return { index: stop, filesystem: this.mounts[path] };
-    } else {
-      return { index: undefined, filesystem: undefined };
-    }
-  }
-
-  getMounts(): Record<string, Filesystem> {
-    return this.mounts;
-  }
-
-  async addMount(path: string, filesystem: Filesystem): Promise<number> {
-    let { index, err, handle } = await this.getHandle(path, true);
-    if (err === constants.WASI_ENOENT) {
-      let mountPoint = this.mounts[path.slice(0, index)];
-      if (mountPoint === undefined) {
-        return constants.WASI_ENOENT;
-      } else {
-        return mountPoint.addMount(path.slice(index + 1), filesystem);
-      }
-    } else if (err !== constants.WASI_ESUCCESS) {
-      return err;
-    } else {
-      if ((handle as FileSystemDirectoryHandle).entries().next === undefined) {
-        this.mounts[path] = filesystem;
-        return constants.WASI_ESUCCESS;
-      } else {
-        return constants.WASI_ENOTEMPTY;
-      }
-    }
-  }
-
-  async removeMount(path: string): Promise<number> {
-    if (this.mounts[path] == undefined) {
-      return constants.WASI_EINVAL;
-    } else {
-      delete this.mounts[path];
-      return constants.WASI_ESUCCESS;
     }
   }
 
   async createDir(path: string): Promise<number> {
     let { index, err, handle } = await this.getHandle(
       path.slice(0, path.lastIndexOf("/")),
-      true
+      true,
+      undefined
     );
-    if (err === constants.WASI_ENOENT) {
-      let mountPoint = this.mounts[path.slice(0, index)];
-      if (mountPoint === undefined) {
-        return err;
-      } else {
-        return mountPoint.createDir(path.slice(index + 1));
-      }
-    } else if (err !== constants.WASI_ESUCCESS) {
+    if (err !== constants.WASI_ESUCCESS) {
       return err;
-    } else {
-      let __path = path.slice(index + 1);
-      let { err: e } = await this.getHandle(
-        __path,
-        true,
-        handle as FileSystemDirectoryHandle
-      );
-      // TODO: fill dummy data with something meaningful
-      await setStoredData(path, {
-        dev: 0n,
-        ino: 0n,
-        filetype: constants.WASI_FILETYPE_DIRECTORY,
-        nlink: 0n,
-        size: 4096n,
-        mtim: 0n,
-        atim: 0n,
-        ctim: 0n,
-      });
-      switch (e) {
+    }
+    let __path = path.slice(index + 1);
+    try {
+      this.getHandle(__path, true, handle as FileSystemDirectoryHandle);
+    } catch (e) {
+      let __err = constants.WASI_EINVAL;
+      if (e instanceof DOMException) {
+        __err = FsaFilesystem.mapErr(e, true);
+      }
+      switch (__err) {
         case constants.WASI_ENOENT:
-          try {
-            await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
-              __path,
-              { create: true }
-            );
-            return constants.WASI_ESUCCESS;
-          } catch (_) {
-            return constants.WASI_EACCES;
-          }
-        case constants.WASI_ESUCCESS:
-        case constants.WASI_ENOTDIR:
-          return constants.WASI_EEXIST;
+          (handle as FileSystemDirectoryHandle).getDirectoryHandle(path, {
+            create: true,
+          });
+          // TODO: fill dummy data with something meaningful
+          await setStoredData(path, {
+            dev: 0n,
+            ino: 0n,
+            filetype: constants.WASI_FILETYPE_DIRECTORY,
+            nlink: 0n,
+            size: 4096n,
+            mtim: 0n,
+            atim: 0n,
+            ctim: 0n,
+          });
+          return constants.WASI_ESUCCESS;
         default:
-          return e;
+          return __err;
       }
     }
+    return constants.WASI_EEXIST;
   }
 
   async getFilestat(
     path: string
   ): Promise<{ err: number; filestat: Filestat }> {
     let storedData = await getStoredData(path);
-    if (storedData === undefined) {
-      let { index, filesystem } = await this.getMount(path);
-      if (index === undefined) {
-        return { err: constants.WASI_ENOENT, filestat: undefined };
-      } else {
-        return filesystem.getFilestat(path.slice(index + 1));
-      }
-    } else {
-      return { err: constants.WASI_ESUCCESS, filestat: storedData };
-    }
+    return { err: constants.WASI_ESUCCESS, filestat: storedData };
   }
 }

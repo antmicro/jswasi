@@ -34,6 +34,7 @@ export type Fdstat = {
 
 export interface Descriptor {
   getFdstat(): Promise<Fdstat>;
+
   setFilestatTimes(
     fstflags: Fstflags,
     atim: Timestamp,
@@ -47,6 +48,7 @@ export interface Descriptor {
   close(): Promise<number>;
 
   read(len: number, buffer: DataView): Promise<number>;
+  read_str(): Promise<string>;
   pread(len: number, pos: bigint, buffer: DataView): Promise<number>;
 
   write(buffer: DataView, len: number): Promise<number>;
@@ -70,10 +72,6 @@ export interface Descriptor {
 }
 
 export interface Filesystem {
-  getMounts(): Record<string, Filesystem>;
-  addMount(path: string, mountedFs: Filesystem): Promise<number>;
-  removeMount(absolutePath: string): Promise<number>;
-
   createDir(path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
   setFilestatTimes(
@@ -86,12 +84,11 @@ export interface Filesystem {
   // missing path_link
   open(
     path: string,
-    dirflags: LookupFlags,
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     fdflags: Fdflags
-  ): Promise<Descriptor>;
+  ): Promise<{ err: number; index: number; desc: Descriptor }>;
   readlink(path: string, buffer: DataView, len: number): Promise<number>;
   removeDirectory(path: string): Promise<number>;
   rename(oldPath: string, newPath: string): Promise<number>;
