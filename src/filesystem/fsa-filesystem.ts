@@ -1,5 +1,4 @@
 import { Filestat, Descriptor, Fdstat, Filesystem } from "./filesystem";
-import { pathSeparators } from "../utils";
 import * as constants from "../constants";
 import { getStoredData, setStoredData } from "./metadata";
 
@@ -171,6 +170,17 @@ class FsaFilesystem implements Filesystem {
         true,
         handle as FileSystemDirectoryHandle
       );
+      // TODO: fill dummy data with something meaningful
+      await setStoredData(path, {
+        dev: 0n,
+        ino: 0n,
+        filetype: constants.WASI_FILETYPE_DIRECTORY,
+        nlink: 0n,
+        size: 4096n,
+        mtim: 0n,
+        atim: 0n,
+        ctim: 0n,
+      });
       switch (e) {
         case constants.WASI_ENOENT:
           try {
