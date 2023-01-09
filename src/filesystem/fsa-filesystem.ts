@@ -1,6 +1,7 @@
 import { Filestat, Descriptor, Fdstat, Filesystem } from "./filesystem";
 import { pathSeparators } from "../utils";
 import * as constants from "../constants";
+import { getStoredData, setStoredData } from "./metadata";
 
 class FsaFilesystem implements Filesystem {
   private mounts: Record<string, Filesystem>;
@@ -82,6 +83,39 @@ class FsaFilesystem implements Filesystem {
     }
   }
 
+  /*
+   * Check if the path is mounted
+   * This function iterates over all path components to check if any prefix is a mount point
+   *
+   * @note This function is not recursive - it only returns the first mount point in the path
+   *
+   * @param path - path to examine
+   *
+   * @returns
+   * index - path slice that corresponds to a mount point, if the path is not mounted this value is undefined
+   * filesystem - mounted filesystem
+   */
+  async getMount(
+    path: string
+  ): Promise<{ index: number; filesystem: Filesystem }> {
+    let stop = 1;
+    while (true) {
+      stop = path.indexOf("/", stop);
+      if (stop === -1) {
+        break;
+      }
+      let mntPoint = path.slice(0, stop);
+      if (this.mounts[mntPoint] !== undefined) {
+        return { index: stop, filesystem: this.mounts[mntPoint] };
+      }
+    }
+    if (this.mounts[path]) {
+      return { index: stop, filesystem: this.mounts[path] };
+    } else {
+      return { index: undefined, filesystem: undefined };
+    }
+  }
+
   getMounts(): Record<string, Filesystem> {
     return this.mounts;
   }
@@ -154,6 +188,22 @@ class FsaFilesystem implements Filesystem {
         default:
           return e;
       }
+    }
+  }
+
+  async getFilestat(
+    path: string
+  ): Promise<{ err: number; filestat: Filestat }> {
+    let storedData = await getStoredData(path);
+    if (storedData === undefined) {
+      let { index, filesystem } = await this.getMount(path);
+      if (index === undefined) {
+        return { err: constants.WASI_ENOENT, filestat: undefined };
+      } else {
+        return filesystem.getFilestat(path.slice(index + 1));
+      }
+    } else {
+      return { err: constants.WASI_ESUCCESS, filestat: storedData };
     }
   }
 }

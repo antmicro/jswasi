@@ -75,7 +75,7 @@ export interface Filesystem {
   removeMount(absolutePath: string): Promise<number>;
 
   createDir(path: string): Promise<number>;
-  getFilestat(path: string, buffer: DataView): Promise<number>;
+  getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
   setFilestatTimes(
     path: string,
     lookupFlags: LookupFlags,
