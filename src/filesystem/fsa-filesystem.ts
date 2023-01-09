@@ -115,4 +115,45 @@ class FsaFilesystem implements Filesystem {
       return constants.WASI_ESUCCESS;
     }
   }
+
+  async createDir(path: string): Promise<number> {
+    let { index, err, handle } = await this.getHandle(
+      path.slice(0, path.lastIndexOf("/")),
+      true
+    );
+    if (err === constants.WASI_ENOENT) {
+      let mountPoint = this.mounts[path.slice(0, index)];
+      if (mountPoint === undefined) {
+        return err;
+      } else {
+        return mountPoint.createDir(path.slice(index + 1));
+      }
+    } else if (err !== constants.WASI_ESUCCESS) {
+      return err;
+    } else {
+      let __path = path.slice(index + 1);
+      let { err: e } = await this.getHandle(
+        __path,
+        true,
+        handle as FileSystemDirectoryHandle
+      );
+      switch (e) {
+        case constants.WASI_ENOENT:
+          try {
+            await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
+              __path,
+              { create: true }
+            );
+            return constants.WASI_ESUCCESS;
+          } catch (_) {
+            return constants.WASI_EACCES;
+          }
+        case constants.WASI_ESUCCESS:
+        case constants.WASI_ENOTDIR:
+          return constants.WASI_EEXIST;
+        default:
+          return e;
+      }
+    }
+  }
 }

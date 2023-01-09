@@ -74,7 +74,7 @@ export interface Filesystem {
   addMount(path: string, mountedFs: Filesystem): Promise<number>;
   removeMount(absolutePath: string): Promise<number>;
 
-  createDir(path: Uint8Array): Promise<number>;
+  createDir(path: string): Promise<number>;
   getFilestat(path: string, buffer: DataView): Promise<number>;
   setFilestatTimes(
     path: string,
