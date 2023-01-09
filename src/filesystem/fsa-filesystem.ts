@@ -12,24 +12,42 @@ class FsaFilesystem implements Filesystem {
 
   private async getHandle(
     path: string,
-    isDir: boolean
+    isDir: boolean,
+    handle: FileSystemDirectoryHandle = undefined
   ): Promise<{ index: number; err: number; handle: FileSystemHandle }> {
-    const indices = pathSeparators(path);
-    let handle = await this.getRootHandle();
-    let index;
-    try {
-      for (index = 0; index < indices.length - 1; index++) {
-        handle = await handle.getDirectoryHandle(
-          path.slice(indices[index] + 1, indices[index + 1])
-        );
-      }
-      let h: FileSystemHandle;
-      if (isDir) {
-        h = await handle.getDirectoryHandle(path.slice(indices[index]));
+    let start, stop;
+    if (path.startsWith("/")) {
+      handle = await this.getRootHandle();
+      start = 1;
+    } else {
+      if (handle === undefined) {
+        handle = await this.getRootHandle();
       } else {
-        h = await handle.getFileHandle(path.slice(indices[index]));
+        handle = handle;
       }
-      return { handle: h, err: constants.WASI_ESUCCESS, index: undefined };
+      start = 0;
+    }
+    try {
+      stop = path.indexOf("/", start);
+      while (true) {
+        handle = await handle.getDirectoryHandle(path.slice(start, stop));
+        stop = path.indexOf("/", start);
+        if (stop === -1) {
+          break;
+        }
+        start = stop + 1;
+      }
+      let __handle;
+      if (isDir) {
+        __handle = await handle.getDirectoryHandle(path.slice(start));
+      } else {
+        __handle = await handle.getFileHandle(path.slice(start));
+      }
+      return {
+        handle: __handle,
+        err: constants.WASI_ESUCCESS,
+        index: undefined,
+      };
     } catch (e) {
       let err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
@@ -48,7 +66,7 @@ class FsaFilesystem implements Filesystem {
             break;
         }
       }
-      return { index, err, handle };
+      return { index: start, err, handle };
     }
   }
 
