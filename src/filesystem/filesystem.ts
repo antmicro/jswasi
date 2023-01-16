@@ -34,6 +34,8 @@ export type Fdstat = {
 
 export interface Descriptor {
   getFdstat(): Promise<Fdstat>;
+  getFilestat(): Promise<Filestat>;
+  initialize(path: string): void;
 
   setFilestatTimes(
     fstflags: Fstflags,
