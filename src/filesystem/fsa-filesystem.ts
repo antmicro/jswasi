@@ -10,6 +10,7 @@ import {
   Whence,
   Dirent,
 } from "./filesystem";
+import { msToNs } from "../utils";
 import * as constants from "../constants";
 import { getStoredData, setStoredData } from "./metadata";
 
@@ -182,6 +183,52 @@ class FsaFileDescriptor implements Descriptor {
     return getStoredData(this.path);
   }
 
+  async setFilestatTimes(
+    fstflags: Fstflags,
+    atim: Timestamp,
+    mtim: Timestamp
+  ): Promise<number> {
+    let filestat = await getStoredData(this.path);
+
+    const __atim =
+      fstflags &
+      (constants.WASI_FSTFLAGS_ATIM | constants.WASI_FSTFLAGS_ATIM_NOW);
+    switch (__atim) {
+      case constants.WASI_FSTFLAGS_ATIM:
+        filestat.atim = atim;
+        break;
+      case constants.WASI_FSTFLAGS_ATIM_NOW:
+        filestat.atim = msToNs(performance.now());
+        break;
+      case constants.WASI_FSTFLAGS_ATIM | constants.WASI_FSTFLAGS_ATIM_NOW:
+        return constants.WASI_EINVAL;
+    }
+
+    const __mtim =
+      fstflags &
+      (constants.WASI_FSTFLAGS_MTIM | constants.WASI_FSTFLAGS_MTIM_NOW);
+    switch (__mtim) {
+      case constants.WASI_FSTFLAGS_MTIM:
+        filestat.mtim = mtim;
+        break;
+      case constants.WASI_FSTFLAGS_MTIM_NOW:
+        filestat.mtim = msToNs(performance.now());
+      case constants.WASI_FSTFLAGS_MTIM | constants.WASI_FSTFLAGS_MTIM:
+        return constants.WASI_EINVAL;
+    }
+    return constants.WASI_ESUCCESS;
+  }
+
+  async setFdstatFlags(flags: Fdflags): Promise<number> {
+    this.fdstat.fs_flags = flags;
+    return constants.WASI_ESUCCESS;
+  }
+
+  async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
+    this.fdstat.fs_rights_base = rights_b;
+    this.fdstat.fs_rights_inheriting = rights_i;
+    return constants.WASI_ESUCCESS;
+  }
   async readdir(): Promise<{ err: number; dirents: Dirent[] }> {
     return { err: constants.WASI_ENOTDIR, dirents: undefined };
   }
