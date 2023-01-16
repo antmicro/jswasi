@@ -224,12 +224,98 @@ class FsaFileDescriptor implements Descriptor {
     return constants.WASI_ESUCCESS;
   }
 
+  /**
+   * Auxiliary function for getting a file from a handle and handling errors
+   */
+  private async __getFile(): Promise<{ err: number; file: File }> {
+    try {
+      const file = await this.handle.getFile();
+      return { err: constants.WASI_ESUCCESS, file };
+    } catch (_) {
+      return { err: constants.WASI_EACCES, file: undefined };
+    }
+  }
+
+  async read(len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
+    const { err, file } = await this.__getFile();
+    if (err !== constants.WASI_ESUCCESS) {
+      return { err, buffer: undefined };
+    }
+
+    const { size } = await getStoredData(this.path);
+    const end = size < this.cursor + len ? Number(size) : this.cursor + len;
+    this.cursor += end;
+    return {
+      err: constants.WASI_ESUCCESS,
+      buffer: await file.slice(this.cursor, end).arrayBuffer(),
+    };
+  }
+
+  async read_str(): Promise<{ err: number; content: string }> {
+    const { err, file } = await this.__getFile();
+    if (err !== constants.WASI_ESUCCESS) {
+      return { err, content: undefined };
+    }
+    return { err: constants.WASI_ESUCCESS, content: await file.text() };
+  }
+
+  async pread(
+    len: number,
+    pos: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    const { err, file } = await this.__getFile();
+    if (err !== constants.WASI_ESUCCESS) {
+      return { err, buffer: undefined };
+    }
+    const { size } = await getStoredData(this.path);
+    const end = size < pos + len ? size : this.cursor + len;
+    return {
+      err: constants.WASI_ESUCCESS,
+      buffer: await file.slice(this.cursor, end as number).arrayBuffer(),
+    };
+  }
+
+  async seek(
+    offset: number,
+    whence: Whence
+  ): Promise<{ err: number; offset: number }> {
+    const { size } = await getStoredData(this.path);
+    switch (whence) {
+      case constants.WASI_WHENCE_CUR:
+        if (this.cursor + offset > size || offset < this.cursor) {
+          return { offset: this.cursor, err: constants.WASI_EINVAL };
+        }
+        this.cursor += offset;
+        break;
+      case constants.WASI_WHENCE_SET:
+        if (Number(size) < offset || offset < 0) {
+          return { offset: this.cursor, err: constants.WASI_EINVAL };
+        }
+        this.cursor = offset;
+        break;
+      case constants.WASI_WHENCE_END:
+        if (offset > 0 || size < -offset) {
+          return { offset: this.cursor, err: constants.WASI_EINVAL };
+        }
+        this.cursor = Number(size) - offset;
+        break;
+      default:
+        return { offset: this.cursor, err: constants.WASI_EINVAL };
+    }
+    return { err: constants.WASI_ESUCCESS, offset: constants.WASI_ESUCCESS };
+  }
+
   async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
     this.fdstat.fs_rights_base = rights_b;
     this.fdstat.fs_rights_inheriting = rights_i;
     return constants.WASI_ESUCCESS;
   }
+
   async readdir(): Promise<{ err: number; dirents: Dirent[] }> {
     return { err: constants.WASI_ENOTDIR, dirents: undefined };
+  }
+
+  async close(): Promise<number> {
+    return constants.WASI_ESUCCESS;
   }
 }

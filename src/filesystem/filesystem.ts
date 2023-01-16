@@ -58,9 +58,17 @@ export interface Descriptor {
   ): Promise<number>;
   close(): Promise<number>;
 
-  read(len: number, buffer: DataView): Promise<number>;
-  read_str(): Promise<string>;
-  pread(len: number, pos: bigint, buffer: DataView): Promise<number>;
+  read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
+  /*
+   * Auxiliary function for internal purposes when we
+   * are certain that content of the file is utf-8 text and
+   * is relatively short
+   */
+  read_str(): Promise<{ err: number; content: string }>;
+  pread(
+    len: number,
+    pos: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
   write(buffer: DataView, len: number): Promise<number>;
   pwrite(buffer: Uint8Array, len: number, pos: bigint): Promise<number>;
