@@ -8,6 +8,7 @@ import {
   Fstflags,
   Timestamp,
   Whence,
+  Dirent,
 } from "./filesystem";
 import * as constants from "../constants";
 import { getStoredData, setStoredData } from "./metadata";
@@ -179,5 +180,9 @@ class FsaFileDescriptor implements Descriptor {
 
   async getFilestat(): Promise<Filestat> {
     return getStoredData(this.path);
+  }
+
+  async readdir(): Promise<{ err: number; dirents: Dirent[] }> {
+    return { err: constants.WASI_ENOTDIR, dirents: undefined };
   }
 }

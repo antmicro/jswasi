@@ -14,6 +14,8 @@ export type Whence = number;
 
 export type Fstflags = number;
 
+export type Dircookie = bigint;
+
 export type Filestat = {
   dev: Device;
   ino: Inode;
@@ -30,6 +32,13 @@ export type Fdstat = {
   fs_flags: Fdflags;
   fs_rights_base: Rights;
   fs_rights_inheriting: Rights;
+};
+
+export type Dirent = {
+  d_next: Dircookie;
+  d_ino: Inode;
+  d_namlen: number;
+  d_type: Filetype;
 };
 
 export interface Descriptor {
@@ -66,11 +75,7 @@ export interface Descriptor {
 
   truncate(size: number): Promise<number>;
 
-  readdir(
-    buffer: DataView,
-    len: number,
-    cookie: number
-  ): Promise<{ err: number; size: number }>;
+  readdir(): Promise<{ err: number; dirents: Dirent[] }>;
 }
 
 export interface Filesystem {
