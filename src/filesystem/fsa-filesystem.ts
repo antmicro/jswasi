@@ -360,3 +360,60 @@ class FsaFileDescriptor implements Descriptor {
     return { err: constants.WASI_ESUCCESS, written };
   }
 }
+
+class FsaDirectoryDescriptor implements Descriptor {
+  private handle: FileSystemDirectoryHandle;
+  private fdstat: Fdstat;
+
+  constructor(
+    handle: FileSystemDirectoryHandle,
+    fs_flags: Fdflags,
+    fs_rights_inheriting: Rights,
+    fs_rights_base: Rights
+  ) {
+    this.handle = handle;
+    this.fdstat = {
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      fs_filetype: undefined,
+    };
+  }
+
+  async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
+  }
+
+  async read_str(): Promise<{ err: number; content: string }> {
+    return { err: constants.WASI_EISDIR, content: "" };
+  }
+
+  async pread(
+    _len: number,
+    _pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
+  }
+
+  async write(_buffer: DataView): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EISDIR, written: -1n };
+  }
+
+  async pwrite(
+    _buffer: DataView,
+    _offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EISDIR, written: -1n };
+  }
+
+  async seek(
+    _offset: bigint,
+    _whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    return { err: constants.WASI_EISDIR, offset: -1n };
+  }
+
+  async close(): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+}
