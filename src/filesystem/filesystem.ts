@@ -71,7 +71,10 @@ export interface Descriptor {
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
   write(buffer: DataView): Promise<{ err: number; written: bigint }>;
-  pwrite(buffer: Uint8Array, len: number, pos: bigint): Promise<number>;
+  pwrite(
+    buffer: DataView,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }>;
 
   seek(
     offset: bigint,
@@ -81,21 +84,12 @@ export interface Descriptor {
     offset: bigint;
   }>;
 
-  truncate(size: number): Promise<number>;
-
   readdir(): Promise<{ err: number; dirents: Dirent[] }>;
 }
 
 export interface Filesystem {
   createDir(path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
-  setFilestatTimes(
-    path: string,
-    lookupFlags: LookupFlags,
-    fstflags: Fstflags,
-    atim: Timestamp,
-    mtim: Timestamp
-  ): Promise<number>;
   // missing path_link
   open(
     path: string,
