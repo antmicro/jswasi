@@ -67,18 +67,18 @@ export interface Descriptor {
   read_str(): Promise<{ err: number; content: string }>;
   pread(
     len: number,
-    pos: number
+    pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
-  write(buffer: DataView, len: number): Promise<number>;
+  write(buffer: DataView): Promise<{ err: number; written: bigint }>;
   pwrite(buffer: Uint8Array, len: number, pos: bigint): Promise<number>;
 
   seek(
-    offset: number,
+    offset: bigint,
     whence: Whence
   ): Promise<{
     err: number;
-    offset: number;
+    offset: bigint;
   }>;
 
   truncate(size: number): Promise<number>;

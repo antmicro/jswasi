@@ -149,10 +149,11 @@ class FsaFilesystem implements Filesystem {
 }
 
 class FsaFileDescriptor implements Descriptor {
-  private cursor: number;
+  private cursor: bigint;
   private handle: FileSystemFileHandle;
   private path: string;
   private fdstat: Fdstat;
+  private writer: FileSystemWritableFileStream;
 
   constructor(
     handle: FileSystemFileHandle,
@@ -171,8 +172,20 @@ class FsaFileDescriptor implements Descriptor {
 
   async initialize(path: string) {
     this.path = path;
-    const { filetype } = await getStoredData(path);
+    const { filetype, size } = await getStoredData(path);
     this.fdstat.fs_filetype = filetype;
+    const append = (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) != 0;
+    if (append) {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: true,
+      });
+      this.cursor = size;
+    } else {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: false,
+      });
+      this.cursor = 0n;
+    }
   }
 
   async getFdstat(): Promise<Fdstat> {
@@ -261,24 +274,24 @@ class FsaFileDescriptor implements Descriptor {
 
   async pread(
     len: number,
-    pos: number
+    pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     const { err, file } = await this.__getFile();
     if (err !== constants.WASI_ESUCCESS) {
       return { err, buffer: undefined };
     }
     const { size } = await getStoredData(this.path);
-    const end = size < pos + len ? size : this.cursor + len;
+    const end = size < pos + BigInt(len) ? size : this.cursor + BigInt(len);
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: await file.slice(this.cursor, end as number).arrayBuffer(),
+      buffer: await file.slice(Number(this.cursor), Number(end)).arrayBuffer(),
     };
   }
 
   async seek(
-    offset: number,
+    offset: bigint,
     whence: Whence
-  ): Promise<{ err: number; offset: number }> {
+  ): Promise<{ err: number; offset: bigint }> {
     const { size } = await getStoredData(this.path);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
@@ -297,12 +310,12 @@ class FsaFileDescriptor implements Descriptor {
         if (offset > 0 || size < -offset) {
           return { offset: this.cursor, err: constants.WASI_EINVAL };
         }
-        this.cursor = Number(size) - offset;
+        this.cursor = size - offset;
         break;
       default:
         return { offset: this.cursor, err: constants.WASI_EINVAL };
     }
-    return { err: constants.WASI_ESUCCESS, offset: constants.WASI_ESUCCESS };
+    return { err: constants.WASI_ESUCCESS, offset: this.cursor };
   }
 
   async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
@@ -317,5 +330,18 @@ class FsaFileDescriptor implements Descriptor {
 
   async close(): Promise<number> {
     return constants.WASI_ESUCCESS;
+  }
+
+  async write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+    await this.writer.write({
+      type: "write",
+      position: Number(this.cursor),
+      data: buffer,
+    });
+    let filestat = await getStoredData(this.path);
+    let written = BigInt(buffer.byteLength);
+    this.cursor += written;
+    filestat.size += written;
+    return { err: constants.WASI_ESUCCESS, written };
   }
 }
