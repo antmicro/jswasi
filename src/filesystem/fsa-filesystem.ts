@@ -148,44 +148,25 @@ class FsaFilesystem implements Filesystem {
   }
 }
 
-class FsaFileDescriptor implements Descriptor {
-  private cursor: bigint;
-  private handle: FileSystemFileHandle;
-  private path: string;
-  private fdstat: Fdstat;
-  private writer: FileSystemWritableFileStream;
+/**
+ * Abstract class that holds common implementations for both FsaFileDescriptor and FsaDirectoryDescriptor
+ * The sole purpose of this class is to avoid redundant Descriptor implementations
+ */
+abstract class FsaDescriptor implements Descriptor {
+  protected fdstat: Fdstat;
+  protected path: string;
 
   constructor(
-    handle: FileSystemFileHandle,
     fs_flags: Fdflags,
     fs_rights_inheriting: Rights,
     fs_rights_base: Rights
   ) {
-    this.handle = handle;
     this.fdstat = {
       fs_flags,
       fs_rights_base,
       fs_rights_inheriting,
       fs_filetype: undefined,
     };
-  }
-
-  async initialize(path: string) {
-    this.path = path;
-    const { filetype, size } = await getStoredData(path);
-    this.fdstat.fs_filetype = filetype;
-    const append = (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) != 0;
-    if (append) {
-      this.writer = await this.handle.createWritable({
-        keepExistingData: true,
-      });
-      this.cursor = size;
-    } else {
-      this.writer = await this.handle.createWritable({
-        keepExistingData: false,
-      });
-      this.cursor = 0n;
-    }
   }
 
   async getFdstat(): Promise<Fdstat> {
@@ -195,6 +176,24 @@ class FsaFileDescriptor implements Descriptor {
   async getFilestat(): Promise<Filestat> {
     return getStoredData(this.path);
   }
+
+  abstract initialize(path: string): void;
+  abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
+  abstract read_str(): Promise<{ err: number; content: string }>;
+  abstract pread(
+    len: number,
+    pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }>;
+  abstract write(buffer: DataView): Promise<{ err: number; written: bigint }>;
+  abstract pwrite(
+    buffer: DataView,
+    pos: bigint
+  ): Promise<{ err: number; written: bigint }>;
+  abstract seek(
+    offset: bigint,
+    whence: Whence
+  ): Promise<{ err: number; offset: bigint }>;
+  abstract readdir(): Promise<{ err: number; dirents: Dirent[] }>;
 
   async setFilestatTimes(
     fstflags: Fstflags,
@@ -232,9 +231,53 @@ class FsaFileDescriptor implements Descriptor {
     return constants.WASI_ESUCCESS;
   }
 
+  async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
+    this.fdstat.fs_rights_base = rights_b;
+    this.fdstat.fs_rights_inheriting = rights_i;
+    return constants.WASI_ESUCCESS;
+  }
+
   async setFdstatFlags(flags: Fdflags): Promise<number> {
     this.fdstat.fs_flags = flags;
     return constants.WASI_ESUCCESS;
+  }
+
+  async close(): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+}
+
+class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
+  private cursor: bigint;
+  private handle: FileSystemFileHandle;
+  private writer: FileSystemWritableFileStream;
+
+  constructor(
+    handle: FileSystemFileHandle,
+    fs_flags: Fdflags,
+    fs_rights_inheriting: Rights,
+    fs_rights_base: Rights
+  ) {
+    super(fs_flags, fs_rights_inheriting, fs_rights_base);
+    this.handle = handle;
+  }
+
+  async initialize(path: string) {
+    this.path = path;
+    const { filetype, size } = await getStoredData(path);
+    this.fdstat.fs_filetype = filetype;
+    const append = (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) != 0;
+    if (append) {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: true,
+      });
+      this.cursor = size;
+    } else {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: false,
+      });
+      this.cursor = 0n;
+    }
   }
 
   /**
@@ -318,18 +361,8 @@ class FsaFileDescriptor implements Descriptor {
     return { err: constants.WASI_ESUCCESS, offset: this.cursor };
   }
 
-  async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
-    this.fdstat.fs_rights_base = rights_b;
-    this.fdstat.fs_rights_inheriting = rights_i;
-    return constants.WASI_ESUCCESS;
-  }
-
   async readdir(): Promise<{ err: number; dirents: Dirent[] }> {
     return { err: constants.WASI_ENOTDIR, dirents: undefined };
-  }
-
-  async close(): Promise<number> {
-    return constants.WASI_ESUCCESS;
   }
 
   async write(buffer: DataView): Promise<{ err: number; written: bigint }> {
@@ -361,9 +394,8 @@ class FsaFileDescriptor implements Descriptor {
   }
 }
 
-class FsaDirectoryDescriptor implements Descriptor {
+class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   private handle: FileSystemDirectoryHandle;
-  private fdstat: Fdstat;
 
   constructor(
     handle: FileSystemDirectoryHandle,
@@ -371,13 +403,9 @@ class FsaDirectoryDescriptor implements Descriptor {
     fs_rights_inheriting: Rights,
     fs_rights_base: Rights
   ) {
+    super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
-    this.fdstat = {
-      fs_flags,
-      fs_rights_base,
-      fs_rights_inheriting,
-      fs_filetype: undefined,
-    };
+    this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
   }
 
   async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -411,9 +439,5 @@ class FsaDirectoryDescriptor implements Descriptor {
     _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     return { err: constants.WASI_EISDIR, offset: -1n };
-  }
-
-  async close(): Promise<number> {
-    return constants.WASI_ESUCCESS;
   }
 }
