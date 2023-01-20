@@ -344,4 +344,19 @@ class FsaFileDescriptor implements Descriptor {
     filestat.size += written;
     return { err: constants.WASI_ESUCCESS, written };
   }
+
+  async pwrite(
+    buffer: DataView,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    await this.writer.write({
+      type: "write",
+      position: Number(offset),
+      data: buffer,
+    });
+    let filestat = await getStoredData(this.path);
+    let written = BigInt(buffer.byteLength);
+    filestat.size += written;
+    return { err: constants.WASI_ESUCCESS, written };
+  }
 }
