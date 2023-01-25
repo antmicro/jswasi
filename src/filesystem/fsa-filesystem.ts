@@ -193,7 +193,9 @@ abstract class FsaDescriptor implements Descriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }>;
-  abstract readdir(): Promise<{ err: number; dirents: Dirent[] }>;
+  abstract readdir(
+    refresh: boolean
+  ): Promise<{ err: number; dirents: Dirent[] }>;
 
   async setFilestatTimes(
     fstflags: Fstflags,
@@ -396,6 +398,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
 
 class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   private handle: FileSystemDirectoryHandle;
+  private entries: Dirent[];
 
   constructor(
     handle: FileSystemDirectoryHandle,
@@ -406,6 +409,10 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
     this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
+  }
+
+  async initialize(path: string) {
+    this.path = path;
   }
 
   async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -439,5 +446,25 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     return { err: constants.WASI_EISDIR, offset: -1n };
+  }
+
+  async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+    if (refresh) {
+      this.entries = [];
+      var i = 1n;
+      for await (const name of this.handle.keys()) {
+        if (name.endsWith(".crswap")) {
+          continue;
+        }
+        let filestat = await getStoredData(`${this.path}/${name}`);
+        this.entries.push({
+          d_next: i++,
+          d_ino: filestat.ino,
+          d_namlen: name.length,
+          d_type: filestat.filetype,
+        });
+      }
+    }
+    return { err: constants.WASI_ESUCCESS, dirents: this.entries };
   }
 }

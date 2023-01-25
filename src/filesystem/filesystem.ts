@@ -84,7 +84,7 @@ export interface Descriptor {
     offset: bigint;
   }>;
 
-  readdir(): Promise<{ err: number; dirents: Dirent[] }>;
+  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }>;
 }
 
 export interface Filesystem {
