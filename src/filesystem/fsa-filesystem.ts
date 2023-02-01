@@ -241,8 +241,8 @@ abstract class FsaDescriptor implements Descriptor {
 
   constructor(
     fs_flags: Fdflags,
-    fs_rights_inheriting: Rights,
-    fs_rights_base: Rights
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights
   ) {
     this.fdstat = {
       fs_flags,
@@ -250,6 +250,10 @@ abstract class FsaDescriptor implements Descriptor {
       fs_rights_inheriting,
       fs_filetype: undefined,
     };
+  }
+
+  getPath(): string {
+    return this.path;
   }
 
   async getFdstat(): Promise<Fdstat> {
@@ -340,8 +344,8 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   constructor(
     handle: FileSystemFileHandle,
     fs_flags: Fdflags,
-    fs_rights_inheriting: Rights,
-    fs_rights_base: Rights
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights
   ) {
     super(fs_flags, fs_rights_inheriting, fs_rights_base);
     this.handle = handle;
@@ -486,8 +490,8 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   constructor(
     handle: FileSystemDirectoryHandle,
     fs_flags: Fdflags,
-    fs_rights_inheriting: Rights,
-    fs_rights_base: Rights
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
