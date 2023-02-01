@@ -9,6 +9,8 @@ import {
   Timestamp,
   Whence,
   Dirent,
+  OpenFlags,
+  LookupFlags,
 } from "./filesystem";
 import { msToNs } from "../utils";
 import * as constants from "../constants";
@@ -63,23 +65,24 @@ class FsaFilesystem implements Filesystem {
     isDir: boolean,
     start_handle: FileSystemDirectoryHandle
   ): Promise<{ index: number; err: number; handle: FileSystemHandle }> {
-    let start, stop;
+    let stop,
+      start,
+      __isDir = true;
     let handle =
       start_handle === undefined ? await this.getRootHandle() : start_handle;
-    start = 1;
     try {
-      stop = path.indexOf("/", start);
-      while (true) {
+      start = 1;
+      for (
+        stop = path.indexOf("/", start);
+        stop != -1;
+        stop = path.indexOf("/", start)
+      ) {
         // TODO: can fsa api handle .. and .?
         handle = await handle.getDirectoryHandle(path.slice(start, stop));
-        stop = path.indexOf("/", start);
-        if (stop === -1) {
-          start = -1;
-          break;
-        }
         start = stop + 1;
       }
       let __handle;
+      __isDir = isDir;
       if (isDir) {
         __handle = await handle.getDirectoryHandle(path.slice(start));
       } else {
@@ -93,24 +96,25 @@ class FsaFilesystem implements Filesystem {
     } catch (e) {
       let err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
-        err = FsaFilesystem.mapErr(e, isDir);
+        err = FsaFilesystem.mapErr(e, __isDir);
       }
-      return { index: start, err, handle };
+      return { index: stop, err, handle };
     }
   }
 
   async createDir(path: string): Promise<number> {
-    let { index, err, handle } = await this.getHandle(
-      path.slice(0, path.lastIndexOf("/")),
+    let __last_separator = path.lastIndexOf("/");
+    let { err, handle } = await this.getHandle(
+      path.slice(0, __last_separator),
       true,
       undefined
     );
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
-    let __path = path.slice(index + 1);
+    let name = path.slice(__last_separator + 1);
     try {
-      this.getHandle(__path, true, handle as FileSystemDirectoryHandle);
+      this.getHandle(name, true, handle as FileSystemDirectoryHandle);
     } catch (e) {
       let __err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
@@ -145,6 +149,85 @@ class FsaFilesystem implements Filesystem {
   ): Promise<{ err: number; filestat: Filestat }> {
     let storedData = await getStoredData(path);
     return { err: constants.WASI_ESUCCESS, filestat: storedData };
+  }
+
+  async open(
+    path: string,
+    dirflags: LookupFlags,
+    oflags: OpenFlags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    fdflags: Fdflags
+  ): Promise<{ err: number; index: number; desc: Descriptor }> {
+    let result = await this.getHandle(path, true, undefined);
+    let err = result.err,
+      index = result.err,
+      desc = undefined;
+    switch (result.err) {
+      // The search was succesfull and a directory was found
+      case constants.WASI_ESUCCESS: {
+        err = result.err;
+        index = result.index;
+        desc = new FsaDirectoryDescriptor(
+          result.handle as FileSystemDirectoryHandle,
+          fdflags,
+          fs_rights_base,
+          fs_rights_inheriting
+        );
+        break;
+      }
+      case constants.WASI_ENOTDIR: {
+        if (index === -1) {
+          // the last component of the path caused an ENOTDIR error
+          if (
+            oflags & constants.WASI_O_DIRECTORY &&
+            !(dirflags & constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW)
+          ) {
+            // directory was demanded and symlink follow is disabled - no point in further search
+            break;
+          }
+          const __result = await this.getHandle(
+            path.slice(path.lastIndexOf("/") + 1),
+            true,
+            result.handle as FileSystemDirectoryHandle
+          );
+          if (__result.err === constants.WASI_ESUCCESS) {
+            if (!(oflags & constants.WASI_O_DIRECTORY)) {
+              // Indicate that the demanded path might be a symlink
+              // It is up to the top level fs to find out if the file is a symlink
+              // If user demanded a directory and a regular file was found, the search continues
+              // as that file might be a symlink that can be resolved to a directory
+              err = __result.err;
+            }
+            desc = new FsaFileDescriptor(
+              __result.handle as FileSystemFileHandle,
+              fdflags,
+              fs_rights_base,
+              fs_rights_inheriting
+            );
+          }
+          break;
+        } else if (dirflags & constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) {
+          // If some component in the middle of the path is not a directory, it might be
+          // a symlink, if symlink follow flag is set, return a descriptor to the symlink
+          const __result = await this.getHandle(
+            path.slice(index + 1),
+            false,
+            result.handle as FileSystemDirectoryHandle
+          );
+          if (__result.err === constants.WASI_ESUCCESS) {
+            desc = new FsaFileDescriptor(
+              __result.handle as FileSystemFileHandle,
+              fdflags,
+              fs_rights_base,
+              fs_rights_inheriting
+            );
+            break;
+          }
+        }
+      }
+    }
+    return { err, index, desc };
   }
 }
 

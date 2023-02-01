@@ -44,7 +44,7 @@ export type Dirent = {
 export interface Descriptor {
   getFdstat(): Promise<Fdstat>;
   getFilestat(): Promise<Filestat>;
-  initialize(path: string): void;
+  initialize(path: string): Promise<void>;
 
   setFilestatTimes(
     fstflags: Fstflags,
@@ -93,6 +93,7 @@ export interface Filesystem {
   // missing path_link
   open(
     path: string,
+    dirflags: LookupFlags,
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
