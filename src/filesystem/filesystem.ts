@@ -143,6 +143,15 @@ export interface Descriptor {
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
   /*
+   * returns the whole ArrayBuffer of the underlying file
+   *
+   * @returns an object holding:
+   * err - status code
+   * buffer - a buffer of the underlying file
+   */
+  arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
+
+  /*
    * Writes data to the underlying file
    *
    * @param buffer - data to write

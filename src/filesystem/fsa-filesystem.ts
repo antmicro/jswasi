@@ -264,7 +264,8 @@ abstract class FsaDescriptor implements Descriptor {
     return getStoredData(this.path);
   }
 
-  abstract initialize(path: string): void;
+  abstract initialize(path: string): Promise<void>;
+  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
   abstract pread(
