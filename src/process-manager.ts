@@ -1,19 +1,15 @@
 import * as constants from "./constants.js";
-import { In, Out, EventSource } from "./devices.js";
-import {
-  Filesystem,
-  OpenDirectory,
-  OpenFile,
-} from "./filesystem/interfaces.js";
-import { FileOrDir } from "./filesystem/enums.js";
+import { EventSource } from "./devices.js";
+import { TopLevelFs } from "./filesystem/top-level-fs";
+import { Descriptor } from "./filesystem/filesystem";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 
 export class FdTable {
-  private fdt: Record<number, FileDescriptor> = {};
+  private fdt: Record<number, Descriptor> = {};
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, FileDescriptor>, preopen: boolean = true) {
+  constructor(fds: Record<number, Descriptor>, preopen: boolean = true) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
     if (preopen) {
@@ -30,7 +26,7 @@ export class FdTable {
     return fdTable;
   }
 
-  public addFile(entry: FileDescriptor): number {
+  public addFile(entry: Descriptor): number {
     if (entry === undefined) {
       throw "Entry is undefined";
     }
@@ -52,7 +48,7 @@ export class FdTable {
     this.freeFds.push(fd);
   }
 
-  public replaceFd(fd: number, entry: FileDescriptor) {
+  public replaceFd(fd: number, entry: Descriptor) {
     if (!(fd in this.fdt)) {
       throw "descriptor not present in descriptor table";
     }
@@ -62,7 +58,7 @@ export class FdTable {
     this.fdt[fd] = entry;
   }
 
-  public getFd(fd: number): FileDescriptor {
+  public getFd(fd: number): Descriptor {
     return this.fdt[fd];
   }
   public tearDown() {
@@ -167,7 +163,7 @@ export default class ProcessManager {
     private readonly scriptName: string,
     public readonly terminalOutputCallback: (output: string) => void,
     public readonly terminal: any, // TODO: extract Terminal interface and use it here
-    public readonly filesystem: Filesystem
+    public readonly filesystem: TopLevelFs
   ) {
     // it's a constructor with only parameter properties
   }
@@ -210,17 +206,17 @@ export default class ProcessManager {
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     try {
       if (!this.compiledModules[command]) {
-        const { err, entry } = await this.filesystem
-          .getRootDir()
-          .open()
-          .getEntry(command, FileOrDir.File);
+        const { err, desc } = await this.filesystem.open(command);
+        await desc.initialize(command);
         if (err !== constants.WASI_ESUCCESS) {
           console.error(`No such binary: ${command}`);
           return err;
         }
 
         this.compiledModules[command] = await WebAssembly.compile(
-          await (await entry.open()).arrayBuffer()
+          (
+            await desc.arrayBuffer()
+          ).buffer
         );
       }
     } catch (e) {

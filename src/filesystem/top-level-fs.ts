@@ -9,16 +9,16 @@ import {
 import * as constants from "../constants";
 import { realpath } from "../utils";
 
-class TopLevelFs {
+export class TopLevelFs {
   private mounts: Record<string, Filesystem>;
 
   async open(
     path: string,
-    dirflags: LookupFlags,
-    oflags: OpenFlags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    fdflags: Fdflags
+    dirflags: LookupFlags = 0,
+    oflags: OpenFlags = 0,
+    fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
+    fdflags: Fdflags = 0
   ): Promise<{ desc: Descriptor; err: number }> {
     let rpath = realpath(path);
     let fs = this.mounts[rpath];
@@ -69,21 +69,24 @@ class TopLevelFs {
               fdstat !== undefined &&
               fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
             ) {
-              let link_dest = await desc.read_str();
+              let { err: err_, content } = await desc.read_str();
+              if (err_ !== constants.WASI_ESUCCESS) {
+                return { desc: undefined, err };
+              }
               let __path: string;
-              if (link_dest.startsWith("/")) {
-                __path = link_dest;
+              if (content.startsWith("/")) {
+                __path = content;
               } else {
                 // replace symlink filename with it's content
                 let __index = lastSeparator + index;
                 let left_path = rpath.slice(0, __index + 1);
                 if (err === constants.WASI_ESUCCESS) {
-                  __path = left_path.concat(link_dest);
+                  __path = left_path.concat(content);
                 } else {
                   let right_path = rpath.slice(
                     __index + rpath.indexOf("/", __index + 1)
                   );
-                  __path = left_path.concat(link_dest, right_path);
+                  __path = left_path.concat(content, right_path);
                 }
               }
               return this.open(
