@@ -28,6 +28,7 @@ export class TopLevelFs {
       // so we don't have to try to expand any symlink here
       return fs.open(
         "/",
+        dirflags,
         oflags,
         fs_rights_base,
         fs_rights_inheriting,
