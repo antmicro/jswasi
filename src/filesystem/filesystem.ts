@@ -205,7 +205,7 @@ export interface Descriptor {
 }
 
 export interface Filesystem {
-  createDir(path: string): Promise<number>;
+  mkdirat(desc: Descriptor, path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
   // missing path_link
   open(
@@ -219,6 +219,10 @@ export interface Filesystem {
   readlink(path: string, buffer: DataView, len: number): Promise<number>;
   removeDirectory(path: string): Promise<number>;
   rename(oldPath: string, newPath: string): Promise<number>;
-  addSymlink(source: string, target: string): Promise<number>;
+  symlinkat(
+    target: string,
+    desc: Descriptor,
+    linkpath: string
+  ): Promise<number>;
   unlinkFile(path: string): Promise<number>;
 }
