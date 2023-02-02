@@ -17,10 +17,14 @@ import * as constants from "../constants";
 import { getStoredData, setStoredData } from "./metadata";
 
 class FsaFilesystem implements Filesystem {
+  private rootHandle: FileSystemDirectoryHandle;
+
   private async getRootHandle(): Promise<FileSystemDirectoryHandle> {
-    return await (
-      await navigator.storage.getDirectory()
-    ).getDirectoryHandle("root", { create: false });
+    return this.rootHandle;
+  }
+
+  constructor(rootHandle: FileSystemDirectoryHandle) {
+    this.rootHandle = rootHandle;
   }
 
   /**
@@ -555,4 +559,41 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     }
     return { err: constants.WASI_ESUCCESS, dirents: this.entries };
   }
+}
+
+export async function createFsaFilesystem(
+  name: string
+): Promise<FsaFilesystem> {
+  const topLevelHandle = await navigator.storage.getDirectory();
+  let rootHandle;
+  try {
+    rootHandle = await topLevelHandle.getDirectoryHandle(name);
+    return undefined;
+  } catch (e) {
+    if (
+      e instanceof DOMException &&
+      (e as DOMException).name == "NotFoundError"
+    ) {
+      rootHandle = await topLevelHandle.getDirectoryHandle(name, {
+        create: true,
+      });
+    } else {
+      return undefined;
+    }
+  }
+
+  const rootStoredData = await getStoredData("/");
+  if (!rootStoredData) {
+    await setStoredData("/", {
+      dev: 0n,
+      ino: 0n,
+      filetype: constants.WASI_FILETYPE_DIRECTORY,
+      nlink: 0n,
+      size: 4096n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    });
+  }
+  return new FsaFilesystem(rootHandle);
 }

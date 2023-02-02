@@ -2,11 +2,10 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { FdTable } from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { createFsaFilesystem, FsaDirectory } from "./filesystem/fsa-filesystem";
+import { createFsaFilesystem } from "./filesystem/fsa-filesystem";
 import { Stderr, Stdin, Stdout } from "./devices.js";
-import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
-import { Filesystem, OpenDirectory } from "./filesystem/interfaces";
 import { md5sum } from "./utils.js";
+import { TopLevelFs } from "./filesystem/top-level-fs.js";
 
 declare global {
   interface Window {
@@ -29,55 +28,11 @@ const ALWAYS_FETCH_BINARIES = {
 };
 
 export async function fetchFile(
-  dir: OpenDirectory,
+  fs: TopLevelFs,
   filename: string,
   address: string,
-  refetch: boolean = true,
-  stdout: Stdout = undefined,
-  stderr: Stderr = undefined,
-  to_stdout: boolean = false
-) {
-  let position = 0;
-  let bar_position = 0;
-  let size = -1;
-  let progress = new TransformStream({
-    transform(data, controller) {
-      position += data.length;
-      if (size == -1) {
-        stdout?.write(
-          new TextEncoder().encode(`\r[${".".repeat(50)}: ${position}]`)
-        );
-      } else if (position == size) {
-        stdout?.write(
-          new TextEncoder().encode(`\r[${"#".repeat(50)}: ${size}]`)
-        );
-      } else if (Math.round((position / size) * 50) != bar_position) {
-        bar_position = Math.round((position / size) * 50);
-        stdout?.write(
-          new TextEncoder().encode(
-            `\r[${"#".repeat(bar_position)}${"-".repeat(
-              50 - bar_position
-            )}: ${size}]`
-          )
-        );
-      }
-      controller.enqueue(data);
-    },
-    flush() {
-      size = position;
-      stdout?.write(
-        new TextEncoder().encode(`\r[${"#".repeat(50)}: ${size}]\n`)
-      );
-    },
-  });
-
-  let stdout_writer = new WritableStream({
-    write(data) {
-      position += data.length;
-      stdout?.write(new TextEncoder().encode(`Content until ${position}\n`));
-    },
-  });
-
+  refetch: boolean = true
+): Promise<number> {
   if (
     !(
       !(address.startsWith("http://") || address.startsWith("https://")) ||
@@ -89,247 +44,123 @@ export async function fetchFile(
     address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
   }
 
-  if (to_stdout) {
-    const response = await fetch(new Request(address));
-    if (response.status != 200) {
-      stdout.write(
-        new TextEncoder().encode("Error: returned " + response.status + "\n")
-      );
-      return;
-    }
-    let clen = response.headers.get("content-length");
-    if (clen != null) size = +clen;
-    await response.body?.pipeTo(stdout_writer);
-    return;
-  }
-
-  const { err, entry } = await dir.getEntry(
+  const { err, desc } = await fs.open(
     filename,
-    FileOrDir.File,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create
+    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    constants.WASI_O_CREAT
   );
   if (err !== constants.WASI_ESUCCESS) {
-    console.warn(`Unable to resolve path for ${dir.name} and ${filename}`);
-    stderr?.write(new TextEncoder().encode("Error: Cannot resolve path.\n"));
-    return;
+    console.warn(`Unable to resolve path for ${filename}`);
+    return err;
   }
 
   // only fetch binary if not yet present
-  if (refetch || (await entry.metadata()).size === 0n) {
+  if (refetch || (await desc.getFilestat()).size === 0n) {
     const response = await fetch(address);
-    stdout?.write(new TextEncoder().encode("Downloading...\n"));
     if (response.status != 200) {
-      stderr?.write(
-        new TextEncoder().encode("Error: returned " + response.status + "\n")
-      );
+      return constants.WASI_ENOENT;
     } else {
-      let clen = response.headers.get("content-length");
-      if (clen != null) size = +clen;
-      const op = await entry.open();
-      const writable = await op.writableStream();
-      stdout?.write(
-        new TextEncoder().encode(`[${"-".repeat(50)}: ${position}]\r`)
-      );
-      await response.body?.pipeThrough(progress).pipeTo(writable);
-      stdout?.write(new TextEncoder().encode("Download finished.\n"));
+      const { err, stream } = await desc.writableStream();
+      if (err != constants.WASI_ESUCCESS) {
+        return err;
+      }
+      await response.body?.pipeTo(stream);
     }
   }
+  return constants.WASI_ESUCCESS;
 }
 
 // setup filesystem
-async function initFs(openedRootDir: OpenDirectory) {
+async function initFs(fs: TopLevelFs) {
   // top level directories creation
   await Promise.all([
-    openedRootDir.getEntry(
-      "/tmp",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    // TODO: this will be an in-memory vfs in the future
-    openedRootDir.getEntry(
-      "/proc",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/etc",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/home",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/usr",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/lib",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
+    fs.createDir("/tmp"),
+    // TODO: mount memfs on proc once it is ready
+    fs.createDir("/proc"),
+    fs.createDir("/etc"),
+    fs.createDir("/home"),
+    fs.createDir("/usr"),
+    fs.createDir("/lib"),
   ]);
 
   // 2nd level directories creation
   await Promise.all([
-    openedRootDir.getEntry(
-      DEFAULT_WORK_DIR,
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      "/usr/local",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
+    fs.createDir(DEFAULT_WORK_DIR),
+    fs.createDir("/usr/bin"),
+    fs.createDir("/usr/local"),
   ]);
 
   // 3rd level directories/files/symlinks creation
   await Promise.all([
-    openedRootDir.getEntry(
-      "/usr/local/bin",
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-    openedRootDir.getEntry(
-      `${DEFAULT_WORK_DIR}/.config`,
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
+    fs.createDir("/usr/local/bin"),
+    fs.createDir(`${DEFAULT_WORK_DIR}/.config`),
   ]);
 
   // 4th level directories/files/symlinks creation
-  await Promise.all([
-    openedRootDir.getEntry(
-      `${DEFAULT_WORK_DIR}/.config/ox`,
-      FileOrDir.Directory,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create | OpenFlags.Directory
-    ),
-  ]);
+  await Promise.all([fs.createDir(`${DEFAULT_WORK_DIR}/.config/ox`)]);
 
   const washRcPromise = (async () => {
     // TODO: this should be moved to shell
     const washrc = (
-      await openedRootDir.getEntry(
-        `${DEFAULT_WORK_DIR}/.washrc`,
-        FileOrDir.File,
-        LookupFlags.SymlinkFollow,
-        OpenFlags.Create
-      )
-    ).entry;
-    if ((await washrc.metadata()).size === 0n) {
-      let rc_open = await washrc.open();
-      await rc_open.write(
-        new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
+      await fs.open(`${DEFAULT_WORK_DIR}/.washrc`, 0, constants.WASI_O_CREAT)
+    ).desc;
+    if ((await washrc.getFilestat()).size === 0n) {
+      await washrc.write(
+        new DataView(
+          new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
+        )
       );
-      await rc_open.close();
+      await washrc.close();
     }
   })();
 
   const dummyBinariesPromise = Promise.all([
-    openedRootDir.getEntry(
-      "/usr/bin/mount",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/umount",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/wget",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/download",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/ps",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/free",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
-    openedRootDir.getEntry(
-      "/usr/bin/reset",
-      FileOrDir.File,
-      LookupFlags.SymlinkFollow,
-      OpenFlags.Create
-    ),
+    fs.open("/usr/bin/mount", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/umount", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/wget", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/download", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/ps", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/free", 0, constants.WASI_O_CREAT),
+    fs.open("/usr/bin/reset", 0, constants.WASI_O_CREAT),
   ]);
 
   const symlinkCreationPromise = Promise.all([
-    openedRootDir.addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/touch", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/rm", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/mv", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/cp", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/echo", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/date", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/printf", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/env", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/cat", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/realpath", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/test", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/[", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/true", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
-    openedRootDir.addSymlink("/usr/bin/sleep", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/touch", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/rm", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/mv", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/cp", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/echo", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/date", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/printf", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/env", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/cat", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/realpath", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/test", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/[", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/true", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/sleep", "/usr/bin/coreutils"),
 
-    openedRootDir.addSymlink("/usr/local/bin/unzip", "/usr/local/bin/wasibox"),
-    openedRootDir.addSymlink(
-      "/usr/local/bin/hexdump",
-      "/usr/local/bin/wasibox"
-    ),
-    openedRootDir.addSymlink("/usr/local/bin/imgcat", "/usr/local/bin/wasibox"),
-    openedRootDir.addSymlink("/usr/local/bin/purge", "/usr/local/bin/wasibox"),
-    openedRootDir.addSymlink("/usr/local/bin/tree", "/usr/local/bin/wasibox"),
-    openedRootDir.addSymlink("/usr/local/bin/tar", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/unzip", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/hexdump", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/imgcat", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/purge", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/tree", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/tar", "/usr/local/bin/wasibox"),
   ]);
 
-  await washRcPromise;
-  await dummyBinariesPromise;
-  await symlinkCreationPromise;
+  await Promise.all([
+    washRcPromise,
+    dummyBinariesPromise,
+    symlinkCreationPromise,
+  ]);
 
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
     ([filename, address]) => fetchFile(openedRootDir, filename, address, true)
@@ -353,20 +184,10 @@ function initFsaDropImport(
       entry: FileSystemDirectoryHandle | FileSystemFileHandle,
       path: string
     ) => {
-      const dir = (
-        await processManager.filesystem
-          .getRootDir()
-          .open()
-          .getEntry(
-            path,
-            FileOrDir.Directory,
-            LookupFlags.SymlinkFollow,
-            OpenFlags.Create
-          )
-      ).entry as FsaDirectory;
+      const dir = (await processManager.filesystem.open("/")).desc;
       if (entry.kind === "directory") {
         // create directory in VFS, expand path and fill directory contents
-        await dir.handle.getDirectoryHandle(entry.name, { create: true });
+        await processManager.filesystem.createDir(entry.name);
         for await (const [, handle] of entry.entries()) {
           await copyEntry(handle, `${path}/${entry.name}`);
         }
@@ -426,52 +247,29 @@ export async function init(
     return;
   }
 
-  const filesystem: Filesystem = await createFsaFilesystem();
+  const tfs = new TopLevelFs();
+  tfs.addMount("/", await createFsaFilesystem("root"));
 
   initServiceWorker();
-  if (
-    !(await filesystem.pathExists(
-      filesystem.getMetaDir(),
-      "/filesystem-initiated"
-    ))
-  ) {
-    await initFs(filesystem.getRootDir().open());
-    // create flag file to indicate that the filesystem was already initiated
-    await filesystem
-      .getMetaDir()
-      .open()
-      .getEntry(
-        "/filesystem-initiated",
-        FileOrDir.File,
-        LookupFlags.NoFollow,
-        OpenFlags.Create
-      );
+  // create flag file to indicate that the filesystem was already initiated
+  const { err } = await tfs.open(
+    "/filesystem-initiated",
+    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    constants.WASI_O_CREAT | constants.WASI_O_EXCL
+  );
+  if (err === constants.WASI_ESUCCESS) {
+    await initFs(tfs);
   }
 
   // verify if wash and init are up to date and refetch them if they are not
-  const openedRootDir = filesystem.getRootDir().open();
-  await openedRootDir.getEntry(
-    "/usr",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
-  await openedRootDir.getEntry(
-    "/usr/bin",
-    FileOrDir.Directory,
-    LookupFlags.SymlinkFollow,
-    OpenFlags.Create | OpenFlags.Directory
-  );
+  await tfs.createDir("/usr");
+  await tfs.createDir("/usr/bin");
   const checksumPromises = Object.entries(CHECKSUM_BINARIES).map(
     async ([filename, [address, checksum]]) => {
-      const file = await filesystem
-        .getRootDir()
-        .open()
-        .getEntry(filename, FileOrDir.File);
+      const file = await tfs.open(filename);
       if (file.err === constants.EXIT_SUCCESS) {
-        const open_file = await file.entry.open();
         // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
-        let actual_sum = await md5sum(open_file, 1 << (16 + 1));
+        let actual_sum = await md5sum(file.desc, 1 << (16 + 1));
         let exp_sum = new TextDecoder().decode(
           (await (await fetch(checksum)).arrayBuffer()).slice(0, 32)
         );
@@ -479,7 +277,7 @@ export async function init(
           return undefined;
         }
       }
-      return fetchFile(openedRootDir, filename, address, true);
+      return fetchFile(tfs, filename, address, true);
     }
   );
   await Promise.all(checksumPromises);
@@ -501,7 +299,7 @@ export async function init(
       }
     },
     terminal,
-    filesystem
+    tfs
   );
 
   terminal.decorate(anchor);
@@ -559,13 +357,7 @@ export async function init(
     processManager
   );
 
-  const pwdDir = (
-    await filesystem
-      .getRootDir()
-      .open()
-      .getEntry(DEFAULT_WORK_DIR, FileOrDir.Directory)
-  ).entry.open();
-  pwdDir.setAsCwd(); // doesn't make any difference
+  const pwdDir = (await tfs.open(DEFAULT_WORK_DIR)).desc;
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -575,10 +367,10 @@ export async function init(
       0: new Stdin(processManager),
       1: new Stdout(processManager),
       2: new Stderr(processManager),
-      3: filesystem.getRootDir().open(),
+      3: (await tfs.open("/")).desc,
       4: pwdDir,
       // TODO: why must fds[5] be present for ls to work, and what should it be
-      5: filesystem.getRootDir().open(),
+      5: (await tfs.open("/")).desc,
     }),
     ["/usr/bin/wash", "/usr/bin/init"],
     {
