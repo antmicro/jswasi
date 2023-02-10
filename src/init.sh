@@ -41,10 +41,10 @@ fi
 
 if test ! -d /usr/lib || test ! -d /usr/local || test ! -d /usr/share; then
     echo "downloading clang sysroot..."
-    wget resources/sysroot.zip /usr/sysroot.zip
+    wget resources/wasi-sysroot.tar.gz /usr/wasi-sysroot.tar.gz
     cd /usr
-    unzip sysroot.zip
-    rm sysroot.zip
+    tar -xf wasi-sysroot.tar.gz
+    rm wasi-sysroot.tar.gz
 fi
 
 cd $HOME
