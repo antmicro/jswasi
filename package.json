@@ -27,7 +27,8 @@
     "prettier": "npx prettier --write .",
     "prettier-check": "npx prettier . --check",
     "record": "make record",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test": "export platform=${PLATFORM:-browser}; [ \"$platform\" = \"browser\" ] && make cache_base; cd tests/robot && robot --variable platform:$platform -i $platform ."
   },
   "lint-staged": {
     "*.ts": [
