@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build": "make build",
-    "start": "make start",
+    "start": "./custom_server.py ${PORT:-8000}",
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
     "prettier-check": "npx prettier . --check",
