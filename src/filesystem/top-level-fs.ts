@@ -154,4 +154,14 @@ export class TopLevelFs {
       linkpath.slice(linkpath.lastIndexOf("/") + 1)
     );
   }
+
+  async addMount(path: string, fs: Filesystem): Promise<number> {
+    if (this.mounts[path] !== undefined) {
+      return constants.WASI_EEXIST;
+    }
+
+    // TODO: expand symlinks in path and ensure it points to an empty directory
+    this.mounts[path] = fs;
+    return constants.WASI_ESUCCESS;
+  }
 }
