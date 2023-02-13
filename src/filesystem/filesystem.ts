@@ -34,10 +34,12 @@ export type Fdstat = {
   fs_rights_inheriting: Rights;
 };
 
+// This is not exactly a Dirent struct defined in wasi.
+// d_namlen is replaced with name for convenience
 export type Dirent = {
   d_next: Dircookie;
   d_ino: Inode;
-  d_namlen: number;
+  name: string;
   d_type: Filetype;
 };
 

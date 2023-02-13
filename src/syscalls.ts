@@ -609,7 +609,7 @@ export default async function syscallCallback(
         const { fds } = processManager.processInfos[processId];
         if (fds.getFd(fd) !== undefined) {
           if (
-            (fds.getFd(fd).rightsBase &
+            ((await fds.getFd(fd).getFdstat()).fs_rights_base &
               constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
             0n
           ) {
@@ -690,16 +690,13 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (
         fds.getFd(fd) !== undefined &&
-        (await fds.getFd(fd).stat()).fileType ===
+        (await fds.getFd(fd).getFilestat()).filetype ===
           constants.WASI_FILETYPE_DIRECTORY
       ) {
-        const entries = await (fds.getFd(fd) as OpenDirectory).entries();
-        const stats = await Promise.all(
-          entries.map(async (entry) => entry.stat())
-        );
+        let entries = (await fds.getFd(fd).readdir(cookie === 0)).dirents;
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
-          const nameBuf = new TextEncoder().encode(entry.name());
+          const nameBuf = new TextEncoder().encode(entry.name);
 
           // TODO: check if these breaks can lead to null byte runtime errors
           if (dataBufPtr + 8 > bufLen) {
@@ -713,7 +710,7 @@ export default async function syscallCallback(
             dataBufPtr += 8;
             break;
           }
-          dataBuf.setBigUint64(dataBufPtr, stats[i].ino, true);
+          dataBuf.setBigUint64(dataBufPtr, entry.d_ino, true);
           dataBufPtr += 8;
 
           if (dataBufPtr + 4 >= bufLen) {
@@ -727,7 +724,7 @@ export default async function syscallCallback(
             dataBufPtr += 4;
             break;
           }
-          dataBuf.setUint8(dataBufPtr, stats[i].fileType);
+          dataBuf.setUint8(dataBufPtr, entry.d_type);
           dataBufPtr += 4; // uint8 + padding
 
           // check if name will fit

@@ -613,7 +613,7 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
         this.entries.push({
           d_next: i++,
           d_ino: filestat.ino,
-          d_namlen: name.length,
+          name,
           d_type: filestat.filetype,
         });
       }
