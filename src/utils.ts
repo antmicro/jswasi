@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { OpenFile } from "./filesystem/interfaces.js";
+import { Descriptor } from "./filesystem/filesystem";
 import { Md5 } from "./md5.js";
 
 export function arraysEqual(a: any[], b: any[]) {
@@ -73,14 +73,14 @@ export function now(clockId: number, cpuTimeStart: bigint): bigint {
 }
 
 export async function md5sum(
-  file: OpenFile,
+  file: Descriptor,
   chunkLen: number
 ): Promise<string | Int32Array> {
-  var chunk = await file.read(chunkLen);
+  var { buffer } = await file.read(chunkLen);
   var md5 = new Md5();
-  while (chunk[0].length !== 0) {
-    md5.appendByteArray(chunk[0]);
-    chunk = await file.read(chunkLen);
+  while (buffer.byteLength !== 0) {
+    md5.appendByteArray(new Uint8Array(buffer));
+    buffer = (await file.read(chunkLen)).buffer;
   }
   return md5.end();
 }
