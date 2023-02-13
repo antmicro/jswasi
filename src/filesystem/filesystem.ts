@@ -202,6 +202,20 @@ export interface Descriptor {
    * dirents - an array holding dirent structures for the directory contents
    */
   readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }>;
+
+  /*
+   * Get writable stream of the underlying file
+   *
+   * @returns an object holding:
+   * err - status code
+   * stream - writable stream
+   */
+  writableStream(): Promise<{ err: number; stream: WritableStream }>;
+
+  /*
+   * Tells if the descriptor is a terminal
+   */
+  isatty(): boolean;
 }
 
 export interface Filesystem {
