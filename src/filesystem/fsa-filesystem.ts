@@ -106,12 +106,20 @@ class FsaFilesystem implements Filesystem {
     }
   }
 
-  async createDir(path: string): Promise<number> {
+  async mkdirat(desc: Descriptor, path: string): Promise<number> {
+    let start_handle = undefined;
+    if (desc !== undefined) {
+      if (desc instanceof FsaDirectoryDescriptor) {
+        start_handle = desc.handle;
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
     let __last_separator = path.lastIndexOf("/");
     let { err, handle } = await this.getHandle(
       path.slice(0, __last_separator),
       true,
-      undefined
+      start_handle
     );
     if (err !== constants.WASI_ESUCCESS) {
       return err;
@@ -136,6 +144,59 @@ class FsaFilesystem implements Filesystem {
             filetype: constants.WASI_FILETYPE_DIRECTORY,
             nlink: 0n,
             size: 4096n,
+            mtim: 0n,
+            atim: 0n,
+            ctim: 0n,
+          });
+          return constants.WASI_ESUCCESS;
+        default:
+          return __err;
+      }
+    }
+    return constants.WASI_EEXIST;
+  }
+
+  async symlinkat(
+    target: string,
+    desc: Descriptor,
+    linkpath: string
+  ): Promise<number> {
+    if (!(desc instanceof FsaDirectoryDescriptor)) {
+      return constants.WASI_EINVAL;
+    }
+    let __last_separator = linkpath.lastIndexOf("/");
+    let { err, handle } = await this.getHandle(
+      linkpath.slice(0, __last_separator),
+      true,
+      (desc as FsaDirectoryDescriptor).handle
+    );
+    if (err !== constants.WASI_ESUCCESS) {
+      return err;
+    }
+    let name = linkpath.slice(__last_separator + 1);
+    try {
+      this.getHandle(name, false, handle as FileSystemDirectoryHandle);
+    } catch (e) {
+      let __err = constants.WASI_EINVAL;
+      if (e instanceof DOMException) {
+        __err = FsaFilesystem.mapErr(e, true);
+      }
+      switch (__err) {
+        case constants.WASI_ENOENT:
+          let symlink = await (
+            handle as FileSystemDirectoryHandle
+          ).getFileHandle(linkpath, {
+            create: true,
+          });
+          await (await symlink.createWritable()).write(target);
+
+          // TODO: fill dummy data with something meaningful
+          await setStoredData(linkpath, {
+            dev: 0n,
+            ino: 0n,
+            filetype: constants.WASI_FILETYPE_DIRECTORY,
+            nlink: 0n,
+            size: BigInt(target.length),
             mtim: 0n,
             atim: 0n,
             ctim: 0n,
@@ -343,8 +404,8 @@ abstract class FsaDescriptor implements Descriptor {
 
 class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   private cursor: bigint;
-  private handle: FileSystemFileHandle;
   private writer: FileSystemWritableFileStream;
+  handle: FileSystemFileHandle;
 
   constructor(
     handle: FileSystemFileHandle,
@@ -489,8 +550,8 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
 }
 
 class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
-  private handle: FileSystemDirectoryHandle;
   private entries: Dirent[];
+  handle: FileSystemDirectoryHandle;
 
   constructor(
     handle: FileSystemDirectoryHandle,
