@@ -33,15 +33,6 @@ import {
   EventSourceArgs,
   CleanInodesArgs,
 } from "./types.js";
-import {
-  download,
-  free,
-  mount,
-  ps,
-  reset,
-  umount,
-  wget,
-} from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { In, Stdin, Out, EventSource } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
@@ -252,48 +243,6 @@ export default async function syscallCallback(
       );
 
       switch (path) {
-        case "/usr/bin/ps": {
-          const result = await ps(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/mount": {
-          const result = await mount(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/umount": {
-          const result = await umount(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/free": {
-          const result = await free(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/wget": {
-          const result = await wget(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/download": {
-          const result = await download(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/reset": {
-          const result = await reset(processManager, processId, args, env);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
         case "/usr/local/bin/syscalls_test": {
           const openedPwdDir = fds.getFd(4) as OpenDirectory;
           await openedPwdDir.getEntry(
