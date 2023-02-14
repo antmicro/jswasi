@@ -12,9 +12,9 @@ import {
   OpenFlags,
   LookupFlags,
 } from "./filesystem";
-import { msToNs } from "../utils";
+import { basename, dirname, msToNs } from "../utils";
 import * as constants from "../constants";
-import { getStoredData, setStoredData } from "./metadata";
+import { delStoredData, getStoredData, setStoredData } from "./metadata";
 
 class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;

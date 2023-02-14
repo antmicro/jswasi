@@ -866,20 +866,14 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       let err;
       if (fds.getFd(fd) !== undefined) {
-        console.log((await fds.getFd(fd).stat()).fileType);
-        if ((fds.getFd(fd).rightsBase & constants.WASI_RIGHT_FD_TELL) !== 0n) {
-          const ftype = (await fds.getFd(fd).stat()).fileType;
+        let fdstat = await fds.getFd(fd).getFdstat();
+        if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_TELL) !== 0n) {
           if (
-            ftype === constants.WASI_FILETYPE_REGULAR_FILE ||
-            ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK
+            fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE ||
+            fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
           ) {
             offset[0] = BigInt(
-              (
-                await (fds.getFd(fd) as OpenFile).seek(
-                  0,
-                  constants.WASI_WHENCE_CUR
-                )
-              ).pos
+              (await fds.getFd(fd).seek(0n, constants.WASI_WHENCE_CUR)).offset
             );
             err = constants.WASI_ESUCCESS;
           } else {

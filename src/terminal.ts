@@ -163,12 +163,13 @@ async function initFs(fs: TopLevelFs) {
   ]);
 
   const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
-    ([filename, address]) => fetchFile(openedRootDir, filename, address, true)
+    ([filename, address]) => fetchFile(fs, filename, address, true)
   );
 
   await Promise.all(alwaysFetchPromises);
 }
 
+/* TODO: make this work on new filesystem
 function initFsaDropImport(
   terminalContentWindow: Window,
   notifyDroppedFileSaved: (path: string, entryName: string) => void,
@@ -216,7 +217,7 @@ function initFsaDropImport(
     }
     await Promise.all(entryPromises);
   });
-}
+}*/
 
 function initServiceWorker() {
   window.addEventListener("load", () => {
@@ -349,13 +350,13 @@ export async function init(
     processManager.events.publishEvent(constants.WASI_EVENT_WINCH);
   };
 
-  // drag and drop support (save dragged files and folders to current directory)
-  // hterm creates iframe child of provided anchor, we assume there's only one of those
+  /* drag and drop support (save dragged files and folders to current directory)
+   * hterm creates iframe child of provided anchor, we assume there's only one of those
   initFsaDropImport(
     anchor.getElementsByTagName("iframe")[0].contentWindow,
     notifyDroppedFileSaved,
     processManager
-  );
+  );*/
 
   const pwdDir = (await tfs.open(DEFAULT_WORK_DIR)).desc;
   await processManager.spawnProcess(

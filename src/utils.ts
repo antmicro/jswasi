@@ -85,6 +85,18 @@ export async function md5sum(
   return md5.end();
 }
 
+export function basename(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
+export function dirname(path: string): string {
+  let last_index = path.lastIndexOf("/");
+  if (last_index < 1) {
+    last_index++;
+  }
+  return path.slice(0, last_index);
+}
+
 export function humanReadable(bytes: number): string {
   const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;

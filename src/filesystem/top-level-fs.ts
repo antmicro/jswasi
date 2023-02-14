@@ -7,19 +7,26 @@ import {
   Rights,
 } from "./filesystem";
 import * as constants from "../constants";
-import { realpath } from "../utils";
+import { dirname, basename, realpath } from "../utils";
+
+type DescInfo = {
+  err: number;
+  desc: Descriptor;
+  fs: Filesystem;
+  path: string;
+};
 
 export class TopLevelFs {
   private mounts: Record<string, Filesystem>;
 
-  private async getFsAndDesc(
+  private async getDescInfo(
     path: string,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0
-  ): Promise<{ err: number; desc: Descriptor; fs: Filesystem }> {
+  ): Promise<DescInfo> {
     let rpath = realpath(path);
     let fs = this.mounts[rpath];
     if (fs !== undefined) {
@@ -34,7 +41,7 @@ export class TopLevelFs {
         fs_rights_inheriting,
         fdflags
       );
-      return { err, desc, fs };
+      return { err, desc, fs, path: rpath };
     }
 
     let lastSeparator;
@@ -68,7 +75,7 @@ export class TopLevelFs {
           ) {
             let { err: err_, content } = await desc.read_str();
             if (err_ !== constants.WASI_ESUCCESS) {
-              return { desc: undefined, err, fs };
+              return { desc: undefined, err, fs, path: undefined };
             }
             let __path: string;
             if (content.startsWith("/")) {
@@ -86,7 +93,7 @@ export class TopLevelFs {
                 __path = left_path.concat(content, right_path);
               }
             }
-            let ret = await this.open(
+            return await this.getDescInfo(
               __path,
               dirflags,
               oflags,
@@ -94,16 +101,15 @@ export class TopLevelFs {
               fs_rights_inheriting,
               fdflags
             );
-            return { err: ret.err, desc: ret.desc, fs };
           }
           if (err === constants.WASI_ESUCCESS) {
-            return { desc, err, fs };
+            return { desc, err, fs, path: rpath };
           } else {
-            return { desc: undefined, err, fs };
+            return { desc: undefined, err, fs, path: rpath };
           }
         }
         default: {
-          return { desc: undefined, err, fs };
+          return { desc: undefined, err, fs, path: undefined };
         }
       }
     } else {
@@ -111,6 +117,7 @@ export class TopLevelFs {
         err,
         desc: err === constants.WASI_ESUCCESS ? desc : undefined,
         fs,
+        path: rpath,
       };
     }
   }
@@ -123,7 +130,7 @@ export class TopLevelFs {
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0
   ): Promise<{ desc: Descriptor; err: number }> {
-    return await this.getFsAndDesc(
+    return await this.getDescInfo(
       path,
       dirflags,
       oflags,
@@ -134,7 +141,7 @@ export class TopLevelFs {
   }
 
   async createDir(path: string): Promise<number> {
-    const { desc, fs, err } = await this.getFsAndDesc(
+    const { desc, fs, err } = await this.getDescInfo(
       path.slice(0, path.lastIndexOf("/")),
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
@@ -143,7 +150,7 @@ export class TopLevelFs {
   }
 
   async addSymlink(target: string, linkpath: string): Promise<number> {
-    const { desc, fs, err } = await this.getFsAndDesc(
+    const { desc, fs, err } = await this.getDescInfo(
       linkpath.slice(0, linkpath.lastIndexOf("/")),
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
@@ -155,13 +162,45 @@ export class TopLevelFs {
     );
   }
 
+  async removeDirectory(path: string): Promise<number> {
+    const { desc, fs, err } = await this.getDescInfo(
+      dirname(path),
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+    );
+    if (err !== constants.WASI_ESUCCESS) return err;
+    // TODO: this could potentially remove a mount point while it is still mounted
+    return await fs.unlinkat(desc, basename(path), true);
+  }
+
+  async move(source: string, target: string): Promise<number> {
+    let dinfo1 = await this.getDescInfo(
+      dirname(source),
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+    );
+    let dinfo2 = await this.getDescInfo(
+      dirname(target),
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+    );
+  }
+
   async addMount(path: string, fs: Filesystem): Promise<number> {
     if (this.mounts[path] !== undefined) {
       return constants.WASI_EEXIST;
     }
 
     // TODO: expand symlinks in path and ensure it points to an empty directory
-    this.mounts[path] = fs;
-    return constants.WASI_ESUCCESS;
+    let descInfo = await this.getDescInfo(
+      path,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+      constants.WASI_O_DIRECTORY
+    );
+    if (descInfo.err !== constants.WASI_ESUCCESS) {
+      return descInfo.err;
+    }
+    if ((await descInfo.desc.readdir(true)).dirents.length === 0) {
+      this.mounts[path] = fs;
+      return constants.WASI_ESUCCESS;
+    }
+    return constants.WASI_ENOTEMPTY;
   }
 }
