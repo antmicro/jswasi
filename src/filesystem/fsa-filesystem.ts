@@ -47,6 +47,8 @@ class FsaFilesystem implements Filesystem {
         }
       case "NotFoundError":
         return constants.WASI_ENOENT;
+      case "InvalidModificationError":
+        return constants.WASI_ENOTEMPTY;
       default:
         return constants.WASI_EINVAL;
     }
@@ -103,6 +105,51 @@ class FsaFilesystem implements Filesystem {
         err = FsaFilesystem.mapErr(e, __isDir);
       }
       return { index: stop, err, handle };
+    }
+  }
+
+  async unlinkat(
+    desc: Descriptor,
+    path: string,
+    is_dir: boolean
+  ): Promise<number> {
+    let start_handle = undefined;
+    if (desc !== undefined) {
+      if (desc instanceof FsaDirectoryDescriptor) {
+        start_handle = desc.handle;
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
+    let { err, handle } = await this.getHandle(
+      dirname(path),
+      true,
+      start_handle
+    );
+    if (err !== constants.WASI_ESUCCESS) {
+      return err;
+    }
+    let name = basename(path);
+    try {
+      // check if deleted entry matches given type
+      // TODO: does leaving it unchecked make sense?
+      let __err = (
+        await this.getHandle(name, is_dir, handle as FileSystemDirectoryHandle)
+      ).err;
+      if (__err !== constants.WASI_ESUCCESS) {
+        return __err;
+      }
+      (handle as FileSystemDirectoryHandle).removeEntry(name, {
+        recursive: false,
+      });
+      await delStoredData(path);
+      return constants.WASI_ESUCCESS;
+    } catch (e) {
+      let __err = constants.WASI_EINVAL;
+      if (e instanceof DOMException) {
+        __err = FsaFilesystem.mapErr(e, true);
+      }
+      return __err;
     }
   }
 
@@ -194,7 +241,7 @@ class FsaFilesystem implements Filesystem {
           await setStoredData(linkpath, {
             dev: 0n,
             ino: 0n,
-            filetype: constants.WASI_FILETYPE_DIRECTORY,
+            filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
             nlink: 0n,
             size: BigInt(target.length),
             mtim: 0n,

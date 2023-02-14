@@ -232,13 +232,16 @@ export interface Filesystem {
     fs_rights_inheriting: Rights,
     fdflags: Fdflags
   ): Promise<{ err: number; index: number; desc: Descriptor }>;
-  readlink(path: string, buffer: DataView, len: number): Promise<number>;
-  removeDirectory(path: string): Promise<number>;
-  rename(oldPath: string, newPath: string): Promise<number>;
+  unlinkat(desc: Descriptor, path: string, is_dir: boolean): Promise<number>;
+  renameat(
+    oldDesc: Descriptor,
+    oldPath: string,
+    newDesc: Descriptor,
+    newPath: string
+  ): Promise<number>;
   symlinkat(
     target: string,
     desc: Descriptor,
     linkpath: string
   ): Promise<number>;
-  unlinkFile(path: string): Promise<number>;
 }
