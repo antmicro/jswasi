@@ -1,70 +1,67 @@
-# Installation
+# Rust Shell
 
-Make sure you have Rust and `wasm32-wasi` target installed, as well as node.
-Otherwise, run:
+Copyright (c) 2022-2023 [Antmicro](https://www.antmicro.com)
+
+This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib) api.
+Along with [wash](https://github.com/antmicro/wash) shell and some terminal apps, it tries to mimic a linux terminal experience.
+
+# Dependencies
+
+Make sure you have Rust and `cargo` installed, as well as node.
+
+To install rust, you can use the following commands:
 
 ```
 # install rustc, rustup, cargo
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh # proceed with defaults here
 source $HOME/.cargo/env
+```
 
-# install wasm32-wasi target
-rustup target add wasm32-wasi
+To install node, you can use the following commands:
 
+```
 # install newest node via nvm
-url -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 nvm install node
 ```
 
-Once you're done, make sure you're in the project root directory and run once:
+# Installation
+
+To build the project use:
 
 ```
 npm install
-./setup.sh build
+npm run build
 ```
 
-Note: This is not the complete build and needs to be updated. The CI works so it should be a reference. Possibly we can use `tuttest` to keep the CI and README in sync.
+This will package all necessary files in `dist/` directory.
 
-## Local run
+# Running
 
-Now if you want to run the project at a specific port run:
-
-```
-./setup start 8000
-```
-
-and go to http://localhost:8000 (make sure you have localhost mapped to 0.0.0.0 in /etc/hosts).
-
-## Running tests
-
-Install prerequisites:
+Once the project is built, it can be ran using:
 
 ```
-pip install robotframework PexpectLibrary
+npm run start
 ```
 
-Run (browser tests):
+This will setup a `http` server that listens on `8000` port.
+To choose a different port, you can use:
 
 ```
-cd tests/robot
-node shell-driver/shell-driver.js --cache-dir=/tmp/ci-cache-base --exit # prepare base cache directory
-robot --variable platform:browser -i browser .
+PORT=<port> npm run start
 ```
 
-Run (native tests):
+# Running tests
+
+`rust-shell` uses `robot framework` and `pexpect` library for organizing a wide variety of end-to-end tests.
+Install dependencies (you need `python3` and `pip3` installed for that):
 
 ```
-export PATH=$PATH:$(pwd)/wash/target/release/
-cd tests/robot
-robot --variable platform:native -i native test-shell.robot
+pip3 install robotframework PexpectLibrary
 ```
 
-## Embedding
-
-If you only want to embed wash run:
+To run tests against the browser runtime use:
 
 ```
-./setup.sh embedded
+npm run test
 ```
-
-All necessary files will be generated to `dist` directory.
