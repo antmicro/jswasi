@@ -22,7 +22,7 @@ export type FdReadArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
   len: number;
-  pread: bigint;
+  offset: bigint;
 };
 
 export type FdReaddirArgs = {

@@ -430,7 +430,7 @@ export default async function syscallCallback(
     }
     case "fd_pread":
     case "fd_read": {
-      const { sharedBuffer, fd, len, pread } = data as FdReadArgs;
+      const { sharedBuffer, fd, len, offset } = data as FdReadArgs;
 
       const { fds } = processManager.processInfos[processId];
       const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -452,8 +452,8 @@ export default async function syscallCallback(
         Atomics.store(lck, 0, constants.WASI_EINVAL);
         Atomics.notify(lck, 0);
       } else {
-        if (pread) {
-          err = (await fds.getFd(fd).pread(len, pread)).err;
+        if (offset) {
+          err = (await fds.getFd(fd).pread(len, offset)).err;
         } else {
           err = (await fds.getFd(fd).read(len)).err;
         }

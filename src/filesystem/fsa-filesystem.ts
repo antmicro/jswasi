@@ -5,14 +5,13 @@ import {
   Filesystem,
   Rights,
   Fdflags,
-  Fstflags,
   Timestamp,
   Whence,
   Dirent,
   OpenFlags,
   LookupFlags,
 } from "./filesystem";
-import { basename, dirname, msToNs } from "../utils";
+import { basename, dirname } from "../utils";
 import * as constants from "../constants";
 import { delStoredData, getStoredData, setStoredData } from "./metadata";
 
@@ -377,9 +376,9 @@ abstract class FsaDescriptor implements Descriptor {
   }
 
   abstract initialize(path: string): Promise<void>;
-  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
+  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract pread(
     len: number,
     pos: bigint
@@ -396,36 +395,15 @@ abstract class FsaDescriptor implements Descriptor {
   abstract readdir(
     refresh: boolean
   ): Promise<{ err: number; dirents: Dirent[] }>;
+  abstract writableStream(): Promise<{ err: number; stream: WritableStream }>;
+  abstract truncate(size: bigint): Promise<number>;
 
   async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
     let filestat = await getStoredData(this.path);
 
-    const __atim =
-      fstflags &
-      (constants.WASI_FSTFLAGS_ATIM | constants.WASI_FSTFLAGS_ATIM_NOW);
-    switch (__atim) {
-      case constants.WASI_FSTFLAGS_ATIM:
-        filestat.atim = atim;
-        break;
-      case constants.WASI_FSTFLAGS_ATIM_NOW:
-        filestat.atim = msToNs(performance.now());
-        break;
-      case constants.WASI_FSTFLAGS_ATIM | constants.WASI_FSTFLAGS_ATIM_NOW:
-        return constants.WASI_EINVAL;
-    }
+    if (atim) filestat.atim = atim;
+    if (mtim) filestat.mtim = mtim;
 
-    const __mtim =
-      fstflags &
-      (constants.WASI_FSTFLAGS_MTIM | constants.WASI_FSTFLAGS_MTIM_NOW);
-    switch (__mtim) {
-      case constants.WASI_FSTFLAGS_MTIM:
-        filestat.mtim = mtim;
-        break;
-      case constants.WASI_FSTFLAGS_MTIM_NOW:
-        filestat.mtim = msToNs(performance.now());
-      case constants.WASI_FSTFLAGS_MTIM | constants.WASI_FSTFLAGS_MTIM:
-        return constants.WASI_EINVAL;
-    }
     return constants.WASI_ESUCCESS;
   }
 
@@ -442,6 +420,10 @@ abstract class FsaDescriptor implements Descriptor {
 
   async close(): Promise<number> {
     return constants.WASI_ESUCCESS;
+  }
+
+  isatty(): boolean {
+    return false;
   }
 }
 
@@ -497,11 +479,14 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     }
 
     const { size } = await getStoredData(this.path);
-    const end = size < this.cursor + len ? Number(size) : this.cursor + len;
-    this.cursor += end;
+    const end =
+      size < Number(this.cursor) + len
+        ? Number(size)
+        : Number(this.cursor) + len;
+    this.cursor += BigInt(end);
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: await file.slice(this.cursor, end).arrayBuffer(),
+      buffer: await file.slice(Number(this.cursor), Number(end)).arrayBuffer(),
     };
   }
 
@@ -590,6 +575,20 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     filestat.size += written;
     return { err: constants.WASI_ESUCCESS, written };
   }
+
+  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return { err: constants.WASI_ESUCCESS, stream: this.writer };
+  }
+
+  async truncate(size: bigint): Promise<number> {
+    await this.writer.write({ type: "truncate", size: Number(size) });
+    return constants.WASI_ESUCCESS;
+  }
+
+  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    let buffer = await (await this.handle.getFile()).arrayBuffer();
+    return { err: constants.WASI_ESUCCESS, buffer };
+  }
 }
 
 class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
@@ -619,6 +618,10 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     return { err: constants.WASI_EISDIR, content: "" };
   }
 
+  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return { err: constants.WASI_EISDIR, stream: undefined };
+  }
+
   async pread(
     _len: number,
     _pos: bigint
@@ -642,6 +645,14 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     return { err: constants.WASI_EISDIR, offset: -1n };
+  }
+
+  async truncate(_size: bigint): Promise<number> {
+    return constants.WASI_EISDIR;
+  }
+
+  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
   }
 
   async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {

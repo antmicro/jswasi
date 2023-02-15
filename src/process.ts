@@ -7,7 +7,6 @@ import {
   GetCwdArgs,
   FdCloseArgs,
   FdFdstatGetArgs,
-  FdFilestatGetArgs,
   FdPrestatDirNameArgs,
   FdPrestatGetArgs,
   FdReadArgs,
@@ -18,7 +17,7 @@ import {
   GetPidArgs,
   IsAttyArgs,
   PathCreateDirectoryArgs,
-  PathFilestatGetArgs,
+  FilestatGetArgs,
   PathLinkArgs,
   PathOpenArgs,
   PathReadlinkArgs,
@@ -457,10 +456,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     lck[0] = -1;
     const statBuf = new DataView(sharedBuffer, 4);
 
-    sendToKernel([
-      "fd_filestat_get",
-      { sharedBuffer, fd } as FdFilestatGetArgs,
-    ]);
+    sendToKernel(["fd_filestat_get", { sharedBuffer, fd } as FilestatGetArgs]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -529,7 +525,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
       sendToKernel([
         "fd_read",
-        { sharedBuffer, fd, len, pread: undefined } as FdReadArgs,
+        { sharedBuffer, fd, len, offset: undefined } as FdReadArgs,
       ]);
       Atomics.wait(lck, 0, -1);
 
@@ -575,7 +571,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       const readBuf = new Uint8Array(sharedBuffer, 8, len);
       sendToKernel([
         "fd_pread",
-        { sharedBuffer, fd, len, pread: offset } as FdReadArgs,
+        { sharedBuffer, fd, len, offset } as FdReadArgs,
       ]);
       Atomics.wait(lck, 0, -1);
 
@@ -719,7 +715,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
     sendToKernel([
       "path_filestat_get",
-      { sharedBuffer, fd, path, lookupFlags } as PathFilestatGetArgs,
+      { sharedBuffer, fd, path, lookupFlags } as FilestatGetArgs,
     ]);
     Atomics.wait(lck, 0, -1);
 
@@ -1355,7 +1351,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
     sendToKernel([
       "path_symlink",
-      { sharedBuffer, oldPath, newFd, newPath } as PathSymlinkArgs,
+      {
+        sharedBuffer,
+        targetPath: oldPath,
+        linkFd: newFd,
+        linkPath: newPath,
+      } as PathSymlinkArgs,
     ]);
 
     Atomics.wait(lck, 0, -1);

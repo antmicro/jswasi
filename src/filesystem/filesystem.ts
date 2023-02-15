@@ -221,7 +221,7 @@ export interface Descriptor {
    *
    * @returns status code
    */
-  truncate(size: bigint): Promise<{ err: number }>;
+  truncate(size: bigint): Promise<number>;
 }
 
 export interface Filesystem {
