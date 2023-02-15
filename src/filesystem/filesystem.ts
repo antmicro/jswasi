@@ -70,17 +70,12 @@ export interface Descriptor {
    *
    * @param atim - access time
    * @param mtim - modification time
-   * @param fstflags - settings
    *
    * @returns status code
    *
    * @see https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#-fstflags-record
    */
-  setFilestatTimes(
-    fstflags: Fstflags,
-    atim: Timestamp,
-    mtim: Timestamp
-  ): Promise<number>;
+  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
 
   /*
    * Sets fdflags for the descriptor
@@ -218,6 +213,15 @@ export interface Descriptor {
    * Tells if the descriptor is a terminal
    */
   isatty(): boolean;
+
+  /*
+   * Truncates the underlying file to a given size
+   *
+   * @param size - the size of the file to truncate to
+   *
+   * @returns status code
+   */
+  truncate(size: bigint): Promise<{ err: number }>;
 }
 
 export interface Filesystem {

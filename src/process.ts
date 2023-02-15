@@ -30,8 +30,7 @@ import {
   SpawnArgs,
   HtermConfArgs,
   PathRenameArgs,
-  FdFilestatSetTimesArgs,
-  PathFilestatSetTimesArgs,
+  FilestatSetTimesArgs,
   ClockEvent,
   FdReadSub,
   FdWriteSub,
@@ -1672,7 +1671,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         st_atim,
         st_mtim,
         fst_flags,
-      } as PathFilestatSetTimesArgs,
+      } as FilestatSetTimesArgs,
     ]);
     Atomics.wait(lck, 0, -1);
     const err = Atomics.load(lck, 0);
@@ -1724,7 +1723,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         st_atim,
         st_mtim,
         fst_flags,
-      } as FdFilestatSetTimesArgs,
+      } as FilestatSetTimesArgs,
     ]);
     Atomics.wait(lck, 0, -1);
     const err = Atomics.load(lck, 0);

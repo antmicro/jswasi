@@ -397,11 +397,7 @@ abstract class FsaDescriptor implements Descriptor {
     refresh: boolean
   ): Promise<{ err: number; dirents: Dirent[] }>;
 
-  async setFilestatTimes(
-    fstflags: Fstflags,
-    atim: Timestamp,
-    mtim: Timestamp
-  ): Promise<number> {
+  async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
     let filestat = await getStoredData(this.path);
 
     const __atim =

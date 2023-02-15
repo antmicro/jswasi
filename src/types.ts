@@ -18,8 +18,6 @@ export type FdWriteArgs = {
 
 export type FdCloseArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
 
-export type FdFilestatGetArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
-
 export type FdReadArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
@@ -47,7 +45,7 @@ export type PathCreateDirectoryArgs = {
   path: string;
 };
 
-export type PathFilestatGetArgs = {
+export type FilestatGetArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
   path: string;
@@ -121,9 +119,9 @@ export type FdPrestatDirNameArgs = {
 
 export type PathSymlinkArgs = {
   sharedBuffer: SharedArrayBuffer;
-  oldPath: string;
-  newFd: number;
-  newPath: string;
+  targetPath: string;
+  linkFd: number;
+  linkPath: string;
 };
 
 export type PathLinkArgs = {
@@ -155,15 +153,7 @@ export type FdTellArgs = {
   fd: number;
 };
 
-export type FdFilestatSetTimesArgs = {
-  sharedBuffer: SharedArrayBuffer;
-  fd: number;
-  st_atim: bigint;
-  st_mtim: bigint;
-  fst_flags: number;
-};
-
-export type PathFilestatSetTimesArgs = {
+export type FilestatSetTimesArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
   flags: LookupFlags;

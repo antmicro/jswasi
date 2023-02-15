@@ -4,7 +4,6 @@ import {
   GetCwdArgs,
   FdCloseArgs,
   FdFdstatGetArgs,
-  FdFilestatGetArgs,
   FdPrestatDirNameArgs,
   FdPrestatGetArgs,
   FdReadArgs,
@@ -15,7 +14,7 @@ import {
   GetPidArgs,
   IsAttyArgs,
   PathCreateDirectoryArgs,
-  PathFilestatGetArgs,
+  FilestatGetArgs,
   PathLinkArgs,
   PathOpenArgs,
   PathReadlinkArgs,
@@ -26,17 +25,15 @@ import {
   SpawnArgs,
   HtermConfArgs,
   PathRenameArgs,
-  FdFilestatSetTimesArgs,
-  PathFilestatSetTimesArgs,
+  FilestatSetTimesArgs,
   PollOneoffArgs,
   FdReadSub,
   EventSourceArgs,
   CleanInodesArgs,
 } from "./types.js";
 import ProcessManager from "./process-manager.js";
-import { In, Stdin, Out, EventSource } from "./devices.js";
-import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
-import { msToNs } from "./utils.js";
+import { Stdin, EventSource } from "./devices.js";
+import { basename, msToNs } from "./utils.js";
 import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
 
 const RED_ANSI = "\u001b[31m";
@@ -235,78 +232,40 @@ export default async function syscallCallback(
           );
           fds.replaceFd(fd, desc);
           if (mode === "write") {
-            desc.truncate(0);
+            desc.truncate(0n);
           } else if (mode === "append") {
             desc.seek(0n, constants.WASI_WHENCE_END);
           }
         })
       );
-
-      switch (path) {
-        case "/usr/local/bin/syscalls_test": {
-          const openedPwdDir = fds.getFd(4) as OpenDirectory;
-          await openedPwdDir.getEntry(
-            "dir",
-            FileOrDir.Directory,
-            LookupFlags.SymlinkFollow,
-            OpenFlags.Create | OpenFlags.Directory
+      try {
+        const id = await processManager.spawnProcess(
+          processId,
+          background ? null : parentLck,
+          syscallCallback,
+          path,
+          fds,
+          args,
+          env,
+          background,
+          processManager.processInfos[processId].cwd
+        );
+        const newProcessName = path.split("/").slice(-1)[0];
+        if (env["DEBUG"] === "1") {
+          console.log(
+            `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
+            "background:black; color: white;",
+            "background:black; color:yellow;",
+            "background: black; color:white;",
+            "background:default; color: default;"
           );
-          const text = await (
-            await openedPwdDir.getEntry(
-              "text",
-              FileOrDir.Any,
-              LookupFlags.SymlinkFollow,
-              OpenFlags.Create
-            )
-          ).entry.open();
-          await (text as OpenFile).write(
-            new TextEncoder().encode("sample text\n")
-          );
-          await text.close();
-          openedPwdDir.addSymlink("link", "text");
-          openedPwdDir.addSymlink("dir_link", "dir");
-          for (let i = 0; i < 10; i++) {
-            await openedPwdDir.getEntry(
-              `dir/ent${i}`,
-              FileOrDir.File,
-              LookupFlags.SymlinkFollow,
-              OpenFlags.Create
-            );
-          }
-          // no break so that test is spawned normally (default must be below this case)
         }
-        default: {
-          try {
-            const id = await processManager.spawnProcess(
-              processId,
-              background ? null : parentLck,
-              syscallCallback,
-              path,
-              fds,
-              args,
-              env,
-              background,
-              processManager.processInfos[processId].cwd
-            );
-            const newProcessName = path.split("/").slice(-1)[0];
-            if (env["DEBUG"] === "1") {
-              console.log(
-                `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
-                "background:black; color: white;",
-                "background:black; color:yellow;",
-                "background: black; color:white;",
-                "background:default; color: default;"
-              );
-            }
-          } catch (_) {
-            console.log("Failed spawning process");
-          }
-          if (background) {
-            Atomics.store(parentLck, 0, 0);
-            Atomics.notify(parentLck, 0);
-          }
-          break;
-        }
+      } catch (_) {
+        console.log("Failed spawning process");
+      }
+      if (background) {
+        Atomics.store(parentLck, 0, 0);
+        Atomics.notify(parentLck, 0);
       }
       break;
     }
@@ -337,17 +296,19 @@ export default async function syscallCallback(
     }
 
     case "path_symlink": {
-      const { sharedBuffer, oldPath, newFd, newPath } = data as PathSymlinkArgs;
+      const { sharedBuffer, targetPath, linkFd, linkPath } =
+        data as PathSymlinkArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
       let err;
-      if (fds.getFd(newFd) === undefined) {
+      if (fds.getFd(linkFd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        err = await (fds.getFd(newFd) as OpenDirectory).addSymlink(
-          newPath,
-          oldPath
+        err = await processManager.filesystem.addSymlink(
+          targetPath,
+          linkPath,
+          fds.getFd(linkFd)
         );
       }
 
@@ -391,16 +352,17 @@ export default async function syscallCallback(
       let err = constants.WASI_ESUCCESS;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
-        let linkedPath;
-        ({ err, linkedPath } = await (fds.getFd(fd) as OpenDirectory).readlink(
+        let __path;
+        ({ err, path: __path } = await processManager.filesystem.readLink(
+          fds.getFd(fd),
           path
         ));
         if (err === constants.WASI_ESUCCESS) {
-          if (linkedPath.length > bufferLen) {
+          if (__path.length > bufferLen) {
             bufferUsed[0] = bufferLen;
           } else {
-            buffer.set(new TextEncoder().encode(linkedPath), 0);
-            bufferUsed[0] = linkedPath.length;
+            buffer.set(new TextEncoder().encode(__path), 0);
+            bufferUsed[0] = __path.length;
           }
         } else {
           err = constants.WASI_EINVAL;
@@ -423,7 +385,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
         path.set(
-          new TextEncoder().encode((fds.getFd(fd) as OpenFile).name()),
+          new TextEncoder().encode(basename(fds.getFd(fd).getPath())),
           0
         );
         err = constants.WASI_ESUCCESS;
@@ -517,7 +479,6 @@ export default async function syscallCallback(
       const openedFd = new Int32Array(sharedBuffer, 4, 1);
 
       let err;
-      let entry;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(dirFd) !== undefined) {
         if (
@@ -526,20 +487,18 @@ export default async function syscallCallback(
             openFlags & constants.WASI_O_DIRECTORY
           )
         ) {
-          ({ err, entry } = await (fds.getFd(dirFd) as OpenDirectory).getEntry(
+          let desc;
+          ({ err, desc } = await processManager.filesystem.openat(
+            fds.getFd(fd),
             path,
-            FileOrDir.Any,
             lookupFlags,
-            openFlags
+            openFlags,
+            fsRightsBase,
+            fsRightsInheriting,
+            fdFlags
           ));
           if (err === constants.WASI_ESUCCESS) {
-            const e = await entry.open(
-              fsRightsBase &
-                (fds.getFd(dirFd) as OpenDirectory).rightsInheriting,
-              fsRightsInheriting,
-              fdFlags
-            );
-            openedFd[0] = fds.addFile(e);
+            openedFd[0] = fds.addFile(desc);
           }
         } else {
           err = constants.WASI_EINVAL;
@@ -570,81 +529,56 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
-    case "fd_filestat_get": {
-      const { sharedBuffer, fd } = data as FdFilestatGetArgs;
-      const lck = new Int32Array(sharedBuffer, 0, 1);
-      const buf = new DataView(sharedBuffer, 4);
-
-      let err;
-      const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        const stat = await fds.getFd(fd).getFilestat();
-        buf.setBigUint64(0, stat.dev, true);
-        buf.setBigUint64(8, stat.ino, true);
-        buf.setUint8(16, stat.filetype);
-        buf.setBigUint64(24, stat.nlink, true);
-        buf.setBigUint64(32, stat.size, true);
-        buf.setBigUint64(40, stat.atim, true);
-        buf.setBigUint64(48, stat.mtim, true);
-        buf.setBigUint64(56, stat.ctim, true);
-        err = constants.WASI_ESUCCESS;
-      } else {
-        err = constants.WASI_EBADF;
-      }
-
-      Atomics.store(lck, 0, err);
-      Atomics.notify(lck, 0);
-      break;
-    }
     case "path_filestat_get": {
-      const { sharedBuffer, fd, path, lookupFlags } =
-        data as PathFilestatGetArgs;
+      const { sharedBuffer, fd, path, lookupFlags } = data as FilestatGetArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const buf = new DataView(sharedBuffer, 4);
 
       let err;
-      let entry;
 
-      if (path[0] !== "!") {
-        const { fds } = processManager.processInfos[processId];
-        if (fds.getFd(fd) !== undefined) {
+      const { fds } = processManager.processInfos[processId];
+      let desc = fds.getFd(fd);
+      if (desc === undefined) {
+        err = constants.WASI_EBADF;
+      } else {
+        let __desc;
+        if (path !== undefined) {
+          let res = await processManager.filesystem.openat(
+            desc,
+            path,
+            lookupFlags
+          );
+          if (res.err !== constants.WASI_ESUCCESS) {
+            err = constants.WASI_ENOENT;
+          } else {
+            __desc = res.desc;
+          }
+        } else {
+          __desc = desc;
+        }
+        if (__desc === undefined) {
+          err = constants.WASI_ENOENT;
+        } else {
+          let fdstat = await __desc.getFdstat();
           if (
-            ((await fds.getFd(fd).getFdstat()).fs_rights_base &
-              constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
+            (fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
             0n
           ) {
-            ({ err, entry } = await (fds.getFd(fd) as OpenDirectory).getEntry(
-              path,
-              FileOrDir.Any,
-              lookupFlags
-            ));
             if (err === constants.WASI_ESUCCESS) {
-              const stat = await entry.stat();
-              buf.setBigUint64(0, stat.dev, true);
-              buf.setBigUint64(8, stat.ino, true);
-              buf.setUint8(16, stat.fileType);
-              buf.setBigUint64(24, stat.nlink, true);
-              buf.setBigUint64(32, stat.size, true);
-              buf.setBigUint64(40, stat.atim, true);
-              buf.setBigUint64(48, stat.mtim, true);
-              buf.setBigUint64(56, stat.ctim, true);
+              let filestat = await __desc.getFilestat();
+              buf.setBigUint64(0, filestat.dev, true);
+              buf.setBigUint64(8, filestat.ino, true);
+              buf.setUint8(16, filestat.filetype);
+              buf.setBigUint64(24, filestat.nlink, true);
+              buf.setBigUint64(32, filestat.size, true);
+              buf.setBigUint64(40, filestat.atim, true);
+              buf.setBigUint64(48, filestat.mtim, true);
+              buf.setBigUint64(56, filestat.ctim, true);
             }
           } else {
             err = constants.WASI_EACCES;
           }
-        } else {
-          err = constants.WASI_EBADF;
         }
-      } else {
-        buf.setBigUint64(0, BigInt(0), true);
-        buf.setBigUint64(8, BigInt(0), true);
-        buf.setUint8(16, 0);
-        buf.setBigUint64(24, BigInt(0), true);
-        buf.setBigUint64(32, BigInt(4096), true);
-        buf.setBigUint64(40, BigInt(0), true);
-        buf.setBigUint64(48, BigInt(0), true);
-        buf.setBigUint64(56, BigInt(0), true);
-        err = constants.WASI_ESUCCESS;
       }
 
       Atomics.store(lck, 0, err);
@@ -755,12 +689,11 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
-        ({ err } = await (fds.getFd(fd) as OpenDirectory).deleteEntry(path, {
-          // recursive flag is only meant for internal purposes
-          // from outside, path_remove_directory can only delete empty directory
-          // to remove non-empty directory, all files need to be removed from directory using different syscalls
-          recursive: false,
-        }));
+        err = await processManager.filesystem.removeEntry(
+          path,
+          action !== "path_unlink_file",
+          fds.getFd(fd)
+        );
       } else {
         err = constants.WASI_EBADF;
       }
@@ -776,12 +709,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getFd(fd) !== undefined) {
-        ({ err } = await (fds.getFd(fd) as OpenDirectory).getEntry(
-          path,
-          FileOrDir.Directory,
-          LookupFlags.SymlinkFollow,
-          OpenFlags.Create | OpenFlags.Directory | OpenFlags.Exclusive
-        ));
+        err = await processManager.filesystem.createDir(path, fds.getFd(fd));
       } else {
         err = constants.WASI_EBADF;
       }
@@ -889,70 +817,49 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
-    case "path_filestat_set_times":
     case "fd_filestat_set_times": {
-      const { sharedBuffer, st_atim, st_mtim, fst_flags } =
-        data as FdFilestatSetTimesArgs;
-      let file;
+      const { sharedBuffer, st_atim, st_mtim, fst_flags, fd, path } =
+        data as FilestatSetTimesArgs;
+
       let err = constants.WASI_ESUCCESS;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
-      if (action === "fd_filestat_set_times") {
-        const { fd } = data as FdFilestatGetArgs;
-        file = fds.getFd(fd);
-        if (!file) {
-          err = constants.WASI_EBADF;
-        } else if (
-          (file.rightsBase & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES) ===
-          0n
-        ) {
-          err = constants.WASI_EACCES;
-        }
-      } else {
-        const { fd, path, flags } = data as PathFilestatSetTimesArgs;
-        if (fds.getFd(fd) === undefined) {
-          err = constants.WASI_EBADF;
-        } else {
-          file = (
-            await (fds.getFd(fd) as OpenDirectory).getEntry(
-              path,
-              FileOrDir.Any,
-              flags
-            )
-          ).entry;
-          if (!file) {
-            err = constants.WASI_EINVAL;
-          }
-        }
+      let desc = fds.getFd(fd);
+      if (path !== undefined) {
+        const res = await processManager.filesystem.openat(desc, path);
+        desc = res.desc;
+        err = res.err;
       }
-      if (err === constants.WASI_ESUCCESS) {
+      let fdstat = await desc.getFdstat();
+
+      if (!desc) {
+        err = constants.WASI_EBADF;
+      } else if (
+        !(fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES)
+      ) {
+        err = constants.WASI_EACCES;
+      } else {
         if (
-          (!(
-            (fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
-            (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0
-          ) &&
-            !(
-              (fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
-              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0
-            )) ||
-          file.fileType === constants.WASI_FILETYPE_CHARACTER_DEVICE
+          !(
+            ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
+              (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) ||
+            ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
+              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0)
+          )
         ) {
-          let metadata = await (file as File | Directory).metadata();
+          let __mtim, __atim;
           if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
-            metadata.atim = st_atim;
+            __atim = st_atim;
           } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
-            metadata.atim = msToNs(performance.now());
+            __atim = msToNs(performance.now());
           }
           if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
-            metadata.mtim = st_mtim;
+            __mtim = st_mtim;
           } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
-            metadata.mtim = msToNs(performance.now());
+            __mtim = msToNs(performance.now());
           }
-          try {
-            // setting times of character devices makes no sense for now
-            await (file as File | Directory).updateMetadata(metadata);
-          } catch (e: any) {}
+          await desc.setFilestatTimes(__mtim, __atim);
         } else {
           err = constants.WASI_EINVAL;
         }

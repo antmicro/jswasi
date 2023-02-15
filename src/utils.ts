@@ -105,5 +105,6 @@ export function humanReadable(bytes: number): string {
     result /= 1024;
     unit += 1;
   }
+
   return `${result.toFixed(1)}${units[unit]}`;
 }

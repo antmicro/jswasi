@@ -140,18 +140,64 @@ export class TopLevelFs {
     );
   }
 
-  async createDir(path: string): Promise<number> {
-    const { desc, fs, err } = await this.getDescInfo(
-      path.slice(0, path.lastIndexOf("/")),
+  async openat(
+    desc: Descriptor,
+    path: string,
+    dirflags: LookupFlags = 0,
+    oflags: OpenFlags = 0,
+    fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
+    fdflags: Fdflags = 0
+  ): Promise<{ desc: Descriptor; err: number }> {
+    let __path;
+    if (!path.startsWith("/")) {
+      __path = `${desc.getPath()}/path`;
+    } else {
+      __path = path;
+    }
+    return await this.getDescInfo(
+      __path,
+      dirflags,
+      oflags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      fdflags
+    );
+  }
+
+  async createDir(path: string, desc: Descriptor = undefined): Promise<number> {
+    let __path;
+    if (desc !== undefined && !path.startsWith("/")) {
+      __path = `${desc.getPath()}/${path}`;
+    } else {
+      __path = path;
+    }
+    const {
+      desc: __desc,
+      fs,
+      err,
+    } = await this.getDescInfo(
+      dirname(__path),
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
     return await fs.mkdirat(desc, path.slice(path.lastIndexOf("/") + 1));
   }
 
-  async addSymlink(target: string, linkpath: string): Promise<number> {
+  // linkpath and linkdesc are in reverse order so that linkdesc can have default value
+  async addSymlink(
+    target: string,
+    linkpath: string,
+    linkdesc: Descriptor = undefined
+  ): Promise<number> {
+    let path;
+    if (linkdesc !== undefined && !linkpath.startsWith("/")) {
+      path = `${linkdesc.getPath()}/${linkpath}`;
+    } else {
+      path = linkpath;
+    }
     const { desc, fs, err } = await this.getDescInfo(
-      linkpath.slice(0, linkpath.lastIndexOf("/")),
+      dirname(path),
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
@@ -162,14 +208,28 @@ export class TopLevelFs {
     );
   }
 
-  async removeDirectory(path: string): Promise<number> {
-    const { desc, fs, err } = await this.getDescInfo(
-      dirname(path),
+  async removeEntry(
+    path: string,
+    is_dir: boolean,
+    desc: Descriptor = undefined
+  ): Promise<number> {
+    let __path;
+    if (desc !== undefined && !path.startsWith("/")) {
+      __path = `${desc.getPath()}/${path}`;
+    } else {
+      __path = path;
+    }
+    const {
+      desc: __desc,
+      fs,
+      err,
+    } = await this.getDescInfo(
+      dirname(__path),
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
     // TODO: this could potentially remove a mount point while it is still mounted
-    return await fs.unlinkat(desc, basename(path), true);
+    return await fs.unlinkat(__desc, basename(__path), is_dir);
   }
 
   async move(source: string, target: string): Promise<number> {
@@ -202,5 +262,23 @@ export class TopLevelFs {
       return constants.WASI_ESUCCESS;
     }
     return constants.WASI_ENOTEMPTY;
+  }
+
+  async readLink(
+    desc: Descriptor,
+    path: string
+  ): Promise<{ err: number; path: string }> {
+    let __path;
+    if (desc !== undefined && !path.startsWith("/")) {
+      __path = `${desc.getPath()}/${path}`;
+    } else {
+      __path = path;
+    }
+    let __res = await this.openat(desc, __path);
+    if (__res.err !== constants.WASI_ESUCCESS) {
+      return { err: __res.err, path: undefined };
+    }
+    const { err, content } = await __res.desc.read_str();
+    return { err, path: content };
   }
 }
