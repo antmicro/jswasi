@@ -340,6 +340,20 @@ class FsaFilesystem implements Filesystem {
     }
     return { err, index, desc };
   }
+  async renameat(
+    _oldDesc: Descriptor,
+    _oldPath: string,
+    _newDesc: Descriptor,
+    _newPath: string
+  ): Promise<number> {
+    // Filesystem Access API doesn't support renaming entries at this point
+    // This feature is now under development, it's progress can be tracked here
+    // https://chromestatus.com/feature/5640802622504960
+    // Once it is stabilized, this implementation should use it
+    // EXDEV indicates that user attempted to move files between mount points
+    // most userspace apps will handle it by copying source and then removing it
+    return constants.WASI_EXDEV;
+  }
 }
 
 /**
@@ -656,7 +670,7 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
-    if (refresh) {
+    if (refresh || this.entries === []) {
       this.entries = [];
       var i = 1n;
       for await (const name of this.handle.keys()) {

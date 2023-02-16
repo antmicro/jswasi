@@ -19,6 +19,16 @@ type DescInfo = {
 export class TopLevelFs {
   private mounts: Record<string, Filesystem>;
 
+  abspath(desc: Descriptor, path: string): string {
+    if (desc !== undefined && !path.startsWith("/")) {
+      if (path.length === 0) {
+        return desc.getPath();
+      }
+      return `${desc.getPath()}/${path}`;
+    }
+    return path;
+  }
+
   private async getDescInfo(
     path: string,
     dirflags: LookupFlags = 0,
@@ -149,12 +159,7 @@ export class TopLevelFs {
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0
   ): Promise<{ desc: Descriptor; err: number }> {
-    let __path;
-    if (!path.startsWith("/")) {
-      __path = `${desc.getPath()}/path`;
-    } else {
-      __path = path;
-    }
+    let __path = this.abspath(desc, path);
     return await this.getDescInfo(
       __path,
       dirflags,
@@ -166,12 +171,7 @@ export class TopLevelFs {
   }
 
   async createDir(path: string, desc: Descriptor = undefined): Promise<number> {
-    let __path;
-    if (desc !== undefined && !path.startsWith("/")) {
-      __path = `${desc.getPath()}/${path}`;
-    } else {
-      __path = path;
-    }
+    let __path = this.abspath(desc, path);
     const {
       desc: __desc,
       fs,
@@ -213,12 +213,7 @@ export class TopLevelFs {
     is_dir: boolean,
     desc: Descriptor = undefined
   ): Promise<number> {
-    let __path;
-    if (desc !== undefined && !path.startsWith("/")) {
-      __path = `${desc.getPath()}/${path}`;
-    } else {
-      __path = path;
-    }
+    let __path = this.abspath(desc, path);
     const {
       desc: __desc,
       fs,
@@ -232,15 +227,56 @@ export class TopLevelFs {
     return await fs.unlinkat(__desc, basename(__path), is_dir);
   }
 
-  async move(source: string, target: string): Promise<number> {
+  async move(
+    desc_s: Descriptor,
+    source: string,
+    desc_t: Descriptor,
+    target: string
+  ): Promise<number> {
+    let __source = this.abspath(desc_s, source);
+    let __target = this.abspath(desc_t, target);
     let dinfo1 = await this.getDescInfo(
-      dirname(source),
+      __source,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
+    if (dinfo1.err !== constants.WASI_ESUCCESS) {
+      return dinfo1.err;
+    }
+    let filestat1 = await dinfo1.desc.getFilestat();
+    if (this.mounts[dinfo1.path]) {
+      return constants.WASI_EBUSY;
+    }
+
     let dinfo2 = await this.getDescInfo(
-      dirname(target),
+      __target,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
+    if (dinfo2.err !== constants.WASI_ESUCCESS) {
+      return dinfo2.err;
+    }
+
+    const { filetype, dev } = await dinfo2.desc.getFilestat();
+    if (filestat1.dev !== dev) {
+      return constants.WASI_EXDEV;
+    }
+    if (filetype === constants.WASI_FILETYPE_DIRECTORY) {
+      if (filestat1.filetype !== constants.WASI_FILETYPE_DIRECTORY) {
+        return constants.WASI_ENOTDIR;
+      }
+      const { err, dirents } = await dinfo2.desc.readdir(false);
+      if (err !== constants.WASI_ESUCCESS) {
+        return err;
+      }
+      if (dirents.length !== 0) {
+        return constants.WASI_ENOTEMPTY;
+      }
+      return dinfo2.fs.renameat(dinfo1.desc, "", dinfo2.desc, "");
+    } else {
+      if (filestat1.filetype === constants.WASI_FILETYPE_DIRECTORY) {
+        return constants.WASI_EISDIR;
+      }
+      return dinfo2.fs.renameat(dinfo1.desc, "", dinfo2.desc, "");
+    }
   }
 
   async addMount(path: string, fs: Filesystem): Promise<number> {
@@ -268,13 +304,7 @@ export class TopLevelFs {
     desc: Descriptor,
     path: string
   ): Promise<{ err: number; path: string }> {
-    let __path;
-    if (desc !== undefined && !path.startsWith("/")) {
-      __path = `${desc.getPath()}/${path}`;
-    } else {
-      __path = path;
-    }
-    let __res = await this.openat(desc, __path);
+    let __res = await this.openat(desc, path);
     if (__res.err !== constants.WASI_ESUCCESS) {
       return { err: __res.err, path: undefined };
     }
