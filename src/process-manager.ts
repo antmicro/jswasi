@@ -9,14 +9,9 @@ export class FdTable {
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, Descriptor>, preopen: boolean = true) {
+  constructor(fds: Record<number, Descriptor>) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
-    if (preopen) {
-      Object.values(this.fdt).map((fd) => {
-        fd.isPreopened = true;
-      });
-    }
   }
 
   public clone(): FdTable {

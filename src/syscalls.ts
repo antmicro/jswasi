@@ -277,17 +277,12 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (
-        fds.getFd(fd) === undefined ||
-        (await fds.getFd(fd).stat()).fileType !==
-          constants.WASI_FILETYPE_DIRECTORY ||
-        fds.getFd(fd).isPreopened === false
-      ) {
-        err = constants.WASI_EBADF;
-      } else {
+      if (fd > 2 && fd < 6) {
         preopenType[0] = constants.WASI_PREOPENTYPE_DIR;
-        nameLen[0] = (fds.getFd(fd) as OpenFile).name().length;
+        nameLen[0] = basename(fds.getFd(fd).getPath()).length;
         err = constants.WASI_ESUCCESS;
+      } else {
+        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
