@@ -888,7 +888,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             };
           }
           return {
-            exit_status: constants.EXIT_FAILURE,
+            exit_status: err,
             output: `${constants.EXIT_SUCCESS}`,
           };
         }
