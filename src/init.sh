@@ -32,17 +32,17 @@ fi
 
 if test ! -d /lib/python3.10; then
     echo "downloading python libs..."
-    wget resources/python.zip /lib/python.zip
+    wget resources/python.tar.gz /lib/python.tar.gz
     cd /lib
-    unzip python.zip
-    rm python.zip
+    tar -xvf python.tar.gz
+    rm python.tar.gz
 fi
 
 if test ! -d /usr/lib || test ! -d /usr/local || test ! -d /usr/share; then
     echo "downloading clang sysroot..."
     wget resources/wasi-sysroot.tar.gz /usr/wasi-sysroot.tar.gz
     cd /usr
-    tar -xf wasi-sysroot.tar.gz
+    tar -xvf wasi-sysroot.tar.gz
     rm wasi-sysroot.tar.gz
 fi
 
