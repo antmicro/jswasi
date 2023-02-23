@@ -1,28 +1,28 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { Stat } from "./filesystem/enums.js";
+import {
+  Dirent,
+  Fdflags,
+  Fdstat,
+  Filestat,
+  Filetype,
+  Rights,
+  Timestamp,
+  Whence,
+} from "./filesystem/filesystem.js";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
+import { Descriptor } from "./filesystem/filesystem";
 
 const RED_ANSI = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export interface In {
-  fileType: number;
+  fileType: Filetype;
   isPreopened: boolean;
-  isatty(): boolean;
-  stat(): Promise<Stat>;
-  rightsBase: bigint;
-  rightsInheriting: bigint;
-  fdFlags: number;
-
-  scheduleRead(
-    workerId: number,
-    requestedLen: number,
-    sharedBuffer: SharedArrayBuffer,
-    pread?: bigint
-  ): Promise<void>;
-
-  close(): Promise<void>;
+  rightsBase: Rights;
+  rightsInheriting: Rights;
+  fdFlags: Fdflags;
 }
 
 export interface Out {
@@ -39,7 +39,7 @@ export interface Out {
   close(): Promise<void>;
 }
 
-export class Stdin implements In {
+export class Stdin implements Descriptor, In {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
   rightsBase = constants.WASI_RIGHTS_STDIN;
@@ -48,51 +48,162 @@ export class Stdin implements In {
 
   constructor(private workerTable: ProcessManager) {}
 
-  // eslint-disable-next-line class-methods-use-this
-  isatty() {
-    return true;
+  getFdstat(): Promise<Fdstat> {
+    return Promise.resolve({
+      fs_filetype: this.fileType,
+      fs_flags: this.fdFlags,
+      fs_rights_base: this.rightsBase,
+      fs_rights_inheriting: this.rightsInheriting,
+    } as Fdstat);
   }
 
-  scheduleRead(
-    workerId: number,
-    requestedLen: number,
-    sbuf: SharedArrayBuffer,
-    pread?: bigint
-  ): Promise<void> {
-    const lck = new Int32Array(sbuf, 0, 1);
-    const readLen = new Int32Array(sbuf, 4, 1);
-    const readBuf = new Uint8Array(sbuf, 8, requestedLen);
-    this.workerTable.sendBufferToProcess(
-      workerId,
-      requestedLen,
-      lck,
-      readLen,
-      readBuf
-    );
-
-    return Promise.resolve();
-  }
-
-  // TODO: fill dummy values with something meaningful
-  stat(): Promise<Stat> {
+  getFilestat(): Promise<Filestat> {
+    // TODO: Mostly dummy values
     return Promise.resolve({
       dev: 0n,
       ino: 0n,
-      fileType: this.fileType,
+      filetype: this.fileType,
       nlink: 0n,
       size: 0n,
-      atim: 0n,
       mtim: 0n,
+      atim: 0n,
       ctim: 0n,
-    });
+    } as Filestat);
   }
 
-  close(): Promise<void> {
+  initialize(path: string): Promise<void> {
+    // TODO: For now ignore it
     return Promise.resolve();
   }
 
-  seek(): number {
-    return 0;
+  getPath(): string {
+    // TODO: return /dev/tty?
+    return "";
+  }
+
+  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+    // TODO: set atim and mtim
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatFlags(flags: Fdflags): Promise<number> {
+    this.fdFlags = flags;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatRights(
+    rightsBase: Rights,
+    rightsInheriting: Rights
+  ): Promise<number> {
+    this.rightsBase = rightsBase;
+    this.rightsInheriting = rightsInheriting;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  close(): Promise<number> {
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  read(
+    len: number,
+    sharedBuff?: ArrayBuffer,
+    workerId?: number
+  ): Promise<{ err: number; buffer: string }> {
+    // TODO: handle sharedBuff and processId can be undefined
+    const lck = new Int32Array(sharedBuff, 0, 1);
+    const readLen = new Int32Array(sharedBuff, 4, 1);
+    const readBuf = new Uint8Array(sharedBuff, 8, len);
+
+    // releasing the lock is delegated to process-manager
+    this.workerTable.sendBufferToProcess(workerId, len, lck, readLen, readBuf);
+
+    // It is not real errno code
+    return Promise.resolve({
+      err: constants.WASI_ESUCCESS,
+      buffer: "",
+    });
+  }
+
+  read_str(): Promise<{ err: number; content: string }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      content: "",
+    });
+  }
+
+  pread(
+    len: number,
+    pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+    // If we assume that stdin is same as /dev/tty then we can just consider
+    // writing to stdin as writting to stdout.
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      written: 0n,
+    });
+  }
+
+  pwrite(
+    buffer: DataView,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      written: 0n,
+    });
+  }
+
+  seek(
+    offset: bigint,
+    whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      offset: 0n,
+    });
+  }
+
+  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+    return Promise.resolve({
+      err: constants.WASI_ENOTDIR,
+      dirents: [],
+    });
+  }
+
+  writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      stream: new WritableStream(),
+    });
+  }
+
+  isatty(): boolean {
+    return true;
+  }
+
+  truncate(size: bigint): Promise<number> {
+    // TODO: check error code is ok
+    return Promise.resolve(constants.WASI_EBADF);
   }
 
   availableBytes(workerId: number): number {

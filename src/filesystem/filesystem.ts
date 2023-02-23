@@ -115,7 +115,12 @@ export interface Descriptor {
    * err - error code
    * buffer - ArrayBuffer with read data
    */
-  read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
+  // original: read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
+  read(
+    len: number,
+    sharedBuff?: ArrayBuffer,
+    workerId?: number
+  ): Promise<{ err: number; buffer: string }>;
 
   /*
    * Auxiliary function for internal purposes when we
