@@ -26,17 +26,11 @@ export interface In {
 }
 
 export interface Out {
-  fileType: number;
+  fileType: Filetype;
   isPreopened: boolean;
-  isatty(): boolean;
-  stat(): Promise<Stat>;
-  rightsBase: bigint;
-  rightsInheriting: bigint;
-  fdFlags: number;
-
-  write(content: Uint8Array): Promise<number>;
-
-  close(): Promise<void>;
+  rightsBase: Rights;
+  rightsInheriting: Rights;
+  fdFlags: Fdflags;
 }
 
 export class Stdin implements Descriptor, In {
@@ -101,6 +95,7 @@ export class Stdin implements Descriptor, In {
   }
 
   close(): Promise<number> {
+    // TODO: set closed flag
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -237,91 +232,185 @@ export class Stdin implements Descriptor, In {
   }
 }
 
-export class Stdout implements Out {
+export class Stdout implements Descriptor, Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
   rightsBase = constants.WASI_RIGHTS_STDOUT;
   rightsInheriting = 0n;
   fdFlags = constants.WASI_FDFLAG_APPEND;
 
-  constructor(private workerTable: ProcessManager) {}
+  constructor(protected workerTable: ProcessManager) {}
 
-  // eslint-disable-next-line class-methods-use-this
-  isatty() {
-    return true;
+  getFdstat(): Promise<Fdstat> {
+    return Promise.resolve({
+      fs_filetype: this.fileType,
+      fs_flags: this.fdFlags,
+      fs_rights_base: this.rightsBase,
+      fs_rights_inheriting: this.rightsInheriting,
+    } as Fdstat);
   }
 
-  write(content: Uint8Array): Promise<number> {
-    // TODO: maybe blocking on this would fix wrong output order in CI (fast paced command bashing)
-    this.workerTable.terminalOutputCallback(new TextDecoder().decode(content));
-    return Promise.resolve(constants.WASI_ESUCCESS);
-  }
-
-  // TODO: fill dummy values with something meaningful
-  stat(): Promise<Stat> {
+  getFilestat(): Promise<Filestat> {
+    // TODO: Mostly dummy values
     return Promise.resolve({
       dev: 0n,
       ino: 0n,
-      fileType: this.fileType,
+      filetype: this.fileType,
       nlink: 0n,
       size: 0n,
-      atim: 0n,
       mtim: 0n,
+      atim: 0n,
       ctim: 0n,
-    });
+    } as Filestat);
   }
 
-  close(): Promise<void> {
-    // TODO: handle pollQueue
+  initialize(path: string): Promise<void> {
+    // TODO: For now ignore it
     return Promise.resolve();
   }
 
-  seek(): number {
-    return 0;
+  getPath(): string {
+    // TODO: return /dev/tty?
+    return "";
+  }
+
+  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+    // TODO: set atim and mtim
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatFlags(flags: Fdflags): Promise<number> {
+    this.fdFlags = flags;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatRights(
+    rightsBase: Rights,
+    rightsInheriting: Rights
+  ): Promise<number> {
+    this.rightsBase = rightsBase;
+    this.rightsInheriting = rightsInheriting;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  close(): Promise<number> {
+    // TODO: set closed flag
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  read(
+    len: number,
+    sharedBuff?: ArrayBuffer,
+    workerId?: number
+  ): Promise<{ err: number; buffer: string }> {
+    // If we assume that stdin is same as /dev/tty then we can just consider
+    // writing to stdin as writting to stdout.
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: "",
+    });
+  }
+
+  read_str(): Promise<{ err: number; content: string }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      content: "",
+    });
+  }
+
+  pread(
+    len: number,
+    pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+    this.workerTable.terminalOutputCallback(
+      new TextDecoder().decode(buffer.buffer)
+    );
+
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      written: BigInt(buffer.byteLength),
+    });
+  }
+
+  pwrite(
+    buffer: DataView,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      written: 0n,
+    });
+  }
+
+  seek(
+    offset: bigint,
+    whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      offset: 0n,
+    });
+  }
+
+  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+    return Promise.resolve({
+      err: constants.WASI_ENOTDIR,
+      dirents: [],
+    });
+  }
+
+  writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      stream: new WritableStream(),
+    });
+  }
+
+  isatty(): boolean {
+    return true;
+  }
+
+  truncate(size: bigint): Promise<number> {
+    // TODO: check error code is ok
+    return Promise.resolve(constants.WASI_EBADF);
   }
 }
 
-export class Stderr implements Out {
-  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
-  isPreopened = true;
-  rightsBase = constants.WASI_RIGHTS_STDERR;
-  rightsInheriting = 0n;
-  fdFlags = constants.WASI_FDFLAG_APPEND;
+export class Stderr extends Stdout {
+  override rightsBase = constants.WASI_RIGHTS_STDERR;
 
-  constructor(private workerTable: ProcessManager) {}
-
-  // eslint-disable-next-line class-methods-use-this
-  isatty() {
-    return true;
+  constructor(workerTable: ProcessManager) {
+    super(workerTable);
   }
 
-  write(content: Uint8Array): Promise<number> {
+  override write(buffer: DataView): Promise<{ err: number; written: bigint }> {
     this.workerTable.terminalOutputCallback(
-      `${RED_ANSI}${new TextDecoder().decode(content)}${RESET}`
+      `${RED_ANSI}${new TextDecoder().decode(buffer.buffer)}${RESET}`
     );
-    return Promise.resolve(constants.WASI_ESUCCESS);
-  }
 
-  // TODO: fill dummy values with something meaningful
-  stat(): Promise<Stat> {
     return Promise.resolve({
-      dev: 0n,
-      ino: 0n,
-      fileType: this.fileType,
-      nlink: 0n,
-      size: 0n,
-      atim: 0n,
-      mtim: 0n,
-      ctim: 0n,
+      err: constants.WASI_ENOTSUP,
+      written: BigInt(buffer.byteLength),
     });
-  }
-
-  close(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  seek(): number {
-    return 0;
   }
 }
 
