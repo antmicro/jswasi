@@ -1,6 +1,5 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
-import { Stat } from "./filesystem/enums.js";
 import {
   Dirent,
   Fdflags,
@@ -415,7 +414,7 @@ export class Stderr extends Stdout {
 }
 
 // EventSource implements write end fifo features
-export class EventSource implements In {
+export class EventSource implements Descriptor, In {
   // In unix, crossterm uses pipe as event source
   // Wasi doesn't define filetype pipe/fifo so it's defined as char device
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
@@ -438,49 +437,158 @@ export class EventSource implements In {
     this.workerTable.events.subscribeEvent(this.eventSub, subscribedEvents);
   }
 
-  isatty() {
-    return false;
+  getFdstat(): Promise<Fdstat> {
+    return Promise.resolve({
+      fs_filetype: this.fileType,
+      fs_flags: this.fdFlags,
+      fs_rights_base: this.rightsBase,
+      fs_rights_inheriting: this.rightsInheriting,
+    } as Fdstat);
   }
 
-  scheduleRead(
-    workerId: number,
-    requestedLen: number,
-    sbuf: SharedArrayBuffer,
-    pread?: bigint
-  ): Promise<void> {
-    const lck = new Int32Array(sbuf, 0, 1);
-    const readLen = new Int32Array(sbuf, 4, 1);
-    const readBuf = new Uint8Array(sbuf, 8, requestedLen);
-
-    this.sendBufferToProcess(requestedLen, lck, readLen, readBuf);
-
-    return Promise.resolve();
-  }
-
-  // TODO: fill dummy values with something meaningful
-  stat(): Promise<Stat> {
+  getFilestat(): Promise<Filestat> {
+    // TODO: Mostly dummy values
     return Promise.resolve({
       dev: 0n,
       ino: 0n,
-      fileType: this.fileType,
+      filetype: this.fileType,
       nlink: 0n,
       size: 0n,
-      atim: 0n,
       mtim: 0n,
+      atim: 0n,
       ctim: 0n,
-    });
+    } as Filestat);
   }
 
-  close(): Promise<void> {
+  initialize(path: string): Promise<void> {
+    // TODO: For now ignore it
+    return Promise.resolve();
+  }
+
+  getPath(): string {
+    // TODO: return /dev/{event-source-device} ?
+    return "";
+  }
+
+  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+    // TODO: set atim and mtim
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatFlags(flags: Fdflags): Promise<number> {
+    this.fdFlags = flags;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  setFdstatRights(
+    rightsBase: Rights,
+    rightsInheriting: Rights
+  ): Promise<number> {
+    this.rightsBase = rightsBase;
+    this.rightsInheriting = rightsInheriting;
+    return Promise.resolve(constants.WASI_ESUCCESS);
+  }
+
+  close(): Promise<number> {
     this.workerTable.events.unsubscribeEvent(
       this.eventSub,
       this.subscribedEvents
     );
-    return Promise.resolve();
+    return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  seek(): number {
-    return 0;
+  read(
+    len: number,
+    sharedBuff?: ArrayBuffer,
+    workerId?: number
+  ): Promise<{ err: number; buffer: string }> {
+    // TODO: handle sharedBuff and processId can be undefined
+    const lck = new Int32Array(sharedBuff, 0, 1);
+    const readLen = new Int32Array(sharedBuff, 4, 1);
+    const readBuf = new Uint8Array(sharedBuff, 8, len);
+
+    this.workerTable.sendBufferToProcess(workerId, len, lck, readLen, readBuf);
+
+    return Promise.resolve({
+      err: constants.WASI_ESUCCESS,
+      buffer: "",
+    });
+  }
+
+  read_str(): Promise<{ err: number; content: string }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      content: "",
+    });
+  }
+
+  pread(
+    len: number,
+    pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    // TODO: For now ignore it
+    return Promise.resolve({
+      err: constants.WASI_ENOTSUP,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return Promise.resolve({
+      err: constants.WASI_EBADF,
+      buffer: new ArrayBuffer(0),
+    });
+  }
+
+  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+    return Promise.resolve({
+      err: constants.WASI_EBADF,
+      written: 0n,
+    });
+  }
+
+  pwrite(
+    buffer: DataView,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    return Promise.resolve({
+      err: constants.WASI_EBADF,
+      written: 0n,
+    });
+  }
+
+  seek(
+    offset: bigint,
+    whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    return Promise.resolve({
+      err: constants.WASI_EBADF,
+      offset: 0n,
+    });
+  }
+
+  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+    return Promise.resolve({
+      err: constants.WASI_ENOTDIR,
+      dirents: [],
+    });
+  }
+
+  writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return Promise.resolve({
+      err: constants.WASI_EBADF,
+      stream: new WritableStream(),
+    });
+  }
+
+  isatty(): boolean {
+    return false;
+  }
+
+  truncate(size: bigint): Promise<number> {
+    // TODO: check error code is ok
+    return Promise.resolve(constants.WASI_EBADF);
   }
 
   sendBufferToProcess(
