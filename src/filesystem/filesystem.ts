@@ -120,7 +120,7 @@ export interface Descriptor {
     len: number,
     sharedBuff?: ArrayBuffer,
     workerId?: number
-  ): Promise<{ err: number; buffer: string }>;
+  ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
   /*
    * Auxiliary function for internal purposes when we

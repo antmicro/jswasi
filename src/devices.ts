@@ -71,7 +71,7 @@ export class Stdin implements Descriptor, In {
 
   getPath(): string {
     // TODO: return /dev/tty?
-    return "";
+    return undefined;
   }
 
   setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
@@ -102,7 +102,7 @@ export class Stdin implements Descriptor, In {
     len: number,
     sharedBuff?: ArrayBuffer,
     workerId?: number
-  ): Promise<{ err: number; buffer: string }> {
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // TODO: handle sharedBuff and processId can be undefined
     const lck = new Int32Array(sharedBuff, 0, 1);
     const readLen = new Int32Array(sharedBuff, 4, 1);
@@ -114,7 +114,7 @@ export class Stdin implements Descriptor, In {
     // It is not real errno code
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
-      buffer: "",
+      buffer: undefined,
     });
   }
 
@@ -122,7 +122,7 @@ export class Stdin implements Descriptor, In {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      content: "",
+      content: undefined,
     });
   }
 
@@ -133,7 +133,7 @@ export class Stdin implements Descriptor, In {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
@@ -141,7 +141,7 @@ export class Stdin implements Descriptor, In {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
@@ -180,14 +180,14 @@ export class Stdin implements Descriptor, In {
   readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
-      dirents: [],
+      dirents: undefined,
     });
   }
 
   writableStream(): Promise<{ err: number; stream: WritableStream }> {
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      stream: new WritableStream(),
+      stream: undefined,
     });
   }
 
@@ -270,7 +270,7 @@ export class Stdout implements Descriptor, Out {
 
   getPath(): string {
     // TODO: return /dev/tty?
-    return "";
+    return undefined;
   }
 
   setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
@@ -301,12 +301,12 @@ export class Stdout implements Descriptor, Out {
     len: number,
     sharedBuff?: ArrayBuffer,
     workerId?: number
-  ): Promise<{ err: number; buffer: string }> {
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // If we assume that stdin is same as /dev/tty then we can just consider
     // writing to stdin as writting to stdout.
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: "",
+      buffer: undefined,
     });
   }
 
@@ -314,7 +314,7 @@ export class Stdout implements Descriptor, Out {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      content: "",
+      content: undefined,
     });
   }
 
@@ -325,7 +325,7 @@ export class Stdout implements Descriptor, Out {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
@@ -333,7 +333,7 @@ export class Stdout implements Descriptor, Out {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
@@ -373,14 +373,14 @@ export class Stdout implements Descriptor, Out {
   readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
-      dirents: [],
+      dirents: undefined,
     });
   }
 
   writableStream(): Promise<{ err: number; stream: WritableStream }> {
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      stream: new WritableStream(),
+      stream: undefined,
     });
   }
 
@@ -467,7 +467,7 @@ export class EventSource implements Descriptor, In {
 
   getPath(): string {
     // TODO: return /dev/{event-source-device} ?
-    return "";
+    return undefined;
   }
 
   setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
@@ -501,7 +501,7 @@ export class EventSource implements Descriptor, In {
     len: number,
     sharedBuff?: ArrayBuffer,
     workerId?: number
-  ): Promise<{ err: number; buffer: string }> {
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // TODO: handle sharedBuff and processId can be undefined
     const lck = new Int32Array(sharedBuff, 0, 1);
     const readLen = new Int32Array(sharedBuff, 4, 1);
@@ -511,7 +511,7 @@ export class EventSource implements Descriptor, In {
 
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
-      buffer: "",
+      buffer: undefined,
     });
   }
 
@@ -519,7 +519,7 @@ export class EventSource implements Descriptor, In {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      content: "",
+      content: undefined,
     });
   }
 
@@ -530,14 +530,14 @@ export class EventSource implements Descriptor, In {
     // TODO: For now ignore it
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
   arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
     return Promise.resolve({
       err: constants.WASI_EBADF,
-      buffer: new ArrayBuffer(0),
+      buffer: undefined,
     });
   }
 
@@ -571,14 +571,14 @@ export class EventSource implements Descriptor, In {
   readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
-      dirents: [],
+      dirents: undefined,
     });
   }
 
   writableStream(): Promise<{ err: number; stream: WritableStream }> {
     return Promise.resolve({
       err: constants.WASI_EBADF,
-      stream: new WritableStream(),
+      stream: undefined,
     });
   }
 
