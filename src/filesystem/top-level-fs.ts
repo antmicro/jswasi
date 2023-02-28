@@ -19,6 +19,10 @@ type DescInfo = {
 export class TopLevelFs {
   private mounts: Record<string, Filesystem>;
 
+  constructor() {
+    this.mounts = {};
+  }
+
   abspath(desc: Descriptor, path: string): string {
     if (desc !== undefined && !path.startsWith("/")) {
       if (path.length === 0) {
@@ -57,11 +61,15 @@ export class TopLevelFs {
     let lastSeparator;
     for (
       lastSeparator = rpath.lastIndexOf("/");
-      lastSeparator !== -1 && fs === undefined;
+      lastSeparator > 0 && fs === undefined;
       lastSeparator = rpath.lastIndexOf("/", lastSeparator - 1)
     ) {
       let mountPoint = rpath.slice(0, lastSeparator);
-      fs = this.mounts[mountPoint === "" ? "/" : mountPoint];
+      fs = this.mounts[mountPoint];
+    }
+
+    if (fs === undefined) {
+      fs = this.mounts["/"];
     }
 
     let { err, index, desc } = await fs.open(
@@ -282,6 +290,10 @@ export class TopLevelFs {
   async addMount(path: string, fs: Filesystem): Promise<number> {
     if (this.mounts[path] !== undefined) {
       return constants.WASI_EEXIST;
+    } else if (path === "/") {
+      // special case when we want to mount rootfs
+      this.mounts[path] = fs;
+      return constants.WASI_ESUCCESS;
     }
 
     // TODO: expand symlinks in path and ensure it points to an empty directory

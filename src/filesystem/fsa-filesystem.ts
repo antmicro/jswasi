@@ -697,7 +697,6 @@ export async function createFsaFilesystem(
   let rootHandle;
   try {
     rootHandle = await topLevelHandle.getDirectoryHandle(name);
-    return undefined;
   } catch (e) {
     if (
       e instanceof DOMException &&
