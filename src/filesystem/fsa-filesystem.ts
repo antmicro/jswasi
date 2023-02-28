@@ -10,10 +10,10 @@ import {
   Dirent,
   OpenFlags,
   LookupFlags,
-} from "./filesystem";
-import { basename, dirname } from "../utils";
-import * as constants from "../constants";
-import { delStoredData, getStoredData, setStoredData } from "./metadata";
+} from "./filesystem.js";
+import { basename, dirname } from "../utils.js";
+import * as constants from "../constants.js";
+import { delStoredData, getStoredData, setStoredData } from "./metadata.js";
 
 class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;

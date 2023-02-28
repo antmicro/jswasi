@@ -5,9 +5,9 @@ import {
   LookupFlags,
   Fdflags,
   Rights,
-} from "./filesystem";
-import * as constants from "../constants";
-import { dirname, basename, realpath } from "../utils";
+} from "./filesystem.js";
+import * as constants from "../constants.js";
+import { dirname, basename, realpath } from "../utils.js";
 
 type DescInfo = {
   err: number;

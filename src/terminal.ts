@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { FdTable } from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { createFsaFilesystem } from "./filesystem/fsa-filesystem";
+import { createFsaFilesystem } from "./filesystem/fsa-filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
 import { TopLevelFs } from "./filesystem/top-level-fs.js";
