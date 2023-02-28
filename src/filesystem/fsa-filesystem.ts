@@ -18,7 +18,7 @@ import { delStoredData, getStoredData, setStoredData } from "./metadata.js";
 class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;
 
-  private async getRootHandle(): Promise<FileSystemDirectoryHandle> {
+  private getRootHandle(): FileSystemDirectoryHandle {
     return this.rootHandle;
   }
 
@@ -258,7 +258,8 @@ class FsaFilesystem implements Filesystem {
   async getFilestat(
     path: string
   ): Promise<{ err: number; filestat: Filestat }> {
-    let storedData = await getStoredData(path);
+    let metadataPath = this.getRootHandle().name + path;
+    let storedData = await getStoredData(metadataPath);
     return { err: constants.WASI_ESUCCESS, filestat: storedData };
   }
 
@@ -363,6 +364,8 @@ class FsaFilesystem implements Filesystem {
 abstract class FsaDescriptor implements Descriptor {
   protected fdstat: Fdstat;
   protected path: string;
+  protected metadataPath: string;
+  protected abstract handle: FileSystemHandle;
 
   constructor(
     fs_flags: Fdflags,
@@ -389,7 +392,13 @@ abstract class FsaDescriptor implements Descriptor {
     return getStoredData(this.path);
   }
 
-  abstract initialize(path: string): Promise<void>;
+  async initialize(path: string): Promise<void> {
+    this.path = path;
+    const components = await (
+      await navigator.storage.getDirectory()
+    ).resolve(this.handle);
+    this.metadataPath = components.join("/");
+  }
   abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
   abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
@@ -444,7 +453,7 @@ abstract class FsaDescriptor implements Descriptor {
 class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   private cursor: bigint;
   private writer: FileSystemWritableFileStream;
-  handle: FileSystemFileHandle;
+  override handle: FileSystemFileHandle;
 
   constructor(
     handle: FileSystemFileHandle,
@@ -456,11 +465,11 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     this.handle = handle;
   }
 
-  async initialize(path: string) {
-    this.path = path;
-    const { filetype, size } = await getStoredData(path);
-    this.fdstat.fs_filetype = filetype;
+  override async initialize(path: string) {
+    await super.initialize(path);
     const append = (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) != 0;
+    const { filetype, size } = await getStoredData(this.metadataPath);
+    this.fdstat.fs_filetype = filetype;
     if (append) {
       this.writer = await this.handle.createWritable({
         keepExistingData: true,
@@ -607,7 +616,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
 
 class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   private entries: Dirent[];
-  handle: FileSystemDirectoryHandle;
+  override handle: FileSystemDirectoryHandle;
 
   constructor(
     handle: FileSystemDirectoryHandle,
@@ -618,10 +627,6 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
     this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
-  }
-
-  async initialize(path: string) {
-    this.path = path;
   }
 
   async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
