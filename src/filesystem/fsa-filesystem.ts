@@ -74,9 +74,13 @@ class FsaFilesystem implements Filesystem {
       start,
       __isDir = true;
     let handle =
-      start_handle === undefined ? await this.getRootHandle() : start_handle;
+      start_handle === undefined ? this.getRootHandle() : start_handle;
     try {
-      start = 1;
+      if (path.startsWith("/")) {
+        start = 1;
+      } else {
+        start = 0;
+      }
       for (
         stop = path.indexOf("/", start);
         stop != -1;
@@ -88,10 +92,13 @@ class FsaFilesystem implements Filesystem {
       }
       let __handle;
       __isDir = isDir;
-      if (isDir) {
-        __handle = await handle.getDirectoryHandle(path.slice(start));
+      let component = path.slice(start);
+      if (component === "") {
+        __handle = handle;
+      } else if (isDir) {
+        __handle = await handle.getDirectoryHandle(component);
       } else {
-        __handle = await handle.getFileHandle(path.slice(start));
+        __handle = await handle.getFileHandle(component);
       }
       return {
         handle: __handle,
@@ -273,9 +280,9 @@ class FsaFilesystem implements Filesystem {
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
     let result = await this.getHandle(path, true, undefined);
     let err = result.err,
-      index = result.err,
+      index = result.index,
       desc = undefined;
-    switch (result.err) {
+    switch (err) {
       // The search was succesfull and a directory was found
       case constants.WASI_ESUCCESS: {
         err = result.err;
@@ -299,8 +306,8 @@ class FsaFilesystem implements Filesystem {
             break;
           }
           const __result = await this.getHandle(
-            path.slice(path.lastIndexOf("/") + 1),
-            true,
+            basename(path),
+            false,
             result.handle as FileSystemDirectoryHandle
           );
           if (__result.err === constants.WASI_ESUCCESS) {
@@ -377,6 +384,7 @@ class FsaFilesystem implements Filesystem {
         break;
       }
     }
+
     return { err, index, desc };
   }
   async renameat(
