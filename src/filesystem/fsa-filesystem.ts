@@ -338,6 +338,44 @@ class FsaFilesystem implements Filesystem {
           }
         }
       }
+      case constants.WASI_ENOENT: {
+        // the last path component is the only one to fail
+        // if O_CREAT is set, create the file
+        if (oflags & constants.WASI_O_CREAT && index === -1) {
+          try {
+            const handle = await (
+              result.handle as FileSystemDirectoryHandle
+            ).getFileHandle(basename(path), {
+              create: true,
+            });
+            err = constants.WASI_ESUCCESS;
+            desc = new FsaFileDescriptor(
+              handle,
+              fdflags,
+              fs_rights_base,
+              fs_rights_inheriting
+            );
+            await desc.initMetadataPath();
+            await setStoredData(path, {
+              dev: 0n,
+              ino: 0n,
+              filetype: constants.WASI_FILETYPE_REGULAR_FILE,
+              nlink: 0n,
+              size: 0n,
+              mtim: 0n,
+              atim: 0n,
+              ctim: 0n,
+            });
+          } catch (e) {
+            if (e instanceof DOMException) {
+              err = FsaFilesystem.mapErr(e, false);
+            } else {
+              err = constants.WASI_EINVAL;
+            }
+          }
+        }
+        break;
+      }
     }
     return { err, index, desc };
   }
@@ -372,12 +410,20 @@ abstract class FsaDescriptor implements Descriptor {
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights
   ) {
+    this.metadataPath = "";
     this.fdstat = {
       fs_flags,
       fs_rights_base,
       fs_rights_inheriting,
       fs_filetype: undefined,
     };
+  }
+
+  async initMetadataPath() {
+    const components = await (
+      await navigator.storage.getDirectory()
+    ).resolve(this.handle);
+    this.metadataPath = components.join("/");
   }
 
   getPath(): string {
@@ -394,11 +440,11 @@ abstract class FsaDescriptor implements Descriptor {
 
   async initialize(path: string): Promise<void> {
     this.path = path;
-    const components = await (
-      await navigator.storage.getDirectory()
-    ).resolve(this.handle);
-    this.metadataPath = components.join("/");
+    if (this.metadataPath === "") {
+      await this.initMetadataPath();
+    }
   }
+
   abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
   abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
