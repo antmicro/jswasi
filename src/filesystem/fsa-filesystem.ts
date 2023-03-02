@@ -552,15 +552,11 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       return { err, buffer: undefined };
     }
 
-    const { size } = await getStoredData(this.metadataPath);
-    const end =
-      size < Number(this.cursor) + len
-        ? Number(size)
-        : Number(this.cursor) + len;
-    this.cursor += BigInt(end);
+    const end = Number(this.cursor) + len;
     const buffer = await file
       .slice(Number(this.cursor), Number(end))
       .arrayBuffer();
+    this.cursor += BigInt(buffer.byteLength);
     return {
       err: constants.WASI_ESUCCESS,
       buffer,

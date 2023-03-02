@@ -427,7 +427,9 @@ export default async function syscallCallback(
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const readBuf = new Uint8Array(sharedBuffer, 8, len);
       let ftype, err;
+      const readLen = new Int32Array(sharedBuffer, 4, 1);
       const fdstat = await fds.getFd(fd).getFdstat();
+
       if (fds.getFd(fd) !== undefined) {
         ftype = fdstat.fs_filetype;
       }
@@ -448,7 +450,7 @@ export default async function syscallCallback(
         let char_dev = fds.getFd(fd);
         if (char_dev instanceof Stdin || char_dev instanceof EventSource) {
           // releasing the lock is delegated to read() call
-          char_dev.read(len, sharedBuffer);
+          char_dev.read(len, sharedBuffer, processId);
           break;
         } else {
           err = constants.WASI_EBADF;
@@ -462,6 +464,7 @@ export default async function syscallCallback(
         }
         err = res.err;
         readBuf.set(new Uint8Array(res.buffer));
+        readLen[0] = res.buffer.byteLength;
       }
 
       Atomics.store(lck, 0, err);
