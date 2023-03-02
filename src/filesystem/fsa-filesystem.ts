@@ -455,9 +455,11 @@ abstract class FsaDescriptor implements Descriptor {
     len: number,
     pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract write(buffer: DataView): Promise<{ err: number; written: bigint }>;
+  abstract write(
+    buffer: ArrayBuffer
+  ): Promise<{ err: number; written: bigint }>;
   abstract pwrite(
-    buffer: DataView,
+    buffer: ArrayBuffer,
     pos: bigint
   ): Promise<{ err: number; written: bigint }>;
   abstract seek(
@@ -623,7 +625,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     return { err: constants.WASI_ENOTDIR, dirents: undefined };
   }
 
-  async write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+  async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     await this.writer.write({
       type: "write",
       position: Number(this.cursor),
@@ -637,7 +639,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async pwrite(
-    buffer: DataView,
+    buffer: ArrayBuffer,
     offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     await this.writer.write({
@@ -700,12 +702,12 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     return { err: constants.WASI_EISDIR, buffer: undefined };
   }
 
-  async write(_buffer: DataView): Promise<{ err: number; written: bigint }> {
+  async write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     return { err: constants.WASI_EISDIR, written: -1n };
   }
 
   async pwrite(
-    _buffer: DataView,
+    _buffer: ArrayBuffer,
     _offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     return { err: constants.WASI_EISDIR, written: -1n };

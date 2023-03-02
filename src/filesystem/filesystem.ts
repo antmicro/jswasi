@@ -162,7 +162,7 @@ export interface Descriptor {
    * err - error code
    * written - number of succesfully written bytes
    */
-  write(buffer: DataView): Promise<{ err: number; written: bigint }>;
+  write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }>;
 
   /*
    * Writes data to the underlying file at a given position, ignoring the file cursor
@@ -175,7 +175,7 @@ export interface Descriptor {
    * written - number of succesfully written bytes
    */
   pwrite(
-    buffer: DataView,
+    buffer: ArrayBuffer,
     offset: bigint
   ): Promise<{ err: number; written: bigint }>;
 

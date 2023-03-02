@@ -323,11 +323,7 @@ export default async function syscallCallback(
         err = (
           await fds
             .getFd(constants.WASI_STDERR_FILENO)
-            .write(
-              new DataView(
-                new TextEncoder().encode("hard links are not supported")
-              )
-            )
+            .write(new TextEncoder().encode("hard links are not supported"))
         ).err;
       } else {
         err = constants.WASI_EBADF;
@@ -416,7 +412,7 @@ export default async function syscallCallback(
       ) {
         err = constants.WASI_EACCES;
       } else {
-        err = (await fds.getFd(fd).write(new DataView(content))).err;
+        err = (await fds.getFd(fd).write(content.buffer)).err;
       }
 
       Atomics.store(lck, 0, err);

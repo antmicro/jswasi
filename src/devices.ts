@@ -64,7 +64,7 @@ export class Stdin implements Descriptor, In {
     } as Filestat);
   }
 
-  initialize(path: string): Promise<void> {
+  initialize(_path: string): Promise<void> {
     // TODO: For now ignore it
     return Promise.resolve();
   }
@@ -74,7 +74,7 @@ export class Stdin implements Descriptor, In {
     return undefined;
   }
 
-  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+  setFilestatTimes(_atim: Timestamp, _mtim: Timestamp): Promise<number> {
     // TODO: set atim and mtim
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
@@ -127,8 +127,8 @@ export class Stdin implements Descriptor, In {
   }
 
   pread(
-    len: number,
-    pos: bigint
+    _len: number,
+    _pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -145,7 +145,7 @@ export class Stdin implements Descriptor, In {
     });
   }
 
-  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+  write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     // If we assume that stdin is same as /dev/tty then we can just consider
     // writing to stdin as writting to stdout.
     // TODO: For now ignore it
@@ -156,8 +156,8 @@ export class Stdin implements Descriptor, In {
   }
 
   pwrite(
-    buffer: DataView,
-    offset: bigint
+    _buffer: ArrayBuffer,
+    _offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -167,8 +167,8 @@ export class Stdin implements Descriptor, In {
   }
 
   seek(
-    offset: bigint,
-    whence: Whence
+    _offset: bigint,
+    _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -177,7 +177,7 @@ export class Stdin implements Descriptor, In {
     });
   }
 
-  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+  readdir(_refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
       dirents: undefined,
@@ -298,9 +298,9 @@ export class Stdout implements Descriptor, Out {
   }
 
   read(
-    len: number,
-    sharedBuff?: ArrayBuffer,
-    workerId?: number
+    _len: number,
+    _sharedBuff?: ArrayBuffer,
+    _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // If we assume that stdin is same as /dev/tty then we can just consider
     // writing to stdin as writting to stdout.
@@ -319,8 +319,8 @@ export class Stdout implements Descriptor, Out {
   }
 
   pread(
-    len: number,
-    pos: bigint
+    _len: number,
+    _pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -337,10 +337,8 @@ export class Stdout implements Descriptor, Out {
     });
   }
 
-  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
-    this.workerTable.terminalOutputCallback(
-      new TextDecoder().decode(buffer.buffer)
-    );
+  write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
+    this.workerTable.terminalOutputCallback(new TextDecoder().decode(buffer));
 
     return Promise.resolve({
       err: constants.WASI_ENOTSUP,
@@ -349,8 +347,8 @@ export class Stdout implements Descriptor, Out {
   }
 
   pwrite(
-    buffer: DataView,
-    offset: bigint
+    _buffer: ArrayBuffer,
+    _offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -360,8 +358,8 @@ export class Stdout implements Descriptor, Out {
   }
 
   seek(
-    offset: bigint,
-    whence: Whence
+    _offset: bigint,
+    _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -370,7 +368,7 @@ export class Stdout implements Descriptor, Out {
     });
   }
 
-  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+  readdir(_refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
       dirents: undefined,
@@ -388,7 +386,7 @@ export class Stdout implements Descriptor, Out {
     return true;
   }
 
-  truncate(size: bigint): Promise<number> {
+  truncate(_size: bigint): Promise<number> {
     // TODO: check error code is ok
     return Promise.resolve(constants.WASI_EBADF);
   }
@@ -401,9 +399,11 @@ export class Stderr extends Stdout {
     super(workerTable);
   }
 
-  override write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+  override write(
+    buffer: ArrayBuffer
+  ): Promise<{ err: number; written: bigint }> {
     this.workerTable.terminalOutputCallback(
-      `${RED_ANSI}${new TextDecoder().decode(buffer.buffer)}${RESET}`
+      `${RED_ANSI}${new TextDecoder().decode(buffer)}${RESET}`
     );
 
     return Promise.resolve({
@@ -460,7 +460,7 @@ export class EventSource implements Descriptor, In {
     } as Filestat);
   }
 
-  initialize(path: string): Promise<void> {
+  initialize(_path: string): Promise<void> {
     // TODO: For now ignore it
     return Promise.resolve();
   }
@@ -470,7 +470,7 @@ export class EventSource implements Descriptor, In {
     return undefined;
   }
 
-  setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+  setFilestatTimes(_atim: Timestamp, _mtim: Timestamp): Promise<number> {
     // TODO: set atim and mtim
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
@@ -524,8 +524,8 @@ export class EventSource implements Descriptor, In {
   }
 
   pread(
-    len: number,
-    pos: bigint
+    _len: number,
+    _pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     // TODO: For now ignore it
     return Promise.resolve({
@@ -541,7 +541,7 @@ export class EventSource implements Descriptor, In {
     });
   }
 
-  write(buffer: DataView): Promise<{ err: number; written: bigint }> {
+  write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     return Promise.resolve({
       err: constants.WASI_EBADF,
       written: 0n,
@@ -549,8 +549,8 @@ export class EventSource implements Descriptor, In {
   }
 
   pwrite(
-    buffer: DataView,
-    offset: bigint
+    _buffer: ArrayBuffer,
+    _offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     return Promise.resolve({
       err: constants.WASI_EBADF,
@@ -559,8 +559,8 @@ export class EventSource implements Descriptor, In {
   }
 
   seek(
-    offset: bigint,
-    whence: Whence
+    _offset: bigint,
+    _whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
     return Promise.resolve({
       err: constants.WASI_EBADF,
@@ -568,7 +568,7 @@ export class EventSource implements Descriptor, In {
     });
   }
 
-  readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+  readdir(_refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
     return Promise.resolve({
       err: constants.WASI_ENOTDIR,
       dirents: undefined,
@@ -586,7 +586,7 @@ export class EventSource implements Descriptor, In {
     return false;
   }
 
-  truncate(size: bigint): Promise<number> {
+  truncate(_size: bigint): Promise<number> {
     // TODO: check error code is ok
     return Promise.resolve(constants.WASI_EBADF);
   }
@@ -649,7 +649,7 @@ export class EventSource implements Descriptor, In {
     }
   }
 
-  availableBytes(workerId: number): number {
+  availableBytes(_workerId: number): number {
     return this.occuredEvents != constants.WASI_NO_EVENT
       ? constants.WASI_EVENT_MASK_SIZE
       : 0;

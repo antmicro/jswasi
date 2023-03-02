@@ -108,11 +108,7 @@ async function initFs(fs: TopLevelFs) {
     );
     if ((await washrc.desc.getFilestat()).size === 0n) {
       await washrc.desc.write(
-        new DataView(
-          new TextEncoder().encode(
-            "export RUST_BACKTRACE=full\nexport DEBUG=1"
-          ).buffer
-        )
+        new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
       );
       await washrc.desc.close();
     }
