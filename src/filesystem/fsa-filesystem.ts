@@ -363,7 +363,7 @@ class FsaFilesystem implements Filesystem {
               fs_rights_inheriting
             );
             await desc.initMetadataPath();
-            await setStoredData(path, {
+            await setStoredData(desc.metadataPath, {
               dev: 0n,
               ino: 0n,
               filetype: constants.WASI_FILETYPE_REGULAR_FILE,
@@ -410,7 +410,7 @@ class FsaFilesystem implements Filesystem {
 abstract class FsaDescriptor implements Descriptor {
   protected fdstat: Fdstat;
   protected path: string;
-  protected metadataPath: string;
+  metadataPath: string;
   protected abstract handle: FileSystemHandle;
 
   constructor(
@@ -432,6 +432,7 @@ abstract class FsaDescriptor implements Descriptor {
       await navigator.storage.getDirectory()
     ).resolve(this.handle);
     this.metadataPath = components.join("/");
+    console.log(`metadatapath: ${this.metadataPath}`);
   }
 
   getPath(): string {
@@ -771,7 +772,7 @@ export async function createFsaFilesystem(
 
   const rootStoredData = await getStoredData("/");
   if (!rootStoredData) {
-    await setStoredData("/", {
+    await setStoredData(name, {
       dev: 0n,
       ino: 0n,
       filetype: constants.WASI_FILETYPE_DIRECTORY,
