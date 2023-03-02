@@ -51,7 +51,6 @@ import {
 import ProcessManager from "./process-manager.js";
 import { In, Stdin, Out, EventSource } from "./devices.js";
 import { FileOrDir, LookupFlags, OpenFlags } from "./filesystem/enums.js";
-import { terminal } from "./terminal.js";
 import { msToNs } from "./utils.js";
 import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
 
@@ -111,6 +110,8 @@ export default async function syscallCallback(
     case "hterm": {
       const { sharedBuffer, method, attrib, val } = data as HtermConfArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
+
+      const terminal = processManager.terminal;
 
       let err = constants.WASI_ESUCCESS;
       if (method === "get") {
