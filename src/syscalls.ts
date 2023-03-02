@@ -560,31 +560,32 @@ export default async function syscallCallback(
             err = constants.WASI_ENOENT;
           } else {
             __desc = res.desc;
-            if (__desc === undefined) {
-              err = constants.WASI_ENOENT;
-            }
           }
         } else {
           __desc = desc;
         }
-        let fdstat = await __desc.getFdstat();
-        if (
-          (fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
-          0n
-        ) {
-          if (err === constants.WASI_ESUCCESS) {
-            let filestat = await __desc.getFilestat();
-            buf.setBigUint64(0, filestat.dev, true);
-            buf.setBigUint64(8, filestat.ino, true);
-            buf.setUint8(16, filestat.filetype);
-            buf.setBigUint64(24, filestat.nlink, true);
-            buf.setBigUint64(32, filestat.size, true);
-            buf.setBigUint64(40, filestat.atim, true);
-            buf.setBigUint64(48, filestat.mtim, true);
-            buf.setBigUint64(56, filestat.ctim, true);
-          }
+        if (__desc === undefined) {
+          err = constants.WASI_ENOENT;
         } else {
-          err = constants.WASI_EACCES;
+          let fdstat = await __desc.getFdstat();
+          if (
+            (fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
+            0n
+          ) {
+            if (err === constants.WASI_ESUCCESS) {
+              let filestat = await __desc.getFilestat();
+              buf.setBigUint64(0, filestat.dev, true);
+              buf.setBigUint64(8, filestat.ino, true);
+              buf.setUint8(16, filestat.filetype);
+              buf.setBigUint64(24, filestat.nlink, true);
+              buf.setBigUint64(32, filestat.size, true);
+              buf.setBigUint64(40, filestat.atim, true);
+              buf.setBigUint64(48, filestat.mtim, true);
+              buf.setBigUint64(56, filestat.ctim, true);
+            }
+          } else {
+            err = constants.WASI_EACCES;
+          }
         }
       }
 
