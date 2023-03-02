@@ -341,7 +341,7 @@ export class Stdout implements Descriptor, Out {
     this.workerTable.terminalOutputCallback(new TextDecoder().decode(buffer));
 
     return Promise.resolve({
-      err: constants.WASI_ENOTSUP,
+      err: constants.WASI_ESUCCESS,
       written: BigInt(buffer.byteLength),
     });
   }
@@ -407,7 +407,7 @@ export class Stderr extends Stdout {
     );
 
     return Promise.resolve({
-      err: constants.WASI_ENOTSUP,
+      err: constants.WASI_ESUCCESS,
       written: BigInt(buffer.byteLength),
     });
   }
