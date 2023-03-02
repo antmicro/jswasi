@@ -15,6 +15,13 @@ import { basename, dirname } from "../utils.js";
 import * as constants from "../constants.js";
 import { delStoredData, getStoredData, setStoredData } from "./metadata.js";
 
+async function initMetadataPath(handle: FileSystemHandle): Promise<string> {
+  const components = await (
+    await navigator.storage.getDirectory()
+  ).resolve(handle);
+  return components.join("/");
+}
+
 class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;
 
@@ -168,45 +175,43 @@ class FsaFilesystem implements Filesystem {
         return constants.WASI_EINVAL;
       }
     }
-    let __last_separator = path.lastIndexOf("/");
     let { err, handle } = await this.getHandle(
-      path.slice(0, __last_separator),
+      dirname(path),
       true,
       start_handle
     );
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
-    let name = path.slice(__last_separator + 1);
-    try {
-      this.getHandle(name, true, handle as FileSystemDirectoryHandle);
-    } catch (e) {
-      let __err = constants.WASI_EINVAL;
-      if (e instanceof DOMException) {
-        __err = FsaFilesystem.mapErr(e, true);
-      }
-      switch (__err) {
-        case constants.WASI_ENOENT:
-          (handle as FileSystemDirectoryHandle).getDirectoryHandle(path, {
-            create: true,
-          });
-          // TODO: fill dummy data with something meaningful
-          await setStoredData(path, {
-            dev: 0n,
-            ino: 0n,
-            filetype: constants.WASI_FILETYPE_DIRECTORY,
-            nlink: 0n,
-            size: 4096n,
-            mtim: 0n,
-            atim: 0n,
-            ctim: 0n,
-          });
-          return constants.WASI_ESUCCESS;
-        default:
-          return __err;
-      }
+    let name = basename(path);
+    ({ err } = await this.getHandle(
+      name,
+      true,
+      handle as FileSystemDirectoryHandle
+    ));
+    if (err === constants.WASI_ESUCCESS) {
+      return constants.WASI_EEXIST;
     }
-    return constants.WASI_EEXIST;
+    if (err !== constants.WASI_ENOENT) {
+      return err;
+    }
+    handle = await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
+      path,
+      {
+        create: true,
+      }
+    );
+    await setStoredData(await initMetadataPath(handle), {
+      dev: 0n,
+      ino: 0n,
+      filetype: constants.WASI_FILETYPE_DIRECTORY,
+      nlink: 0n,
+      size: 4096n,
+      mtim: 0n,
+      atim: 0n,
+      ctim: 0n,
+    });
+    return constants.WASI_ESUCCESS;
   }
 
   async symlinkat(
@@ -217,49 +222,46 @@ class FsaFilesystem implements Filesystem {
     if (!(desc instanceof FsaDirectoryDescriptor)) {
       return constants.WASI_EINVAL;
     }
-    let __last_separator = linkpath.lastIndexOf("/");
     let { err, handle } = await this.getHandle(
-      linkpath.slice(0, __last_separator),
+      dirname(linkpath),
       true,
       (desc as FsaDirectoryDescriptor).handle
     );
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
-    let name = linkpath.slice(__last_separator + 1);
-    try {
-      this.getHandle(name, false, handle as FileSystemDirectoryHandle);
-    } catch (e) {
-      let __err = constants.WASI_EINVAL;
-      if (e instanceof DOMException) {
-        __err = FsaFilesystem.mapErr(e, true);
-      }
-      switch (__err) {
-        case constants.WASI_ENOENT:
-          let symlink = await (
-            handle as FileSystemDirectoryHandle
-          ).getFileHandle(linkpath, {
-            create: true,
-          });
-          await (await symlink.createWritable()).write(target);
-
-          // TODO: fill dummy data with something meaningful
-          await setStoredData(linkpath, {
-            dev: 0n,
-            ino: 0n,
-            filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
-            nlink: 0n,
-            size: BigInt(target.length),
-            mtim: 0n,
-            atim: 0n,
-            ctim: 0n,
-          });
-          return constants.WASI_ESUCCESS;
-        default:
-          return __err;
-      }
+    let name = basename(linkpath);
+    ({ err } = await this.getHandle(
+      name,
+      false,
+      handle as FileSystemDirectoryHandle
+    ));
+    if (err === constants.WASI_ESUCCESS) {
+      return constants.WASI_EEXIST;
     }
-    return constants.WASI_EEXIST;
+    if (err !== constants.WASI_ENOENT) {
+      return err;
+    }
+    let symlink = await (handle as FileSystemDirectoryHandle).getFileHandle(
+      linkpath,
+      {
+        create: true,
+      }
+    );
+    await (await symlink.createWritable()).write(target);
+
+    // TODO: fill dummy data with something meaningful
+    await setStoredData(await initMetadataPath(symlink), {
+      dev: 0n,
+      ino: 0n,
+      filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
+      nlink: 0n,
+      size: BigInt(target.length),
+      mtim: 0n,
+      atim: 0n,
+      ctim: 0n,
+    });
+    return constants.WASI_ESUCCESS;
   }
 
   async getFilestat(
@@ -362,7 +364,7 @@ class FsaFilesystem implements Filesystem {
               fs_rights_base,
               fs_rights_inheriting
             );
-            await desc.initMetadataPath();
+            desc.metadataPath = await initMetadataPath(handle);
             await setStoredData(desc.metadataPath, {
               dev: 0n,
               ino: 0n,
@@ -427,14 +429,6 @@ abstract class FsaDescriptor implements Descriptor {
     };
   }
 
-  async initMetadataPath() {
-    const components = await (
-      await navigator.storage.getDirectory()
-    ).resolve(this.handle);
-    this.metadataPath = components.join("/");
-    console.log(`metadatapath: ${this.metadataPath}`);
-  }
-
   getPath(): string {
     return this.path;
   }
@@ -444,13 +438,13 @@ abstract class FsaDescriptor implements Descriptor {
   }
 
   async getFilestat(): Promise<Filestat> {
-    return getStoredData(this.path);
+    return getStoredData(this.metadataPath);
   }
 
   async initialize(path: string): Promise<void> {
     this.path = path;
     if (this.metadataPath === "") {
-      await this.initMetadataPath();
+      this.metadataPath = await initMetadataPath(this.handle);
     }
   }
 
@@ -477,7 +471,7 @@ abstract class FsaDescriptor implements Descriptor {
   abstract truncate(size: bigint): Promise<number>;
 
   async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
-    let filestat = await getStoredData(this.path);
+    let filestat = await getStoredData(this.metadataPath);
 
     if (atim) filestat.atim = atim;
     if (mtim) filestat.mtim = mtim;
@@ -556,15 +550,18 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       return { err, buffer: undefined };
     }
 
-    const { size } = await getStoredData(this.path);
+    const { size } = await getStoredData(this.metadataPath);
     const end =
       size < Number(this.cursor) + len
         ? Number(size)
         : Number(this.cursor) + len;
     this.cursor += BigInt(end);
+    const buffer = await file
+      .slice(Number(this.cursor), Number(end))
+      .arrayBuffer();
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: await file.slice(Number(this.cursor), Number(end)).arrayBuffer(),
+      buffer,
     };
   }
 
@@ -584,7 +581,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     if (err !== constants.WASI_ESUCCESS) {
       return { err, buffer: undefined };
     }
-    const { size } = await getStoredData(this.path);
+    const { size } = await getStoredData(this.metadataPath);
     const end = size < pos + BigInt(len) ? size : this.cursor + BigInt(len);
     return {
       err: constants.WASI_ESUCCESS,
@@ -596,7 +593,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
-    const { size } = await getStoredData(this.path);
+    const { size } = await getStoredData(this.metadataPath);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
         if (this.cursor + offset > size || offset < this.cursor) {
@@ -632,7 +629,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       position: Number(this.cursor),
       data: buffer,
     });
-    let filestat = await getStoredData(this.path);
+    let filestat = await getStoredData(this.metadataPath);
     let written = BigInt(buffer.byteLength);
     this.cursor += written;
     filestat.size += written;
@@ -648,7 +645,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       position: Number(offset),
       data: buffer,
     });
-    let filestat = await getStoredData(this.path);
+    let filestat = await getStoredData(this.metadataPath);
     let written = BigInt(buffer.byteLength);
     filestat.size += written;
     return { err: constants.WASI_ESUCCESS, written };
@@ -737,7 +734,7 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
         if (name.endsWith(".crswap")) {
           continue;
         }
-        let filestat = await getStoredData(`${this.path}/${name}`);
+        let filestat = await getStoredData(`${this.metadataPath}/${name}`);
         this.entries.push({
           d_next: i++,
           d_ino: filestat.ino,
@@ -770,7 +767,7 @@ export async function createFsaFilesystem(
     }
   }
 
-  const rootStoredData = await getStoredData("/");
+  const rootStoredData = await getStoredData(name);
   if (!rootStoredData) {
     await setStoredData(name, {
       dev: 0n,

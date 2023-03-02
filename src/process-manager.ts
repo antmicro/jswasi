@@ -202,7 +202,6 @@ export default class ProcessManager {
     try {
       if (!this.compiledModules[command]) {
         const { err, desc } = await this.filesystem.open(command);
-        await desc.initialize(command);
         if (err !== constants.WASI_ESUCCESS) {
           console.error(`No such binary: ${command}`);
           return err;

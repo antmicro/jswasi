@@ -55,6 +55,7 @@ export class TopLevelFs {
         fs_rights_inheriting,
         fdflags
       );
+      await desc.initialize(path);
       return { err, desc, fs, path: rpath };
     }
 
@@ -121,6 +122,7 @@ export class TopLevelFs {
             );
           }
           if (err === constants.WASI_ESUCCESS) {
+            await desc.initialize(path);
             return { desc, err, fs, path: rpath };
           } else {
             return { desc: undefined, err, fs, path: rpath };
@@ -131,6 +133,11 @@ export class TopLevelFs {
         }
       }
     } else {
+      if (err !== constants.WASI_ESUCCESS) {
+        desc = undefined;
+      } else {
+        await desc.initialize(path);
+      }
       return {
         err,
         desc: err === constants.WASI_ESUCCESS ? desc : undefined,
@@ -189,7 +196,7 @@ export class TopLevelFs {
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
-    return await fs.mkdirat(desc, path.slice(path.lastIndexOf("/") + 1));
+    return await fs.mkdirat(__desc, basename(path));
   }
 
   // linkpath and linkdesc are in reverse order so that linkdesc can have default value
@@ -209,11 +216,7 @@ export class TopLevelFs {
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
-    return fs.symlinkat(
-      target,
-      desc,
-      linkpath.slice(linkpath.lastIndexOf("/") + 1)
-    );
+    return fs.symlinkat(target, desc, basename(linkpath));
   }
 
   async removeEntry(

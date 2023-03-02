@@ -101,16 +101,20 @@ async function initFs(fs: TopLevelFs) {
 
   const washRcPromise = (async () => {
     // TODO: this should be moved to shell
-    const washrc = (
-      await fs.open(`${DEFAULT_WORK_DIR}/.washrc`, 0, constants.WASI_O_CREAT)
-    ).desc;
-    if ((await washrc.getFilestat()).size === 0n) {
-      await washrc.write(
+    const washrc = await fs.open(
+      `${DEFAULT_WORK_DIR}/.washrc`,
+      0,
+      constants.WASI_O_CREAT
+    );
+    if ((await washrc.desc.getFilestat()).size === 0n) {
+      await washrc.desc.write(
         new DataView(
-          new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
+          new TextEncoder().encode(
+            "export RUST_BACKTRACE=full\nexport DEBUG=1"
+          ).buffer
         )
       );
-      await washrc.close();
+      await washrc.desc.close();
     }
   })();
 
@@ -125,35 +129,35 @@ async function initFs(fs: TopLevelFs) {
   ]);
 
   const symlinkCreationPromise = Promise.all([
-    fs.addSymlink("/usr/bin/ls", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/mkdir", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/rmdir", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/touch", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/rm", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/mv", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/cp", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/echo", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/date", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/printf", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/env", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/cat", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/realpath", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/ln", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/printenv", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/md5sum", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/test", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/[", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/wc", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/true", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/false", "/usr/bin/coreutils"),
-    fs.addSymlink("/usr/bin/sleep", "/usr/bin/coreutils"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/ls"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/mkdir"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/rmdir"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/touch"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/rm"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/mv"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/cp"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/echo"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/date"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/printf"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/env"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/cat"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/realpath"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/ln"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/printenv"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/md5sum"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/test"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/["),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/wc"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/true"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/false"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/sleep"),
 
-    fs.addSymlink("/usr/local/bin/unzip", "/usr/local/bin/wasibox"),
-    fs.addSymlink("/usr/local/bin/hexdump", "/usr/local/bin/wasibox"),
-    fs.addSymlink("/usr/local/bin/imgcat", "/usr/local/bin/wasibox"),
-    fs.addSymlink("/usr/local/bin/purge", "/usr/local/bin/wasibox"),
-    fs.addSymlink("/usr/local/bin/tree", "/usr/local/bin/wasibox"),
-    fs.addSymlink("/usr/local/bin/tar", "/usr/local/bin/wasibox"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/unzip"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/hexdump"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/imgcat"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/purge"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tree"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tar"),
   ]);
 
   await Promise.all([

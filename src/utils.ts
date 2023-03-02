@@ -21,9 +21,9 @@ export function parsePath(path: string): { parts: string[]; name: string } {
 }
 
 export function realpath(path: string): string {
-  if (!path.startsWith("/")) {
+  /* if (!path.startsWith("/")) {
     throw Error("path must be absolute");
-  }
+  }*/
   const result = [];
   let resultPath = "";
   let tmpPath = path;
