@@ -534,6 +534,15 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     }
   }
 
+  async getWriter(): Promise<FileSystemWritableFileStream> {
+    if (!this.writer) {
+      this.writer = await this.handle.createWritable({
+        keepExistingData: true,
+      });
+    }
+    return this.writer;
+  }
+
   /**
    * Auxiliary function for getting a file from a handle and handling errors
    */
@@ -622,7 +631,9 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
-    await this.writer.write({
+    await (
+      await this.getWriter()
+    ).write({
       type: "write",
       position: Number(this.cursor),
       data: buffer,
@@ -631,6 +642,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     let written = BigInt(buffer.byteLength);
     this.cursor += written;
     filestat.size += written;
+    await setStoredData(this.metadataPath, filestat);
     return { err: constants.WASI_ESUCCESS, written };
   }
 
@@ -638,7 +650,9 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     buffer: ArrayBuffer,
     offset: bigint
   ): Promise<{ err: number; written: bigint }> {
-    await this.writer.write({
+    await (
+      await this.getWriter()
+    ).write({
       type: "write",
       position: Number(offset),
       data: buffer,
@@ -650,17 +664,28 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async writableStream(): Promise<{ err: number; stream: WritableStream }> {
-    return { err: constants.WASI_ESUCCESS, stream: this.writer };
+    return { err: constants.WASI_ESUCCESS, stream: await this.getWriter() };
   }
 
   async truncate(size: bigint): Promise<number> {
-    await this.writer.write({ type: "truncate", size: Number(size) });
+    await (
+      await this.getWriter()
+    ).write({ type: "truncate", size: Number(size) });
     return constants.WASI_ESUCCESS;
   }
 
   async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
     let buffer = await (await this.handle.getFile()).arrayBuffer();
     return { err: constants.WASI_ESUCCESS, buffer };
+  }
+
+  override async close(): Promise<number> {
+    let __promise = this.writer?.close();
+    this.writer = null;
+    // prevent other processes from closing the same descriptor
+    // TODO: is mutex necessary here?
+    await __promise;
+    return constants.WASI_ESUCCESS;
   }
 }
 

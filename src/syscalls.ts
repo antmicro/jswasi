@@ -82,7 +82,7 @@ export default async function syscallCallback(
           "background:default; color: default;"
         );
       }
-      processManager.terminateProcess(processId, data);
+      await processManager.terminateProcess(processId, data);
       if (processId === 0) {
         window.alive = false;
         window.exitCode = data;

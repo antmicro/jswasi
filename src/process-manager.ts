@@ -56,10 +56,11 @@ export class FdTable {
   public getFd(fd: number): Descriptor {
     return this.fdt[fd];
   }
-  public tearDown() {
+
+  tearDown() {
     Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {
-        await fileDescriptor?.close();
+        fileDescriptor?.close();
       })
     );
   }
@@ -223,7 +224,7 @@ export default class ProcessManager {
       } else {
         errno = constants.WASI_ENOEXEC;
       }
-      this.terminateProcess(id, errno);
+      await this.terminateProcess(id, errno);
       throw Error("invalid binary");
     }
 
@@ -239,11 +240,11 @@ export default class ProcessManager {
     return id;
   }
 
-  terminateProcess(id: number, exitNo: number = 0) {
+  async terminateProcess(id: number, exitNo: number = 0) {
     const process = this.processInfos[id];
 
     // close/flush all opened files to make sure written contents are saved to persistent storage
-    process.fds.tearDown();
+    this.processInfos[id].fds.tearDown();
 
     process.worker.terminate();
     // notify parent that they can resume operation
