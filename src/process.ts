@@ -58,7 +58,7 @@ type WASICallbacks = {
     fd: number,
     buf: ptr,
     bufLen: number,
-    cookie: number,
+    cookie: bigint,
     bufUsedPtr: ptr
   ) => number;
   fd_filestat_get: (fd: number, buf: ptr) => number;
@@ -593,7 +593,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     fd: number,
     buf: ptr,
     bufLen: number,
-    cookie: number,
+    cookie: bigint,
     bufUsedPtr: ptr
   ) {
     workerConsoleLog(

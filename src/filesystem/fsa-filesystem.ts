@@ -677,6 +677,7 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
     this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
+    this.entries = [];
   }
 
   async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -725,7 +726,7 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
-    if (refresh || this.entries === []) {
+    if (refresh || this.entries.length === 0) {
       this.entries = [];
       var i = 1n;
       for await (const name of this.handle.keys()) {

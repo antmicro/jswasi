@@ -635,7 +635,7 @@ export default async function syscallCallback(
         (await fds.getFd(fd).getFilestat()).filetype ===
           constants.WASI_FILETYPE_DIRECTORY
       ) {
-        let entries = (await fds.getFd(fd).readdir(cookie === 0)).dirents;
+        let entries = (await fds.getFd(fd).readdir(cookie === 0n)).dirents;
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name);

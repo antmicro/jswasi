@@ -28,7 +28,7 @@ export type FdReadArgs = {
 export type FdReaddirArgs = {
   sharedBuffer: SharedArrayBuffer;
   fd: number;
-  cookie: number;
+  cookie: bigint;
   bufLen: number;
 };
 
