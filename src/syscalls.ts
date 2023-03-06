@@ -225,14 +225,12 @@ export default async function syscallCallback(
         redirects.map(async ({ mode, path, fd }) => {
           const { desc } = await processManager.filesystem.open(
             path,
-            constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+            constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+            constants.WASI_O_CREAT |
+              (mode === "write" ? constants.WASI_O_TRUNC : 0),
+            mode === "append" ? constants.WASI_FDFLAG_APPEND : 0
           );
           fds.replaceFd(fd, desc);
-          if (mode === "write") {
-            desc.truncate(0n);
-          } else if (mode === "append") {
-            desc.seek(0n, constants.WASI_WHENCE_END);
-          }
         })
       );
       try {
@@ -498,9 +496,9 @@ export default async function syscallCallback(
             path,
             lookupFlags,
             openFlags,
+            fdFlags,
             fsRightsBase,
-            fsRightsInheriting,
-            fdFlags
+            fsRightsInheriting
           ));
           if (err === constants.WASI_ESUCCESS) {
             openedFd[0] = fds.addFile(desc);

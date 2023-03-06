@@ -123,6 +123,9 @@ export class TopLevelFs {
           }
           if (err === constants.WASI_ESUCCESS) {
             await desc.initialize(path);
+            if (oflags & constants.WASI_O_TRUNC) {
+              desc.truncate(0n);
+            }
             return { desc, err, fs, path: rpath };
           } else {
             return { desc: undefined, err, fs, path: rpath };
@@ -151,9 +154,9 @@ export class TopLevelFs {
     path: string,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
+    fdflags: Fdflags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
-    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
-    fdflags: Fdflags = 0
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL
   ): Promise<{ desc: Descriptor; err: number }> {
     return await this.getDescInfo(
       path,
@@ -170,9 +173,9 @@ export class TopLevelFs {
     path: string,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
+    fdflags: Fdflags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
-    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
-    fdflags: Fdflags = 0
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL
   ): Promise<{ desc: Descriptor; err: number }> {
     let __path = this.abspath(desc, path);
     return await this.getDescInfo(

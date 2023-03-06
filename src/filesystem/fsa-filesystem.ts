@@ -518,18 +518,11 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
 
   override async initialize(path: string) {
     await super.initialize(path);
-    const append = (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) != 0;
     const { filetype, size } = await getStoredData(this.metadataPath);
     this.fdstat.fs_filetype = filetype;
-    if (append) {
-      this.writer = await this.handle.createWritable({
-        keepExistingData: true,
-      });
+    if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) {
       this.cursor = size;
     } else {
-      this.writer = await this.handle.createWritable({
-        keepExistingData: false,
-      });
       this.cursor = 0n;
     }
   }
@@ -680,11 +673,13 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   override async close(): Promise<number> {
-    let __promise = this.writer?.close();
-    this.writer = null;
-    // prevent other processes from closing the same descriptor
-    // TODO: is mutex necessary here?
-    await __promise;
+    if (this.writer) {
+      let __promise = this.writer?.close();
+      this.writer = null;
+      // prevent other processes from closing the same descriptor
+      // TODO: is mutex necessary here?
+      await __promise;
+    }
     return constants.WASI_ESUCCESS;
   }
 }
