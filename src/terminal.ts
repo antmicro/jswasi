@@ -358,7 +358,6 @@ export async function init(
     processManager
   );*/
 
-  const pwdDir = (await tfs.open(DEFAULT_WORK_DIR)).desc;
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -369,9 +368,6 @@ export async function init(
       1: new Stdout(processManager),
       2: new Stderr(processManager),
       3: (await tfs.open("/")).desc,
-      4: pwdDir,
-      // TODO: why must fds[5] be present for ls to work, and what should it be
-      5: (await tfs.open("/")).desc,
     }),
     ["/usr/bin/wash", "/usr/bin/init"],
     {

@@ -139,10 +139,7 @@ export default async function syscallCallback(
     case "chdir": {
       const { dir, sharedBuffer } = data as ChdirArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
-      const { fds } = processManager.processInfos[processId];
 
-      const { desc } = await processManager.filesystem.open(dir);
-      fds.replaceFd(4, desc);
       processManager.processInfos[processId].cwd = dir;
 
       Atomics.store(lock, 0, 0);
@@ -277,7 +274,7 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fd > 2 && fd < 6) {
+      if (fd > 2 && fd < 4) {
         preopenType[0] = constants.WASI_PREOPENTYPE_DIR;
         nameLen[0] = basename(fds.getFd(fd).getPath()).length;
         err = constants.WASI_ESUCCESS;
