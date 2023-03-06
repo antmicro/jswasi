@@ -248,7 +248,9 @@ class FsaFilesystem implements Filesystem {
         create: true,
       }
     );
-    await (await symlink.createWritable()).write(target);
+    let symlink_writable = await symlink.createWritable();
+    await symlink_writable.write(target);
+    await symlink_writable.close();
 
     // TODO: fill dummy data with something meaningful
     await setStoredData(await initMetadataPath(symlink), {

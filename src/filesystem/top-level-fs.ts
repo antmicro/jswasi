@@ -81,6 +81,13 @@ export class TopLevelFs {
       fs_rights_inheriting,
       fdflags
     );
+    if (desc) {
+      if (index > -1) {
+        await desc.initialize(rpath.slice(0, lastSeparator));
+      } else {
+        await desc.initialize(rpath);
+      }
+    }
 
     if (dirflags & constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) {
       switch (err) {
@@ -122,7 +129,6 @@ export class TopLevelFs {
             );
           }
           if (err === constants.WASI_ESUCCESS) {
-            await desc.initialize(path);
             if (oflags & constants.WASI_O_TRUNC) {
               desc.truncate(0n);
             }
@@ -136,11 +142,6 @@ export class TopLevelFs {
         }
       }
     } else {
-      if (err !== constants.WASI_ESUCCESS) {
-        desc = undefined;
-      } else {
-        await desc.initialize(path);
-      }
       return {
         err,
         desc: err === constants.WASI_ESUCCESS ? desc : undefined,

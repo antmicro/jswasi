@@ -202,7 +202,10 @@ export default class ProcessManager {
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     try {
       if (!this.compiledModules[command]) {
-        const { err, desc } = await this.filesystem.open(command);
+        const { err, desc } = await this.filesystem.open(
+          command,
+          constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+        );
         if (err !== constants.WASI_ESUCCESS) {
           console.error(`No such binary: ${command}`);
           return err;
