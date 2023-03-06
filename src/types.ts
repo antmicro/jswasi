@@ -1,5 +1,5 @@
-import { LookupFlags } from "./filesystem/enums";
 import { EventSource } from "./devices.js";
+import { LookupFlags } from "./filesystem/filesystem.js";
 
 export type BufferRequest = {
   requestedLen: number;

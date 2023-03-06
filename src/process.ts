@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { LookupFlags } from "./filesystem/enums";
+import { LookupFlags } from "./filesystem/filesystem.js";
 import {
   ChdirArgs,
   GetCwdArgs,
