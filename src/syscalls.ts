@@ -31,6 +31,7 @@ import {
   EventSourceArgs,
   CleanInodesArgs,
 } from "./types.js";
+import { free, mount, ps, reset, wget } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { Stdin, EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
@@ -233,34 +234,68 @@ export default async function syscallCallback(
           fds.replaceFd(fd, desc);
         })
       );
-      try {
-        const id = await processManager.spawnProcess(
-          processId,
-          background ? null : parentLck,
-          syscallCallback,
-          path,
-          fds,
-          args,
-          env,
-          background,
-          processManager.processInfos[processId].cwd
-        );
-        const newProcessName = path.split("/").slice(-1)[0];
-        if (env["DEBUG"] === "1") {
-          console.log(
-            `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
-            "background:black; color: white;",
-            "background:black; color:yellow;",
-            "background: black; color:white;",
-            "background:default; color: default;"
-          );
+      switch (path) {
+        case "/usr/bin/ps": {
+          const result = await ps(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
         }
-      } catch (_) {
-        console.log("Failed spawning process");
-      }
-      if (background) {
-        Atomics.store(parentLck, 0, 0);
-        Atomics.notify(parentLck, 0);
+        case "/usr/bin/mount": {
+          const result = await mount(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        case "/usr/bin/free": {
+          const result = await free(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        case "/usr/bin/wget": {
+          const result = await wget(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        case "/usr/bin/reset": {
+          const result = await reset(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        default: {
+          try {
+            const id = await processManager.spawnProcess(
+              processId,
+              background ? null : parentLck,
+              syscallCallback,
+              path,
+              fds,
+              args,
+              env,
+              background,
+              processManager.processInfos[processId].cwd
+            );
+            const newProcessName = path.split("/").slice(-1)[0];
+            if (env["DEBUG"] === "1") {
+              console.log(
+                `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
+                "background:black; color: white;",
+                "background:black; color:yellow;",
+                "background: black; color:white;",
+                "background:default; color: default;"
+              );
+            }
+          } catch (_) {
+            console.log("Failed spawning process");
+          }
+          if (background) {
+            Atomics.store(parentLck, 0, 0);
+            Atomics.notify(parentLck, 0);
+          }
+        }
       }
       break;
     }

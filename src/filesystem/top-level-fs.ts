@@ -330,4 +330,8 @@ export class TopLevelFs {
     const { err, content } = await __res.desc.read_str();
     return { err, path: content };
   }
+
+  getMounts(): string[] {
+    return Object.keys(this.mounts);
+  }
 }
