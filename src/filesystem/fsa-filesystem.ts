@@ -506,6 +506,7 @@ abstract class FsaDescriptor implements Descriptor {
 class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   private cursor: bigint;
   private writer: FileSystemWritableFileStream;
+  private file: File;
   override handle: FileSystemFileHandle;
 
   constructor(
@@ -516,11 +517,13 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   ) {
     super(fs_flags, fs_rights_inheriting, fs_rights_base);
     this.handle = handle;
+    this.file = undefined;
   }
 
   override async initialize(path: string) {
     await super.initialize(path);
-    const { filetype, size } = await getStoredData(this.metadataPath);
+    const { filetype } = await getStoredData(this.metadataPath);
+    const size = BigInt((await this.__getFile()).file?.size);
     this.fdstat.fs_filetype = filetype;
     if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) {
       this.cursor = size;
@@ -542,12 +545,16 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
    * Auxiliary function for getting a file from a handle and handling errors
    */
   private async __getFile(): Promise<{ err: number; file: File }> {
-    try {
-      const file = await this.handle.getFile();
-      return { err: constants.WASI_ESUCCESS, file };
-    } catch (_) {
-      return { err: constants.WASI_EACCES, file: undefined };
+    if (!this.file) {
+      try {
+        const file = await this.handle.getFile();
+        this.file = file;
+        return { err: constants.WASI_ESUCCESS, file };
+      } catch (_) {
+        return { err: constants.WASI_EACCES, file: undefined };
+      }
     }
+    return { err: constants.WASI_ESUCCESS, file: this.file };
   }
 
   async read(len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -583,7 +590,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     if (err !== constants.WASI_ESUCCESS) {
       return { err, buffer: undefined };
     }
-    const { size } = await getStoredData(this.metadataPath);
+    const size = BigInt((await this.__getFile()).file?.size);
     const end = size < pos + BigInt(len) ? size : this.cursor + BigInt(len);
     return {
       err: constants.WASI_ESUCCESS,
@@ -595,7 +602,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
-    const { size } = await getStoredData(this.metadataPath);
+    const size = BigInt((await this.__getFile()).file?.size);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
         if (this.cursor + offset > size || offset < this.cursor) {
@@ -633,11 +640,8 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       position: Number(this.cursor),
       data: buffer,
     });
-    let filestat = await getStoredData(this.metadataPath);
     let written = BigInt(buffer.byteLength);
     this.cursor += written;
-    filestat.size += written;
-    await setStoredData(this.metadataPath, filestat);
     return { err: constants.WASI_ESUCCESS, written };
   }
 
@@ -652,9 +656,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       position: Number(offset),
       data: buffer,
     });
-    let filestat = await getStoredData(this.metadataPath);
     let written = BigInt(buffer.byteLength);
-    filestat.size += written;
     return { err: constants.WASI_ESUCCESS, written };
   }
 
@@ -683,6 +685,12 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       await __promise;
     }
     return constants.WASI_ESUCCESS;
+  }
+
+  override async getFilestat() {
+    let meta = await getStoredData(this.metadataPath);
+    meta.size = BigInt((await this.__getFile()).file?.size);
+    return meta;
   }
 }
 
