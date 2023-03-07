@@ -191,6 +191,9 @@ export class TopLevelFs {
 
   async createDir(path: string, desc: Descriptor = undefined): Promise<number> {
     let __path = this.abspath(desc, path);
+    if (__path.endsWith("/")) {
+      __path = __path.slice(0, -1);
+    }
     const {
       desc: __desc,
       fs,
@@ -200,7 +203,7 @@ export class TopLevelFs {
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
-    return await fs.mkdirat(__desc, basename(path));
+    return await fs.mkdirat(__desc, basename(__path));
   }
 
   // linkpath and linkdesc are in reverse order so that linkdesc can have default value
