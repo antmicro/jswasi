@@ -605,7 +605,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     const size = BigInt((await this.__getFile()).file?.size);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
-        if (this.cursor + offset > size || offset < this.cursor) {
+        if (this.cursor + offset < 0) {
           return { offset: this.cursor, err: constants.WASI_EINVAL };
         }
         this.cursor += offset;
@@ -620,7 +620,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
         if (offset > 0 || size < -offset) {
           return { offset: this.cursor, err: constants.WASI_EINVAL };
         }
-        this.cursor = size - offset;
+        this.cursor = size + offset;
         break;
       default:
         return { offset: this.cursor, err: constants.WASI_EINVAL };
