@@ -272,7 +272,7 @@ export default class ProcessManager {
     ) {
       console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
     } else {
-      this.terminateProcess(id);
+      this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     }
   }
 

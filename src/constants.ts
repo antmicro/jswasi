@@ -31,6 +31,7 @@ IN THE SOFTWARE.
 export const EXIT_SUCCESS = 0;
 export const EXIT_FAILURE = 1;
 export const EXIT_CMD_NOT_FOUND = 127;
+export const EXIT_INTERRUPTED = 130;
 
 export const WASI_ESUCCESS = 0;
 export const WASI_E2BIG = 1;
@@ -241,7 +242,7 @@ export const WASI_POLL_BUF_STATUS_VALID = 0;
 export const WASI_POLL_BUF_STATUS_READY = 1;
 export const WASI_POLL_BUF_STATUS_ERR = 2;
 
-// Hterm events
+// Events
 export const WASI_NO_EVENT = BigInt(0x0000000000000000);
 export const WASI_EVENT_MASK_SIZE = 4;
 export const WASI_EVENTS_NUM = 1;
