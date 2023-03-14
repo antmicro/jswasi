@@ -599,8 +599,12 @@ export default async function syscallCallback(
         } else {
           let fdstat = await __desc.getFdstat();
           if (
-            (fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) !==
-            0n
+            (path &&
+              fdstat.fs_rights_base &
+                constants.WASI_RIGHT_PATH_FILESTAT_GET) !== 0n ||
+            (!path &&
+              fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET) !==
+              0n
           ) {
             if (err === constants.WASI_ESUCCESS) {
               let filestat = await __desc.getFilestat();
