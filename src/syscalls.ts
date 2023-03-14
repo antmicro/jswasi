@@ -527,7 +527,7 @@ export default async function syscallCallback(
         ) {
           let desc;
           ({ err, desc } = await processManager.filesystem.openat(
-            fds.getFd(fd),
+            fds.getFd(dirFd),
             path,
             lookupFlags,
             openFlags,
