@@ -397,7 +397,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       workerConsoleLog(`fd_write written ${written} bytes.`);
       view.setUint32(nWritten, written, true);
     } else {
-      workerConsoleLog("fd_write ERROR!.");
+      workerConsoleLog(`fd_write returned ${err}.`);
     }
     return err;
   }
@@ -418,7 +418,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return constants.WASI_ESUCCESS;
   }
 
-  function clock_res_get(clock_id: number) {
+  function clock_res_get(_clock_id: number) {
     return placeholder();
   }
 
@@ -1361,7 +1361,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
     Atomics.wait(lck, 0, -1);
 
-    return Atomics.load(lck, 0);
+    let err = Atomics.load(lck, 0);
+    workerConsoleLog(`path_symlink returned ${err}`);
+    return err;
   }
 
   function path_link(

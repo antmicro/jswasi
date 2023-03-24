@@ -426,23 +426,23 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       let err;
       let ftype;
-      const fdstat = await fds.getFd(fd).getFdstat();
       if (fds.getFd(fd) !== undefined) {
+        const fdstat = await fds.getFd(fd).getFdstat();
         ftype = fdstat.fs_filetype;
-      }
-      if (fds.getFd(fd) === undefined) {
-        err = constants.WASI_EBADF;
-      } else if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
-        err = constants.WASI_EISDIR;
-      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
-        err = constants.WASI_EINVAL;
-      } else if (
-        (fdstat.fs_rights_base & constants.WASI_RIGHT_FD_WRITE) ===
-        0n
-      ) {
-        err = constants.WASI_EACCES;
+        if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
+          err = constants.WASI_EISDIR;
+        } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+          err = constants.WASI_EINVAL;
+        } else if (
+          (fdstat.fs_rights_base & constants.WASI_RIGHT_FD_WRITE) ===
+          0n
+        ) {
+          err = constants.WASI_EACCES;
+        } else {
+          err = (await fds.getFd(fd).write(content.buffer)).err;
+        }
       } else {
-        err = (await fds.getFd(fd).write(content.buffer)).err;
+        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
@@ -456,45 +456,45 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const readBuf = new Uint8Array(sharedBuffer, 8, len);
-      let ftype, err;
+      let err;
       const readLen = new Int32Array(sharedBuffer, 4, 1);
-      const fdstat = await fds.getFd(fd).getFdstat();
 
-      if (fds.getFd(fd) !== undefined) {
-        ftype = fdstat.fs_filetype;
-      }
+      let fdstat;
       if (fds.getFd(fd) === undefined) {
-        Atomics.store(lck, 0, constants.WASI_EBADF);
-        Atomics.notify(lck, 0);
-      } else if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) == 0n) {
-        Atomics.store(lck, 0, constants.WASI_EACCES);
-        Atomics.notify(lck, 0);
-      } else if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
-        Atomics.store(lck, 0, constants.WASI_EISDIR);
-        Atomics.notify(lck, 0);
-      } else if (ftype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
-        Atomics.store(lck, 0, constants.WASI_EINVAL);
-        Atomics.notify(lck, 0);
-      } else if (ftype === constants.WASI_FILETYPE_CHARACTER_DEVICE) {
-        // TODO: handle fd_pread(...)
-        let char_dev = fds.getFd(fd);
-        if (char_dev instanceof Stdin || char_dev instanceof EventSource) {
-          // releasing the lock is delegated to read() call
-          char_dev.read(len, sharedBuffer, processId);
-          break;
-        } else {
-          err = constants.WASI_EBADF;
-        }
+        err = constants.WASI_EBADF;
       } else {
-        let res;
-        if (offset) {
-          res = await fds.getFd(fd).pread(len, offset);
+        fdstat = await fds.getFd(fd).getFdstat();
+        if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) == 0n) {
+          err = constants.WASI_EACCES;
+        } else if (fdstat.fs_filetype === constants.WASI_FILETYPE_DIRECTORY) {
+          err = constants.WASI_EISDIR;
+        } else if (
+          fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
+        ) {
+          err = constants.WASI_EINVAL;
+        } else if (
+          fdstat.fs_filetype === constants.WASI_FILETYPE_CHARACTER_DEVICE
+        ) {
+          // TODO: handle fd_pread(...)
+          let char_dev = fds.getFd(fd);
+          if (char_dev instanceof Stdin || char_dev instanceof EventSource) {
+            // releasing the lock is delegated to read() call
+            char_dev.read(len, sharedBuffer, processId);
+            break;
+          } else {
+            err = constants.WASI_EBADF;
+          }
         } else {
-          res = await fds.getFd(fd).read(len);
+          let res;
+          if (offset) {
+            res = await fds.getFd(fd).pread(len, offset);
+          } else {
+            res = await fds.getFd(fd).read(len);
+          }
+          err = res.err;
+          readBuf.set(new Uint8Array(res.buffer));
+          readLen[0] = res.buffer.byteLength;
         }
-        err = res.err;
-        readBuf.set(new Uint8Array(res.buffer));
-        readLen[0] = res.buffer.byteLength;
       }
 
       Atomics.store(lck, 0, err);
@@ -832,6 +832,7 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
+    case "path_filestat_set_times":
     case "fd_filestat_set_times": {
       const { sharedBuffer, st_atim, st_mtim, fst_flags, fd, path } =
         data as FilestatSetTimesArgs;

@@ -131,26 +131,20 @@ export class TopLevelFs {
               fdflags
             );
           }
-          if (err === constants.WASI_ESUCCESS) {
-            if (oflags & constants.WASI_O_TRUNC) {
-              desc.truncate(0n);
-            }
-            return { desc, err, fs, path: rpath };
-          } else {
-            return { desc: undefined, err, fs, path: rpath };
-          }
+          break;
         }
         default: {
           return { desc: undefined, err, fs, path: undefined };
         }
       }
+    }
+    if (err === constants.WASI_ESUCCESS) {
+      if (oflags & constants.WASI_O_TRUNC) {
+        await desc.truncate(0n);
+      }
+      return { desc, err, fs, path: rpath };
     } else {
-      return {
-        err,
-        desc: err === constants.WASI_ESUCCESS ? desc : undefined,
-        fs,
-        path: rpath,
-      };
+      return { desc: undefined, err, fs, path: rpath };
     }
   }
 

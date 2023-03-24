@@ -86,6 +86,9 @@ export async function md5sum(
 }
 
 export function basename(path: string): string {
+  if (path == "/") {
+    return "/";
+  }
   return path.slice(path.lastIndexOf("/") + 1);
 }
 

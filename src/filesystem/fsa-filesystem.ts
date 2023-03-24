@@ -22,6 +22,33 @@ async function initMetadataPath(handle: FileSystemHandle): Promise<string> {
   return components.join("/");
 }
 
+/**
+ * Returns wasi error code corresponding to a given DOMException
+ *
+ * @param e - DOMException instance
+ * @param isDir - some error variants differ depending on whether a directory or a file was requested
+ *
+ * @returns wasi error code
+ */
+function mapErr(e: DOMException, isDir: boolean): number {
+  switch (e.name) {
+    case "NotAllowedError":
+      return constants.WASI_EACCES;
+    case "TypeMismatchError":
+      if (isDir) {
+        return constants.WASI_ENOTDIR;
+      } else {
+        return constants.WASI_EISDIR;
+      }
+    case "NotFoundError":
+      return constants.WASI_ENOENT;
+    case "InvalidModificationError":
+      return constants.WASI_ENOTEMPTY;
+    default:
+      return constants.WASI_EINVAL;
+  }
+}
+
 class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;
 
@@ -31,33 +58,6 @@ class FsaFilesystem implements Filesystem {
 
   constructor(rootHandle: FileSystemDirectoryHandle) {
     this.rootHandle = rootHandle;
-  }
-
-  /**
-   * Returns wasi error code corresponding to a given DOMException
-   *
-   * @param e - DOMException instance
-   * @param isDir - some error variants differ depending on whether a directory or a file was requested
-   *
-   * @returns wasi error code
-   */
-  private static mapErr(e: DOMException, isDir: boolean): number {
-    switch (e.name) {
-      case "NotAllowedError":
-        return constants.WASI_EACCES;
-      case "TypeMismatchError":
-        if (isDir) {
-          return constants.WASI_ENOTDIR;
-        } else {
-          return constants.WASI_EISDIR;
-        }
-      case "NotFoundError":
-        return constants.WASI_ENOENT;
-      case "InvalidModificationError":
-        return constants.WASI_ENOTEMPTY;
-      default:
-        return constants.WASI_EINVAL;
-    }
   }
 
   /**
@@ -115,7 +115,7 @@ class FsaFilesystem implements Filesystem {
     } catch (e) {
       let err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
-        err = FsaFilesystem.mapErr(e, __isDir);
+        err = mapErr(e, __isDir);
       }
       return { index: stop, err, handle };
     }
@@ -160,7 +160,7 @@ class FsaFilesystem implements Filesystem {
     } catch (e) {
       let __err = constants.WASI_EINVAL;
       if (e instanceof DOMException) {
-        __err = FsaFilesystem.mapErr(e, true);
+        __err = mapErr(e, true);
       }
       return __err;
     }
@@ -219,13 +219,18 @@ class FsaFilesystem implements Filesystem {
     desc: Descriptor,
     linkpath: string
   ): Promise<number> {
-    if (!(desc instanceof FsaDirectoryDescriptor)) {
-      return constants.WASI_EINVAL;
+    let start_handle;
+    if (desc !== undefined) {
+      if (desc instanceof FsaDirectoryDescriptor) {
+        start_handle = desc.handle;
+      } else {
+        return constants.WASI_EINVAL;
+      }
     }
     let { err, handle } = await this.getHandle(
       dirname(linkpath),
       true,
-      (desc as FsaDirectoryDescriptor).handle
+      start_handle
     );
     if (err !== constants.WASI_ESUCCESS) {
       return err;
@@ -379,7 +384,7 @@ class FsaFilesystem implements Filesystem {
             });
           } catch (e) {
             if (e instanceof DOMException) {
-              err = FsaFilesystem.mapErr(e, false);
+              err = mapErr(e, false);
             } else {
               err = constants.WASI_EINVAL;
             }
@@ -515,7 +520,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights
   ) {
-    super(fs_flags, fs_rights_inheriting, fs_rights_base);
+    super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.handle = handle;
     this.file = undefined;
   }
@@ -665,9 +670,18 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   async truncate(size: bigint): Promise<number> {
-    await (
-      await this.getWriter()
-    ).write({ type: "truncate", size: Number(size) });
+    try {
+      await (
+        await this.getWriter()
+      ).write({ type: "truncate", size: Number(size) });
+    } catch (e) {
+      if (e instanceof DOMException) {
+        return mapErr(e, false);
+      }
+      return constants.WASI_EINVAL;
+    }
+    await this.flush();
+    this.cursor = 0n;
     return constants.WASI_ESUCCESS;
   }
 
@@ -676,7 +690,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     return { err: constants.WASI_ESUCCESS, buffer };
   }
 
-  override async close(): Promise<number> {
+  async flush(): Promise<void> {
     if (this.writer) {
       let __promise = this.writer?.close();
       this.writer = null;
@@ -684,6 +698,9 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       // TODO: is mutex necessary here?
       await __promise;
     }
+  }
+  override async close(): Promise<number> {
+    await this.flush();
     return constants.WASI_ESUCCESS;
   }
 
