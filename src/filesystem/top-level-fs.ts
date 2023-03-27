@@ -42,26 +42,9 @@ export class TopLevelFs {
     fdflags: Fdflags = 0
   ): Promise<DescInfo> {
     let rpath = realpath(path);
-    let fs = this.mounts[rpath];
-    if (fs !== undefined) {
-      // we assume that mount paths are always realpaths
-      // a root of a filesystem cannot be anything other than a directory
-      // so we don't have to try to expand any symlink here
-      const { err, desc } = await fs.open(
-        "/",
-        dirflags,
-        oflags,
-        fs_rights_base,
-        fs_rights_inheriting,
-        fdflags
-      );
-      await desc.initialize(path);
-      return { err, desc, fs, path: rpath };
-    }
-
-    let lastSeparator;
+    let lastSeparator, fs;
     for (
-      lastSeparator = rpath.lastIndexOf("/");
+      lastSeparator = rpath.length;
       lastSeparator > 0 && fs === undefined;
       lastSeparator = rpath.lastIndexOf("/", lastSeparator - 1)
     ) {

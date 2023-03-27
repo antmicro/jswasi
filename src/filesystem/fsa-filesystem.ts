@@ -294,7 +294,15 @@ class FsaFilesystem implements Filesystem {
     switch (err) {
       // The search was succesfull and a directory was found
       case constants.WASI_ESUCCESS: {
-        err = result.err;
+        if (oflags & constants.WASI_O_CREAT) {
+          if (oflags & constants.WASI_O_EXCL) {
+            err = constants.WASI_EEXIST;
+          } else {
+            err = constants.WASI_EISDIR;
+          }
+        } else {
+          err = result.err;
+        }
         index = result.index;
         desc = new FsaDirectoryDescriptor(
           result.handle as FileSystemDirectoryHandle,
@@ -320,7 +328,14 @@ class FsaFilesystem implements Filesystem {
             result.handle as FileSystemDirectoryHandle
           );
           if (__result.err === constants.WASI_ESUCCESS) {
-            if (!(oflags & constants.WASI_O_DIRECTORY)) {
+            if (
+              oflags & constants.WASI_O_CREAT &&
+              oflags & constants.WASI_O_EXCL
+            ) {
+              // The requested file already exists, while CREAT and EXCL are requested
+              // TODO: this check should rather be a part of top level fs
+              err = constants.WASI_EEXIST;
+            } else if (!(oflags & constants.WASI_O_DIRECTORY)) {
               // Indicate that the demanded path might be a symlink
               // It is up to the top level fs to find out if the file is a symlink
               // If user demanded a directory and a regular file was found, the search continues
