@@ -155,7 +155,7 @@ class FsaFilesystem implements Filesystem {
       (handle as FileSystemDirectoryHandle).removeEntry(name, {
         recursive: false,
       });
-      await delStoredData(path);
+      await delStoredData(`${await initMetadataPath(handle)}/${path}`);
       return constants.WASI_ESUCCESS;
     } catch (e) {
       let __err = constants.WASI_EINVAL;
