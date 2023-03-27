@@ -841,50 +841,50 @@ export default async function syscallCallback(
     }
     case "path_filestat_set_times":
     case "fd_filestat_set_times": {
-      const { sharedBuffer, st_atim, st_mtim, fst_flags, fd, path } =
+      const { sharedBuffer, st_atim, flags, st_mtim, fst_flags, fd, path } =
         data as FilestatSetTimesArgs;
 
-      let err = constants.WASI_ESUCCESS;
+      let err = constants.WASI_EBADF;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
       let desc = fds.getFd(fd);
-      if (path !== undefined) {
-        const res = await processManager.filesystem.openat(desc, path);
+      if (desc && path !== undefined) {
+        const res = await processManager.filesystem.openat(desc, path, flags);
         desc = res.desc;
         err = res.err;
       }
-      let fdstat = await desc.getFdstat();
 
-      if (!desc) {
-        err = constants.WASI_EBADF;
-      } else if (
-        !(fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES)
-      ) {
-        err = constants.WASI_EACCES;
-      } else {
+      if (desc) {
+        let fdstat = await desc.getFdstat();
         if (
-          !(
-            ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
-              (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) ||
-            ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
-              (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0)
-          )
+          !(fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES)
         ) {
-          let __mtim, __atim;
-          if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
-            __atim = st_atim;
-          } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
-            __atim = msToNs(performance.now());
-          }
-          if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
-            __mtim = st_mtim;
-          } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
-            __mtim = msToNs(performance.now());
-          }
-          await desc.setFilestatTimes(__mtim, __atim);
+          err = constants.WASI_EACCES;
         } else {
-          err = constants.WASI_EINVAL;
+          if (
+            !(
+              ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0 &&
+                (fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) ||
+              ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0 &&
+                (fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0)
+            )
+          ) {
+            let __mtim, __atim;
+            if ((fst_flags & constants.WASI_FSTFLAGS_ATIM) !== 0) {
+              __atim = st_atim;
+            } else if ((fst_flags & constants.WASI_FSTFLAGS_ATIM_NOW) !== 0) {
+              __atim = msToNs(performance.now());
+            }
+            if ((fst_flags & constants.WASI_FSTFLAGS_MTIM) !== 0) {
+              __mtim = st_mtim;
+            } else if ((fst_flags & constants.WASI_FSTFLAGS_MTIM_NOW) !== 0) {
+              __mtim = msToNs(performance.now());
+            }
+            err = await desc.setFilestatTimes(__atim, __mtim);
+          } else {
+            err = constants.WASI_EINVAL;
+          }
         }
       }
       Atomics.store(lck, 0, err);

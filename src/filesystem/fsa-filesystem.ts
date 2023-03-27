@@ -497,8 +497,12 @@ abstract class FsaDescriptor implements Descriptor {
   async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
     let filestat = await getStoredData(this.metadataPath);
 
-    if (atim) filestat.atim = atim;
-    if (mtim) filestat.mtim = mtim;
+    if (atim !== undefined) filestat.atim = atim;
+    if (mtim !== undefined) filestat.mtim = mtim;
+
+    if (atim !== undefined || mtim !== undefined) {
+      await setStoredData(this.metadataPath, filestat);
+    }
 
     return constants.WASI_ESUCCESS;
   }
