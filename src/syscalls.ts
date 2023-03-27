@@ -634,8 +634,10 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      const fdstat = await fds.getFd(fd).getFdstat();
-      if (fds.getFd(fd) !== undefined) {
+      if (fds.getFd(fd) === undefined) {
+        err = constants.WASI_EBADF;
+      } else {
+        const fdstat = await fds.getFd(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_SEEK) !== 0n) {
           if (fdstat.fs_filetype !== constants.WASI_FILETYPE_DIRECTORY) {
             const result = await fds.getFd(fd).seek(offset, whence);
@@ -647,8 +649,6 @@ export default async function syscallCallback(
         } else {
           err = constants.WASI_EACCES;
         }
-      } else {
-        err = constants.WASI_EBADF;
       }
 
       Atomics.store(lck, 0, err);
