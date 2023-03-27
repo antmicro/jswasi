@@ -456,7 +456,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     lck[0] = -1;
     const statBuf = new DataView(sharedBuffer, 4);
 
-    sendToKernel(["filestat_get", { sharedBuffer, fd } as FilestatGetArgs]);
+    sendToKernel(["fd_filestat_get", { sharedBuffer, fd } as FilestatGetArgs]);
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
@@ -714,7 +714,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const statBuf = new DataView(sharedBuffer, 4);
 
     sendToKernel([
-      "filestat_get",
+      "path_filestat_get",
       { sharedBuffer, fd, path, lookupFlags } as FilestatGetArgs,
     ]);
     Atomics.wait(lck, 0, -1);

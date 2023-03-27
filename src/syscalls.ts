@@ -567,7 +567,8 @@ export default async function syscallCallback(
       Atomics.notify(lck, 0);
       break;
     }
-    case "filestat_get": {
+    case "path_filestat_get":
+    case "fd_filestat_get": {
       const { sharedBuffer, fd, path, lookupFlags } = data as FilestatGetArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const buf = new DataView(sharedBuffer, 4);
@@ -579,47 +580,53 @@ export default async function syscallCallback(
       if (desc === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        let __desc;
-        if (path !== undefined) {
-          let res = await processManager.filesystem.openat(
-            desc,
-            path,
-            lookupFlags
-          );
-          if (res.err !== constants.WASI_ESUCCESS) {
-            err = constants.WASI_ENOENT;
-          } else {
-            __desc = res.desc;
-          }
-        } else {
-          __desc = desc;
-        }
-        if (__desc === undefined) {
-          err = constants.WASI_ENOENT;
-        } else {
-          let fdstat = await __desc.getFdstat();
-          if (
-            (path &&
-              fdstat.fs_rights_base &
-                constants.WASI_RIGHT_PATH_FILESTAT_GET) !== 0n ||
-            (!path &&
-              fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET) !==
-              0n
-          ) {
-            if (err === constants.WASI_ESUCCESS) {
-              let filestat = await __desc.getFilestat();
-              buf.setBigUint64(0, filestat.dev, true);
-              buf.setBigUint64(8, filestat.ino, true);
-              buf.setUint8(16, filestat.filetype);
-              buf.setBigUint64(24, filestat.nlink, true);
-              buf.setBigUint64(32, filestat.size, true);
-              buf.setBigUint64(40, filestat.atim, true);
-              buf.setBigUint64(48, filestat.mtim, true);
-              buf.setBigUint64(56, filestat.ctim, true);
+        let fdstat = await desc.getFdstat();
+        if (
+          (path &&
+            fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) ||
+          (!path &&
+            fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET)
+        ) {
+          let __desc;
+          if (path !== undefined) {
+            let res = await processManager.filesystem.openat(
+              desc,
+              path,
+              lookupFlags
+            );
+            if (res.err !== constants.WASI_ESUCCESS) {
+              err = constants.WASI_ENOENT;
+            } else {
+              __desc = res.desc;
             }
           } else {
-            err = constants.WASI_EACCES;
+            __desc = desc;
           }
+          if (__desc === undefined) {
+            err = constants.WASI_ENOENT;
+          } else {
+            if (
+              (path &&
+                fdstat.fs_rights_base &
+                  constants.WASI_RIGHT_PATH_FILESTAT_GET) ||
+              (!path &&
+                fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET)
+            ) {
+              if (err === constants.WASI_ESUCCESS) {
+                let filestat = await __desc.getFilestat();
+                buf.setBigUint64(0, filestat.dev, true);
+                buf.setBigUint64(8, filestat.ino, true);
+                buf.setUint8(16, filestat.filetype);
+                buf.setBigUint64(24, filestat.nlink, true);
+                buf.setBigUint64(32, filestat.size, true);
+                buf.setBigUint64(40, filestat.atim, true);
+                buf.setBigUint64(48, filestat.mtim, true);
+                buf.setBigUint64(56, filestat.ctim, true);
+              }
+            }
+          }
+        } else {
+          err = constants.WASI_EACCES;
         }
       }
 
