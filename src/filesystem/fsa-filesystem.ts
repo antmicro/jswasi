@@ -241,7 +241,7 @@ class FsaFilesystem implements Filesystem {
       false,
       handle as FileSystemDirectoryHandle
     ));
-    if (err === constants.WASI_ESUCCESS) {
+    if (err === constants.WASI_ESUCCESS || err === constants.WASI_EISDIR) {
       return constants.WASI_EEXIST;
     }
     if (err !== constants.WASI_ENOENT) {
