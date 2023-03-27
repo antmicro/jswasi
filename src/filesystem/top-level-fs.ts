@@ -306,11 +306,17 @@ export class TopLevelFs {
     desc: Descriptor,
     path: string
   ): Promise<{ err: number; path: string }> {
-    let __res = await this.openat(desc, path);
-    if (__res.err !== constants.WASI_ESUCCESS) {
-      return { err: __res.err, path: undefined };
+    let { err: __err, desc: __desc } = await this.openat(desc, path);
+    if (__err !== constants.WASI_ESUCCESS) {
+      return { err: __err, path: undefined };
     }
-    const { err, content } = await __res.desc.read_str();
+
+    let __fdstat = await __desc.getFdstat();
+    if (__fdstat.fs_filetype !== constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+      return { err: constants.WASI_EINVAL, path: undefined };
+    }
+
+    const { err, content } = await __desc.read_str();
     return { err, path: content };
   }
 
