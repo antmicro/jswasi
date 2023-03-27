@@ -77,7 +77,7 @@ impl Test {
         // invalid path
         expect_error(
             self.root_fd, 0, &self.invalid_path, 0, 0, wasi::FSTFLAGS_ATIM | wasi::FSTFLAGS_MTIM,
-            wasi::ERRNO_INVAL, "attempt to set times for invalid file path succeeded")?;
+            wasi::ERRNO_NOENT, "attempt to set times for invalid file path succeeded")?;
         // invalid root fd
         expect_error(
             match wasi::path_open(

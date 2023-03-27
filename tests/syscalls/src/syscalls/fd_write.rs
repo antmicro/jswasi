@@ -132,7 +132,7 @@ pub fn test_fd_write() -> Result<(), String> {
         }
 
         let buf = "symlink write".as_bytes();
-        if let Err(e) = wasi::path_symlink(TEMP_FILENAME, 4, TEMP_SYMLINK) {
+        if let Err(e) = wasi::path_symlink(TEMP_FILENAME, constants::PWD_DESC, TEMP_SYMLINK) {
             return Err(e.to_string());
         }
 

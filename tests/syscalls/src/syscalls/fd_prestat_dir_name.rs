@@ -11,7 +11,7 @@ pub fn test_fd_prestat_dir_name() -> Result<(), String> {
             constants::PWD_DESC, dir_name_buf.as_mut_ptr(),
             prestat_desc.u.dir.pr_name_len) {
             Ok(_) => {
-                if dir_name_buf != ".".as_bytes() {
+                if dir_name_buf != "/".as_bytes() {
                     Err(format!(
                         "In fd_prestat_dir_name({}): invalid path (expected {:?}, got {:?})",
                         constants::PWD_DESC, ".", dir_name_buf))

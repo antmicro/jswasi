@@ -36,6 +36,33 @@ fn main() -> Result<(), String>{
         ("set_env", set_env::test_set_env as fn() -> Result<(), String>),
     ];
 
+    unsafe {
+        let tmp_fd = wasi::path_open(
+            constants::PWD_DESC, 0, constants::SAMPLE_TEXT_FILENAME,
+            wasi::OFLAGS_CREAT, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0).unwrap();
+        wasi::fd_write(
+            tmp_fd,
+            &[wasi::Ciovec{
+                buf: constants::SAMPLE_TEXT.as_ptr(),
+                buf_len: constants::SAMPLE_TEXT_LEN
+            }]).unwrap();
+        wasi::fd_close(tmp_fd).unwrap();
+        wasi::path_create_directory(constants::PWD_DESC, constants::SAMPLE_DIR_FILENAME).unwrap();
+        wasi::path_symlink(
+            constants::SAMPLE_TEXT_FILENAME,
+            constants::PWD_DESC,
+            constants::SAMPLE_LINK_FILENAME).unwrap();
+        wasi::path_symlink(
+            constants::SAMPLE_DIR_FILENAME,
+            constants::PWD_DESC,
+            constants::SAMPLE_DIR_LINK_FILENAME).unwrap();
+        for i in 0..10 {
+            wasi::fd_close(wasi::path_open(
+                constants::PWD_DESC, 0,
+                &format!("{}/ent{}", constants::SAMPLE_DIR_FILENAME, i),
+                wasi::OFLAGS_CREAT, constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0).unwrap()).unwrap();
+        }
+    }
     let mut fails: u32 = 0;
     for (name, test) in &tests {
         let result = test();

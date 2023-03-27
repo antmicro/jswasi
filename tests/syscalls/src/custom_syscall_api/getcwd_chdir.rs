@@ -1,5 +1,4 @@
 use constants;
-use std::env;
 use std::fs;
 
 struct Test {
@@ -24,9 +23,8 @@ impl Test {
         Ok(())
     }
     fn run_tests(&self) -> Result<(), String> {
-        // assume that cwd of parent process is stored in PWD
-        getcwd_success(Some(&self.base_cwd))?;
         chdir_success(&self.base_cwd)?;
+        getcwd_success(Some(&self.base_cwd))?;
 
         // change directory
         let tmp = fs::canonicalize(&self.dir_path).unwrap();
@@ -63,12 +61,8 @@ impl Test {
             constants::RIGHTS_ALL, constants::RIGHTS_ALL, 0) } {
             return Err(format!("Could not setup test environment: {:?}", e));
         }
-        let base_cwd = match env::var("PWD") {
-            Ok(pwd) => pwd,
-            Err(e) => { return Err(format!("Could not setup test environment: {:?}", e)); }
-        };
         Ok(Test {
-            base_cwd,
+            base_cwd: String::from("/"),
             dir_path: String::from(constants::SAMPLE_DIR_FILENAME),
             file_path: String::from(constants::SAMPLE_TEXT_FILENAME),
             long_dir,
