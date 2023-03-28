@@ -73,7 +73,7 @@ export async function mount(
   }
 }
 
-/*export async function umount(
+export async function umount(
   processManager: ProcessManager,
   processId: number,
   args: string[],
@@ -86,17 +86,22 @@ export async function mount(
   // handle relative path
   if (arg === "-a") {
     // remove all mounts
-    for (const mountPoint of processManager.filesystem.getMounts()) {
-      processManager.filesystem.umount(
-        `${mountPoint.parts.join("/")}/${mountPoint.name}`
-      );
+    for (const mountPoint of Object.keys(
+      processManager.filesystem.getMounts()
+    )) {
+      if (mountPoint !== "/") {
+        let err = await processManager.filesystem.removeMount(mountPoint);
+        if (err !== constants.WASI_ESUCCESS) {
+          return err;
+        }
+      }
     }
   } else if (arg !== undefined && arg !== "--help") {
     if (!arg.startsWith("/")) {
       arg = `${env["PWD"] === "/" ? "" : env["PWD"]}/${arg}`;
     }
 
-    if (!processManager.filesystem.isMounted(arg)) {
+    if (!processManager.filesystem.getMounts()[arg]) {
       await stderr.write(
         new TextEncoder().encode(`umount: ${arg}: not mounted\n`)
       );
@@ -111,7 +116,7 @@ export async function mount(
     );
   }
   return 0;
-}*/
+}
 
 export async function wget(
   processManager: ProcessManager,

@@ -31,7 +31,7 @@ import {
   EventSourceArgs,
   CleanInodesArgs,
 } from "./types.js";
-import { free, mount, ps, reset, wget } from "./browser-apps.js";
+import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { Stdin, EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
@@ -261,6 +261,12 @@ export default async function syscallCallback(
         }
         case "/usr/bin/reset": {
           const result = await reset(processManager, processId, args, env);
+          Atomics.store(parentLck, 0, result);
+          Atomics.notify(parentLck, 0);
+          break;
+        }
+        case "/usr/bin/umount": {
+          const result = await umount(processManager, processId, args, env);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
