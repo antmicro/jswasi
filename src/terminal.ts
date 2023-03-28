@@ -2,7 +2,10 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { FdTable } from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import { createFsaFilesystem } from "./filesystem/fsa-filesystem.js";
+import {
+  createFsaFilesystem,
+  createFsaFilesystem2,
+} from "./filesystem/fsa-filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
 import { TopLevelFs } from "./filesystem/top-level-fs.js";
@@ -16,6 +19,21 @@ declare global {
 }
 
 const DEFAULT_WORK_DIR = "/home/ant";
+const DEFAULT_ENV = {
+  PATH: "/usr/bin:/usr/local/bin",
+  PWD: DEFAULT_WORK_DIR,
+  OLDPWD: DEFAULT_WORK_DIR,
+  TMPDIR: "/tmp",
+  TERM: "xterm-256color",
+  HOME: DEFAULT_WORK_DIR,
+  SHELL: "/usr/bin/wash",
+  LANG: "en_US.UTF-8",
+  USER: "ant",
+  HOSTNAME: "browser",
+  PYTHONHOME: "/",
+  PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
+  DEBUG: "1",
+};
 
 // binaries which need to be verified
 const CHECKSUM_BINARIES = {
@@ -169,55 +187,85 @@ async function initFs(fs: TopLevelFs) {
   await Promise.all(alwaysFetchPromises);
 }
 
-/* TODO: make this work on new filesystem
 function initFsaDropImport(
   terminalContentWindow: Window,
   notifyDroppedFileSaved: (path: string, entryName: string) => void,
   processManager: ProcessManager
 ) {
-  terminalContentWindow.addEventListener("dragover", (e: DragEvent) =>
-    e.preventDefault()
+  terminalContentWindow.addEventListener(
+    "dragover",
+    function handleDragOver(evt) {
+      evt.stopPropagation();
+      evt.preventDefault();
+      evt.dataTransfer.dropEffect = "copy";
+    },
+    false
   );
-  terminalContentWindow.addEventListener("drop", async (e: DragEvent) => {
-    e.preventDefault();
+  terminalContentWindow.addEventListener("drop", async function (evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    const pwd = processManager.processInfos[processManager.currentProcess].cwd;
 
-    const copyEntry = async (
-      entry: FileSystemDirectoryHandle | FileSystemFileHandle,
-      path: string
-    ) => {
-      const dir = (await processManager.filesystem.open("/")).desc;
-      if (entry.kind === "directory") {
-        // create directory in VFS, expand path and fill directory contents
-        await processManager.filesystem.createDir(entry.name);
-        for await (const [, handle] of entry.entries()) {
-          await copyEntry(handle, `${path}/${entry.name}`);
+    await Promise.all(
+      (Object.values(evt.dataTransfer?.items) || []).map(async (item) => {
+        let handle = await item.getAsFileSystemHandle();
+        let path = `${pwd}/${handle.name}`;
+        if (handle.kind === "file") {
+          const stream = (
+            await (handle as FileSystemFileHandle).getFile()
+          ).stream();
+          const result = await processManager.filesystem.open(
+            path,
+            0,
+            constants.WASI_O_CREAT
+          );
+          if (result.err !== constants.WASI_ESUCCESS) {
+            return;
+          }
+          const { err: __err, stream: writableStream } =
+            await result.desc.writableStream();
+          return new Promise<void>(async (resolve) => {
+            // @ts-ignore
+            await stream.pipeTo(writableStream);
+            if (notifyDroppedFileSaved)
+              notifyDroppedFileSaved(path, handle.name);
+            resolve();
+          });
+        } else if (handle.kind === "directory") {
+          // TODO: use some kind of uuid in mount point names
+          const tmp_mount = `/tmp/temp_mount_${handle.name}`;
+          await processManager.filesystem.createDir(tmp_mount);
+          await processManager.filesystem.addMount(
+            tmp_mount,
+            await createFsaFilesystem2(handle, false)
+          );
+          // this process is spawned as a child of init, this isn't very elegant
+          await processManager.spawnProcess(
+            0, // parent_id
+            null, // parent_lock
+            syscallCallback,
+            "/usr/bin/wash",
+            new FdTable({
+              // TODO: replace with /dev/null once it is implemented
+              0: undefined,
+              1: undefined,
+              2: undefined,
+              3: (await processManager.filesystem.open("/")).desc,
+            }),
+            [
+              "/usr/bin/wash",
+              "-c",
+              `cp -r ${tmp_mount} ${path} ; umount ${tmp_mount}`,
+            ],
+            DEFAULT_ENV,
+            false,
+            DEFAULT_WORK_DIR
+          );
         }
-      } else {
-        // create VFS file, open dragged file as stream and pipe it to VFS file
-        const handle = await dir.handle.getFileHandle(entry.name, {
-          create: true,
-        });
-        const writable = await handle.createWritable();
-        const stream = (await entry.getFile()).stream();
-        // @ts-ignore pipeTo is still experimental
-        await stream.pipeTo(writable);
-        if (notifyDroppedFileSaved) notifyDroppedFileSaved(path, entry.name);
-      }
-    };
-    const pwd =
-      processManager.processInfos[processManager.currentProcess].env["PWD"];
-    const entryPromises = [];
-    for (const item of e.dataTransfer?.items || []) {
-      if (item.kind === "file") {
-        entryPromises.push(async () => {
-          const entry = await item.getAsFileSystemHandle();
-          await copyEntry(entry, pwd);
-        });
-      }
-    }
-    await Promise.all(entryPromises);
+      })
+    );
   });
-}*/
+}
 
 function initServiceWorker() {
   window.addEventListener("load", () => {
@@ -350,13 +398,11 @@ export async function init(
     processManager.events.publishEvent(constants.WASI_EVENT_WINCH);
   };
 
-  /* drag and drop support (save dragged files and folders to current directory)
-   * hterm creates iframe child of provided anchor, we assume there's only one of those
   initFsaDropImport(
     anchor.getElementsByTagName("iframe")[0].contentWindow,
     notifyDroppedFileSaved,
     processManager
-  );*/
+  );
 
   await processManager.spawnProcess(
     null, // parent_id
@@ -370,21 +416,7 @@ export async function init(
       3: (await tfs.open("/")).desc,
     }),
     ["/usr/bin/wash", "/usr/bin/init"],
-    {
-      PATH: "/usr/bin:/usr/local/bin",
-      PWD: DEFAULT_WORK_DIR,
-      OLDPWD: DEFAULT_WORK_DIR,
-      TMPDIR: "/tmp",
-      TERM: "xterm-256color",
-      HOME: DEFAULT_WORK_DIR,
-      SHELL: "/usr/bin/wash",
-      LANG: "en_US.UTF-8",
-      USER: "ant",
-      HOSTNAME: "browser",
-      PYTHONHOME: "/",
-      PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
-      DEBUG: "1",
-    },
+    DEFAULT_ENV,
     false,
     DEFAULT_WORK_DIR
   );

@@ -112,9 +112,11 @@ class FsaFilesystem implements Filesystem {
         index: -1,
       };
     } catch (e) {
-      let err = constants.WASI_EINVAL;
-      if (e instanceof DOMException) {
-        err = mapErr(e, __isDir);
+      let err;
+      try {
+        err = mapErr(e as DOMException, __isDir);
+      } catch {
+        err = constants.WASI_EINVAL;
       }
       return { index: stop, err, handle };
     }
