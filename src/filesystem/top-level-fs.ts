@@ -45,11 +45,14 @@ export class TopLevelFs {
     let lastSeparator, fs;
     for (
       lastSeparator = rpath.length;
-      lastSeparator > 0 && fs === undefined;
+      lastSeparator > 0;
       lastSeparator = rpath.lastIndexOf("/", lastSeparator - 1)
     ) {
       let mountPoint = rpath.slice(0, lastSeparator);
       fs = this.mounts[mountPoint];
+      if (fs !== undefined) {
+        break;
+      }
     }
 
     if (fs === undefined) {
