@@ -50,15 +50,14 @@ function mapErr(e: DOMException, isDir: boolean): number {
 }
 
 class FsaFilesystem implements Filesystem {
-  private rootHandle: FileSystemDirectoryHandle;
-
   private getRootHandle(): FileSystemDirectoryHandle {
     return this.rootHandle;
   }
 
-  constructor(rootHandle: FileSystemDirectoryHandle) {
-    this.rootHandle = rootHandle;
-  }
+  constructor(
+    private rootHandle: FileSystemDirectoryHandle,
+    private keepMetadata: boolean
+  ) {}
 
   /**
    * Returns a handle using relative or absolute path
@@ -201,16 +200,18 @@ class FsaFilesystem implements Filesystem {
         create: true,
       }
     );
-    await setStoredData(await initMetadataPath(handle), {
-      dev: 0n,
-      ino: 0n,
-      filetype: constants.WASI_FILETYPE_DIRECTORY,
-      nlink: 1n,
-      size: 4096n,
-      mtim: 0n,
-      atim: 0n,
-      ctim: 0n,
-    });
+    if (this.keepMetadata) {
+      await setStoredData(await initMetadataPath(handle), {
+        dev: 0n,
+        ino: 0n,
+        filetype: constants.WASI_FILETYPE_DIRECTORY,
+        nlink: 1n,
+        size: 4096n,
+        mtim: 0n,
+        atim: 0n,
+        ctim: 0n,
+      });
+    }
     return constants.WASI_ESUCCESS;
   }
 
@@ -257,26 +258,52 @@ class FsaFilesystem implements Filesystem {
     await symlink_writable.write(target);
     await symlink_writable.close();
 
-    // TODO: fill dummy data with something meaningful
-    await setStoredData(await initMetadataPath(symlink), {
-      dev: 0n,
-      ino: 0n,
-      filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
-      nlink: 1n,
-      size: BigInt(target.length),
-      mtim: 0n,
-      atim: 0n,
-      ctim: 0n,
-    });
+    if (this.keepMetadata) {
+      // TODO: fill dummy data with something meaningful
+      await setStoredData(await initMetadataPath(symlink), {
+        dev: 0n,
+        ino: 0n,
+        filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
+        nlink: 1n,
+        size: BigInt(target.length),
+        mtim: 0n,
+        atim: 0n,
+        ctim: 0n,
+      });
+    }
     return constants.WASI_ESUCCESS;
   }
 
   async getFilestat(
     path: string
   ): Promise<{ err: number; filestat: Filestat }> {
-    let metadataPath = this.getRootHandle().name + path;
-    let storedData = await getStoredData(metadataPath);
-    return { err: constants.WASI_ESUCCESS, filestat: storedData };
+    if (this.keepMetadata) {
+      const metadataPath = this.getRootHandle().name + path;
+      const filestat = await getStoredData(metadataPath);
+      return {
+        filestat,
+        err: filestat ? constants.WASI_ESUCCESS : constants.WASI_ENOENT,
+      };
+    } else {
+      const { err } = await this.getHandle(path, true, undefined);
+      switch (err) {
+        case constants.WASI_ENOTDIR:
+          return {
+            err: constants.WASI_ESUCCESS,
+            filestat: FsaDirectoryDescriptor.defaultFilestat,
+          };
+        case constants.WASI_ESUCCESS:
+          return {
+            err: constants.WASI_ESUCCESS,
+            filestat: FsaFileDescriptor.defaultFilestat,
+          };
+        default:
+          return {
+            err,
+            filestat: undefined,
+          };
+      }
+    }
   }
 
   async open(
@@ -308,7 +335,8 @@ class FsaFilesystem implements Filesystem {
           result.handle as FileSystemDirectoryHandle,
           fdflags,
           fs_rights_base,
-          fs_rights_inheriting
+          fs_rights_inheriting,
+          this.keepMetadata
         );
         break;
       }
@@ -346,7 +374,8 @@ class FsaFilesystem implements Filesystem {
               __result.handle as FileSystemFileHandle,
               fdflags,
               fs_rights_base,
-              fs_rights_inheriting
+              fs_rights_inheriting,
+              this.keepMetadata
             );
           }
           break;
@@ -363,7 +392,8 @@ class FsaFilesystem implements Filesystem {
               __result.handle as FileSystemFileHandle,
               fdflags,
               fs_rights_base,
-              fs_rights_inheriting
+              fs_rights_inheriting,
+              this.keepMetadata
             );
             break;
           }
@@ -384,19 +414,22 @@ class FsaFilesystem implements Filesystem {
               handle,
               fdflags,
               fs_rights_base,
-              fs_rights_inheriting
+              fs_rights_inheriting,
+              this.keepMetadata
             );
-            desc.metadataPath = await initMetadataPath(handle);
-            await setStoredData(desc.metadataPath, {
-              dev: 0n,
-              ino: 0n,
-              filetype: constants.WASI_FILETYPE_REGULAR_FILE,
-              nlink: 1n,
-              size: 0n,
-              mtim: 0n,
-              atim: 0n,
-              ctim: 0n,
-            });
+            if (this.keepMetadata) {
+              desc.metadataPath = await initMetadataPath(handle);
+              await setStoredData(desc.metadataPath, {
+                dev: 0n,
+                ino: 0n,
+                filetype: constants.WASI_FILETYPE_REGULAR_FILE,
+                nlink: 1n,
+                size: 0n,
+                mtim: 0n,
+                atim: 0n,
+                ctim: 0n,
+              });
+            }
           } catch (e) {
             if (e instanceof DOMException) {
               err = mapErr(e, false);
@@ -432,17 +465,27 @@ class FsaFilesystem implements Filesystem {
  * The sole purpose of this class is to avoid redundant Descriptor implementations
  */
 abstract class FsaDescriptor implements Descriptor {
+  static readonly defaultFilestat: Filestat;
+
   protected fdstat: Fdstat;
   protected path: string;
-  metadataPath: string;
   protected abstract handle: FileSystemHandle;
+  metadataPath: string;
 
   constructor(
     fs_flags: Fdflags,
     fs_rights_base: Rights,
-    fs_rights_inheriting: Rights
+    fs_rights_inheriting: Rights,
+    // There is no point in keeping metadata of local files mounted
+    // in in the app in the indexedDB as the metadata would have to
+    // be recursively applied and removed each mount/umount. Also,
+    // filesystem access API doesn't provide access to all fields of
+    // Filestat structure so in such cases, just return dummy metadata
+    protected keepMetadata: boolean
   ) {
-    this.metadataPath = "";
+    if (this.keepMetadata) {
+      this.metadataPath = "";
+    }
     this.fdstat = {
       fs_flags,
       fs_rights_base,
@@ -459,17 +502,14 @@ abstract class FsaDescriptor implements Descriptor {
     return this.fdstat;
   }
 
-  async getFilestat(): Promise<Filestat> {
-    return getStoredData(this.metadataPath);
-  }
-
   async initialize(path: string): Promise<void> {
     this.path = path;
-    if (this.metadataPath === "") {
+    if (this.keepMetadata && this.metadataPath === "") {
       this.metadataPath = await initMetadataPath(this.handle);
     }
   }
 
+  abstract getFilestat(): Promise<Filestat>;
   abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
   abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
@@ -495,13 +535,15 @@ abstract class FsaDescriptor implements Descriptor {
   abstract truncate(size: bigint): Promise<number>;
 
   async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
-    let filestat = await getStoredData(this.metadataPath);
+    if (this.keepMetadata) {
+      let filestat = await getStoredData(this.metadataPath);
 
-    if (atim !== undefined) filestat.atim = atim;
-    if (mtim !== undefined) filestat.mtim = mtim;
+      if (atim !== undefined) filestat.atim = atim;
+      if (mtim !== undefined) filestat.mtim = mtim;
 
-    if (atim !== undefined || mtim !== undefined) {
-      await setStoredData(this.metadataPath, filestat);
+      if (atim !== undefined || mtim !== undefined) {
+        await setStoredData(this.metadataPath, filestat);
+      }
     }
 
     return constants.WASI_ESUCCESS;
@@ -528,27 +570,41 @@ abstract class FsaDescriptor implements Descriptor {
 }
 
 class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
+  // Filesystem access API doesn't support real symlinks so
+  // assume that by default every file is a regular file
+  static override defaultFilestat: Filestat = {
+    dev: 0n,
+    ino: 0n,
+    filetype: constants.WASI_FILETYPE_REGULAR_FILE,
+    nlink: 1n,
+    size: 0n,
+    atim: 0n,
+    mtim: 0n,
+    ctim: 0n,
+  };
   private cursor: bigint;
   private writer: FileSystemWritableFileStream;
   private file: File;
-  override handle: FileSystemFileHandle;
 
   constructor(
-    handle: FileSystemFileHandle,
+    override handle: FileSystemFileHandle,
     fs_flags: Fdflags,
     fs_rights_base: Rights,
-    fs_rights_inheriting: Rights
+    fs_rights_inheriting: Rights,
+    keepMetadata: boolean
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting);
-    this.handle = handle;
+    super(fs_flags, fs_rights_base, fs_rights_inheriting, keepMetadata);
     this.file = undefined;
   }
 
   override async initialize(path: string) {
     await super.initialize(path);
-    const { filetype } = await getStoredData(this.metadataPath);
     const size = BigInt((await this.__getFile()).file?.size);
-    this.fdstat.fs_filetype = filetype;
+    this.fdstat.fs_filetype = (
+      this.keepMetadata
+        ? await getStoredData(this.metadataPath)
+        : FsaFileDescriptor.defaultFilestat
+    ).filetype;
     if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) {
       this.cursor = size;
     } else {
@@ -724,26 +780,45 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 
   override async getFilestat() {
-    let meta = await getStoredData(this.metadataPath);
+    let meta = this.keepMetadata
+      ? await getStoredData(this.metadataPath)
+      : FsaFileDescriptor.defaultFilestat;
     meta.size = BigInt((await this.__getFile()).file?.size);
     return meta;
   }
 }
 
 class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
+  static override defaultFilestat: Filestat = {
+    dev: 0n,
+    ino: 0n,
+    filetype: constants.WASI_FILETYPE_DIRECTORY,
+    nlink: 1n,
+    size: 4096n,
+    atim: 0n,
+    mtim: 0n,
+    ctim: 0n,
+  };
   private entries: Dirent[];
-  override handle: FileSystemDirectoryHandle;
 
   constructor(
-    handle: FileSystemDirectoryHandle,
+    override handle: FileSystemDirectoryHandle,
     fs_flags: Fdflags,
     fs_rights_base: Rights,
-    fs_rights_inheriting: Rights
+    fs_rights_inheriting: Rights,
+    keepMetadata: boolean
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting);
-    this.handle = handle;
+    super(fs_flags, fs_rights_base, fs_rights_inheriting, keepMetadata);
     this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
     this.entries = [];
+  }
+
+  override async getFilestat(): Promise<Filestat> {
+    if (this.keepMetadata) {
+      return getStoredData(this.metadataPath);
+    } else {
+      return FsaDirectoryDescriptor.defaultFilestat;
+    }
   }
 
   async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -799,7 +874,9 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
         if (name.endsWith(".crswap")) {
           continue;
         }
-        let filestat = await getStoredData(`${this.metadataPath}/${name}`);
+        let filestat = this.keepMetadata
+          ? await getStoredData(`${this.metadataPath}/${name}`)
+          : FsaDirectoryDescriptor.defaultFilestat;
         this.entries.push({
           d_next: i++,
           d_ino: filestat.ino,
@@ -813,7 +890,8 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
 }
 
 export async function createFsaFilesystem(
-  name: string
+  name: string,
+  keepMetadata: boolean
 ): Promise<FsaFilesystem> {
   const topLevelHandle = await navigator.storage.getDirectory();
   let rootHandle;
@@ -833,7 +911,7 @@ export async function createFsaFilesystem(
   }
 
   const rootStoredData = await getStoredData(name);
-  if (!rootStoredData) {
+  if (keepMetadata && !rootStoredData) {
     await setStoredData(name, {
       dev: 0n,
       ino: 0n,
@@ -845,5 +923,5 @@ export async function createFsaFilesystem(
       ctim: 0n,
     });
   }
-  return new FsaFilesystem(rootHandle);
+  return new FsaFilesystem(rootHandle, keepMetadata);
 }

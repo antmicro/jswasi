@@ -249,7 +249,7 @@ export async function init(
   }
 
   const tfs = new TopLevelFs();
-  tfs.addMount("/", await createFsaFilesystem("fsa1"));
+  await tfs.addMount("/", await createFsaFilesystem("fsa1", true));
 
   initServiceWorker();
   // create flag file to indicate that the filesystem was already initiated
