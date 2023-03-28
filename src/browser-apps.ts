@@ -3,6 +3,7 @@ import * as utils from "./utils.js";
 import { fetchFile } from "./terminal.js";
 import ProcessManager from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
+import { createFsaFilesystem2 } from "./filesystem/fsa-filesystem.js";
 
 export async function mount(
   processManager: ProcessManager,
@@ -17,16 +18,52 @@ export async function mount(
 
   switch (args.length) {
     case 1: {
-      await stdout.write(new TextEncoder().encode("wasmfs on /\n"));
-      for (const mountPoint of processManager.filesystem.getMounts()) {
-        // eslint-disable-next-line no-await-in-loop
-        await stdout.write(
-          new TextEncoder().encode(`fsapi on /${mountPoint}}\n`)
-        );
-      }
+      Object.entries(processManager.filesystem.getMounts()).forEach(
+        async ([mountPoint, fs]) => {
+          await stdout.write(
+            new TextEncoder().encode(
+              `${fs.constructor.name} on ${mountPoint}\n`
+            )
+          );
+        }
+      );
       return constants.WASI_ESUCCESS;
     }
-    // Mounting must be completely reworked, for now, mounting local directories is removed
+    case 2: {
+      let path = args[1];
+      let result;
+      if (!path.startsWith("/")) {
+        path = `${
+          processManager.processInfos[processManager.currentProcess].cwd
+        }/${path}`;
+        result = await processManager.filesystem.open(path);
+      }
+
+      if (result.err !== constants.WASI_ESUCCESS) {
+        stderr.write(new TextEncoder().encode(`error: ${result.err}\n`));
+        return result.err;
+      }
+
+      if ((await result.desc.readdir(true)).dirents.length !== 0) {
+        const err = constants.WASI_ENOTEMPTY;
+        stderr.write(
+          new TextEncoder().encode(`Directory is not empty: ${err}\n`)
+        );
+        return err;
+      }
+
+      if (processManager.filesystem.getMounts()[path] !== undefined) {
+        const err = constants.WASI_EBUSY;
+        stderr.write(new TextEncoder().encode(`Mount point is busy: ${err}\n`));
+        return err;
+      }
+
+      const mountPoint = await showDirectoryPicker();
+      return await processManager.filesystem.addMount(
+        path,
+        await createFsaFilesystem2(mountPoint, false)
+      );
+    }
     default: {
       await stderr.write(
         new TextEncoder().encode("mount: help: mount [<mount-point>]\n")

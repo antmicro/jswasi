@@ -282,7 +282,7 @@ export class TopLevelFs {
 
   async addMount(path: string, fs: Filesystem): Promise<number> {
     if (this.mounts[path] !== undefined) {
-      return constants.WASI_EEXIST;
+      return constants.WASI_EBUSY;
     } else if (path === "/") {
       // special case when we want to mount rootfs
       this.mounts[path] = fs;
@@ -323,7 +323,7 @@ export class TopLevelFs {
     return { err, path: content };
   }
 
-  getMounts(): string[] {
-    return Object.keys(this.mounts);
+  getMounts(): Record<string, Filesystem> {
+    return this.mounts;
   }
 }

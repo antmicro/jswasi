@@ -889,6 +889,13 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   }
 }
 
+export async function createFsaFilesystem2(
+  dir: FileSystemDirectoryHandle,
+  keepMetadata: boolean
+): Promise<FsaFilesystem> {
+  return new FsaFilesystem(dir, keepMetadata);
+}
+
 export async function createFsaFilesystem(
   name: string,
   keepMetadata: boolean
