@@ -36,8 +36,8 @@ export async function mount(
         path = `${
           processManager.processInfos[processManager.currentProcess].cwd
         }/${path}`;
-        result = await processManager.filesystem.open(path);
       }
+      result = await processManager.filesystem.open(path);
 
       if (result.err !== constants.WASI_ESUCCESS) {
         stderr.write(new TextEncoder().encode(`error: ${result.err}\n`));
