@@ -600,17 +600,14 @@ export default async function syscallCallback(
               path,
               lookupFlags
             );
-            if (res.err !== constants.WASI_ESUCCESS) {
-              err = constants.WASI_ENOENT;
-            } else {
+            err = res.err;
+            if (res.err === constants.WASI_ESUCCESS) {
               __desc = res.desc;
             }
           } else {
             __desc = desc;
           }
-          if (__desc === undefined) {
-            err = constants.WASI_ENOENT;
-          } else {
+          if (__desc !== undefined) {
             if (
               (path &&
                 fdstat.fs_rights_base &

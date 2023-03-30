@@ -9,6 +9,8 @@ import {
 import * as constants from "../constants.js";
 import { dirname, basename, realpath } from "../utils.js";
 
+const SYMBOLIC_LINK_DEPTH_LIMIT = 40;
+
 type DescInfo = {
   err: number;
   desc: Descriptor;
@@ -39,7 +41,8 @@ export class TopLevelFs {
     oflags: OpenFlags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
-    fdflags: Fdflags = 0
+    fdflags: Fdflags = 0,
+    symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT
   ): Promise<DescInfo> {
     let rpath = realpath(path);
     let lastSeparator, fs;
@@ -85,6 +88,10 @@ export class TopLevelFs {
             fdstat !== undefined &&
             fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
           ) {
+            if (symlink_depth === 0) {
+              // Prevent infinite symlink loops
+              return { desc, err: constants.WASI_ELOOP, fs, path: rpath };
+            }
             let { err: err_, content } = await desc.read_str();
             if (err_ !== constants.WASI_ESUCCESS) {
               return { desc: undefined, err, fs, path: undefined };
@@ -114,7 +121,8 @@ export class TopLevelFs {
               oflags,
               fs_rights_base,
               fs_rights_inheriting,
-              fdflags
+              fdflags,
+              symlink_depth - 1
             );
           }
           break;
