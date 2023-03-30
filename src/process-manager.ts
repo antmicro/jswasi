@@ -180,7 +180,10 @@ export default class ProcessManager {
   ): Promise<number> {
     const id = this.nextProcessId;
     this.nextProcessId += 1;
-    if (parentLock != null || parentId == null) {
+    if (
+      parentId == null ||
+      (parentId === this.currentProcess && parentLock != null)
+    ) {
       this.currentProcess = id;
     }
     const worker = new Worker(this.scriptName, { type: "module" });
@@ -254,7 +257,9 @@ export default class ProcessManager {
     if (id !== 0 && process.parentLock != null) {
       Atomics.store(process.parentLock, 0, exitNo);
       Atomics.notify(process.parentLock, 0);
-      this.currentProcess = process.parentId;
+      if (this.currentProcess === id) {
+        this.currentProcess = process.parentId;
+      }
     }
     // remove process from process array
     delete this.processInfos[id];
