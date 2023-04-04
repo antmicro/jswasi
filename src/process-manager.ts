@@ -69,6 +69,7 @@ export class FdTable {
 class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
   public stdinPollSub: PollEntry | null = null;
+  public termiantionOccured: boolean = false;
 
   public shouldEcho = true;
 
@@ -180,12 +181,6 @@ export default class ProcessManager {
   ): Promise<number> {
     const id = this.nextProcessId;
     this.nextProcessId += 1;
-    if (
-      parentId == null ||
-      (parentId === this.currentProcess && parentLock != null)
-    ) {
-      this.currentProcess = id;
-    }
     const worker = new Worker(this.scriptName, { type: "module" });
     this.processInfos[id] = new ProcessInfo(
       id,
@@ -199,6 +194,12 @@ export default class ProcessManager {
       workingDir,
       isJob
     );
+    if (
+      parentId == null ||
+      (parentId === this.currentProcess && parentLock != null)
+    ) {
+      this.currentProcess = id;
+    }
     worker.onmessage = (event) => syscallCallback(event, this);
 
     // save compiled module to cache
@@ -234,14 +235,23 @@ export default class ProcessManager {
       throw Error("invalid binary");
     }
 
-    // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
-    this.processInfos[id].worker.postMessage([
-      "start",
-      this.compiledModules[command],
-      id,
-      args,
-      env,
-    ]);
+    if (
+      parentId != null &&
+      this.processInfos[parentId].termiantionOccured &&
+      !isJob
+    ) {
+      this.processInfos[parentId].termiantionOccured = false;
+      this.terminateProcess(id, constants.EXIT_INTERRUPTED);
+    } else {
+      // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
+      this.processInfos[id].worker.postMessage([
+        "start",
+        this.compiledModules[command],
+        id,
+        args,
+        env,
+      ]);
+    }
 
     return id;
   }
@@ -266,11 +276,13 @@ export default class ProcessManager {
   }
 
   sendSigInt(id: number) {
+    let currentProcess = this.currentProcess;
     if (
-      this.currentProcess === 0 ||
-      this.processInfos[this.currentProcess].cmd === "/usr/bin/wash"
+      currentProcess === 0 ||
+      this.processInfos[currentProcess].cmd === "/usr/bin/wash"
     ) {
       console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
+      this.processInfos[currentProcess].termiantionOccured = true;
     } else {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     }

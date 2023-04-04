@@ -234,6 +234,9 @@ export default async function syscallCallback(
           fds.replaceFd(fd, desc);
         })
       );
+
+      // TODO: Intentionally ignore SigInt, do not check termiantionOccured is set
+      // for browser apps. Maybe we should handle it in the future..
       switch (path) {
         case "/usr/bin/ps": {
           const result = await ps(processManager, processId, args, env);
@@ -272,6 +275,16 @@ export default async function syscallCallback(
           break;
         }
         default: {
+          // Only wash and process 0 has set termiantionOccured after SigInt comes.
+          // We can skip spawn child here and return to user space with appropriate exit code.
+          if (processManager.processInfos[processId].termiantionOccured) {
+            processManager.processInfos[processId].termiantionOccured = false;
+            fds.tearDown();
+            Atomics.store(parentLck, 0, constants.EXIT_INTERRUPTED);
+            Atomics.notify(parentLck, 0);
+            break;
+          }
+
           try {
             const id = await processManager.spawnProcess(
               processId,
@@ -284,8 +297,8 @@ export default async function syscallCallback(
               background,
               processManager.processInfos[processId].cwd
             );
-            const newProcessName = path.split("/").slice(-1)[0];
             if (env["DEBUG"] === "1") {
+              const newProcessName = path.split("/").slice(-1)[0];
               console.log(
                 `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
                 "background:black; color: white;",
@@ -298,7 +311,14 @@ export default async function syscallCallback(
             console.log("Failed spawning process");
           }
           if (background) {
-            Atomics.store(parentLck, 0, 0);
+            let exit_code = constants.EXIT_SUCCESS;
+            // We have already spawned  background process, SigInt doesn't terminate it.
+            // Wash should break execution of commands chain
+            if (processManager.processInfos[processId].termiantionOccured) {
+              exit_code = constants.EXIT_INTERRUPTED;
+              processManager.processInfos[processId].termiantionOccured = false;
+            }
+            Atomics.store(parentLck, 0, exit_code);
             Atomics.notify(parentLck, 0);
           }
         }
