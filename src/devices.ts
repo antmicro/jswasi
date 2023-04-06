@@ -431,7 +431,7 @@ export class EventSource implements Descriptor, In {
   constructor(
     private workerTable: ProcessManager,
     processId: number,
-    private subscribedEvents: bigint
+    public readonly subscribedEvents: bigint
   ) {
     this.eventSub = { processId, eventSourceFd: this } as HtermEventSub;
     this.workerTable.events.subscribeEvent(this.eventSub, subscribedEvents);

@@ -37,6 +37,7 @@ import {
   PollOneoffArgs,
   EventSourceArgs,
   CleanInodesArgs,
+  AttachSigIntArgs,
 } from "./types";
 
 type ptr = number;
@@ -1084,6 +1085,24 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         let returnCode = Atomics.load(lck, 0);
         return { exit_status: returnCode, output: `${fileDescriptor[0]}` };
+      }
+      case "attach_sigint": {
+        const { event_source_fd: fd }: { event_source_fd: number } =
+          JSON.parse(json);
+
+        // lock + event source file descriptor
+        const sharedBuffer = new SharedArrayBuffer(4 + 4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+
+        sendToKernel([
+          "attach_sigint",
+          { sharedBuffer, fd } as AttachSigIntArgs,
+        ]);
+        Atomics.wait(lck, 0, -1);
+
+        let returnCode = Atomics.load(lck, 0);
+        return { exit_status: returnCode, output: undefined };
       }
       case "clean_inodes": {
         const sharedBuffer = new SharedArrayBuffer(4);

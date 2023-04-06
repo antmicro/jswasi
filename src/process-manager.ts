@@ -70,6 +70,7 @@ class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
   public stdinPollSub: PollEntry | null = null;
   public termiantionOccured: boolean = false;
+  public terminationNotifier: EventSource | null;
 
   public shouldEcho = true;
 

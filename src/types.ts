@@ -206,6 +206,11 @@ export type EventSourceArgs = {
   eventMask: bigint;
 };
 
+export type AttachSigIntArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+};
+
 export type CleanInodesArgs = {
   sharedBuffer: SharedArrayBuffer;
 };

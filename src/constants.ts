@@ -245,6 +245,7 @@ export const WASI_POLL_BUF_STATUS_ERR = 2;
 // Events
 export const WASI_NO_EVENT = BigInt(0x0000000000000000);
 export const WASI_EVENT_MASK_SIZE = 4;
-export const WASI_EVENTS_NUM = 1;
+export const WASI_EVENTS_NUM = 2;
 
-export const WASI_EVENT_WINCH = BigInt(0x0000000000000001);
+export const WASI_EVENT_WINCH = 1n << 0n;
+export const WASI_EVENT_SIGINT = 1n << 0n;
