@@ -507,7 +507,7 @@ export class EventSource implements Descriptor, In {
     const readLen = new Int32Array(sharedBuff, 4, 1);
     const readBuf = new Uint8Array(sharedBuff, 8, len);
 
-    this.workerTable.sendBufferToProcess(workerId, len, lck, readLen, readBuf);
+    this.sendBufferToProcess(len, lck, readLen, readBuf);
 
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
