@@ -10,7 +10,7 @@ import {
   Timestamp,
   Whence,
 } from "./filesystem/filesystem.js";
-import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
+import { PollEntry, HtermEventSub } from "./types.js";
 import { Descriptor } from "./filesystem/filesystem";
 
 const RED_ANSI = "\u001b[31m";
@@ -424,13 +424,12 @@ export class EventSource implements Descriptor, In {
   fdFlags = 0;
 
   occuredEvents = constants.WASI_NO_EVENT;
-  bufferRequestQueue: BufferRequest[] = [];
   eventSub: HtermEventSub;
   poolSub: PollEntry | null = null;
 
   constructor(
     private workerTable: ProcessManager,
-    processId: number,
+    private processId: number,
     public readonly subscribedEvents: bigint
   ) {
     this.eventSub = { processId, eventSourceFd: this } as HtermEventSub;
@@ -494,6 +493,11 @@ export class EventSource implements Descriptor, In {
       this.eventSub,
       this.subscribedEvents
     );
+    let termination =
+      this.workerTable.processInfos[this.processId].terminationNotifier;
+    if (termination !== null && termination == this) {
+      this.workerTable.processInfos[this.processId].terminationNotifier = null;
+    }
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -507,7 +511,10 @@ export class EventSource implements Descriptor, In {
     const readLen = new Int32Array(sharedBuff, 4, 1);
     const readBuf = new Uint8Array(sharedBuff, 8, len);
 
-    this.sendBufferToProcess(len, lck, readLen, readBuf);
+    this.readEvents(len, readLen, readBuf);
+
+    Atomics.store(lck, 0, constants.WASI_ESUCCESS);
+    Atomics.notify(lck, 0);
 
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
@@ -591,53 +598,24 @@ export class EventSource implements Descriptor, In {
     return Promise.resolve(constants.WASI_EBADF);
   }
 
-  sendBufferToProcess(
-    requestedLen: number,
-    lck: Int32Array,
-    readLen: Int32Array,
-    buf: Uint8Array
-  ): void {
-    if (this.occuredEvents === constants.WASI_NO_EVENT) {
-      this.bufferRequestQueue.push({
-        requestedLen,
-        lck,
-        readLen,
-        sharedBuffer: buf,
-      });
-    } else {
-      readLen[0] =
-        requestedLen < constants.WASI_EVENT_MASK_SIZE
-          ? requestedLen
-          : constants.WASI_EVENT_MASK_SIZE;
+  readEvents(requestedLen: number, readLen: Int32Array, buf: Uint8Array): void {
+    readLen[0] =
+      requestedLen < constants.WASI_EVENT_MASK_SIZE
+        ? requestedLen
+        : constants.WASI_EVENT_MASK_SIZE;
 
-      let mask = 0xffn;
-      for (let i = 0; i < readLen[0]; i++) {
-        let val = this.occuredEvents & (mask << BigInt(i * 8));
-        buf[i] = Number(val >> BigInt(i * 8));
-        this.occuredEvents ^= val;
-      }
-
-      Atomics.store(lck, 0, constants.WASI_ESUCCESS);
-      Atomics.notify(lck, 0);
+    let mask = 0xffn;
+    for (let i = 0; i < readLen[0]; i++) {
+      let val = this.occuredEvents & (mask << BigInt(i * 8));
+      buf[i] = Number(val >> BigInt(i * 8));
+      this.occuredEvents ^= val;
     }
   }
 
   sendEvents(events: bigint): void {
     this.occuredEvents |= events;
 
-    while (
-      this.occuredEvents !== constants.WASI_NO_EVENT &&
-      this.bufferRequestQueue.length !== 0
-    ) {
-      const { requestedLen, lck, readLen, sharedBuffer } =
-        this.bufferRequestQueue.shift();
-      this.sendBufferToProcess(requestedLen, lck, readLen, sharedBuffer);
-    }
-
-    if (
-      this.occuredEvents !== constants.WASI_NO_EVENT &&
-      this.poolSub !== null
-    ) {
+    if (this.poolSub !== null) {
       const entry = this.poolSub;
       this.poolSub = null;
       if (Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID) {
@@ -657,5 +635,11 @@ export class EventSource implements Descriptor, In {
 
   setPollEntry(userLock: Int32Array, userBuffer: Int32Array): void {
     this.poolSub = { lck: userLock, data: userBuffer } as PollEntry;
+  }
+
+  obtainEvents(events: bigint): bigint {
+    let result = this.occuredEvents & events;
+    this.occuredEvents ^= result;
+    return result;
   }
 }

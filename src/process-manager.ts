@@ -69,8 +69,7 @@ export class FdTable {
 class ProcessInfo {
   public bufferRequestQueue: BufferRequest[] = [];
   public stdinPollSub: PollEntry | null = null;
-  public termiantionOccured: boolean = false;
-  public terminationNotifier: EventSource | null;
+  public terminationNotifier: EventSource | null = null;
 
   public shouldEcho = true;
 
@@ -237,11 +236,13 @@ export default class ProcessManager {
     }
 
     if (
+      !isJob &&
       parentId != null &&
-      this.processInfos[parentId].termiantionOccured &&
-      !isJob
+      this.processInfos[parentId].terminationNotifier !== null &&
+      this.processInfos[parentId].terminationNotifier.obtainEvents(
+        constants.WASI_EVENT_SIGINT
+      ) != 0n
     ) {
-      this.processInfos[parentId].termiantionOccured = false;
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     } else {
       // TODO: pass module through SharedArrayBuffer to save on copying time (it seems to be a big bottleneck)
@@ -283,10 +284,10 @@ export default class ProcessManager {
       this.processInfos[currentProcess].cmd === "/usr/bin/wash"
     ) {
       console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
-      this.processInfos[currentProcess].termiantionOccured = true;
     } else {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     }
+    this.events.publishEvent(constants.WASI_EVENT_SIGINT);
   }
 
   sendEndOfFile(id: number, lockValue: number) {

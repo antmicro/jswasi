@@ -276,10 +276,16 @@ export default async function syscallCallback(
           break;
         }
         default: {
-          // Only wash and process 0 has set termiantionOccured after SigInt comes.
+          // Check did SigInt come.
           // We can skip spawn child here and return to user space with appropriate exit code.
-          if (processManager.processInfos[processId].termiantionOccured) {
-            processManager.processInfos[processId].termiantionOccured = false;
+          let events =
+            processManager.processInfos[processId].terminationNotifier;
+          let sigintOccurred =
+            events !== null
+              ? events.obtainEvents(constants.WASI_EVENT_SIGINT) != 0n
+              : false;
+
+          if (sigintOccurred) {
             fds.tearDown();
             Atomics.store(parentLck, 0, constants.EXIT_INTERRUPTED);
             Atomics.notify(parentLck, 0);
@@ -315,10 +321,14 @@ export default async function syscallCallback(
             let exit_code = constants.EXIT_SUCCESS;
             // We have already spawned  background process, SigInt doesn't terminate it.
             // Wash should break execution of commands chain
-            if (processManager.processInfos[processId].termiantionOccured) {
+            let sigintOccurred =
+              events !== null
+                ? events.obtainEvents(constants.WASI_EVENT_SIGINT) != 0n
+                : false;
+            if (sigintOccurred) {
               exit_code = constants.EXIT_INTERRUPTED;
-              processManager.processInfos[processId].termiantionOccured = false;
             }
+
             Atomics.store(parentLck, 0, exit_code);
             Atomics.notify(parentLck, 0);
           }
@@ -1090,7 +1100,7 @@ export default async function syscallCallback(
         processManager.processInfos[processId].terminationNotifier = eventFd;
       }
 
-      Atomics.store(lck, 0, 0);
+      Atomics.store(lck, 0, exit_status);
       Atomics.notify(lck, 0);
 
       break;
