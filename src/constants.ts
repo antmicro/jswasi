@@ -248,4 +248,4 @@ export const WASI_EVENT_MASK_SIZE = 4;
 export const WASI_EVENTS_NUM = 2;
 
 export const WASI_EVENT_WINCH = 1n << 0n;
-export const WASI_EVENT_SIGINT = 1n << 0n;
+export const WASI_EVENT_SIGINT = 1n << 1n;

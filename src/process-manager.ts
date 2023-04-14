@@ -15,8 +15,17 @@ export class FdTable {
   }
 
   public clone(): FdTable {
-    var fdTable = new FdTable(this.fdt);
+    var fdTable = new FdTable([]);
     fdTable.freeFds = this.freeFds.slice(0);
+    // TODO: It is temporary fix, we should look at fd_flags here
+    for (let key in this.fdt) {
+      if (!(this.fdt[key] instanceof EventSource)) {
+        fdTable.fdt[key] = this.fdt[key];
+      } else {
+        fdTable.freeFds.push(Number(key));
+      }
+    }
+    fdTable.freeFds.sort();
     fdTable.topFd = this.topFd;
     return fdTable;
   }
@@ -284,10 +293,10 @@ export default class ProcessManager {
       this.processInfos[currentProcess].cmd === "/usr/bin/wash"
     ) {
       console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
+      this.events.publishEvent(constants.WASI_EVENT_SIGINT);
     } else {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     }
-    this.events.publishEvent(constants.WASI_EVENT_SIGINT);
   }
 
   sendEndOfFile(id: number, lockValue: number) {

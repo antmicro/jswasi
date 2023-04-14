@@ -1083,21 +1083,26 @@ export default async function syscallCallback(
       if (eventFd === undefined || !(eventFd instanceof EventSource)) {
         console.log(`attach_sigint: fd=${fd} is not EventSource descriptor!`);
         exit_status = constants.WASI_EBADF;
-      } else if (
-        (eventFd.subscribedEvents & constants.WASI_EVENT_SIGINT) ==
-        constants.WASI_NO_EVENT
-      ) {
-        console.log(
-          `attach_sigint: fd=${fd} does not subscribe WASI_EVENT_SIGINT!`
-        );
-        exit_status = constants.WASI_EINVAL;
       } else {
+        let eventSource = eventFd as EventSource;
         if (
-          processManager.processInfos[processId].terminationNotifier !== null
+          (BigInt(eventSource.subscribedEvents) &
+            constants.WASI_EVENT_SIGINT) ===
+          constants.WASI_NO_EVENT
         ) {
-          console.log(`Process=${processId} overwrites terminationNotifier!`);
+          console.log(
+            `attach_sigint: fd=${fd} does not subscribe WASI_EVENT_SIGINT!`
+          );
+          exit_status = constants.WASI_EINVAL;
+        } else {
+          if (
+            processManager.processInfos[processId].terminationNotifier !== null
+          ) {
+            console.log(`Process=${processId} overwrites terminationNotifier!`);
+          }
+          processManager.processInfos[processId].terminationNotifier =
+            eventSource;
         }
-        processManager.processInfos[processId].terminationNotifier = eventFd;
       }
 
       Atomics.store(lck, 0, exit_status);
