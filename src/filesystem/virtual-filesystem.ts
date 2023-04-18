@@ -38,14 +38,14 @@ function wasiFiletype(stat: vfs.Stat): number {
 
 function wasiFilestat(stat: vfs.Stat): Filestat {
   return {
-    dev: stat.dev,
-    ino: stat.ino,
-    nlink: stat.nlink,
+    dev: BigInt(stat.dev),
+    ino: BigInt(stat.ino),
+    nlink: BigInt(stat.nlink),
     filetype: wasiFiletype(stat),
-    size: stat.size,
-    atim: stat.atime,
-    mtim: stat.mtime,
-    ctim: stat.ctime,
+    size: BigInt(stat.size),
+    atim: BigInt(stat.atime),
+    mtim: BigInt(stat.mtime),
+    ctim: BigInt(stat.ctime),
   };
 }
 
@@ -56,7 +56,7 @@ export class VirtualFilesystem implements Filesystem {
     const __devMgr = new vfs.DeviceManager();
     const __inoMgr = new vfs.INodeManager(__devMgr);
     const [_, __rootDirIno] = __inoMgr.createINode(vfs.Directory, {});
-    const __fdMgr = new vfs.FileDescriptorManager();
+    const __fdMgr = new vfs.FileDescriptorManager(__inoMgr);
     this.virtualFs = new vfs.VirtualFS(
       0o022,
       __rootDirIno,
@@ -67,17 +67,28 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async mkdirat(desc: Descriptor, path: string): Promise<number> {
-    if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
+    if (!(desc instanceof VirtualFilesystemDirectoryDescriptor)) {
       return constants.WASI_EINVAL;
     }
 
     const __desc = desc as VirtualFilesystemDirectoryDescriptor;
 
-    const [, index] = this.virtualFs._iNodeMgr.createINode(vfs.Directory, {
+    let navigated;
+    if (__desc) {
+      navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
+    } else {
+      navigated = this.virtualFs._navigate(path, false);
+    }
+
+    if (navigated.target) {
+      return constants.WASI_EEXIST;
+    }
+
+    const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Directory, {
       mode: vfs.DEFAILT_DIRECTORY_PERM,
       uid: 0,
       gid: 0,
-      parent: __desc.dir.getEntryIndex("."),
+      parent: navigated.dir,
     });
     __desc.dir.addEntry(path, index);
 
@@ -140,7 +151,7 @@ export class VirtualFilesystem implements Filesystem {
     fs_rights_inheriting: Rights,
     fdflags: Fdflags
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
-    const navigated = vfs._navigate(path, false);
+    const navigated = this.virtualFs._navigate(path, false);
     if (navigated.target) {
       let err: number, index: number;
       if (navigated.remaining) {
@@ -154,15 +165,30 @@ export class VirtualFilesystem implements Filesystem {
           err = constants.WASI_ESUCCESS;
         }
       }
-      return {
-        err,
-        index,
-        desc: new VirtualFilesystemFileDescriptor(
+      let desc;
+      if (navigated.target instanceof vfs.Directory) {
+        desc = new VirtualFilesystemDirectoryDescriptor(
           fdflags,
           fs_rights_base,
           fs_rights_inheriting,
-          navigated.target
-        ),
+          navigated.target,
+          this.virtualFs._iNodeMgr
+        );
+      } else {
+        desc = new VirtualFilesystemFileDescriptor(
+          fdflags,
+          fs_rights_base,
+          fs_rights_inheriting,
+          this.virtualFs._fdMgr.createFd(
+            navigated.target,
+            vfs.constants.O_RDWR
+          )[0]
+        );
+      }
+      return {
+        err,
+        index,
+        desc,
       };
     } else if (oflags & constants.WASI_O_CREAT) {
       let [target, index] = this.virtualFs._iNodeMgr.createINode(vfs.File, {
@@ -171,6 +197,10 @@ export class VirtualFilesystem implements Filesystem {
         gid: 0,
       });
       navigated.dir.addEntry(navigated.name, index);
+      const [__desc, _] = this.virtualFs._fdMgr.createFd(
+        target,
+        vfs.constants.O_RDWR
+      );
       return {
         err: constants.WASI_ESUCCESS,
         index: -1,
@@ -178,7 +208,7 @@ export class VirtualFilesystem implements Filesystem {
           fdflags,
           fs_rights_base,
           fs_rights_inheriting,
-          target
+          __desc
         ),
       };
     } else {
@@ -252,18 +282,19 @@ export class VirtualFilesystem implements Filesystem {
 
     const __desc = desc as VirtualFilesystemDirectoryDescriptor;
 
-    const navigated = this.virtualFs._navigate(__desc.dir, linkpath, false);
+    const navigated = this.virtualFs._navigateFrom(__desc.dir, linkpath, false);
 
     if (navigated.target) {
       return constants.WASI_EEXIST;
     }
 
-    this.virtualFs._iNodeMgr.createINode(vfs.Symlink, {
+    const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Symlink, {
       mode: vfs.DEFAULT_SYMLINK_PERM,
       uid: 0,
       gid: 0,
       link: target,
     });
+    __desc.dir.addEntry(navigated.name, index);
     return constants.WASI_ESUCCESS;
   }
 }
@@ -344,6 +375,17 @@ abstract class VirtualFilesystemDescriptor implements Descriptor {
   abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
 }
 
+class VirtualFilesystemWritableFileStream extends WritableStream {
+  constructor(fd: VirtualFilesystemFileDescriptor) {
+    super({
+      write(chunk: any) {
+        fd.write(chunk.buffer);
+        new WritableStream();
+      },
+    });
+  }
+}
+
 class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   private cursor: number;
 
@@ -357,7 +399,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
       fs_flags,
       fs_rights_base,
       fs_rights_inheriting,
-      desc.getInode().getMetadata()
+      desc._iNode.getMetadata()
     );
     this.cursor = 0;
   }
@@ -365,7 +407,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   override async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: this.desc.getInode().data,
+      buffer: this.desc._iNode._data,
     };
   }
 
@@ -375,16 +417,14 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: this.desc.getInode().data.slice(Number(pos), len + Number(pos)),
+      buffer: this.desc._iNode._data.slice(Number(pos), len + Number(pos)),
     };
   }
 
   override async read(
     len: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    const buffer = this.desc
-      .getInode()
-      .arrayBuffer.slice(this.cursor, this.cursor + len);
+    const buffer = this.desc._iNode._data.slice(this.cursor, this.cursor + len);
     this.cursor += buffer.byteLength;
 
     return {
@@ -396,7 +436,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   override async read_str(): Promise<{ err: number; content: string }> {
     return {
       err: constants.WASI_ESUCCESS,
-      content: new TextDecoder().decode(this.desc.getInode().arrayBuffer),
+      content: new TextDecoder().decode(this.desc._iNode.buffer),
     };
   }
 
@@ -404,12 +444,17 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
     try {
+      const written = await this.desc._iNode.write(
+        new Uint8Array(buffer),
+        this.cursor
+      );
+      this.cursor += written;
       return {
         err: constants.WASI_ESUCCESS,
-        written: await this.desc.getInode().write(buffer, this.cursor),
+        written: written,
       };
     } catch (e: vfs.VirtualFSError) {
-      return e.errno;
+      return { err: e.errno, written: 0n };
     }
   }
 
@@ -420,7 +465,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     try {
       return {
         err: constants.WASI_ESUCCESS,
-        written: await this.desc.getInode().write(buffer, Number(offset)),
+        written: await this.desc._iNode.write(buffer, Number(offset)),
       };
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
@@ -440,7 +485,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
-    const size = BigInt((await this.desc.getInode().ino._data).length);
+    const size = BigInt((await this.desc._iNode.ino._data).length);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
         if (this.cursor + Number(offset) < 0n) {
@@ -468,7 +513,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
 
   override async truncate(size: bigint): Promise<number> {
     try {
-      this.desc.getInode().truncate(Number(size));
+      this.desc._iNode.truncate(Number(size));
       return constants.WASI_ESUCCESS;
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
@@ -482,7 +527,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     try {
       return {
         err: constants.WASI_ESUCCESS,
-        stream: this.desc.getInode().createWriteStream,
+        stream: new VirtualFilesystemWritableFileStream(this),
       };
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
@@ -490,11 +535,11 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   }
 
   async getFilestat(): Promise<Filestat> {
-    return wasiFilestat(this.desc.getInode().getMetadata());
+    return wasiFilestat(this.desc._iNode.getMetadata());
   }
 
   async setFilestatTimes(mtim?: Timestamp, atim?: Timestamp): Promise<number> {
-    let metadata = this.desc.getInode().getMetadata();
+    let metadata = this.desc._iNode.getMetadata();
     if (mtim !== undefined) metadata.mtime = mtim;
     if (atim !== undefined) metadata.atime = atim;
     return constants.WASI_ESUCCESS;
@@ -599,16 +644,17 @@ class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
   }> {
     try {
       if (this.dirents === undefined || refresh) {
-        this.dirents = this.dir
-          .getEntries()
-          .enumerate(([name, inode]: [string, number], index: number) => {
+        let __dirents = this.dir.getEntries();
+        this.dirents = (Array.from(__dirents) as [string, number][]).map(
+          ([name, inode]: [string, number], index: number) => {
             return {
-              d_next: index + 1,
-              d_ino: inode,
+              d_next: BigInt(index + 1),
+              d_ino: BigInt(inode),
               name: name,
               d_type: wasiFiletype(this.inodeMgr.getINode(inode).getMetadata()),
             };
-          });
+          }
+        );
       }
       return {
         err: constants.WASI_ESUCCESS,
