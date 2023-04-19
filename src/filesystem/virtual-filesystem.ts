@@ -491,7 +491,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
-    const size = BigInt((await this.desc._iNode.ino._data).length);
+    const size = BigInt((await this.desc._iNode._data).length);
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
         if (this.cursor + Number(offset) < 0n) {
