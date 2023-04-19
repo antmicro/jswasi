@@ -27,10 +27,11 @@ export class TopLevelFs {
 
   abspath(desc: Descriptor, path: string): string {
     if (desc !== undefined && !path.startsWith("/")) {
+      const __path = desc.getPath();
       if (path.length === 0) {
-        return desc.getPath();
+        return __path;
       }
-      return `${desc.getPath()}/${path}`;
+      return `${__path === "/" ? "" : __path}/${path}`;
     }
     return path;
   }
