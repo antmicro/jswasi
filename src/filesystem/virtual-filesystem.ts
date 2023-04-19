@@ -88,7 +88,7 @@ export class VirtualFilesystem implements Filesystem {
       mode: vfs.DEFAILT_DIRECTORY_PERM,
       uid: 0,
       gid: 0,
-      parent: navigated.dir,
+      parent: navigated.dir._dir["."],
     });
     __desc.dir.addEntry(path, index);
 
@@ -650,8 +650,7 @@ class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
   }> {
     try {
       if (this.dirents === undefined || refresh) {
-        let __dirents = this.dir.getEntries();
-        this.dirents = (Array.from(__dirents) as [string, number][]).map(
+        this.dirents = (Array.from(this.dir._dir) as [string, number][]).map(
           ([name, inode]: [string, number], index: number) => {
             return {
               d_next: BigInt(index + 1),
