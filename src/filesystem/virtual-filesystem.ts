@@ -510,7 +510,12 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
-    const size = BigInt((await this.desc._iNode._data).length);
+    let size;
+    if (this.fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
+      size = BigInt((await this.desc._iNode._link).length);
+    } else {
+      size = BigInt((await this.desc._iNode._data).length);
+    }
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
         if (this.cursor + Number(offset) < 0n) {
@@ -538,7 +543,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
 
   override async truncate(size: bigint): Promise<number> {
     try {
-      this.desc._iNode.truncate(Number(size));
+      this.desc._iNode._data.buffer.resize(Number(size));
       return constants.WASI_ESUCCESS;
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
