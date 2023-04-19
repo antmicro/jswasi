@@ -67,17 +67,17 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async mkdirat(desc: Descriptor, path: string): Promise<number> {
-    if (!(desc instanceof VirtualFilesystemDirectoryDescriptor)) {
-      return constants.WASI_EINVAL;
-    }
-
-    const __desc = desc as VirtualFilesystemDirectoryDescriptor;
-
     let navigated;
-    if (__desc) {
-      navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
-    } else {
+    let __desc;
+    if (desc === undefined) {
       navigated = this.virtualFs._navigate(path, false);
+    } else {
+      if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
+        __desc = desc as VirtualFilesystemDirectoryDescriptor;
+        navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
+      } else {
+        return constants.WASI_EINVAL;
+      }
     }
 
     if (navigated.target) {
@@ -114,14 +114,15 @@ export class VirtualFilesystem implements Filesystem {
     path: string,
     is_dir: boolean
   ): Promise<number> {
-    if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
-      return constants.WASI_EINVAL;
-    }
-
-    const __desc = desc as VirtualFilesystemDirectoryDescriptor;
-
     try {
-      const navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
+      let navigated;
+      if (desc === undefined) {
+        navigated = this.virtualFs._navigate(path, false);
+      } else if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
+        navigated = this.virtualFs._navigateFrom(desc.dir, path, false);
+      } else {
+        return constants.WASI_EINVAL;
+      }
 
       if (!navigated.target) {
         return constants.WASI_ENOENT;
@@ -232,26 +233,39 @@ export class VirtualFilesystem implements Filesystem {
     newDesc: Descriptor,
     newPath: string
   ): Promise<number> {
-    if (
-      !(oldDesc instanceof VirtualFilesystemDirectoryDescriptor) ||
-      !(newDesc instanceof VirtualFilesystemDirectoryDescriptor)
-    ) {
-      return constants.WASI_EINVAL;
+    let oldNavigated;
+    let __oldDesc;
+    if (oldDesc === undefined) {
+      oldNavigated = this.virtualFs._navigate(oldPath, false);
+    } else {
+      if (oldDesc instanceof VirtualFilesystemDirectoryDescriptor) {
+        __oldDesc = oldDesc as VirtualFilesystemDirectoryDescriptor;
+        oldNavigated = this.virtualFs._navigateFrom(
+          __oldDesc.dir,
+          oldPath,
+          false
+        );
+      } else {
+        return constants.WASI_EINVAL;
+      }
     }
 
-    const __oldDesc = oldDesc as VirtualFilesystemDirectoryDescriptor;
-    const __newDesc = newDesc as VirtualFilesystemDirectoryDescriptor;
-
-    const oldNavigated = this.virtualFs._navigateFrom(
-      __oldDesc,
-      oldPath,
-      false
-    );
-    const newNavigated = this.virtualFs._navigateFrom(
-      __newDesc,
-      newPath,
-      false
-    );
+    let newNavigated;
+    let __newDesc;
+    if (newDesc === undefined) {
+      newNavigated = this.virtualFs._navigate(newPath, false);
+    } else {
+      if (newDesc instanceof VirtualFilesystemDirectoryDescriptor) {
+        __newDesc = newDesc as VirtualFilesystemDirectoryDescriptor;
+        newNavigated = this.virtualFs._navigateFrom(
+          __newDesc.dir,
+          newPath,
+          false
+        );
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
 
     if (!oldNavigated.target) {
       return constants.WASI_ENOENT;
@@ -276,13 +290,18 @@ export class VirtualFilesystem implements Filesystem {
     desc: Descriptor,
     linkpath: string
   ): Promise<number> {
-    if (!(desc instanceof VirtualFilesystemDirectoryDescriptor)) {
-      return constants.WASI_EINVAL;
+    let navigated;
+    let __desc;
+    if (desc === undefined) {
+      navigated = this.virtualFs._navigate(linkpath, false);
+    } else {
+      if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
+        __desc = desc as VirtualFilesystemDirectoryDescriptor;
+        navigated = this.virtualFs._navigateFrom(__desc.dir, linkpath, false);
+      } else {
+        return constants.WASI_EINVAL;
+      }
     }
-
-    const __desc = desc as VirtualFilesystemDirectoryDescriptor;
-
-    const navigated = this.virtualFs._navigateFrom(__desc.dir, linkpath, false);
 
     if (navigated.target) {
       return constants.WASI_EEXIST;
