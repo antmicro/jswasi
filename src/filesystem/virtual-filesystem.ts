@@ -434,9 +434,15 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
   }
 
   override async read_str(): Promise<{ err: number; content: string }> {
+    let content;
+    if (this.fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE) {
+      new TextDecoder().decode((content = this.desc._iNode._data));
+    } else {
+      content = this.desc._iNode._link;
+    }
     return {
       err: constants.WASI_ESUCCESS,
-      content: new TextDecoder().decode(this.desc._iNode.buffer),
+      content,
     };
   }
 
