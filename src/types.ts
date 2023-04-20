@@ -214,3 +214,9 @@ export type AttachSigIntArgs = {
 export type CleanInodesArgs = {
   sharedBuffer: SharedArrayBuffer;
 };
+
+export type KillArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  processId: number;
+  signalNumber: number;
+};

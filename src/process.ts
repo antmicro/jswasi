@@ -38,6 +38,7 @@ import {
   EventSourceArgs,
   CleanInodesArgs,
   AttachSigIntArgs,
+  KillArgs,
 } from "./types";
 
 type ptr = number;
@@ -1111,6 +1112,24 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         lck[0] = -1;
         sendToKernel(["clean_inodes", { sharedBuffer } as CleanInodesArgs]);
         Atomics.wait(lck, 0, -1);
+        return { exit_status: Atomics.load(lck, 0), output: undefined };
+      }
+      case "kill": {
+        const {
+          process_id: processId,
+          signal: signalNumber,
+        }: { process_id: number; signal: number } = JSON.parse(json);
+
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+
+        sendToKernel([
+          "kill",
+          { sharedBuffer, processId, signalNumber } as KillArgs,
+        ]);
+        Atomics.wait(lck, 0, -1);
+
         return { exit_status: Atomics.load(lck, 0), output: undefined };
       }
       default: {

@@ -31,6 +31,7 @@ import {
   EventSourceArgs,
   AttachSigIntArgs,
   CleanInodesArgs,
+  KillArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -1125,6 +1126,27 @@ export default async function syscallCallback(
       }
 
       Atomics.store(lck, 0, 0);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "kill": {
+      const { sharedBuffer, processId, signalNumber } = data as KillArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      let exitStatus = constants.WASI_ESUCCESS;
+      if (signalNumber !== constants.WASI_SIGKILL) {
+        // For now, we support SigKill only
+        exitStatus = constants.WASI_EINVAL;
+      } else if (processManager.processInfos[processId] === undefined) {
+        exitStatus = constants.WASI_ESRCH;
+      } else {
+        // In bash:
+        // When a command terminates on a fatal signal whose number is N,
+        // Bash uses the value 128+N as the exit status.
+        await processManager.terminateProcess(processId, 128 + signalNumber);
+      }
+
+      Atomics.store(lck, 0, exitStatus);
       Atomics.notify(lck, 0);
       break;
     }
