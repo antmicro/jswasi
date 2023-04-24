@@ -676,7 +676,7 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     const end = size < pos + BigInt(len) ? size : this.cursor + BigInt(len);
     return {
       err: constants.WASI_ESUCCESS,
-      buffer: await file.slice(Number(this.cursor), Number(end)).arrayBuffer(),
+      buffer: await file.slice(Number(pos), Number(end)).arrayBuffer(),
     };
   }
 
