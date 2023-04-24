@@ -252,10 +252,6 @@ export class TopLevelFs {
     if (dinfo1.err !== constants.WASI_ESUCCESS) {
       return dinfo1.err;
     }
-    let filestat1 = await dinfo1.desc.getFilestat();
-    if (this.mounts[dinfo1.path]) {
-      return constants.WASI_EBUSY;
-    }
 
     let dinfo2 = await this.getDescInfo(
       __target,
@@ -263,6 +259,16 @@ export class TopLevelFs {
     );
     if (dinfo2.err !== constants.WASI_ESUCCESS) {
       return dinfo2.err;
+    }
+
+    let filestat1 = await dinfo1.desc.getFilestat();
+    if (
+      Object.keys(this.mounts).some((key) => {
+        key.startsWith(dinfo1.path);
+      }) ||
+      dinfo1.path.startsWith(dinfo2.path)
+    ) {
+      return constants.WASI_EBUSY;
     }
 
     const { filetype, dev } = await dinfo2.desc.getFilestat();
