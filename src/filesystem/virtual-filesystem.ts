@@ -575,10 +575,9 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     return wasiFilestat(this.desc._iNode.getMetadata());
   }
 
-  async setFilestatTimes(mtim?: Timestamp, atim?: Timestamp): Promise<number> {
-    let metadata = this.desc._iNode.getMetadata();
-    if (mtim !== undefined) metadata.mtime = mtim;
-    if (atim !== undefined) metadata.atime = atim;
+  async setFilestatTimes(atim?: Timestamp, mtim?: Timestamp): Promise<number> {
+    if (mtim !== undefined) this.desc._iNode._metadata.mtime = mtim;
+    if (atim !== undefined) this.desc._iNode._metadata.atime = atim;
     return constants.WASI_ESUCCESS;
   }
 }
@@ -710,10 +709,9 @@ class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
     return wasiFilestat(this.dir.getMetadata());
   }
 
-  async setFilestatTimes(mtim?: Timestamp, atim?: Timestamp): Promise<number> {
-    let metadata = this.dir.getMetadata();
-    if (mtim !== undefined) metadata.mtime = mtim;
-    if (atim !== undefined) metadata.atime = atim;
+  async setFilestatTimes(atim?: Timestamp, mtim?: Timestamp): Promise<number> {
+    if (mtim !== undefined) this.dir._metadata.mtime = mtim;
+    if (atim !== undefined) this.dir._metadata.atime = atim;
     return constants.WASI_ESUCCESS;
   }
 }
