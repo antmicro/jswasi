@@ -176,6 +176,16 @@ export class VirtualFilesystem implements Filesystem {
           this.virtualFs._iNodeMgr
         );
       } else {
+        if (oflags & constants.WASI_O_DIRECTORY) {
+          err = constants.WASI_ENOTDIR;
+          desc = new VirtualFilesystemDirectoryDescriptor(
+            fdflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            navigated.dir,
+            this.virtualFs._iNodeMgr
+          );
+        }
         desc = new VirtualFilesystemFileDescriptor(
           fdflags,
           fs_rights_base,
