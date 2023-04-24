@@ -397,8 +397,8 @@ abstract class VirtualFilesystemDescriptor implements Descriptor {
 class VirtualFilesystemWritableFileStream extends WritableStream {
   constructor(fd: VirtualFilesystemFileDescriptor) {
     super({
-      write(chunk: any) {
-        fd.write(chunk.buffer);
+      async write(chunk: any) {
+        await fd.write(chunk.buffer);
         new WritableStream();
       },
     });
@@ -469,10 +469,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
     try {
-      const written = await this.desc._iNode.write(
-        new Uint8Array(buffer),
-        this.cursor
-      );
+      const written = await this.desc._iNode.write(buffer, this.cursor);
       this.cursor += written;
       return {
         err: constants.WASI_ESUCCESS,
@@ -514,7 +511,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     if (this.fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK) {
       size = BigInt((await this.desc._iNode._link).length);
     } else {
-      size = BigInt((await this.desc._iNode._data).length);
+      size = BigInt((await this.desc._iNode._data).byteLength);
     }
     switch (whence) {
       case constants.WASI_WHENCE_CUR:
@@ -543,7 +540,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
 
   override async truncate(size: bigint): Promise<number> {
     try {
-      this.desc._iNode._data.buffer.resize(Number(size));
+      this.desc._iNode._data.resize(Number(size));
       return constants.WASI_ESUCCESS;
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
