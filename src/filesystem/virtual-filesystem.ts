@@ -681,16 +681,18 @@ class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
   }> {
     try {
       if (this.dirents === undefined || refresh) {
-        this.dirents = (Array.from(this.dir._dir) as [string, number][]).map(
-          ([name, inode]: [string, number], index: number) => {
+        this.dirents = (Array.from(this.dir._dir) as [string, number][])
+          .filter(([name, _inode]: [string, number]) => {
+            return name !== "." && name !== "..";
+          })
+          .map(([name, inode]: [string, number], index: number) => {
             return {
               d_next: BigInt(index + 1),
               d_ino: BigInt(inode),
               name: name,
               d_type: wasiFiletype(this.inodeMgr.getINode(inode).getMetadata()),
             };
-          }
-        );
+          });
       }
       return {
         err: constants.WASI_ESUCCESS,
