@@ -2,13 +2,9 @@ import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { FdTable } from "./process-manager.js";
 import syscallCallback from "./syscalls.js";
-import {
-  createFsaFilesystem,
-  createFsaFilesystem2,
-} from "./filesystem/fsa-filesystem.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
-import { TopLevelFs } from "./filesystem/top-level-fs.js";
+import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
 
 declare global {
   interface Window {
@@ -18,6 +14,8 @@ declare global {
   }
 }
 
+const INIT_FSA_ID = "fsa0";
+const BOOT_MOUNT_CONFIG_PATH = "/mounts.json";
 const DEFAULT_WORK_DIR = "/home/ant";
 const DEFAULT_ENV = {
   PATH: "/usr/bin:/usr/local/bin",
@@ -239,10 +237,14 @@ function initFsaDropImport(
           // TODO: use some kind of uuid in mount point names
           const tmp_mount = `/tmp/temp_mount_${handle.name}`;
           await processManager.filesystem.createDir(tmp_mount);
-          await processManager.filesystem.addMount(
-            tmp_mount,
-            await createFsaFilesystem2(handle, false)
-          );
+          let { err, filesystem } = await getFilesystem("fsa", {
+            dir: handle,
+            keepMetadata: false,
+          });
+          if (err !== constants.WASI_ESUCCESS) {
+            return;
+          }
+          await processManager.filesystem.addMount(tmp_mount, filesystem);
           // this process is spawned as a child of init, this isn't very elegant
           await processManager.spawnProcess(
             0, // parent_id
@@ -285,6 +287,45 @@ function initServiceWorker() {
   });
 }
 
+type MountConfig = {
+  mountPoint: string;
+  createMissing: boolean;
+  fsType: string;
+  opts: any;
+};
+
+const DEFAULT_MOUNT_CONFIG: MountConfig = {
+  mountPoint: "/",
+  createMissing: false,
+  fsType: "vfs",
+  opts: {},
+};
+
+async function getTopLevelFs(): Promise<TopLevelFs> {
+  const tfs = new TopLevelFs();
+  let __configFs = (
+    await getFilesystem("fsa", { name: INIT_FSA_ID, keepMetadata: false })
+  ).filesystem;
+  await tfs.addMount("/", __configFs);
+  let mountConfig: MountConfig = DEFAULT_MOUNT_CONFIG;
+
+  const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
+  if (err === constants.WASI_ESUCCESS) {
+    let { err, content } = await desc.read_str();
+    if (err === constants.WASI_ESUCCESS) {
+      try {
+        mountConfig = JSON.parse(content);
+      } catch (_) {}
+    }
+    await desc.close();
+  }
+  await tfs.removeMount("/");
+
+  let __filesystem = (await getFilesystem(mountConfig.fsType, mountConfig.opts))
+    .filesystem;
+  await tfs.addMount("/", __filesystem);
+  return tfs;
+}
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
@@ -300,8 +341,7 @@ export async function init(
     return;
   }
 
-  const tfs = new TopLevelFs();
-  await tfs.addMount("/", await createFsaFilesystem("fsa1", true));
+  const tfs = await getTopLevelFs();
 
   initServiceWorker();
   // create flag file to indicate that the filesystem was already initiated

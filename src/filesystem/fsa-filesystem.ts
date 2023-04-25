@@ -1,8 +1,8 @@
 import {
+  Filesystem,
   Filestat,
   Descriptor,
   Fdstat,
-  Filesystem,
   Rights,
   Fdflags,
   Timestamp,
@@ -49,15 +49,19 @@ function mapErr(e: DOMException, isDir: boolean): number {
   }
 }
 
-class FsaFilesystem implements Filesystem {
+type FsaFilesystemOpts = {
+  name?: string;
+  keepMetadata?: boolean;
+  dir?: FileSystemDirectoryHandle;
+};
+
+export class FsaFilesystem implements Filesystem {
+  private rootHandle: FileSystemDirectoryHandle;
+  private keepMetadata: boolean;
+
   private getRootHandle(): FileSystemDirectoryHandle {
     return this.rootHandle;
   }
-
-  constructor(
-    private rootHandle: FileSystemDirectoryHandle,
-    private keepMetadata: boolean
-  ) {}
 
   /**
    * Returns a handle using relative or absolute path
@@ -446,6 +450,7 @@ class FsaFilesystem implements Filesystem {
 
     return { err, index, desc };
   }
+
   async renameat(
     _oldDesc: Descriptor,
     _oldPath: string,
@@ -459,6 +464,89 @@ class FsaFilesystem implements Filesystem {
     // EXDEV indicates that user attempted to move files between mount points
     // most userspace apps will handle it by copying source and then removing it
     return constants.WASI_EXDEV;
+  }
+
+  /*export async function createFsaFilesystem(
+    name: string,
+    keepMetadata: boolean
+  ): Promise<FsaFilesystem> {
+    const topLevelHandle = await navigator.storage.getDirectory();
+    let rootHandle;
+    try {
+      rootHandle = await topLevelHandle.getDirectoryHandle(name);
+    } catch (e) {
+      if (
+        e instanceof DOMException &&
+        (e as DOMException).name == "NotFoundError"
+      ) {
+        rootHandle = await topLevelHandle.getDirectoryHandle(name, {
+          create: true,
+        });
+      } else {
+        return undefined;
+      }
+    }
+
+    const rootStoredData = await getStoredData(name);
+    if (keepMetadata && !rootStoredData) {
+      await setStoredData(name, {
+        dev: 0n,
+        ino: 0n,
+        filetype: constants.WASI_FILETYPE_DIRECTORY,
+        nlink: 1n,
+        size: 4096n,
+        atim: 0n,
+        mtim: 0n,
+        ctim: 0n,
+      });
+    }
+    return new FsaFilesystem(rootHandle, keepMetadata);
+  }*/
+  async initialize(opts: Object): Promise<number> {
+    const __opts = opts as FsaFilesystemOpts;
+    if (__opts.keepMetadata === undefined || (__opts.dir && __opts.name)) {
+      return constants.WASI_EINVAL;
+    }
+    this.keepMetadata = __opts.keepMetadata;
+
+    if (__opts.dir !== undefined) {
+      this.rootHandle = __opts.dir;
+      return constants.WASI_ESUCCESS;
+    } else if (__opts.name !== undefined) {
+      const topLevelHandle = await navigator.storage.getDirectory();
+      try {
+        this.rootHandle = await topLevelHandle.getDirectoryHandle(__opts.name);
+        return constants.WASI_ESUCCESS;
+      } catch (e) {
+        if (
+          e instanceof DOMException &&
+          (e as DOMException).name == "NotFoundError"
+        ) {
+          this.rootHandle = await topLevelHandle.getDirectoryHandle(
+            __opts.name,
+            {
+              create: true,
+            }
+          );
+        } else {
+          return constants.WASI_ENOENT;
+        }
+      }
+      const rootStoredData = await getStoredData(__opts.name);
+      if (__opts.keepMetadata && !rootStoredData) {
+        await setStoredData(__opts.name, {
+          dev: 0n,
+          ino: 0n,
+          filetype: constants.WASI_FILETYPE_DIRECTORY,
+          nlink: 1n,
+          size: 4096n,
+          atim: 0n,
+          mtim: 0n,
+          ctim: 0n,
+        });
+      }
+    }
+    return constants.WASI_EINVAL;
   }
 }
 
@@ -889,48 +977,4 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     }
     return { err: constants.WASI_ESUCCESS, dirents: this.entries };
   }
-}
-
-export async function createFsaFilesystem2(
-  dir: FileSystemDirectoryHandle,
-  keepMetadata: boolean
-): Promise<FsaFilesystem> {
-  return new FsaFilesystem(dir, keepMetadata);
-}
-
-export async function createFsaFilesystem(
-  name: string,
-  keepMetadata: boolean
-): Promise<FsaFilesystem> {
-  const topLevelHandle = await navigator.storage.getDirectory();
-  let rootHandle;
-  try {
-    rootHandle = await topLevelHandle.getDirectoryHandle(name);
-  } catch (e) {
-    if (
-      e instanceof DOMException &&
-      (e as DOMException).name == "NotFoundError"
-    ) {
-      rootHandle = await topLevelHandle.getDirectoryHandle(name, {
-        create: true,
-      });
-    } else {
-      return undefined;
-    }
-  }
-
-  const rootStoredData = await getStoredData(name);
-  if (keepMetadata && !rootStoredData) {
-    await setStoredData(name, {
-      dev: 0n,
-      ino: 0n,
-      filetype: constants.WASI_FILETYPE_DIRECTORY,
-      nlink: 1n,
-      size: 4096n,
-      atim: 0n,
-      mtim: 0n,
-      ctim: 0n,
-    });
-  }
-  return new FsaFilesystem(rootHandle, keepMetadata);
 }

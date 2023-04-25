@@ -5,6 +5,7 @@ import {
   LookupFlags,
   Fdflags,
   Rights,
+  filesystemMap,
 } from "./filesystem.js";
 import * as constants from "../constants.js";
 import { dirname, basename, realpath } from "../utils.js";
@@ -17,6 +18,25 @@ type DescInfo = {
   fs: Filesystem;
   path: string;
 };
+
+export async function getFilesystem(
+  fs: string,
+  opts: Object
+): Promise<{ err: number; filesystem: Filesystem }> {
+  const __constructor = filesystemMap[fs];
+  if (__constructor) {
+    let __fs = new __constructor();
+    await __fs.initialize(opts);
+    return {
+      err: constants.WASI_ESUCCESS,
+      filesystem: __fs,
+    };
+  }
+  return {
+    err: constants.WASI_EINVAL,
+    filesystem: undefined,
+  };
+}
 
 export class TopLevelFs {
   private mounts: Record<string, Filesystem>;

@@ -3,7 +3,7 @@ import * as utils from "./utils.js";
 import { fetchFile } from "./terminal.js";
 import ProcessManager, { FdTable } from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
-import { createFsaFilesystem2 } from "./filesystem/fsa-filesystem.js";
+import { getFilesystem } from "./filesystem/top-level-fs.js";
 
 export async function mount(
   processManager: ProcessManager,
@@ -60,10 +60,22 @@ export async function mount(
       }
 
       const mountPoint = await showDirectoryPicker();
-      return await processManager.filesystem.addMount(
-        path,
-        await createFsaFilesystem2(mountPoint, false)
-      );
+      let { filesystem } = await getFilesystem("fsa", {
+        dir: mountPoint,
+        keepMetadata: false,
+      });
+      return await processManager.filesystem.addMount(path, filesystem);
+    }
+    case 3: {
+      // TODO: this is ugly and temporary, do it right when implementing
+      // mount as a syscall
+      if (args[1] === "fsa0") {
+        const { filesystem } = await getFilesystem("fsa", {
+          name: "fsa0",
+          keepMetadata: false,
+        });
+        return await processManager.filesystem.addMount(args[2], filesystem);
+      }
     }
     default: {
       await stderr.write(

@@ -1,3 +1,6 @@
+import { FsaFilesystem } from "./fsa-filesystem.js";
+import { VirtualFilesystem } from "./virtual-filesystem.js";
+
 export type LookupFlags = number;
 export type OpenFlags = number;
 export type Fdflags = number;
@@ -32,6 +35,11 @@ export type Fdstat = {
   fs_flags: Fdflags;
   fs_rights_base: Rights;
   fs_rights_inheriting: Rights;
+};
+
+export const filesystemMap: Record<string, new () => Filesystem> = {
+  fsa: FsaFilesystem,
+  vfs: VirtualFilesystem,
 };
 
 // This is not exactly a Dirent struct defined in wasi.
@@ -253,4 +261,5 @@ export interface Filesystem {
     desc: Descriptor,
     linkpath: string
   ): Promise<number>;
+  initialize(opts: Object): Promise<number>;
 }

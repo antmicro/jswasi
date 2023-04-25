@@ -326,6 +326,10 @@ export class VirtualFilesystem implements Filesystem {
     __desc.dir.addEntry(navigated.name, index);
     return constants.WASI_ESUCCESS;
   }
+
+  async initialize(_opts: Object): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
 }
 
 abstract class VirtualFilesystemDescriptor implements Descriptor {
