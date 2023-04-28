@@ -236,6 +236,7 @@ export default async function syscallCallback(
           fds.replaceFd(fd, desc);
         })
       );
+      let isBrowserApp = true;
 
       // TODO: Intentionally ignore SigInt, do not check termiantionOccured is set
       // for browser apps. Maybe we should handle it in the future..
@@ -283,6 +284,7 @@ export default async function syscallCallback(
           break;
         }
         default: {
+          isBrowserApp = false;
           // Check did SigInt come.
           // We can skip spawn child here and return to user space with appropriate exit code.
           let events =
@@ -341,7 +343,11 @@ export default async function syscallCallback(
           }
         }
       }
-      fds.tearDown();
+
+      if (isBrowserApp) {
+        // Close stdout and stderr in browser apps
+        fds.tearDown();
+      }
 
       break;
     }
