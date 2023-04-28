@@ -1136,8 +1136,14 @@ export default async function syscallCallback(
       let exitStatus = constants.WASI_ESUCCESS;
       if (signalNumber !== constants.WASI_SIGKILL) {
         // For now, we support SigKill only
+        console.log(
+          `Process=${processId} send usupported singnal: ${signalNumber}!`
+        );
         exitStatus = constants.WASI_EINVAL;
       } else if (processManager.processInfos[processId] === undefined) {
+        console.log(
+          `Process=${processId} send singnal to process ${processId} that does not exist!`
+        );
         exitStatus = constants.WASI_ESRCH;
       } else {
         // In bash:

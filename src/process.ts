@@ -968,6 +968,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         const { echo }: { echo: string } = JSON.parse(json);
 
+        workerConsoleLog(`set_echo(${echo})`);
+
         sendToKernel([
           "set_echo",
           { shouldEcho: echo, sharedBuffer } as SetEchoArgs,
@@ -984,6 +986,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
         const { fd }: { fd: number } = JSON.parse(json);
 
+        workerConsoleLog(`isatty(${fd})`);
+
         sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
         let err = Atomics.load(lck, 0);
@@ -999,6 +1003,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         lck[0] = -1;
         const pidPtr = new Int32Array(sharedBuffer, 4, 1);
 
+        workerConsoleLog(`attach_sigint()`);
+
         sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
@@ -1007,6 +1013,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       case "hterm": {
         const { attrib, val }: { attrib: string; val: string } =
           JSON.parse(json);
+
+        workerConsoleLog(`hterm(${attrib}, ${val})`);
+
         let returnCode;
         if (val === undefined) {
           var bufferSize = 64;
@@ -1069,6 +1078,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const lck = new Int32Array(sharedBuffer, 0, 1);
         const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
 
+        workerConsoleLog(`event_source_fd(${eventMask})`);
+
         if (
           eventMask === 0n ||
           eventMask >= BigInt(1n) << BigInt(constants.WASI_EVENTS_NUM)
@@ -1095,6 +1106,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
+
+        workerConsoleLog(`attach_sigint(${fd})`);
 
         sendToKernel([
           "attach_sigint",
@@ -1123,6 +1136,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const sharedBuffer = new SharedArrayBuffer(4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
+
+        workerConsoleLog(`kill(${processId}, ${signalNumber})`);
 
         sendToKernel([
           "kill",
