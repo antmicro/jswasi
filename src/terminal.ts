@@ -297,8 +297,11 @@ type MountConfig = {
 const DEFAULT_MOUNT_CONFIG: MountConfig = {
   mountPoint: "/",
   createMissing: false,
-  fsType: "vfs",
-  opts: {},
+  fsType: "fsa",
+  opts: {
+    name: "fsa1",
+    keepMetadata: true,
+  },
 };
 
 async function getTopLevelFs(): Promise<TopLevelFs> {
