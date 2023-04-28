@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 import { fetchFile } from "./terminal.js";
-import ProcessManager from "./process-manager";
+import ProcessManager, { FdTable } from "./process-manager";
 import { Stderr, Stdout } from "./devices.js";
 import { createFsaFilesystem2 } from "./filesystem/fsa-filesystem.js";
 
@@ -9,12 +9,13 @@ export async function mount(
   processManager: ProcessManager,
   processId: number,
   args: string[],
-  _env: Record<string, string>
+  _env: Record<string, string>,
+  fds: FdTable
 ): Promise<number> {
   console.log(`mount(${processId}, ${args})`);
 
-  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
-  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
+  const stdout = fds.getFd(1);
+  const stderr = fds.getFd(2);
 
   switch (args.length) {
     case 1: {
@@ -77,10 +78,11 @@ export async function umount(
   processManager: ProcessManager,
   processId: number,
   args: string[],
-  env: Record<string, string>
+  env: Record<string, string>,
+  fds: FdTable
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
-  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stderr;
+  const stdout = fds.getFd(1);
+  const stderr = fds.getFd(2);
 
   let arg = args[1];
   // handle relative path
@@ -122,9 +124,10 @@ export async function wget(
   processManager: ProcessManager,
   processId: number,
   args: string[],
-  env: Record<string, string>
+  env: Record<string, string>,
+  fds: FdTable
 ): Promise<number> {
-  const stderr = processManager.processInfos[processId].fds.getFd(2) as Stderr;
+  const stderr = fds.getFd(2) as Stderr;
 
   let path: string;
   let address: string;
@@ -230,11 +233,12 @@ export async function wget(
 
 export async function ps(
   processManager: ProcessManager,
-  processId: number,
+  _processId: number,
   _args: string[],
-  _env: Record<string, string>
+  _env: Record<string, string>,
+  fds: FdTable
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
+  const stdout = fds.getFd(1);
 
   let psData = "  PID TTY          TIME CMD\n\r";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
@@ -255,6 +259,7 @@ export async function ps(
   // for now ps must be added artificially
   psData += `-1 pts/0    00:00:00 ps\n\r`;
   await stdout.write(new TextEncoder().encode(psData));
+  stdout.close();
   return 0;
 }
 
@@ -262,9 +267,10 @@ export async function free(
   processManager: ProcessManager,
   processId: number,
   args: string[],
-  _env: Record<string, string>
+  _env: Record<string, string>,
+  fds: FdTable
 ): Promise<number> {
-  const stdout = processManager.processInfos[processId].fds.getFd(1) as Stdout;
+  const stdout = fds.getFd(1) as Stdout;
 
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;
@@ -297,7 +303,8 @@ export async function reset(
   _processManager: ProcessManager,
   _processId: number,
   _args: string[],
-  _env: Record<string, string>
+  _env: Record<string, string>,
+  _fds: FdTable
 ): Promise<number> {
   location.reload();
   return constants.EXIT_SUCCESS;

@@ -241,37 +241,43 @@ export default async function syscallCallback(
       // for browser apps. Maybe we should handle it in the future..
       switch (path) {
         case "/usr/bin/ps": {
-          const result = await ps(processManager, processId, args, env);
+          const result = await ps(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/mount": {
-          const result = await mount(processManager, processId, args, env);
+          const result = await mount(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/free": {
-          const result = await free(processManager, processId, args, env);
+          const result = await free(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/wget": {
-          const result = await wget(processManager, processId, args, env);
+          const result = await wget(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/reset": {
-          const result = await reset(processManager, processId, args, env);
+          const result = await reset(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
         }
         case "/usr/bin/umount": {
-          const result = await umount(processManager, processId, args, env);
+          const result = await umount(
+            processManager,
+            processId,
+            args,
+            env,
+            fds
+          );
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;
@@ -335,6 +341,8 @@ export default async function syscallCallback(
           }
         }
       }
+      fds.tearDown();
+
       break;
     }
     case "fd_prestat_get": {
