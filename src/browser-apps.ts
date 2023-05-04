@@ -23,7 +23,7 @@ export async function mount(
         async ([mountPoint, fs]) => {
           await stdout.write(
             new TextEncoder().encode(
-              `${fs.constructor.name} on ${mountPoint}\n`
+              `${fs.constructor.name} on ${mountPoint}\r\n`
             )
           );
         }
