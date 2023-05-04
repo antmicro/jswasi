@@ -434,7 +434,11 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
       fs_rights_inheriting,
       desc._iNode.getMetadata()
     );
-    this.cursor = 0;
+    if (fs_flags & constants.WASI_FDFLAG_APPEND) {
+      this.cursor = desc._iNode._data.byteLength;
+    } else {
+      this.cursor = 0;
+    }
   }
 
   override async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
