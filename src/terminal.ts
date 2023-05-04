@@ -165,6 +165,7 @@ async function initFs(fs: TopLevelFs) {
     fs.addSymlink("/usr/bin/coreutils", "/usr/bin/true"),
     fs.addSymlink("/usr/bin/coreutils", "/usr/bin/false"),
     fs.addSymlink("/usr/bin/coreutils", "/usr/bin/sleep"),
+    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/seq"),
 
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/unzip"),
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/hexdump"),
