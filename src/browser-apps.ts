@@ -240,7 +240,7 @@ export async function ps(
 ): Promise<number> {
   const stdout = fds.getFd(1);
 
-  let psData = "  PID TTY          TIME CMD\n\r";
+  let psData = "  PID TTY          TIME CMD\r\n";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
     const now = new Date();
     // @ts-ignore Property 'timestamp' does not exits on type unknown (workerInfo type is not recognized)
@@ -253,11 +253,11 @@ export async function ps(
     )}:${`00${minutes}`.slice(-2)}:${`00${seconds}`.slice(-2)} ${
       // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognized)
       workerInfo.cmd.split("/").slice(-1)[0]
-    }\n\r`;
+    }\r\n`;
   }
 
   // for now ps must be added artificially
-  psData += `-1 pts/0    00:00:00 ps\n\r`;
+  psData += `-1 pts/0    00:00:00 ps\r\n`;
   await stdout.write(new TextEncoder().encode(psData));
   stdout.close();
   return 0;
@@ -288,12 +288,12 @@ export async function free(
     usedMemory = `${Math.round(usedMemoryRaw / 1024)}`;
     availableMemory = `${Math.round((totalMemoryRaw - usedMemoryRaw) / 1024)}`;
   }
-  let freeData = "               total        used   available\n\r";
+  let freeData = "               total        used   available\r\n";
   freeData += `Mem:      ${`          ${totalMemory}`.slice(
     -10
   )}  ${`          ${usedMemory}`.slice(
     -10
-  )}  ${`          ${availableMemory}`.slice(-10)}\n\r`;
+  )}  ${`          ${availableMemory}`.slice(-10)}\r\n`;
   await stdout.write(new TextEncoder().encode(freeData));
 
   return constants.EXIT_SUCCESS;
