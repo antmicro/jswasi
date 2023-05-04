@@ -29,7 +29,7 @@
     "prettier-check": "npx prettier . --check",
     "record": "make record",
     "prepare": "husky install",
-    "test": "export platform=${PLATFORM:-browser}; [ \"$platform\" = \"browser\" ] && make cache_base; cd tests/robot && robot --variable cache:$(realpath ../../work/browser_cache/) --variable platform:$platform -i $platform ."
+    "test": "export platform=${PLATFORM:-browser}; [ \"$platform\" = \"browser\" ] && make cache_base || [ \"$platform\" = \"browser_virtual\" ] && make cache_vfs; cd tests/robot && robot --variable cache:$(realpath ../../work/browser_cache/) --variable platform:$platform -i $platform ."
   },
   "lint-staged": {
     "*.ts": [
