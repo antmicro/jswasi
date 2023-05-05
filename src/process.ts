@@ -839,7 +839,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     );
     switch (command) {
       case "spawn": {
-        const sharedBuffer = new SharedArrayBuffer(4);
+        // lock + child PID
+        const sharedBuffer = new SharedArrayBuffer(4 + 4);
 
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
@@ -875,27 +876,29 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         // wait for child process to finish
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
-        const childStatus = new Uint32Array(1);
-        childStatus[0] = constants.EXIT_SUCCESS;
+        const childPID = new Int32Array(sharedBuffer, 4, 1);
+        const userBuffer = new Uint32Array(2);
+        userBuffer[0] = constants.EXIT_SUCCESS;
+        userBuffer[1] = Atomics.load(childPID, 0);
 
         if (err !== constants.WASI_ESUCCESS) {
           workerConsoleLog(`error: spawned process returned ${err}`);
           if (err === constants.WASI_ENOEXEC) {
             // If the program can't be executed, return additional output message
-            childStatus[0] = constants.WASI_ENOEXEC;
+            userBuffer[0] = constants.WASI_ENOEXEC;
             return {
               exit_status: constants.EXIT_FAILURE,
-              output: new Uint8Array(childStatus.buffer, 0, 4),
+              output: new Uint8Array(userBuffer.buffer, 0, 8),
             };
           }
           return {
             exit_status: err,
-            output: new Uint8Array(childStatus.buffer, 0, 4),
+            output: new Uint8Array(userBuffer.buffer, 0, 8),
           };
         }
         return {
           exit_status: constants.EXIT_SUCCESS,
-          output: new Uint8Array(childStatus.buffer, 0, 4),
+          output: new Uint8Array(userBuffer.buffer, 0, 8),
         };
       }
 

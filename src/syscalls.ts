@@ -220,6 +220,8 @@ export default async function syscallCallback(
       const { path, args, env, sharedBuffer, background, redirects } =
         data as SpawnArgs;
       const parentLck = new Int32Array(sharedBuffer, 0, 1);
+      const childPID = new Int32Array(sharedBuffer, 4, 1);
+      childPID[0] = -1;
       args.splice(0, 0, path.split("/").pop());
 
       // replace child's descriptor table with shallow copy of parent's
@@ -313,6 +315,7 @@ export default async function syscallCallback(
               background,
               processManager.processInfos[processId].cwd
             );
+            Atomics.store(childPID, 0, id);
             if (env["DEBUG"] === "1") {
               const newProcessName = path.split("/").slice(-1)[0];
               console.log(
