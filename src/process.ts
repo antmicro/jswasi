@@ -819,7 +819,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   // used solely in path_readlink
   function specialParse(syscallDataJson: string): {
     exit_status: number;
-    output: string;
+    output: Uint8Array;
   } {
     const {
       command,
@@ -875,23 +875,27 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         // wait for child process to finish
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
+        const childStatus = new Uint32Array(1);
+        childStatus[0] = constants.EXIT_SUCCESS;
+
         if (err !== constants.WASI_ESUCCESS) {
           workerConsoleLog(`error: spawned process returned ${err}`);
           if (err === constants.WASI_ENOEXEC) {
             // If the program can't be executed, return additional output message
+            childStatus[0] = constants.WASI_ENOEXEC;
             return {
               exit_status: constants.EXIT_FAILURE,
-              output: `${constants.WASI_ENOEXEC}`,
+              output: new Uint8Array(childStatus.buffer, 0, 4),
             };
           }
           return {
             exit_status: err,
-            output: `${constants.EXIT_SUCCESS}`,
+            output: new Uint8Array(childStatus.buffer, 0, 4),
           };
         }
         return {
           exit_status: constants.EXIT_SUCCESS,
-          output: `${constants.EXIT_SUCCESS}`,
+          output: new Uint8Array(childStatus.buffer, 0, 4),
         };
       }
 
@@ -910,7 +914,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         const err = Atomics.load(lck, 0);
         workerConsoleLog(`chdir returned ${err}`);
-        return { exit_status: err, output: dir };
+        return {
+          exit_status: err,
+          output: new TextEncoder().encode(dir),
+        };
       }
 
       case "getcwd": {
@@ -935,7 +942,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             ? new TextDecoder().decode(cwd_buf.slice(0, cwd_len[0]))
             : undefined;
         workerConsoleLog(`getcwd returned ${output}`);
-        return { exit_status: err, output };
+        return {
+          exit_status: err,
+          output: new TextEncoder().encode(output),
+        };
       }
 
       case "set_env": {
@@ -957,7 +967,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           }
         }
 
-        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
+        return {
+          exit_status: constants.EXIT_SUCCESS,
+          output: new Uint8Array(),
+        };
       }
       // TODO: rework this, linux uses "stty -echo"/"stty echo"
       //  (https://www.thegeeksearch.com/how-to-disable-enable-echo-of-keys-commands-typed-in-linux-shell/)
@@ -976,39 +989,49 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         ]);
         Atomics.wait(lck, 0, -1);
 
-        return { exit_status: constants.EXIT_SUCCESS, output: undefined };
+        return {
+          exit_status: constants.EXIT_SUCCESS,
+          output: new Uint8Array(),
+        };
       }
       case "isatty": {
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        lck[0] = -1;
-
         const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
+
+        lck[0] = -1;
+        isattyPtr[0] = -1;
+
         const { fd }: { fd: number } = JSON.parse(json);
 
         workerConsoleLog(`isatty(${fd})`);
 
         sendToKernel(["isatty", { sharedBuffer, fd } as IsAttyArgs]);
         Atomics.wait(lck, 0, -1);
-        let err = Atomics.load(lck, 0);
 
+        let err = Atomics.load(lck, 0);
         return {
           exit_status: err,
-          output: `${isattyPtr[0]}`,
+          output: new Uint8Array(isattyPtr, 0, 4),
         };
       }
       case "getpid": {
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        lck[0] = -1;
         const pidPtr = new Int32Array(sharedBuffer, 4, 1);
 
-        workerConsoleLog(`attach_sigint()`);
+        lck[0] = -1;
+        pidPtr[0] = -1;
+
+        workerConsoleLog(`getpid()`);
 
         sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
-        return { exit_status: constants.EXIT_SUCCESS, output: `${pidPtr[0]}` };
+        return {
+          exit_status: constants.EXIT_SUCCESS,
+          output: new Uint8Array(pidPtr, 0, 4),
+        };
       }
       case "hterm": {
         const { attrib, val }: { attrib: string; val: string } =
@@ -1023,7 +1046,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufferSize);
             const lck = new Int32Array(sharedBuffer, 0, 1);
             const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
-            const buffer = new Int8Array(sharedBuffer, 8, bufferSize);
+            const buffer = new Uint8Array(sharedBuffer, 8, bufferSize);
 
             lck[0] = -1;
             bufferUsed[0] = bufferSize;
@@ -1038,13 +1061,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             if (returnCode == constants.WASI_ESUCCESS) {
               // In case buffer size was not enought then resize buffer and call syscall again
               if (bufferUsed[0] <= bufferSize) {
-                const value = new TextDecoder().decode(
-                  buffer.slice(0, bufferUsed[0])
-                );
-
                 return {
                   exit_status: constants.EXIT_SUCCESS,
-                  output: `${value}`,
+                  output: buffer,
                 };
               }
 
@@ -1052,7 +1071,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
                 bufferSize *= 2;
               }
             } else {
-              return { exit_status: returnCode, output: undefined };
+              return { exit_status: returnCode, output: new Uint8Array() };
             }
           }
         } else {
@@ -1068,7 +1087,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           Atomics.wait(lck, 0, -1);
 
           returnCode = Atomics.load(lck, 0);
-          return { exit_status: returnCode, output: undefined };
+
+          return {
+            exit_status: returnCode,
+            output: new Uint8Array(),
+          };
         }
       }
       case "event_source_fd": {
@@ -1077,6 +1100,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
+        fileDescriptor[0] = -1;
 
         workerConsoleLog(`event_source_fd(${eventMask})`);
 
@@ -1084,7 +1108,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           eventMask === 0n ||
           eventMask >= BigInt(1n) << BigInt(constants.WASI_EVENTS_NUM)
         ) {
-          return { exit_status: constants.WASI_EINVAL, output: undefined };
+          return {
+            exit_status: constants.WASI_EINVAL,
+            output: new Uint8Array(),
+          };
         }
 
         lck[0] = -1;
@@ -1096,7 +1123,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         let returnCode = Atomics.load(lck, 0);
-        return { exit_status: returnCode, output: `${fileDescriptor[0]}` };
+        return {
+          exit_status: returnCode,
+          output: new Uint8Array(sharedBuffer, 4, 4),
+        };
       }
       case "attach_sigint": {
         const { event_source_fd: fd }: { event_source_fd: number } =
@@ -1116,7 +1146,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         let returnCode = Atomics.load(lck, 0);
-        return { exit_status: returnCode, output: undefined };
+        return {
+          exit_status: returnCode,
+          output: new Uint8Array(),
+        };
       }
       case "clean_inodes": {
         const sharedBuffer = new SharedArrayBuffer(4);
@@ -1125,7 +1158,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         lck[0] = -1;
         sendToKernel(["clean_inodes", { sharedBuffer } as CleanInodesArgs]);
         Atomics.wait(lck, 0, -1);
-        return { exit_status: Atomics.load(lck, 0), output: undefined };
+        return {
+          exit_status: Atomics.load(lck, 0),
+          output: new Uint8Array(),
+        };
       }
       case "kill": {
         const {
@@ -1145,7 +1181,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         ]);
         Atomics.wait(lck, 0, -1);
 
-        return { exit_status: Atomics.load(lck, 0), output: undefined };
+        return {
+          exit_status: Atomics.load(lck, 0),
+          output: new Uint8Array(),
+        };
       }
       default: {
         workerConsoleLog(`Special command ${command} not found.`);
@@ -1180,7 +1219,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       const { exit_status, output } = specialParse(path.slice(1));
       // ensure that syscall output doesn't exceed buffer size and the buffer pointer is not NULL
       if (exit_status !== constants.WASI_ENOBUFS && bufferPtr !== 0) {
-        const result = new TextEncoder().encode(output);
+        const result = output;
         let count = result.byteLength;
         view8.set(result.slice(0, count), bufferPtr);
         view8.set([0], bufferPtr + count);
