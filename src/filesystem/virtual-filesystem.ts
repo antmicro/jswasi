@@ -434,7 +434,10 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
       fs_rights_inheriting,
       desc._iNode.getMetadata()
     );
-    if (fs_flags & constants.WASI_FDFLAG_APPEND) {
+    if (
+      fs_flags & constants.WASI_FDFLAG_APPEND &&
+      this.fdstat.fs_filetype !== constants.WASI_FILETYPE_SYMBOLIC_LINK
+    ) {
       this.cursor = desc._iNode._data.byteLength;
     } else {
       this.cursor = 0;
