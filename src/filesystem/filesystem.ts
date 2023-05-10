@@ -368,6 +368,19 @@ export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
 }
 
 export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
+  constructor(
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights
+  ) {
+    super();
+    this.fdstat = {
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      fs_filetype: constants.WASI_FILETYPE_CHARACTER_DEVICE,
+    };
+  }
   async getFilestat(): Promise<Filestat> {
     return undefined;
   }
@@ -461,4 +474,5 @@ export interface Filesystem {
     linkpath: string
   ): Promise<number>;
   initialize(opts: Object): Promise<number>;
+  mknodat(desc: Descriptor, path: string, dev: number): Promise<number>;
 }

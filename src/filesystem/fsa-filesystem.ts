@@ -550,6 +550,14 @@ export class FsaFilesystem implements Filesystem {
     }
     return constants.WASI_EINVAL;
   }
+
+  async mknodat(
+    _desc: Descriptor,
+    _path: string,
+    _dev: number
+  ): Promise<number> {
+    return constants.WASI_EINVAL;
+  }
 }
 
 interface FsaDescriptor extends AbstractDescriptor {

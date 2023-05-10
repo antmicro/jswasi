@@ -5,6 +5,7 @@ import syscallCallback from "./syscalls.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
+import { createDeviceFilesystem } from "./filesystem/dev-table.js";
 
 declare global {
   interface Window {
@@ -97,6 +98,7 @@ async function initFs(fs: TopLevelFs) {
     fs.createDir("/home"),
     fs.createDir("/usr"),
     fs.createDir("/lib"),
+    fs.createDir("/dev"),
   ]);
 
   // 2nd level directories creation
@@ -356,6 +358,8 @@ export async function init(
   if (err === constants.WASI_ESUCCESS) {
     await initFs(tfs);
   }
+
+  tfs.addMount("/dev", await createDeviceFilesystem());
 
   // verify if wash and init are up to date and refetch them if they are not
   await tfs.createDir("/usr");

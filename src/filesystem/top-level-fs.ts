@@ -1,5 +1,5 @@
 import { FsaFilesystem } from "./fsa-filesystem.js";
-import { VirtualFilesystem } from "./virtual-filesystem.js";
+import { DeviceFilesystem, VirtualFilesystem } from "./virtual-filesystem.js";
 import {
   Filesystem,
   Descriptor,
@@ -23,6 +23,7 @@ type DescInfo = {
 const filesystemMap: Record<string, new () => Filesystem> = {
   fsa: FsaFilesystem,
   vfs: VirtualFilesystem,
+  devfs: DeviceFilesystem,
 };
 
 export async function getFilesystem(

@@ -17,6 +17,7 @@ import * as constants from "../constants.js";
 // @ts-ignore
 import * as vfs from "../vendor/vfs.js";
 import { basename } from "../utils.js";
+import { DEV_MAP, major } from "./dev-table.js";
 
 function wasiFiletype(stat: vfs.Stat): number {
   switch (stat.mode & vfs.constants.S_IFMT) {
@@ -38,7 +39,7 @@ function wasiFiletype(stat: vfs.Stat): number {
   }
 }
 
-function wasiFilestat(stat: vfs.Stat): Filestat {
+export function wasiFilestat(stat: vfs.Stat): Filestat {
   return {
     dev: BigInt(stat.dev),
     ino: BigInt(stat.ino),
@@ -52,7 +53,7 @@ function wasiFilestat(stat: vfs.Stat): Filestat {
 }
 
 export class VirtualFilesystem implements Filesystem {
-  private virtualFs: vfs.VirtualFS;
+  protected virtualFs: vfs.VirtualFS;
 
   constructor() {
     const __devMgr = new vfs.DeviceManager();
@@ -87,12 +88,12 @@ export class VirtualFilesystem implements Filesystem {
     }
 
     const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Directory, {
-      mode: vfs.DEFAILT_DIRECTORY_PERM,
+      mode: vfs.DEFAULT_DIRECTORY_PERM,
       uid: 0,
       gid: 0,
       parent: navigated.dir._dir["."],
     });
-    __desc.dir.addEntry(path, index);
+    navigated.dir.addEntry(path, index);
 
     return constants.WASI_ESUCCESS;
   }
@@ -187,16 +188,21 @@ export class VirtualFilesystem implements Filesystem {
             navigated.dir,
             this.virtualFs._iNodeMgr
           );
+        } else if (navigated.target instanceof vfs.CharacterDev) {
+          desc = new DEV_MAP[
+            vfs.unmkDev(navigated.target._metadata.rdev)[0] as major
+          ](fdflags, fs_rights_base, fs_rights_base, navigated.target);
+        } else {
+          desc = new VirtualFilesystemFileDescriptor(
+            fdflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            this.virtualFs._fdMgr.createFd(
+              navigated.target,
+              vfs.constants.O_RDWR
+            )[0]
+          );
         }
-        desc = new VirtualFilesystemFileDescriptor(
-          fdflags,
-          fs_rights_base,
-          fs_rights_inheriting,
-          this.virtualFs._fdMgr.createFd(
-            navigated.target,
-            vfs.constants.O_RDWR
-          )[0]
-        );
       }
       return {
         err,
@@ -330,6 +336,51 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async initialize(_opts: Object): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+
+  async mknodat(
+    _desc: Descriptor,
+    _path: string,
+    _dev: number
+  ): Promise<number> {
+    return constants.WASI_EINVAL;
+  }
+}
+
+export class DeviceFilesystem extends VirtualFilesystem {
+  override async mknodat(
+    desc: Descriptor,
+    path: string,
+    dev: number
+  ): Promise<number> {
+    let navigated;
+    let __desc;
+    if (desc === undefined) {
+      navigated = this.virtualFs._navigate(path, false);
+    } else {
+      if (desc instanceof VirtualFilesystemDirectoryDescriptor) {
+        __desc = desc as VirtualFilesystemDirectoryDescriptor;
+        navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
+
+    if (navigated.target) {
+      return constants.WASI_EEXIST;
+    }
+
+    const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.CharacterDev, {
+      mode: vfs.DEFAULT_FILE_PERM,
+      uid: 0,
+      gid: 0,
+      minor: 0,
+      major: dev,
+      parent: navigated.dir._dir["."],
+    });
+    navigated.dir.addEntry(path, index);
+
     return constants.WASI_ESUCCESS;
   }
 }
@@ -532,7 +583,7 @@ class VirtualFilesystemFileDescriptor
   }
 }
 
-class VirtualFilesystemDirectoryDescriptor
+export class VirtualFilesystemDirectoryDescriptor
   extends AbstractDirectoryDescriptor
   implements VirtualFilesystemDescriptor
 {
