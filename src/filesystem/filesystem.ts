@@ -367,6 +367,75 @@ export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
   }
 }
 
+export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
+  async getFilestat(): Promise<Filestat> {
+    return undefined;
+  }
+
+  async setFilestatTimes(_atim: Timestamp, _mtim: Timestamp): Promise<number> {
+    return constants.WASI_EBADF;
+  }
+
+  async close(): Promise<number> {
+    return constants.WASI_EBADF;
+  }
+
+  async read(
+    _len: number,
+    _sharedBuff?: ArrayBuffer,
+    _workerId?: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EBADF, buffer: undefined };
+  }
+
+  async read_str(): Promise<{ err: number; content: string }> {
+    return { err: constants.WASI_EBADF, content: undefined };
+  }
+
+  async pread(
+    _len: number,
+    _pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EBADF, buffer: undefined };
+  }
+
+  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EBADF, buffer: undefined };
+  }
+
+  async write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EBADF, written: -1n };
+  }
+
+  async pwrite(
+    _buffer: ArrayBuffer,
+    _offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EBADF, written: -1n };
+  }
+
+  async seek(
+    _offset: bigint,
+    _whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    return { err: constants.WASI_EBADF, offset: -1n };
+  }
+
+  async readdir(
+    _refresh: boolean
+  ): Promise<{ err: number; dirents: Dirent[] }> {
+    return { err: constants.WASI_EBADF, dirents: undefined };
+  }
+
+  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return { err: constants.WASI_EBADF, stream: undefined };
+  }
+
+  async truncate(_size: bigint): Promise<number> {
+    return constants.WASI_EBADF;
+  }
+}
+
 export interface Filesystem {
   mkdirat(desc: Descriptor, path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
