@@ -1000,10 +1000,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       case "isatty": {
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        const isattyPtr = new Int32Array(sharedBuffer, 4, 1);
-
         lck[0] = -1;
-        isattyPtr[0] = -1;
 
         const { fd }: { fd: number } = JSON.parse(json);
 
@@ -1013,9 +1010,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         let err = Atomics.load(lck, 0);
+        const isattyPtr = new Uint8Array(sharedBuffer, 4, 4);
         return {
           exit_status: err,
-          output: new Uint8Array(isattyPtr, 0, 4),
+          output: isattyPtr,
         };
       }
       case "getpid": {
@@ -1102,8 +1100,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           JSON.parse(json);
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
-        fileDescriptor[0] = -1;
 
         workerConsoleLog(`event_source_fd(${eventMask})`);
 
@@ -1126,9 +1122,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         let returnCode = Atomics.load(lck, 0);
+        const fileDescriptor = new Uint8Array(sharedBuffer, 4, 4);
         return {
           exit_status: returnCode,
-          output: new Uint8Array(sharedBuffer, 4, 4),
+          output: fileDescriptor,
         };
       }
       case "attach_sigint": {
