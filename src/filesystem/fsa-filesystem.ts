@@ -2,7 +2,8 @@ import {
   Filesystem,
   Filestat,
   Descriptor,
-  Fdstat,
+  AbstractFileDescriptor,
+  AbstractDirectoryDescriptor,
   Rights,
   Fdflags,
   Timestamp,
@@ -10,6 +11,7 @@ import {
   Dirent,
   OpenFlags,
   LookupFlags,
+  AbstractDescriptor,
 } from "./filesystem.js";
 import { basename, dirname } from "../utils.js";
 import * as constants from "../constants.js";
@@ -550,119 +552,68 @@ export class FsaFilesystem implements Filesystem {
   }
 }
 
-/**
- * Abstract class that holds common implementations for both FsaFileDescriptor and FsaDirectoryDescriptor
- * The sole purpose of this class is to avoid redundant Descriptor implementations
- */
-abstract class FsaDescriptor implements Descriptor {
-  static readonly defaultFilestat: Filestat;
-
-  protected fdstat: Fdstat;
-  protected path: string;
-  protected abstract handle: FileSystemHandle;
+interface FsaDescriptor extends AbstractDescriptor {
+  handle: FileSystemHandle;
   metadataPath: string;
+  keepMetadata: boolean;
+}
 
-  constructor(
-    fs_flags: Fdflags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    // There is no point in keeping metadata of local files mounted
-    // in in the app in the indexedDB as the metadata would have to
-    // be recursively applied and removed each mount/umount. Also,
-    // filesystem access API doesn't provide access to all fields of
-    // Filestat structure so in such cases, just return dummy metadata
-    protected keepMetadata: boolean
-  ) {
-    if (this.keepMetadata) {
-      this.metadataPath = "";
-    }
-    this.fdstat = {
-      fs_flags,
-      fs_rights_base,
-      fs_rights_inheriting,
-      fs_filetype: undefined,
-    };
+function initFsaDesc(
+  desc: FsaDescriptor,
+  fs_flags: Fdflags,
+  fs_rights_base: Rights,
+  fs_rights_inheriting: Rights,
+  // There is no point in keeping metadata of local files mounted
+  // in in the app in the indexedDB as the metadata would have to
+  // be recursively applied and removed each mount/umount. Also,
+  // filesystem access API doesn't provide access to all fields of
+  // Filestat structure so in such cases, just return dummy metadata
+  keepMetadata: boolean
+) {
+  desc.keepMetadata = keepMetadata;
+  if (desc.keepMetadata) {
+    desc.metadataPath = "";
   }
+  desc.fdstat = {
+    fs_flags,
+    fs_rights_base,
+    fs_rights_inheriting,
+    fs_filetype: undefined,
+  };
+}
 
-  getPath(): string {
-    return this.path;
-  }
-
-  async getFdstat(): Promise<Fdstat> {
-    return this.fdstat;
-  }
-
-  async initialize(path: string): Promise<void> {
-    this.path = path;
-    if (this.keepMetadata && this.metadataPath === "") {
-      this.metadataPath = await initMetadataPath(this.handle);
-    }
-  }
-
-  abstract getFilestat(): Promise<Filestat>;
-  abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract read_str(): Promise<{ err: number; content: string }>;
-  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract pread(
-    len: number,
-    pos: bigint
-  ): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract write(
-    buffer: ArrayBuffer
-  ): Promise<{ err: number; written: bigint }>;
-  abstract pwrite(
-    buffer: ArrayBuffer,
-    pos: bigint
-  ): Promise<{ err: number; written: bigint }>;
-  abstract seek(
-    offset: bigint,
-    whence: Whence
-  ): Promise<{ err: number; offset: bigint }>;
-  abstract readdir(
-    refresh: boolean
-  ): Promise<{ err: number; dirents: Dirent[] }>;
-  abstract writableStream(): Promise<{ err: number; stream: WritableStream }>;
-  abstract truncate(size: bigint): Promise<number>;
-
-  async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
-    if (this.keepMetadata) {
-      let filestat = await getStoredData(this.metadataPath);
-
-      if (atim !== undefined) filestat.atim = atim;
-      if (mtim !== undefined) filestat.mtim = mtim;
-
-      if (atim !== undefined || mtim !== undefined) {
-        await setStoredData(this.metadataPath, filestat);
-      }
-    }
-
-    return constants.WASI_ESUCCESS;
-  }
-
-  async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
-    this.fdstat.fs_rights_base = rights_b;
-    this.fdstat.fs_rights_inheriting = rights_i;
-    return constants.WASI_ESUCCESS;
-  }
-
-  async setFdstatFlags(flags: Fdflags): Promise<number> {
-    this.fdstat.fs_flags = flags;
-    return constants.WASI_ESUCCESS;
-  }
-
-  async close(): Promise<number> {
-    return constants.WASI_ESUCCESS;
-  }
-
-  isatty(): boolean {
-    return false;
+async function initializeFsaDesc(desc: FsaDescriptor): Promise<void> {
+  if (desc.keepMetadata && desc.metadataPath === "") {
+    desc.metadataPath = await initMetadataPath(desc.handle);
   }
 }
 
-class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
+async function setFilestatTimesFsaDesc(
+  desc: FsaDescriptor,
+  atim: Timestamp,
+  mtim: Timestamp
+): Promise<number> {
+  if (desc.keepMetadata) {
+    let filestat = await getStoredData(desc.metadataPath);
+
+    if (atim !== undefined) filestat.atim = atim;
+    if (mtim !== undefined) filestat.mtim = mtim;
+
+    if (atim !== undefined || mtim !== undefined) {
+      await setStoredData(desc.metadataPath, filestat);
+    }
+  }
+
+  return constants.WASI_ESUCCESS;
+}
+
+class FsaFileDescriptor
+  extends AbstractFileDescriptor
+  implements FsaDescriptor
+{
   // Filesystem access API doesn't support real symlinks so
   // assume that by default every file is a regular file
-  static override defaultFilestat: Filestat = {
+  static defaultFilestat: Filestat = {
     dev: 0n,
     ino: 0n,
     filetype: constants.WASI_FILETYPE_REGULAR_FILE,
@@ -672,23 +623,34 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     mtim: 0n,
     ctim: 0n,
   };
+  metadataPath: string;
+  keepMetadata: boolean;
+
   private cursor: bigint;
   private writer: FileSystemWritableFileStream;
   private file: File;
 
   constructor(
-    override handle: FileSystemFileHandle,
+    public handle: FileSystemFileHandle,
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     keepMetadata: boolean
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting, keepMetadata);
+    super();
+    initFsaDesc(
+      this,
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      keepMetadata
+    );
     this.file = undefined;
   }
 
   override async initialize(path: string) {
     await super.initialize(path);
+    await initializeFsaDesc(this);
     const size = BigInt((await this.__getFile()).file?.size);
     this.fdstat.fs_filetype = (
       this.keepMetadata
@@ -798,8 +760,8 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
     return { err: constants.WASI_ESUCCESS, offset: this.cursor };
   }
 
-  async readdir(): Promise<{ err: number; dirents: Dirent[] }> {
-    return { err: constants.WASI_ENOTDIR, dirents: undefined };
+  async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+    return setFilestatTimesFsaDesc(this, atim, mtim);
   }
 
   async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
@@ -864,12 +826,12 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
       await __promise;
     }
   }
-  override async close(): Promise<number> {
+  async close(): Promise<number> {
     await this.flush();
     return constants.WASI_ESUCCESS;
   }
 
-  override async getFilestat() {
+  async getFilestat() {
     let meta = this.keepMetadata
       ? await getStoredData(this.metadataPath)
       : FsaFileDescriptor.defaultFilestat;
@@ -878,8 +840,13 @@ class FsaFileDescriptor extends FsaDescriptor implements Descriptor {
   }
 }
 
-class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
-  static override defaultFilestat: Filestat = {
+class FsaDirectoryDescriptor
+  extends AbstractDirectoryDescriptor
+  implements FsaDescriptor
+{
+  metadataPath: string;
+  keepMetadata: boolean;
+  static defaultFilestat: Filestat = {
     dev: 0n,
     ino: 0n,
     filetype: constants.WASI_FILETYPE_DIRECTORY,
@@ -892,18 +859,30 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
   private entries: Dirent[];
 
   constructor(
-    override handle: FileSystemDirectoryHandle,
+    public handle: FileSystemDirectoryHandle,
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     keepMetadata: boolean
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting, keepMetadata);
+    super();
+    initFsaDesc(
+      this,
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      keepMetadata
+    );
     this.fdstat.fs_filetype = constants.WASI_FILETYPE_DIRECTORY;
     this.entries = [];
   }
 
-  override async getFilestat(): Promise<Filestat> {
+  override async initialize(path: string): Promise<void> {
+    await super.initialize(path);
+    await initializeFsaDesc(this);
+  }
+
+  async getFilestat(): Promise<Filestat> {
     if (this.keepMetadata) {
       return getStoredData(this.metadataPath);
     } else {
@@ -911,49 +890,8 @@ class FsaDirectoryDescriptor extends FsaDescriptor implements Descriptor {
     }
   }
 
-  async read(_len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
-    return { err: constants.WASI_EISDIR, buffer: undefined };
-  }
-
-  async read_str(): Promise<{ err: number; content: string }> {
-    return { err: constants.WASI_EISDIR, content: "" };
-  }
-
-  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
-    return { err: constants.WASI_EISDIR, stream: undefined };
-  }
-
-  async pread(
-    _len: number,
-    _pos: bigint
-  ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    return { err: constants.WASI_EISDIR, buffer: undefined };
-  }
-
-  async write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
-    return { err: constants.WASI_EISDIR, written: -1n };
-  }
-
-  async pwrite(
-    _buffer: ArrayBuffer,
-    _offset: bigint
-  ): Promise<{ err: number; written: bigint }> {
-    return { err: constants.WASI_EISDIR, written: -1n };
-  }
-
-  async seek(
-    _offset: bigint,
-    _whence: Whence
-  ): Promise<{ err: number; offset: bigint }> {
-    return { err: constants.WASI_EISDIR, offset: -1n };
-  }
-
-  async truncate(_size: bigint): Promise<number> {
-    return constants.WASI_EISDIR;
-  }
-
-  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
-    return { err: constants.WASI_EISDIR, buffer: undefined };
+  async setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number> {
+    return setFilestatTimesFsaDesc(this, atim, mtim);
   }
 
   async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {

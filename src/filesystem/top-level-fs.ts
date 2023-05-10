@@ -1,3 +1,5 @@
+import { FsaFilesystem } from "./fsa-filesystem.js";
+import { VirtualFilesystem } from "./virtual-filesystem.js";
 import {
   Filesystem,
   Descriptor,
@@ -5,7 +7,6 @@ import {
   LookupFlags,
   Fdflags,
   Rights,
-  filesystemMap,
 } from "./filesystem.js";
 import * as constants from "../constants.js";
 import { dirname, basename, realpath } from "../utils.js";
@@ -17,6 +18,11 @@ type DescInfo = {
   desc: Descriptor;
   fs: Filesystem;
   path: string;
+};
+
+const filesystemMap: Record<string, new () => Filesystem> = {
+  fsa: FsaFilesystem,
+  vfs: VirtualFilesystem,
 };
 
 export async function getFilesystem(

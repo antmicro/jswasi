@@ -1,5 +1,4 @@
-import { FsaFilesystem } from "./fsa-filesystem.js";
-import { VirtualFilesystem } from "./virtual-filesystem.js";
+import * as constants from "../constants.js";
 
 export type LookupFlags = number;
 export type OpenFlags = number;
@@ -35,11 +34,6 @@ export type Fdstat = {
   fs_flags: Fdflags;
   fs_rights_base: Rights;
   fs_rights_inheriting: Rights;
-};
-
-export const filesystemMap: Record<string, new () => Filesystem> = {
-  fsa: FsaFilesystem,
-  vfs: VirtualFilesystem,
 };
 
 // This is not exactly a Dirent struct defined in wasi.
@@ -235,6 +229,142 @@ export interface Descriptor {
    * @returns status code
    */
   truncate(size: bigint): Promise<number>;
+}
+
+export abstract class AbstractDescriptor implements Descriptor {
+  fdstat: Fdstat;
+  path: string;
+
+  async getFdstat(): Promise<Fdstat> {
+    return this.fdstat;
+  }
+
+  async initialize(path: string): Promise<void> {
+    this.path = path;
+  }
+
+  getPath(): string {
+    return this.path;
+  }
+
+  async setFdstatFlags(flags: Fdflags): Promise<number> {
+    this.fdstat.fs_flags = flags;
+    return constants.WASI_ESUCCESS;
+  }
+
+  async setFdstatRights(
+    rightsBase: Rights,
+    rightsInheriting: Rights
+  ): Promise<number> {
+    this.fdstat.fs_rights_base = rightsBase;
+    this.fdstat.fs_rights_inheriting = rightsInheriting;
+    return constants.WASI_ESUCCESS;
+  }
+
+  abstract getFilestat(): Promise<Filestat>;
+  abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
+  abstract close(): Promise<number>;
+  abstract read(
+    len: number,
+    sharedBuff?: ArrayBuffer,
+    workerId?: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }>;
+  abstract read_str(): Promise<{ err: number; content: string }>;
+  abstract pread(
+    len: number,
+    pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }>;
+  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
+  abstract write(
+    buffer: ArrayBuffer
+  ): Promise<{ err: number; written: bigint }>;
+  abstract pwrite(
+    buffer: ArrayBuffer,
+    offset: bigint
+  ): Promise<{ err: number; written: bigint }>;
+  abstract seek(
+    offset: bigint,
+    whence: Whence
+  ): Promise<{ err: number; offset: bigint }>;
+  abstract readdir(
+    refresh: boolean
+  ): Promise<{ err: number; dirents: Dirent[] }>;
+  abstract writableStream(): Promise<{ err: number; stream: WritableStream }>;
+  abstract isatty(): boolean;
+  abstract truncate(size: bigint): Promise<number>;
+}
+
+export abstract class AbstractFileDescriptor extends AbstractDescriptor {
+  isatty(): boolean {
+    return false;
+  }
+  async readdir(
+    _refresh: boolean
+  ): Promise<{ err: number; dirents: Dirent[] }> {
+    return {
+      err: constants.WASI_ENOTDIR,
+      dirents: undefined,
+    };
+  }
+}
+
+export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
+  async close(): Promise<number> {
+    return constants.WASI_EISDIR;
+  }
+
+  async read(
+    _len: number,
+    _sharedBuff?: ArrayBuffer,
+    _workerId?: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
+  }
+
+  async read_str(): Promise<{ err: number; content: string }> {
+    return { err: constants.WASI_EISDIR, content: undefined };
+  }
+
+  async pread(
+    _len: number,
+    _pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
+  }
+
+  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return { err: constants.WASI_EISDIR, buffer: undefined };
+  }
+
+  async write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EISDIR, written: -1n };
+  }
+
+  async pwrite(
+    _buffer: ArrayBuffer,
+    _offset: bigint
+  ): Promise<{ err: number; written: bigint }> {
+    return { err: constants.WASI_EISDIR, written: -1n };
+  }
+
+  async seek(
+    _offset: bigint,
+    _whence: Whence
+  ): Promise<{ err: number; offset: bigint }> {
+    return { err: constants.WASI_EISDIR, offset: -1n };
+  }
+
+  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
+    return { err: constants.WASI_EISDIR, stream: undefined };
+  }
+
+  isatty(): boolean {
+    return false;
+  }
+
+  async truncate(_size: bigint): Promise<number> {
+    return constants.WASI_EISDIR;
+  }
 }
 
 export interface Filesystem {

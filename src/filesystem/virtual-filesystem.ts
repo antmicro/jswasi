@@ -1,7 +1,9 @@
 import {
   Filestat,
   Descriptor,
-  Fdstat,
+  AbstractDescriptor,
+  AbstractFileDescriptor,
+  AbstractDirectoryDescriptor,
   Filesystem,
   Rights,
   Fdflags,
@@ -332,80 +334,21 @@ export class VirtualFilesystem implements Filesystem {
   }
 }
 
-abstract class VirtualFilesystemDescriptor implements Descriptor {
-  protected fdstat: Fdstat;
-  protected path: string;
+interface VirtualFilesystemDescriptor extends AbstractDescriptor {}
 
-  constructor(
-    fs_flags: Fdflags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    stat: vfs.Stat
-  ) {
-    this.fdstat = {
-      fs_flags,
-      fs_rights_base,
-      fs_rights_inheriting,
-      fs_filetype: wasiFiletype(stat),
-    };
-  }
-
-  async initialize(path: string): Promise<void> {
-    this.path = path;
-  }
-
-  getPath(): string {
-    return this.path;
-  }
-
-  async getFdstat(): Promise<Fdstat> {
-    return this.fdstat;
-  }
-
-  async setFdstatRights(rights_b: Rights, rights_i: Rights): Promise<number> {
-    this.fdstat.fs_rights_base = rights_b;
-    this.fdstat.fs_rights_inheriting = rights_i;
-    return constants.WASI_ESUCCESS;
-  }
-
-  async setFdstatFlags(flags: Fdflags): Promise<number> {
-    this.fdstat.fs_flags = flags;
-    return constants.WASI_ESUCCESS;
-  }
-
-  async close(): Promise<number> {
-    return constants.WASI_ESUCCESS;
-  }
-
-  isatty(): boolean {
-    return false;
-  }
-
-  abstract read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract read_str(): Promise<{ err: number; content: string }>;
-  abstract arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract pread(
-    len: number,
-    pos: bigint
-  ): Promise<{ err: number; buffer: ArrayBuffer }>;
-  abstract write(
-    buffer: ArrayBuffer
-  ): Promise<{ err: number; written: bigint }>;
-  abstract pwrite(
-    buffer: ArrayBuffer,
-    pos: bigint
-  ): Promise<{ err: number; written: bigint }>;
-  abstract seek(
-    offset: bigint,
-    whence: Whence
-  ): Promise<{ err: number; offset: bigint }>;
-  abstract readdir(
-    refresh: boolean
-  ): Promise<{ err: number; dirents: Dirent[] }>;
-  abstract writableStream(): Promise<{ err: number; stream: WritableStream }>;
-  abstract truncate(size: bigint): Promise<number>;
-  abstract getFilestat(): Promise<Filestat>;
-  abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
+function initVirtualDesc(
+  desc: VirtualFilesystemDescriptor,
+  fs_flags: Fdflags,
+  fs_rights_base: Rights,
+  fs_rights_inheriting: Rights,
+  stat: vfs.Stat
+) {
+  desc.fdstat = {
+    fs_flags,
+    fs_rights_base,
+    fs_rights_inheriting,
+    fs_filetype: wasiFiletype(stat),
+  };
 }
 
 class VirtualFilesystemWritableFileStream extends WritableStream {
@@ -419,7 +362,10 @@ class VirtualFilesystemWritableFileStream extends WritableStream {
   }
 }
 
-class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
+class VirtualFilesystemFileDescriptor
+  extends AbstractFileDescriptor
+  implements VirtualFilesystemDescriptor
+{
   private cursor: number;
 
   constructor(
@@ -428,7 +374,9 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     fs_rights_inheriting: Rights,
     private desc: vfs.FileDescriptor
   ) {
-    super(
+    super();
+    initVirtualDesc(
+      this,
       fs_flags,
       fs_rights_base,
       fs_rights_inheriting,
@@ -444,14 +392,14 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     }
   }
 
-  override async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
+  async arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
     return {
       err: constants.WASI_ESUCCESS,
       buffer: this.desc._iNode._data,
     };
   }
 
-  override async pread(
+  async pread(
     len: number,
     pos: bigint
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -461,9 +409,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     };
   }
 
-  override async read(
-    len: number
-  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+  async read(len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
     const buffer = this.desc._iNode._data.slice(this.cursor, this.cursor + len);
     this.cursor += buffer.byteLength;
 
@@ -473,7 +419,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     };
   }
 
-  override async read_str(): Promise<{ err: number; content: string }> {
+  async read_str(): Promise<{ err: number; content: string }> {
     let content;
     if (this.fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE) {
       new TextDecoder().decode((content = this.desc._iNode._data));
@@ -486,9 +432,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     };
   }
 
-  override async write(
-    buffer: ArrayBuffer
-  ): Promise<{ err: number; written: bigint }> {
+  async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     try {
       const written = await this.desc._iNode.write(buffer, this.cursor);
       this.cursor += written;
@@ -501,7 +445,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     }
   }
 
-  override async pwrite(
+  async pwrite(
     buffer: ArrayBuffer,
     offset: bigint
   ): Promise<{ err: number; written: bigint }> {
@@ -515,16 +459,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     }
   }
 
-  override async readdir(
-    _refresh: boolean
-  ): Promise<{ err: number; dirents: Dirent[] }> {
-    return {
-      err: constants.WASI_ENOTDIR,
-      dirents: undefined,
-    };
-  }
-
-  override async seek(
+  async seek(
     offset: bigint,
     whence: Whence
   ): Promise<{ err: number; offset: bigint }> {
@@ -559,7 +494,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     return { err: constants.WASI_ESUCCESS, offset: BigInt(this.cursor) };
   }
 
-  override async truncate(size: bigint): Promise<number> {
+  async truncate(size: bigint): Promise<number> {
     try {
       this.desc._iNode._data.resize(Number(size));
       return constants.WASI_ESUCCESS;
@@ -568,7 +503,7 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     }
   }
 
-  override async writableStream(): Promise<{
+  async writableStream(): Promise<{
     err: number;
     stream: WritableStream;
   }> {
@@ -591,9 +526,16 @@ class VirtualFilesystemFileDescriptor extends VirtualFilesystemDescriptor {
     if (atim !== undefined) this.desc._iNode._metadata.atime = atim;
     return constants.WASI_ESUCCESS;
   }
+
+  async close(): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
 }
 
-class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
+class VirtualFilesystemDirectoryDescriptor
+  extends AbstractDirectoryDescriptor
+  implements VirtualFilesystemDescriptor
+{
   private dirents: Dirent[];
 
   constructor(
@@ -603,86 +545,15 @@ class VirtualFilesystemDirectoryDescriptor extends VirtualFilesystemDescriptor {
     public dir: vfs.Directory,
     private inodeMgr: vfs.InodeManager
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting, dir.getMetadata());
+    super();
+    initVirtualDesc(
+      this,
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      dir.getMetadata()
+    );
     this.dirents = undefined;
-  }
-
-  override async arrayBuffer(): Promise<{
-    err: number;
-    buffer: ArrayBuffer;
-  }> {
-    return {
-      err: constants.WASI_EISDIR,
-      buffer: undefined,
-    };
-  }
-
-  override async pread(
-    _len: number,
-    _pos: bigint
-  ): Promise<{
-    err: number;
-    buffer: ArrayBuffer;
-  }> {
-    return {
-      err: constants.WASI_EISDIR,
-      buffer: undefined,
-    };
-  }
-
-  override async read(_len: number): Promise<{
-    err: number;
-    buffer: ArrayBuffer;
-  }> {
-    return {
-      err: constants.WASI_EISDIR,
-      buffer: undefined,
-    };
-  }
-
-  override async read_str(): Promise<{ err: number; content: string }> {
-    return {
-      err: constants.WASI_EISDIR,
-      content: "",
-    };
-  }
-
-  override async pwrite(
-    _buffer: ArrayBuffer,
-    _offset: bigint
-  ): Promise<{
-    err: number;
-    written: bigint;
-  }> {
-    return {
-      err: constants.WASI_EISDIR,
-      written: -1n,
-    };
-  }
-
-  override async write(_buffer: ArrayBuffer): Promise<{
-    err: number;
-    written: bigint;
-  }> {
-    return {
-      err: constants.WASI_EISDIR,
-      written: -1n,
-    };
-  }
-
-  async seek(
-    _offset: bigint,
-    _whence: Whence
-  ): Promise<{ err: number; offset: bigint }> {
-    return { err: constants.WASI_EISDIR, offset: -1n };
-  }
-
-  async truncate(_size: bigint): Promise<number> {
-    return constants.WASI_EISDIR;
-  }
-
-  async writableStream(): Promise<{ err: number; stream: WritableStream }> {
-    return { err: constants.WASI_EISDIR, stream: undefined };
   }
 
   async readdir(refresh: boolean): Promise<{
