@@ -334,7 +334,7 @@ export class VirtualFilesystem implements Filesystem {
   }
 }
 
-interface VirtualFilesystemDescriptor extends AbstractDescriptor {}
+export interface VirtualFilesystemDescriptor extends AbstractDescriptor {}
 
 function initVirtualDesc(
   desc: VirtualFilesystemDescriptor,
