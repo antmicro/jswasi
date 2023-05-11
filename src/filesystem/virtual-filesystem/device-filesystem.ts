@@ -52,6 +52,8 @@ export async function createDeviceFilesystem(): Promise<DeviceFilesystem> {
   let devfs = new DeviceFilesystem();
 
   devfs.mknodat(undefined, "null", major.DEV_NULL);
+  devfs.mknodat(undefined, "zero", major.DEV_ZERO);
+  devfs.mknodat(undefined, "random", major.DEV_RANDOM);
 
   return devfs;
 }

@@ -1,11 +1,13 @@
 import { Rights, Fdflags, AbstractDeviceDescriptor } from "../filesystem.js";
 
-import { VirtualNull } from "./chr-devices.js";
+import { VirtualNull, VirtualZero, VirtualRandom } from "./chr-devices.js";
 // @ts-ignore
 import { CharacterDev } from "../vendor/vfs.js";
 
 export const enum major {
   DEV_NULL = 0,
+  DEV_ZERO = 1,
+  DEV_RANDOM = 2,
 }
 
 export const DEV_MAP: {
@@ -17,4 +19,6 @@ export const DEV_MAP: {
   ) => AbstractDeviceDescriptor;
 } = {
   [major.DEV_NULL]: VirtualNull,
+  [major.DEV_ZERO]: VirtualZero,
+  [major.DEV_RANDOM]: VirtualRandom,
 };

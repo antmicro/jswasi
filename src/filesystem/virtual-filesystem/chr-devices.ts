@@ -95,3 +95,53 @@ export class VirtualNull
     return wasiFilestat(this.ino._metadata);
   }
 }
+
+export class VirtualZero extends VirtualNull {
+  override async read(
+    len: number,
+    _sharedBuff?: ArrayBuffer,
+    _workerId?: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    let __buf = new ArrayBuffer(len);
+    let __view8 = new Uint8Array(__buf);
+    __view8.fill(0, 0, len);
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      buffer: __buf,
+    };
+  }
+
+  override async pread(
+    len: number,
+    _pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return this.read(len);
+  }
+}
+
+export class VirtualRandom extends VirtualNull {
+  override async read(
+    len: number,
+    _sharedBuff?: ArrayBuffer,
+    _workerId?: number
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    let __buf = new ArrayBuffer(len);
+    let __view8 = new Uint8Array(__buf);
+    for (var i = 0; i < len; i++) {
+      __view8.set([Math.floor(Math.random() * 256)], i);
+    }
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      buffer: __buf,
+    };
+  }
+
+  override async pread(
+    len: number,
+    _pos: bigint
+  ): Promise<{ err: number; buffer: ArrayBuffer }> {
+    return this.read(len);
+  }
+}
