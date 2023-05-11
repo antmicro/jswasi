@@ -38,8 +38,7 @@ export class DeviceFilesystem extends VirtualFilesystem {
       mode: vfs.DEFAULT_FILE_PERM,
       uid: 0,
       gid: 0,
-      minor: 0,
-      major: dev,
+      rdev: vfs.mkDev(dev, 0),
       parent: navigated.dir._dir["."],
     });
     navigated.dir.addEntry(path, index);

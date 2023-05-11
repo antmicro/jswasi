@@ -527,31 +527,18 @@ export default async function syscallCallback(
           fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
         ) {
           err = constants.WASI_EINVAL;
-        } else if (
-          fdstat.fs_filetype === constants.WASI_FILETYPE_CHARACTER_DEVICE
-        ) {
-          // TODO: handle fd_pread(...)
-          let char_dev = fds.getFd(fd);
-          if (char_dev instanceof Stdin || char_dev instanceof EventSource) {
-            // releasing the lock is delegated to read() call
-            char_dev.read(len, sharedBuffer, processId);
-            break;
-          } else {
-            err = constants.WASI_EBADF;
-          }
         } else {
           let res;
           if (offset) {
             res = await fds.getFd(fd).pread(len, offset);
           } else {
-            res = await fds.getFd(fd).read(len);
+            res = await fds.getFd(fd).read(len, sharedBuffer, processId);
           }
           err = res.err;
           readBuf.set(new Uint8Array(res.buffer));
           readLen[0] = res.buffer.byteLength;
         }
       }
-
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
       break;
