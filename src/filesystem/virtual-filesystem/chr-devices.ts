@@ -4,7 +4,7 @@ import {
 } from "./virtual-filesystem.js";
 
 // @ts-ignore
-import * as vfs from "../vendor/vfs.js";
+import * as vfs from "../../vendor/vfs.js";
 
 import {
   Whence,
@@ -12,9 +12,9 @@ import {
   Fdflags,
   Rights,
   AbstractDeviceDescriptor,
-} from "./filesystem.js";
+} from "../filesystem.js";
 
-import * as constants from "../constants.js";
+import * as constants from "../../constants.js";
 
 export class VirtualNull
   extends AbstractDeviceDescriptor

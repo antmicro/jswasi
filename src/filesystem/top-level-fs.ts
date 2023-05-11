@@ -1,5 +1,6 @@
 import { FsaFilesystem } from "./fsa-filesystem.js";
-import { DeviceFilesystem, VirtualFilesystem } from "./virtual-filesystem.js";
+import { VirtualFilesystem } from "./virtual-filesystem/virtual-filesystem.js";
+import { DeviceFilesystem } from "./virtual-filesystem/device-filesystem.js";
 import {
   Filesystem,
   Descriptor,

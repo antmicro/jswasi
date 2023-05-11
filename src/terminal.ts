@@ -5,7 +5,7 @@ import syscallCallback from "./syscalls.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
-import { createDeviceFilesystem } from "./filesystem/dev-table.js";
+import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
 
 declare global {
   interface Window {
