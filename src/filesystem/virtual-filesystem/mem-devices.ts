@@ -11,12 +11,63 @@ import {
   Filestat,
   Fdflags,
   Rights,
+  Descriptor,
   AbstractDeviceDescriptor,
 } from "../filesystem.js";
 
+import { DeviceDriver } from "./driver-manager.js";
+
 import * as constants from "../../constants.js";
 
-export class VirtualNull
+export const enum minor {
+  DEV_NULL = 0,
+  DEV_ZERO = 1,
+  DEV_RANDOM = 2,
+}
+
+export class MemoryDeviceDriver implements DeviceDriver {
+  private devices: {
+    [key in minor]: new (
+      fs_flags: Fdflags,
+      fs_rights_base: Rights,
+      fs_rights_inheriting: Rights,
+      ino: vfs.CharacterDev
+    ) => Descriptor;
+  };
+
+  async initDriver(): Promise<number> {
+    this.devices = {
+      [minor.DEV_NULL]: VirtualNullDescriptor,
+      [minor.DEV_ZERO]: VirtualZeroDescriptor,
+      [minor.DEV_RANDOM]: VirtualRandomDescriptor,
+    };
+    return constants.WASI_ESUCCESS;
+  }
+
+  async initDevice(_min: number): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+  async teardownDevice(_min: number): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+  async teardownDriver(): Promise<number> {
+    return constants.WASI_ESUCCESS;
+  }
+
+  async getDescConstructor(min: minor): Promise<{
+    constructor_: new (
+      fs_flags: Fdflags,
+      fs_rights_base: Rights,
+      fs_rights_inheriting: Rights,
+      ino: vfs.CharacterDev
+    ) => Descriptor;
+    err: number;
+  }> {
+    return { constructor_: this.devices[min], err: constants.WASI_ESUCCESS };
+  }
+}
+
+class VirtualNullDescriptor
   extends AbstractDeviceDescriptor
   implements VirtualFilesystemDescriptor
 {
@@ -96,7 +147,7 @@ export class VirtualNull
   }
 }
 
-export class VirtualZero extends VirtualNull {
+class VirtualZeroDescriptor extends VirtualNullDescriptor {
   override async read(
     len: number,
     _sharedBuff?: ArrayBuffer,
@@ -120,7 +171,7 @@ export class VirtualZero extends VirtualNull {
   }
 }
 
-export class VirtualRandom extends VirtualNull {
+class VirtualRandomDescriptor extends VirtualNullDescriptor {
   override async read(
     len: number,
     _sharedBuff?: ArrayBuffer,

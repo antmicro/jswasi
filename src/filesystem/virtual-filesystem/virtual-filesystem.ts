@@ -17,7 +17,6 @@ import * as constants from "../../constants.js";
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
 import { basename } from "../../utils.js";
-import { DEV_MAP, major } from "./dev-table.js";
 
 function wasiFiletype(stat: vfs.Stat): number {
   switch (stat.mode & vfs.constants.S_IFMT) {
@@ -179,20 +178,11 @@ export class VirtualFilesystem implements Filesystem {
           this.virtualFs._iNodeMgr
         );
       } else {
-        if (oflags & constants.WASI_O_DIRECTORY) {
-          err = constants.WASI_ENOTDIR;
-          desc = new VirtualFilesystemDirectoryDescriptor(
-            fdflags,
-            fs_rights_base,
-            fs_rights_inheriting,
-            navigated.dir,
-            this.virtualFs._iNodeMgr
-          );
-        } else if (navigated.target instanceof vfs.CharacterDev) {
-          desc = new DEV_MAP[
-            vfs.unmkDev(navigated.target._metadata.rdev)[0] as major
-          ](fdflags, fs_rights_base, fs_rights_base, navigated.target);
-        } else {
+        if (
+          navigated.target instanceof vfs.File ||
+          navigated.target instanceof vfs.Symlink
+        ) {
+          err = constants.WASI_ESUCCESS;
           desc = new VirtualFilesystemFileDescriptor(
             fdflags,
             fs_rights_base,
@@ -202,13 +192,22 @@ export class VirtualFilesystem implements Filesystem {
               vfs.constants.O_RDWR
             )[0]
           );
+        } else {
+          desc = new VirtualFilesystemDirectoryDescriptor(
+            fdflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            navigated.dir,
+            this.virtualFs._iNodeMgr
+          );
+          if (oflags & constants.WASI_O_DIRECTORY) {
+            err = constants.WASI_ENOTDIR;
+          } else if (navigated.target instanceof vfs.CharacterDev) {
+            err = constants.WASI_ENODEV;
+          }
         }
       }
-      return {
-        err,
-        index,
-        desc,
-      };
+      return { err, index, desc };
     } else if (oflags & constants.WASI_O_CREAT) {
       let [target, index] = this.virtualFs._iNodeMgr.createINode(vfs.File, {
         mode: vfs.DEFAULT_FILE_PERM,
