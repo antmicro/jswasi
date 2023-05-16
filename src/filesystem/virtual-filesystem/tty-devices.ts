@@ -7,22 +7,37 @@ import {
   AbstractDeviceDescriptor,
 } from "../filesystem.js";
 import ProcessManager from "../../process-manager.js";
+import {
+  DEFAULT_ENV,
+  DEFAULT_WORK_DIR,
+  FdTable,
+} from "../../process-manager.js";
 import { DeviceDriver } from "./driver-manager.js";
 import * as constants from "../../constants.js";
 import { getFilesystem } from "../top-level-fs.js";
 
-type Hterm = {
-  terminal: any;
-  buffer: string;
-  currentProcessId: number;
+type BufferRequest = {
+  len: number;
+  lock: SharedArrayBuffer;
+  resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
 };
+
+class Hterm {
+  bufRequestQueue: BufferRequest[];
+  buffer: string;
+
+  constructor(public terminal: any) {
+    this.buffer = "";
+    this.bufRequestQueue = [];
+  }
+}
 
 type InitDeviceArgs = {
   anchor: HTMLElement;
   currentProcessId: number;
 };
 
-type InitDriverArgs = {
+export type InitDriverArgs = {
   processManager: ProcessManager;
 };
 
@@ -104,7 +119,6 @@ export class HtermDeviceDriver implements DeviceDriver {
             await processManager.spawnProcess(
               0, // parent_id
               null, // parent_lock
-              syscallCallback,
               "/usr/bin/wash",
               new FdTable({
                 // TODO: replace with /dev/null once it is implemented
@@ -128,13 +142,13 @@ export class HtermDeviceDriver implements DeviceDriver {
     });
   }
 
-  private __initTerminal(anchor: HTMLElement): any {
+  private __initTerminal(anchor: HTMLElement, currentProcessId: number): Hterm {
     // @ts-ignore
-    let terminal = new hterm.Terminal();
+    let __hterm = new Hterm(new hterm.Terminal());
 
-    terminal.decorate(anchor);
-    terminal.installKeyboard();
-    terminal.keyboard.bindings.addBindings({
+    __hterm.terminal.decorate(anchor);
+    __hterm.terminal.installKeyboard();
+    __hterm.terminal.keyboard.bindings.addBindings({
       "Ctrl-R": "PASS",
     });
     const onTerminalInput = (data: string): void => {
@@ -148,25 +162,37 @@ export class HtermDeviceDriver implements DeviceDriver {
       if (code === 3 || code === 4 || code === 81) {
         // control characters
         if (code === 3) {
-          this.processManager.sendSigInt(this.currentProcessId);
+          this.processManager.sendSigInt(currentProcessId);
         } else if (code === 4) {
-          this.processManager.sendEndOfFile(this.currentProcessId, -1);
+          this.processManager.sendEndOfFile(currentProcessId, -1);
         }
       } else {
         // regular characters
-        this.processManager.pushToBuffer(data);
+        __hterm.buffer += data;
+      }
+
+      if (__hterm.bufRequestQueue.length !== 0) {
+        let request = __hterm.bufRequestQueue.shift();
+
+        let out = __hterm.buffer.slice(0, request.len);
+        __hterm.buffer = __hterm.buffer.slice(request.len);
+
+        request.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: new TextEncoder().encode(out),
+        });
       }
 
       if (code === 10 || code >= 32) {
         // echo
-        if (
-          this.processManager.processInfos[this.currentProcessId].shouldEcho
-        ) {
-          terminal.io.print(code === 10 ? "\r\n" : data);
-        }
+        // if (
+        //   this.processManager.processInfos[currentProcessId].shouldEcho
+        // ) {
+        __hterm.terminal.io.print(code === 10 ? "\r\n" : data);
+        // }
       }
     };
-    const io = terminal.io.push();
+    const io = __hterm.terminal.io.push();
     io.onVTKeystroke = onTerminalInput;
     io.sendString = onTerminalInput;
 
@@ -175,6 +201,7 @@ export class HtermDeviceDriver implements DeviceDriver {
     io.onTerminalResize = (_columns: number, _rows: number) => {
       this.processManager.events.publishEvent(constants.WASI_EVENT_WINCH);
     };
+    return __hterm;
   }
 
   async initDevice(_min: number, args: Object): Promise<number> {
@@ -185,16 +212,14 @@ export class HtermDeviceDriver implements DeviceDriver {
       __ttyMin = this.maxTty++;
     }
 
-    const __term = this.__initTerminal(__args.anchor);
-    this.initFsaDropImport(
-      anchor.getElementsByTagName("iframe")[0].contentWindow,
-      notifyDroppedFileSaved,
-      processManager
+    const __term = this.__initTerminal(__args.anchor, __args.currentProcessId);
+    this.terminals[__ttyMin] = __term;
+    this.__initFsaDropImport(
+      __ttyMin,
+      __args.anchor.getElementsByTagName("iframe")[0].contentWindow!,
+      () => {},
+      this.processManager
     );
-    this.terminals[__ttyMin] = {
-      terminal: __term,
-      buffer: "",
-    };
     return constants.WASI_ESUCCESS;
   }
 
@@ -257,18 +282,35 @@ class VirtualHtermDescriptor extends AbstractDeviceDescriptor {
   override async write(
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
-    this.hterm.terminal.write(new TextDecoder().decode(buffer));
+    this.hterm.terminal.io.print(
+      new TextDecoder().decode(buffer).replaceAll("\n", "\r\n")
+    );
     return { err: constants.WASI_ESUCCESS, written: BigInt(buffer.byteLength) };
   }
 
   override async read(
     len: number,
-    _sharedBuff?: ArrayBuffer,
+    sharedBuff?: SharedArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    return {
-      err: constants.WASI_ESUCCESS,
-      buffer: new TextEncoder().encode(this.hterm.buffer.slice(len)),
-    };
+    if (this.hterm.buffer.length !== 0) {
+      return {
+        err: constants.WASI_ESUCCESS,
+        buffer: new TextEncoder().encode(this.hterm.buffer),
+      };
+    } else if (this.fdstat.fs_flags & constants.WASI_FDFLAG_NONBLOCK) {
+      return {
+        err: constants.WASI_ESUCCESS,
+        buffer: new ArrayBuffer(0),
+      };
+    } else {
+      return new Promise<{ err: number; buffer: ArrayBuffer }>((resolve) => {
+        this.hterm.bufRequestQueue.push({
+          len,
+          resolve,
+          lock: sharedBuff,
+        });
+      });
+    }
   }
 }

@@ -2,7 +2,6 @@ import * as constants from "./constants.js";
 import * as utils from "./utils.js";
 import { fetchFile } from "./terminal.js";
 import ProcessManager, { FdTable } from "./process-manager";
-import { Stderr, Stdout } from "./devices.js";
 import { getFilesystem } from "./filesystem/top-level-fs.js";
 
 export async function mount(
@@ -34,9 +33,7 @@ export async function mount(
       let path = args[1];
       let result;
       if (!path.startsWith("/")) {
-        path = `${
-          processManager.processInfos[processManager.currentProcess].cwd
-        }/${path}`;
+        path = `${processManager.processInfos[processId].cwd}/${path}`;
       }
       result = await processManager.filesystem.open(path);
 
@@ -139,7 +136,7 @@ export async function wget(
   env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stderr = fds.getFd(2) as Stderr;
+  const stderr = fds.getFd(2);
 
   let path: string;
   let address: string;
@@ -282,7 +279,7 @@ export async function free(
   _env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stdout = fds.getFd(1) as Stdout;
+  const stdout = fds.getFd(1);
 
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;

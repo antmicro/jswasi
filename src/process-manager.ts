@@ -5,12 +5,29 @@ import { Descriptor } from "./filesystem/filesystem";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
 import syscallCallback from "./syscalls.js";
 
+export const DEFAULT_WORK_DIR = "/home/ant";
+export const DEFAULT_ENV = {
+  PATH: "/usr/bin:/usr/local/bin",
+  PWD: DEFAULT_WORK_DIR,
+  OLDPWD: DEFAULT_WORK_DIR,
+  TMPDIR: "/tmp",
+  TERM: "xterm-256color",
+  HOME: DEFAULT_WORK_DIR,
+  SHELL: "/usr/bin/wash",
+  LANG: "en_US.UTF-8",
+  USER: "ant",
+  HOSTNAME: "browser",
+  PYTHONHOME: "/",
+  PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
+  DEBUG: "1",
+};
+
 export class FdTable {
   private fdt: Record<number, Descriptor> = {};
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, Descriptor>) {
+  constructor(fds: Record<number, Descriptor | undefined>) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
   }
@@ -266,25 +283,24 @@ export default class ProcessManager {
     if (id !== 0 && process.parentLock != null) {
       Atomics.store(process.parentLock, 0, exitNo);
       Atomics.notify(process.parentLock, 0);
-      if (this.currentProcess === id) {
-        this.currentProcess = process.parentId;
-      }
     }
     // remove process from process array
     delete this.processInfos[id];
   }
 
   sendSigInt(id: number) {
-    let currentProcess = this.currentProcess;
-    if (
-      currentProcess === 0 ||
-      this.processInfos[currentProcess].cmd === "/usr/bin/wash"
-    ) {
-      console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
-      this.events.publishEvent(constants.WASI_EXT_EVENT_SIGINT);
-    } else {
-      this.terminateProcess(id, constants.EXIT_INTERRUPTED);
-    }
+    // TODO: adapt this to new current process notion
+    // let currentProcess = this.currentProcess;
+    // if (
+    //   currentProcess === 0 ||
+    //   this.processInfos[currentProcess].cmd === "/usr/bin/wash"
+    // ) {
+    //   console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
+    //   this.events.publishEvent(constants.WASI_EVENT_SIGINT);
+    // } else {
+    //   this.terminateProcess(id, constants.EXIT_INTERRUPTED);
+    // }
+    this.terminateProcess(id);
   }
 
   sendEndOfFile(id: number, lockValue: number) {
@@ -292,76 +308,6 @@ export default class ProcessManager {
     if (worker.bufferRequestQueue.length !== 0) {
       const { lck } = worker.bufferRequestQueue[0];
       Atomics.store(lck, 0, lockValue);
-      Atomics.notify(lck, 0);
-    }
-  }
-
-  pushToBuffer(data: string) {
-    this.buffer += data;
-
-    // each process has a buffer request queue to store fd_reads on stdin that couldn't be handled straight away
-    // now that buffer was filled, look if there are pending buffer requests from current foreground worker
-    if (this.currentProcess != null) {
-      const process = this.processInfos[this.currentProcess];
-      while (
-        process.bufferRequestQueue.length !== 0 &&
-        this.buffer.length !== 0
-      ) {
-        const { requestedLen, lck, readLen, sharedBuffer } =
-          this.processInfos[this.currentProcess].bufferRequestQueue.shift();
-        this.sendBufferToProcess(
-          this.currentProcess,
-          requestedLen,
-          lck,
-          readLen,
-          sharedBuffer
-        );
-      }
-
-      if (this.buffer.length !== 0 && process.stdinPollSub !== null) {
-        // TODO: this could potentially create race conditions
-        const entry = process.stdinPollSub;
-        process.stdinPollSub = null;
-        if (
-          Atomics.load(entry.data, 0) ==
-          constants.WASI_EXT_POLL_BUF_STATUS_VALID
-        ) {
-          Atomics.store(entry.data, 1, this.buffer.length);
-          Atomics.store(
-            entry.data,
-            0,
-            constants.WASI_EXT_POLL_BUF_STATUS_READY
-          );
-          Atomics.store(entry.lck, 0, 0);
-          Atomics.notify(entry.lck, 0);
-        }
-      }
-    }
-  }
-
-  sendBufferToProcess(
-    workerId: number,
-    requestedLen: number,
-    lck: Int32Array,
-    readLen: Int32Array,
-    buf: Uint8Array
-  ): void {
-    // if the request can't be processed straight away or the process is not in foreground, push it to queue for later
-    if (this.buffer.length === 0 || workerId !== this.currentProcess) {
-      this.processInfos[workerId].bufferRequestQueue.push({
-        requestedLen,
-        lck,
-        readLen,
-        sharedBuffer: buf,
-      });
-    } else {
-      readLen[0] =
-        this.buffer.length > requestedLen ? requestedLen : this.buffer.length;
-      for (let j = 0; j < readLen[0]; j += 1) {
-        buf[j] = this.buffer.charCodeAt(j);
-      }
-      this.buffer = this.buffer.slice(readLen[0]);
-      Atomics.store(lck, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lck, 0);
     }
   }

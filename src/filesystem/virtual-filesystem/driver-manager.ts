@@ -1,13 +1,16 @@
 import * as constants from "../../constants.js";
 
 import { MemoryDeviceDriver } from "./mem-devices.js";
+import { HtermDeviceDriver } from "./tty-devices.js";
 import { Descriptor, Fdflags, Rights } from "../filesystem.js";
+import ProcessManager from "../../process-manager.js";
 
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
 
 export const enum major {
   MAJ_MEMORY = 0,
+  MAJ_HTERM = 1,
 }
 
 export class DriverManager {
@@ -17,7 +20,7 @@ export class DriverManager {
     this.drivers = {};
   }
 
-  async initialize(_opts: Object): Promise<number> {
+  async initialize(processManager: ProcessManager): Promise<number> {
     const __memDriver = new MemoryDeviceDriver();
 
     let err = await __memDriver.initDriver();
@@ -25,7 +28,14 @@ export class DriverManager {
       return err;
     }
 
+    const __htermDriver = new HtermDeviceDriver();
+
+    err = await __htermDriver.initDriver({ processManager });
+    if (err !== constants.WASI_ESUCCESS) {
+      return err;
+    }
     this.drivers[major.MAJ_MEMORY] = __memDriver;
+    this.drivers[major.MAJ_HTERM] = __htermDriver;
     return constants.WASI_ESUCCESS;
   }
 

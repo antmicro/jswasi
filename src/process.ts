@@ -503,8 +503,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   function fd_read(fd: number, iovs: ptr, iovsLen: number, nRead: ptr) {
-    if (fd > 2)
-      workerConsoleLog(`fd_read(${fd}, ${iovs}, ${iovsLen}, ${nRead})`);
+    workerConsoleLog(`fd_read(${fd}, ${iovs}, ${iovsLen}, ${nRead})`);
 
     const view = new DataView(
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer

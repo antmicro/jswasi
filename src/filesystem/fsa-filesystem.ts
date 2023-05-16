@@ -554,7 +554,8 @@ export class FsaFilesystem implements Filesystem {
   async mknodat(
     _desc: Descriptor,
     _path: string,
-    _dev: number
+    _dev: number,
+    _args: Object
   ): Promise<number> {
     return constants.WASI_EINVAL;
   }

@@ -120,7 +120,7 @@ export interface Descriptor {
   // original: read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   read(
     len: number,
-    sharedBuff?: ArrayBuffer,
+    sharedBuff?: SharedArrayBuffer,
     workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
@@ -474,5 +474,10 @@ export interface Filesystem {
     linkpath: string
   ): Promise<number>;
   initialize(opts: Object): Promise<number>;
-  mknodat(desc: Descriptor, path: string, dev: number): Promise<number>;
+  mknodat(
+    desc: Descriptor,
+    path: string,
+    dev: number,
+    args: Object
+  ): Promise<number>;
 }

@@ -1,6 +1,7 @@
 import * as constants from "../../constants.js";
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
+import ProcessManager from "../../process-manager.js";
 
 import {
   VirtualFilesystem,
@@ -34,7 +35,8 @@ export class DeviceFilesystem extends VirtualFilesystem {
   override async mknodat(
     desc: Descriptor,
     path: string,
-    dev: number
+    dev: number,
+    opts: Object
   ): Promise<number> {
     let navigated;
     let __desc;
@@ -64,7 +66,7 @@ export class DeviceFilesystem extends VirtualFilesystem {
 
     const [major_, minor_] = vfs.unmkDev(dev);
     const __driver = this.driverManager.getDriver(major_ as major);
-    __driver.initDevice(minor_);
+    __driver.initDevice(minor_, opts);
 
     return constants.WASI_ESUCCESS;
   }
@@ -99,8 +101,12 @@ export class DeviceFilesystem extends VirtualFilesystem {
     const [major_, minor_] = vfs.unmkDev(navigated.target._metadata.rdev);
 
     const driver = this.driverManager.getDriver(major_ as major);
-    const { err, constructor_ } = await driver.getDescConstructor(
-      minor_ as memMinor
+    const { err, desc } = await driver.getDesc(
+      minor_ as memMinor,
+      fdflags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      navigated.target
     );
     if (err !== constants.WASI_ESUCCESS) {
       return result;
@@ -108,39 +114,40 @@ export class DeviceFilesystem extends VirtualFilesystem {
     return {
       err: constants.WASI_ESUCCESS,
       index: -1,
-      desc: new constructor_(
-        fdflags,
-        fs_rights_base,
-        fs_rights_inheriting,
-        navigated.target
-      ),
+      desc,
     };
   }
 }
 
 export async function createDeviceFilesystem(
-  driverManager: DriverManager
+  driverManager: DriverManager,
+  processManager: ProcessManager,
+  args: Object
 ): Promise<DeviceFilesystem> {
   let devfs = new DeviceFilesystem();
 
-  await driverManager.initialize({});
+  await driverManager.initialize(processManager);
   await devfs.initialize({ driverManager });
 
-  devfs.mknodat(
+  await devfs.mknodat(
     undefined,
     "null",
-    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_NULL)
+    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_NULL),
+    {}
   );
-  devfs.mknodat(
+  await devfs.mknodat(
     undefined,
     "zero",
-    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_ZERO)
+    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_ZERO),
+    {}
   );
-  devfs.mknodat(
+  await devfs.mknodat(
     undefined,
     "random",
-    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_RANDOM)
+    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_RANDOM),
+    {}
   );
+  await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(major.MAJ_HTERM, 0), args);
 
   return devfs;
 }

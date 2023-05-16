@@ -35,12 +35,9 @@ import {
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
-import { Stdin, EventSource } from "./devices.js";
+import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
-
-const RED_ANSI = "\u001b[31m";
-const RESET = "\u001b[0m";
 
 declare global {
   interface Window {
@@ -57,14 +54,6 @@ export default async function syscallCallback(
   const fullCommand = processManager.processInfos[processId].cmd;
   const processName = fullCommand.substr(fullCommand.lastIndexOf("/") + 1);
   switch (action) {
-    case "stdout": {
-      processManager.terminalOutputCallback(data);
-      break;
-    }
-    case "stderr": {
-      processManager.terminalOutputCallback(`${RED_ANSI}${data}${RESET}`);
-      break;
-    }
     case "console": {
       console.log(
         `%c [dbg (%c${processName}:${processId}%c)] %c ${data}`,
@@ -93,49 +82,49 @@ export default async function syscallCallback(
       break;
     }
     case "hterm": {
-      const { sharedBuffer, method, attrib, val } = data as HtermConfArgs;
+      const { sharedBuffer } = data as HtermConfArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
 
-      const terminal = processManager.terminal;
+      //   const terminal = processManager.terminal;
 
-      let err = constants.WASI_ESUCCESS;
-      if (method === "get") {
-        const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
-        const buffer = new Int8Array(sharedBuffer, 8, bufferUsed[0]);
-        const fields = attrib.split(".");
+      //   let err = constants.WASI_ESUCCESS;
+      //   if (method === "get") {
+      //     const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
+      //     const buffer = new Int8Array(sharedBuffer, 8, bufferUsed[0]);
+      //     const fields = attrib.split(".");
 
-        let data;
-        try {
-          if (fields[0] === "prefs_") {
-            data = terminal.prefs_.get(fields[1]);
-          } else {
-            var param = terminal;
-            for (var field of fields) {
-              param = param[field];
-            }
-            data = param;
-          }
+      //     let data;
+      //     try {
+      //       if (fields[0] === "prefs_") {
+      //         data = terminal.prefs_.get(fields[1]);
+      //       } else {
+      //         var param = terminal;
+      //         for (var field of fields) {
+      //           param = param[field];
+      //         }
+      //         data = param;
+      //       }
 
-          const value = String(data);
-          if (value.length <= bufferUsed[0]) {
-            buffer.set(new TextEncoder().encode(value), 0);
-          }
+      //       const value = String(data);
+      //       if (value.length <= bufferUsed[0]) {
+      //         buffer.set(new TextEncoder().encode(value), 0);
+      //       }
 
-          bufferUsed[0] = value.length;
-        } catch (error) {
-          err = constants.WASI_EINVAL;
-        }
-      } else if (method === "set") {
-        try {
-          terminal.prefs_.set(attrib, val);
-        } catch (error) {
-          err = constants.WASI_EINVAL;
-        }
-      } else {
-        err = constants.WASI_EINVAL;
-      }
+      //       bufferUsed[0] = value.length;
+      //     } catch (error) {
+      //       err = constants.WASI_EINVAL;
+      //     }
+      //   } else if (method === "set") {
+      //     try {
+      //       terminal.prefs_.set(attrib, val);
+      //     } catch (error) {
+      //       err = constants.WASI_EINVAL;
+      //     }
+      //   } else {
+      //     err = constants.WASI_EINVAL;
+      //   }
 
-      Atomics.store(lock, 0, err);
+      Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
       break;
     }
@@ -307,7 +296,6 @@ export default async function syscallCallback(
             const id = await processManager.spawnProcess(
               processId,
               background ? null : parentLck,
-              syscallCallback,
               path,
               fds,
               args,
@@ -958,16 +946,7 @@ export default async function syscallCallback(
           case constants.WASI_EVENTTYPE_FD_READ: {
             switch (stat.fs_filetype) {
               case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
-                if (fd instanceof Stdin) {
-                  let stdin = fd as Stdin;
-                  let bytes = stdin.availableBytes(processId);
-
-                  if (bytes > 0) {
-                    event[0] = constants.WASI_EXT_POLL_BUF_STATUS_READY;
-                    event[1] = bytes;
-                    isEvent = true;
-                  }
-                } else if (fd instanceof EventSource) {
+                if (fd instanceof EventSource) {
                   let eventSource = fd as EventSource;
                   let bytes = eventSource.availableBytes(processId);
 
@@ -1035,10 +1014,7 @@ export default async function syscallCallback(
 
         switch (stat.fs_filetype) {
           case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
-            if (fd instanceof Stdin) {
-              let stdin = fd as Stdin;
-              stdin.setPollEntry(processId, endLock, buffer);
-            } else if (fd instanceof EventSource) {
+            if (fd instanceof EventSource) {
               let eventSource = fd as EventSource;
               eventSource.setPollEntry(endLock, buffer);
             } else {
