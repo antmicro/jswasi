@@ -1,11 +1,11 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import { FdTable } from "./process-manager.js";
-import syscallCallback from "./syscalls.js";
 import { Stderr, Stdin, Stdout } from "./devices.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
 import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
+import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
 
 declare global {
   interface Window {
@@ -251,7 +251,6 @@ function initFsaDropImport(
           await processManager.spawnProcess(
             0, // parent_id
             null, // parent_lock
-            syscallCallback,
             "/usr/bin/wash",
             new FdTable({
               // TODO: replace with /dev/null once it is implemented
@@ -359,7 +358,9 @@ export async function init(
     await initFs(tfs);
   }
 
-  tfs.addMount("/dev", await createDeviceFilesystem());
+  const __driverManager = new DriverManager();
+
+  tfs.addMount("/dev", await createDeviceFilesystem(__driverManager));
 
   // verify if wash and init are up to date and refetch them if they are not
   await tfs.createDir("/usr");
@@ -384,70 +385,8 @@ export async function init(
   // FIXME: for now we assume hterm is in scope
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
-  const terminal = new hterm.Terminal();
 
-  const processManager = new ProcessManager(
-    "process.js",
-    (output: string) => {
-      const replaced = output.replaceAll("\n", "\r\n");
-      terminal.io.print(replaced);
-      if (window.stdoutAttached) {
-        window.buffer += replaced;
-      }
-      if (window.logOutput) {
-        console.log(`[OUT] ${output}`);
-      }
-    },
-    terminal,
-    tfs
-  );
-
-  terminal.decorate(anchor);
-  terminal.installKeyboard();
-
-  terminal.keyboard.bindings.addBindings({
-    "Ctrl-R": "PASS",
-  });
-
-  const io = terminal.io.push();
-
-  const onTerminalInput = (data: string): void => {
-    let code = data.charCodeAt(0);
-
-    if (code === 13) {
-      code = 10;
-      data = String.fromCharCode(10);
-    }
-
-    if (code === 3 || code === 4 || code === 81) {
-      // control characters
-      if (code === 3) {
-        processManager.sendSigInt(processManager.currentProcess);
-      } else if (code === 4) {
-        processManager.sendEndOfFile(processManager.currentProcess, -1);
-      }
-    } else {
-      // regular characters
-      processManager.pushToBuffer(data);
-    }
-
-    if (code === 10 || code >= 32) {
-      // echo
-      if (
-        processManager.processInfos[processManager.currentProcess].shouldEcho
-      ) {
-        terminal.io.print(code === 10 ? "\r\n" : data);
-      }
-    }
-  };
-  io.onVTKeystroke = onTerminalInput;
-  io.sendString = onTerminalInput;
-
-  // TODO: maybe save all output and rewrite it on adjusted size?
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  io.onTerminalResize = (columns: number, rows: number) => {
-    processManager.events.publishEvent(constants.WASI_EXT_EVENT_WINCH);
-  };
+  const processManager = new ProcessManager("process.js", tfs);
 
   initFsaDropImport(
     anchor.getElementsByTagName("iframe")[0].contentWindow,
@@ -458,7 +397,6 @@ export async function init(
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
-    syscallCallback,
     "/usr/bin/wash",
     new FdTable({
       0: new Stdin(processManager),

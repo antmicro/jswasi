@@ -54,16 +54,22 @@ export class MemoryDeviceDriver implements DeviceDriver {
     return constants.WASI_ESUCCESS;
   }
 
-  async getDescConstructor(min: minor): Promise<{
-    constructor_: new (
-      fs_flags: Fdflags,
-      fs_rights_base: Rights,
-      fs_rights_inheriting: Rights,
-      ino: vfs.CharacterDev
-    ) => Descriptor;
-    err: number;
-  }> {
-    return { constructor_: this.devices[min], err: constants.WASI_ESUCCESS };
+  async getDesc(
+    min: minor,
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    ino: vfs.CharacterDev
+  ): Promise<{ desc: Descriptor; err: number }> {
+    return {
+      desc: new this.devices[min](
+        fs_flags,
+        fs_rights_base,
+        fs_rights_inheriting,
+        ino
+      ),
+      err: constants.WASI_ESUCCESS,
+    };
   }
 }
 

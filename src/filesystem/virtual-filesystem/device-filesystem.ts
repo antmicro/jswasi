@@ -118,9 +118,10 @@ export class DeviceFilesystem extends VirtualFilesystem {
   }
 }
 
-export async function createDeviceFilesystem(): Promise<DeviceFilesystem> {
+export async function createDeviceFilesystem(
+  driverManager: DriverManager
+): Promise<DeviceFilesystem> {
   let devfs = new DeviceFilesystem();
-  const driverManager = new DriverManager();
 
   await driverManager.initialize({});
   await devfs.initialize({ driverManager });

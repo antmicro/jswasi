@@ -3,6 +3,7 @@ import { EventSource } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
 import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
+import syscallCallback from "./syscalls.js";
 
 export class FdTable {
   private fdt: Record<number, Descriptor> = {};
@@ -155,34 +156,19 @@ class PubSubEvent {
 }
 
 export default class ProcessManager {
-  public buffer = "";
-
-  public currentProcess: number = 0;
-
   public nextProcessId = 0;
-
   public processInfos: Record<number, ProcessInfo> = {};
-
   public compiledModules: Record<string, WebAssembly.Module> = {};
-
   public events: PubSubEvent = new PubSubEvent();
 
   constructor(
     private readonly scriptName: string,
-    public readonly terminalOutputCallback: (output: string) => void,
-    public readonly terminal: any, // TODO: extract Terminal interface and use it here
     public readonly filesystem: TopLevelFs
-  ) {
-    // it's a constructor with only parameter properties
-  }
+  ) {}
 
   async spawnProcess(
     parentId: number | null,
     parentLock: Int32Array | null,
-    syscallCallback: (
-      event: MessageEvent,
-      processManager: ProcessManager
-    ) => Promise<void>,
     command: string,
     fds: FdTable,
     args: string[],

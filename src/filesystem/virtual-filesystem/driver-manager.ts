@@ -35,20 +35,16 @@ export class DriverManager {
 }
 
 export interface DeviceDriver {
-  initDriver(): Promise<number>;
-  initDevice(min: number): Promise<number>;
-  teardownDevice(min: number): Promise<number>;
-  teardownDriver(): Promise<number>;
+  initDriver(args: Object): Promise<number>;
+  initDevice(min: number, args: Object): Promise<number>;
+  teardownDevice(min: number, args: Object): Promise<number>;
+  teardownDriver(args: Object): Promise<number>;
 
-  getDescConstructor(
-    min: number
-  ): Promise<{
-    constructor_: new (
-      fs_flags: Fdflags,
-      fs_rights_base: Rights,
-      fs_rights_inheriting: Rights,
-      ino: vfs.CharacterDev
-    ) => Descriptor;
-    err: number;
-  }>;
+  getDesc(
+    min: number,
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    ino: vfs.CharacterDev
+  ): Promise<{ desc?: Descriptor; err: number }>;
 }
