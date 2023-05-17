@@ -817,9 +817,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   // used solely in path_readlink
-  function specialParse(syscallDataJson: string): {
-    exit_status: number;
-    output: Uint8Array;
+  function specialParse(
+    syscallDataJson: string,
+    outputBuffer: Uint8Array
+  ): {
+    exitStatus: number;
+    outputSize: number;
   } {
     const {
       command,
@@ -878,6 +881,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const err = Atomics.load(lck, 0);
         const childPID = new Int32Array(sharedBuffer, 4, 1);
         const userBuffer = new Uint32Array(2);
+
+        let exitStatus = constants.EXIT_SUCCESS;
         userBuffer[0] = constants.EXIT_SUCCESS;
         userBuffer[1] = Atomics.load(childPID, 0);
 
@@ -886,19 +891,18 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           if (err === constants.WASI_ENOEXEC) {
             // If the program can't be executed, return additional output message
             userBuffer[0] = constants.WASI_ENOEXEC;
-            return {
-              exit_status: constants.EXIT_FAILURE,
-              output: new Uint8Array(userBuffer.buffer, 0, 8),
-            };
+            exitStatus = constants.EXIT_FAILURE;
+          } else {
+            exitStatus = err;
           }
-          return {
-            exit_status: err,
-            output: new Uint8Array(userBuffer.buffer, 0, 8),
-          };
         }
+
+        let byteResult = new Uint8Array(userBuffer.buffer, 0, 8);
+        outputBuffer.set(byteResult, 0);
+
         return {
-          exit_status: constants.EXIT_SUCCESS,
-          output: new Uint8Array(userBuffer.buffer, 0, 8),
+          exitStatus: exitStatus,
+          outputSize: 8,
         };
       }
 
@@ -917,9 +921,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         const err = Atomics.load(lck, 0);
         workerConsoleLog(`chdir returned ${err}`);
+
         return {
-          exit_status: err,
-          output: new TextEncoder().encode(dir),
+          exitStatus: err,
+          outputSize: 0,
         };
       }
 
@@ -945,9 +950,13 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             ? new TextDecoder().decode(cwd_buf.slice(0, cwd_len[0]))
             : undefined;
         workerConsoleLog(`getcwd returned ${output}`);
+
+        //TODO: Check buffer size is enough
+        outputBuffer.set(cwd_buf.slice(0, cwd_len[0]), 0);
+
         return {
-          exit_status: err,
-          output: new TextEncoder().encode(output),
+          exitStatus: err,
+          outputSize: cwd_len[0],
         };
       }
 
@@ -971,8 +980,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         }
 
         return {
-          exit_status: constants.EXIT_SUCCESS,
-          output: new Uint8Array(),
+          exitStatus: constants.EXIT_SUCCESS,
+          outputSize: 0,
         };
       }
       // TODO: rework this, linux uses "stty -echo"/"stty echo"
@@ -993,8 +1002,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         return {
-          exit_status: constants.EXIT_SUCCESS,
-          output: new Uint8Array(),
+          exitStatus: constants.EXIT_SUCCESS,
+          outputSize: 0,
         };
       }
       case "isatty": {
@@ -1011,9 +1020,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         let err = Atomics.load(lck, 0);
         const isattyPtr = new Uint8Array(sharedBuffer, 4, 4);
+        outputBuffer.set(isattyPtr.slice(0, 4), 0);
+
         return {
-          exit_status: err,
-          output: isattyPtr,
+          exitStatus: err,
+          outputSize: 4,
         };
       }
       case "getpid": {
@@ -1029,9 +1040,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
+        outputBuffer.set(pidPtr, 0);
+
         return {
-          exit_status: constants.EXIT_SUCCESS,
-          output: new Uint8Array(pidPtr, 0, 4),
+          exitStatus: constants.EXIT_SUCCESS,
+          outputSize: 4,
         };
       }
       case "hterm": {
@@ -1062,9 +1075,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             if (returnCode == constants.WASI_ESUCCESS) {
               // In case buffer size was not enought then resize buffer and call syscall again
               if (bufferUsed[0] <= bufferSize) {
+                outputBuffer.set(buffer.slice(0, bufferUsed[0]), 0);
+
                 return {
-                  exit_status: constants.EXIT_SUCCESS,
-                  output: buffer,
+                  exitStatus: constants.EXIT_SUCCESS,
+                  outputSize: bufferUsed[0],
                 };
               }
 
@@ -1072,7 +1087,10 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
                 bufferSize *= 2;
               }
             } else {
-              return { exit_status: returnCode, output: new Uint8Array() };
+              return {
+                exitStatus: returnCode,
+                outputSize: 0,
+              };
             }
           }
         } else {
@@ -1090,8 +1108,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           returnCode = Atomics.load(lck, 0);
 
           return {
-            exit_status: returnCode,
-            output: new Uint8Array(),
+            exitStatus: returnCode,
+            outputSize: 0,
           };
         }
       }
@@ -1108,8 +1126,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           eventMask >= BigInt(1n) << BigInt(constants.WASI_EVENTS_NUM)
         ) {
           return {
-            exit_status: constants.WASI_EINVAL,
-            output: new Uint8Array(),
+            exitStatus: constants.WASI_EINVAL,
+            outputSize: 0,
           };
         }
 
@@ -1123,9 +1141,11 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         let returnCode = Atomics.load(lck, 0);
         const fileDescriptor = new Uint8Array(sharedBuffer, 4, 4);
+        outputBuffer.set(fileDescriptor, 0);
+
         return {
-          exit_status: returnCode,
-          output: fileDescriptor,
+          exitStatus: returnCode,
+          outputSize: 4,
         };
       }
       case "attach_sigint": {
@@ -1147,8 +1167,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         let returnCode = Atomics.load(lck, 0);
         return {
-          exit_status: returnCode,
-          output: new Uint8Array(),
+          exitStatus: returnCode,
+          outputSize: 0,
         };
       }
       case "clean_inodes": {
@@ -1159,8 +1179,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         sendToKernel(["clean_inodes", { sharedBuffer } as CleanInodesArgs]);
         Atomics.wait(lck, 0, -1);
         return {
-          exit_status: Atomics.load(lck, 0),
-          output: new Uint8Array(),
+          exitStatus: Atomics.load(lck, 0),
+          outputSize: 0,
         };
       }
       case "kill": {
@@ -1182,8 +1202,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         Atomics.wait(lck, 0, -1);
 
         return {
-          exit_status: Atomics.load(lck, 0),
-          output: new Uint8Array(),
+          exitStatus: Atomics.load(lck, 0),
+          outputSize: 0,
         };
       }
       default: {
@@ -1216,16 +1236,26 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(`path is ${path}, buffer_len = ${bufferLen}, fd = ${fd}`);
     // special case, path_readlink is used for spawning subprocesses
     if (path[0] === "!") {
-      const { exit_status, output } = specialParse(path.slice(1));
+      const outputBuffer =
+        bufferPtr !== 0
+          ? new Uint8Array(
+              (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
+              bufferPtr,
+              bufferLen
+            )
+          : new Uint8Array();
+
+      const { exitStatus, outputSize } = specialParse(
+        path.slice(1),
+        outputBuffer
+      );
+
       // ensure that syscall output doesn't exceed buffer size and the buffer pointer is not NULL
-      if (exit_status !== constants.WASI_ENOBUFS && bufferPtr !== 0) {
-        const result = output;
-        let count = result.byteLength;
-        view8.set(result.slice(0, count), bufferPtr);
-        view8.set([0], bufferPtr + count);
-        view.setUint32(bufferUsedPtr, count, true);
+      if (exitStatus !== constants.WASI_ENOBUFS && bufferPtr !== 0) {
+        view8.set([0], bufferPtr + outputSize);
+        view.setUint32(bufferUsedPtr, outputSize, true);
       }
-      return exit_status;
+      return exitStatus;
     }
 
     const sharedBuffer = new SharedArrayBuffer(4 + bufferLen + 4); // lock, path buffer, buffer used
