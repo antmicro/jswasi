@@ -842,6 +842,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     );
     switch (command) {
       case "spawn": {
+        // wasi_ext_lib::spawn needs: int process_exit_status, int child_pid
+        if (outputBuffer.byteLength < 8) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
         // lock + child PID
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
 
@@ -951,8 +959,16 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             : undefined;
         workerConsoleLog(`getcwd returned ${output}`);
 
-        //TODO: Check buffer size is enough
+        // Check user buffer size is enough
+        if (outputBuffer.byteLength <= cwd_len[0]) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
         outputBuffer.set(cwd_buf.slice(0, cwd_len[0]), 0);
+        outputBuffer.set([0], cwd_len[0]);
 
         return {
           exitStatus: err,
@@ -1007,6 +1023,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         };
       }
       case "isatty": {
+        // wasi_ext_lib::isatty needs: int
+        if (outputBuffer.byteLength < 4) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         lck[0] = -1;
@@ -1028,6 +1052,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         };
       }
       case "getpid": {
+        // wasi_ext_lib::getpid needs: int pid
+        if (outputBuffer.byteLength < 4) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
         const sharedBuffer = new SharedArrayBuffer(8);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         const pidPtr = new Int32Array(sharedBuffer, 4, 1);
@@ -1073,9 +1105,18 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             returnCode = Atomics.load(lck, 0);
 
             if (returnCode == constants.WASI_ESUCCESS) {
-              // In case buffer size was not enought then resize buffer and call syscall again
+              // Check user buffer size is enough
+              if (outputBuffer.byteLength <= bufferUsed[0]) {
+                return {
+                  exitStatus: constants.WASI_ENOBUFS,
+                  outputSize: 0,
+                };
+              }
+
+              // In case sharedBuffer size was not enough then resize buffer and call syscall again
               if (bufferUsed[0] <= bufferSize) {
                 outputBuffer.set(buffer.slice(0, bufferUsed[0]), 0);
+                outputBuffer.set([0], bufferUsed[0]);
 
                 return {
                   exitStatus: constants.EXIT_SUCCESS,
@@ -1114,6 +1155,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         }
       }
       case "event_source_fd": {
+        // wasi_ext_lib::event_source_fd needs: int fd
+        if (outputBuffer.byteLength < 4) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
         const { event_mask: eventMask }: { event_mask: bigint } =
           JSON.parse(json);
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
@@ -1252,7 +1301,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
       // ensure that syscall output doesn't exceed buffer size and the buffer pointer is not NULL
       if (exitStatus !== constants.WASI_ENOBUFS && bufferPtr !== 0) {
-        view8.set([0], bufferPtr + outputSize);
         view.setUint32(bufferUsedPtr, outputSize, true);
       }
       return exitStatus;
