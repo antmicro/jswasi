@@ -260,4 +260,8 @@ export class EventSource implements Descriptor, In {
     this.occuredEvents ^= result;
     return result;
   }
+
+  async ioctl(_request: number, _buf: ArrayBuffer): Promise<number> {
+    return constants.WASI_ENOTTY;
+  }
 }

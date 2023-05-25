@@ -229,6 +229,16 @@ export interface Descriptor {
    * @returns status code
    */
   truncate(size: bigint): Promise<number>;
+
+  /*
+   * Manipulates the underlying device parameters of special files
+   *
+   * @param request - request number, specifies which action to execute in the context of a device
+   * @param buf - buffer which is used to read or write data depending on the request
+   *
+   * @returns status code
+   */
+  ioctl(request: number, buf?: ArrayBuffer): Promise<number>;
 }
 
 export abstract class AbstractDescriptor implements Descriptor {
@@ -259,6 +269,10 @@ export abstract class AbstractDescriptor implements Descriptor {
     this.fdstat.fs_rights_base = rightsBase;
     this.fdstat.fs_rights_inheriting = rightsInheriting;
     return constants.WASI_ESUCCESS;
+  }
+
+  async ioctl(_request: number, _buf: ArrayBuffer): Promise<number> {
+    return constants.WASI_ENOTTY;
   }
 
   abstract getFilestat(): Promise<Filestat>;
