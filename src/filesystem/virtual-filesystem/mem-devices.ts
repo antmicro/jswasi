@@ -70,7 +70,6 @@ class VirtualNullDescriptor
 
   override async read(
     _len: number,
-    _sharedBuff?: ArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     return {
@@ -130,7 +129,6 @@ class VirtualNullDescriptor
 class VirtualZeroDescriptor extends VirtualNullDescriptor {
   override async read(
     len: number,
-    _sharedBuff?: ArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     let __buf = new ArrayBuffer(len);
@@ -154,7 +152,6 @@ class VirtualZeroDescriptor extends VirtualNullDescriptor {
 class VirtualRandomDescriptor extends VirtualNullDescriptor {
   override async read(
     len: number,
-    _sharedBuff?: ArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     let __buf = new ArrayBuffer(len);

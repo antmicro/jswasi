@@ -120,7 +120,6 @@ export interface Descriptor {
   // original: read(len: number): Promise<{ err: number; buffer: ArrayBuffer }>;
   read(
     len: number,
-    sharedBuff?: SharedArrayBuffer,
     workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
 
@@ -280,7 +279,6 @@ export abstract class AbstractDescriptor implements Descriptor {
   abstract close(): Promise<number>;
   abstract read(
     len: number,
-    sharedBuff?: ArrayBuffer,
     workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }>;
   abstract read_str(): Promise<{ err: number; content: string }>;
@@ -329,7 +327,6 @@ export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
 
   async read(
     _len: number,
-    _sharedBuff?: ArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     return { err: constants.WASI_EISDIR, buffer: undefined };
@@ -409,7 +406,6 @@ export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
 
   async read(
     _len: number,
-    _sharedBuff?: ArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     return { err: constants.WASI_EBADF, buffer: undefined };

@@ -520,7 +520,7 @@ export default async function syscallCallback(
           if (offset) {
             res = await fds.getFd(fd).pread(len, offset);
           } else {
-            res = await fds.getFd(fd).read(len, sharedBuffer, processId);
+            res = await fds.getFd(fd).read(len, processId);
           }
           err = res.err;
           readBuf.set(new Uint8Array(res.buffer));

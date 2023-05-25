@@ -14,7 +14,6 @@ import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
 
 type BufferRequest = {
   len: number;
-  lock: SharedArrayBuffer;
   resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
 };
 
@@ -307,7 +306,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
 
   override async read(
     len: number,
-    sharedBuff?: SharedArrayBuffer,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     if (this.hterm.buffer.length !== 0) {
@@ -325,7 +323,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         this.hterm.bufRequestQueue.push({
           len,
           resolve,
-          lock: sharedBuff,
         });
       });
     }
