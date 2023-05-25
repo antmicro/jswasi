@@ -1,11 +1,6 @@
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
-import {
-  Fdflags,
-  Rights,
-  Descriptor,
-  AbstractDeviceDescriptor,
-} from "../filesystem.js";
+import { Fdflags, Rights, Descriptor } from "../filesystem.js";
 import ProcessManager from "../../process-manager.js";
 import {
   DEFAULT_ENV,
@@ -15,6 +10,7 @@ import {
 import { DeviceDriver } from "./driver-manager.js";
 import * as constants from "../../constants.js";
 import { getFilesystem } from "../top-level-fs.js";
+import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
 
 type BufferRequest = {
   len: number;
@@ -264,15 +260,15 @@ export class HtermDeviceDriver implements DeviceDriver {
   }
 }
 
-class VirtualHtermDescriptor extends AbstractDeviceDescriptor {
+class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
   constructor(
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    protected ino: vfs.CharacterDev,
+    ino: vfs.CharacterDev,
     private hterm: Hterm
   ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting);
+    super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
   }
 
   isatty(): boolean {

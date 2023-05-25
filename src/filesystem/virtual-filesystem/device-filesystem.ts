@@ -6,6 +6,7 @@ import ProcessManager from "../../process-manager.js";
 import {
   VirtualFilesystem,
   VirtualFilesystemDirectoryDescriptor,
+  wasiFilestat,
 } from "./virtual-filesystem.js";
 
 import { basename } from "../../utils.js";
@@ -16,6 +17,8 @@ import {
   Rights,
   Fdflags,
   Descriptor,
+  Filestat,
+  AbstractDeviceDescriptor,
 } from "../filesystem.js";
 
 import { DriverManager, major } from "./driver-manager.js";
@@ -116,6 +119,21 @@ export class DeviceFilesystem extends VirtualFilesystem {
       index: -1,
       desc,
     };
+  }
+}
+
+export abstract class AbstractVirtualDeviceDescriptor extends AbstractDeviceDescriptor {
+  constructor(
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    protected ino: vfs.CharacterDev
+  ) {
+    super(fs_flags, fs_rights_base, fs_rights_inheriting);
+  }
+
+  override async getFilestat(): Promise<Filestat> {
+    return wasiFilestat(this.ino._metadata);
   }
 }
 

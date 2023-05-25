@@ -1,23 +1,10 @@
-import {
-  wasiFilestat,
-  VirtualFilesystemDescriptor,
-} from "./virtual-filesystem.js";
-
+import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
-
-import {
-  Whence,
-  Filestat,
-  Fdflags,
-  Rights,
-  Descriptor,
-  AbstractDeviceDescriptor,
-} from "../filesystem.js";
-
+import { Whence, Fdflags, Rights, Descriptor } from "../filesystem.js";
 import { DeviceDriver } from "./driver-manager.js";
-
 import * as constants from "../../constants.js";
+import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
 
 export const enum minor {
   DEV_NULL = 0,
@@ -74,18 +61,9 @@ export class MemoryDeviceDriver implements DeviceDriver {
 }
 
 class VirtualNullDescriptor
-  extends AbstractDeviceDescriptor
+  extends AbstractVirtualDeviceDescriptor
   implements VirtualFilesystemDescriptor
 {
-  constructor(
-    fs_flags: Fdflags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    protected ino: vfs.CharacterDev
-  ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting);
-  }
-
   isatty(): boolean {
     return false;
   }
@@ -146,10 +124,6 @@ class VirtualNullDescriptor
 
   override async truncate(_size: bigint): Promise<number> {
     return constants.WASI_ESUCCESS;
-  }
-
-  override async getFilestat(): Promise<Filestat> {
-    return wasiFilestat(this.ino._metadata);
   }
 }
 
