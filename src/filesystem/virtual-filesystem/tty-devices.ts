@@ -22,10 +22,32 @@ class Hterm {
   bufRequestQueue: BufferRequest[];
   buffer: string;
 
+  rawMode: boolean;
+  echo: boolean;
+
   constructor(public terminal: any) {
     this.buffer = "";
     this.bufRequestQueue = [];
+    this.echo = false;
+    this.rawMode = true;
   }
+
+  getScreenSize(): [number, number] {
+    return [this.terminal.screenSize.width, this.terminal.screenSize.height];
+  }
+
+  setEcho(echo: boolean) {
+    this.echo = echo;
+  }
+  setRawMode(mode: boolean) {
+    this.rawMode = mode;
+  }
+}
+
+const enum ioctlRequests {
+  GET_SCREEN_SIZE = 0,
+  SET_RAW = 1,
+  SET_ECHO = 2,
 }
 
 type InitDeviceArgs = {
@@ -179,13 +201,8 @@ export class HtermDeviceDriver implements DeviceDriver {
         });
       }
 
-      if (code === 10 || code >= 32) {
-        // echo
-        // if (
-        //   this.processManager.processInfos[currentProcessId].shouldEcho
-        // ) {
+      if (__hterm.echo && (code === 10 || code >= 32)) {
         __hterm.terminal.io.print(code === 10 ? "\r\n" : data);
-        // }
       }
     };
     const io = __hterm.terminal.io.push();
@@ -307,6 +324,49 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
           lock: sharedBuff,
         });
       });
+    }
+  }
+
+  override async ioctl(request: number, buf: ArrayBuffer): Promise<number> {
+    switch (request) {
+      case ioctlRequests.GET_SCREEN_SIZE: {
+        if (buf.byteLength < 8) return constants.WASI_ENOBUFS;
+
+        let view32 = new Int32Array(buf);
+        const [width, height] = this.hterm.getScreenSize();
+
+        view32[0] = width;
+        view32[1] = height;
+
+        return constants.WASI_ESUCCESS;
+      }
+      case ioctlRequests.SET_ECHO: {
+        if (buf.byteLength < 4) {
+          return constants.WASI_EINVAL;
+        }
+
+        let view32 = new Int32Array(buf);
+
+        if (view32[0] !== 0 && view32[0] !== 1)
+          this.hterm.setEcho(view32[0] === 1);
+        else return constants.WASI_EINVAL;
+        return constants.WASI_ESUCCESS;
+      }
+      case ioctlRequests.SET_RAW: {
+        if (buf.byteLength < 4) {
+          return constants.WASI_EINVAL;
+        }
+
+        let view32 = new Int32Array(buf);
+
+        if (view32[0] !== 0 && view32[0] !== 1)
+          this.hterm.setRawMode(view32[0] === 1);
+        else return constants.WASI_EINVAL;
+        return constants.WASI_ESUCCESS;
+      }
+      default: {
+        return constants.WASI_EINVAL;
+      }
     }
   }
 }
