@@ -32,6 +32,12 @@ class Hterm {
     this.rawMode = true;
   }
 
+  splitBuf(len: number): string {
+    let out = this.buffer.slice(0, len);
+    this.buffer = this.buffer.slice(len);
+    return out;
+  }
+
   getScreenSize(): [number, number] {
     return [this.terminal.screenSize.width, this.terminal.screenSize.height];
   }
@@ -39,6 +45,7 @@ class Hterm {
   setEcho(echo: boolean) {
     this.echo = echo;
   }
+
   setRawMode(mode: boolean) {
     this.rawMode = mode;
   }
@@ -192,12 +199,9 @@ export class HtermDeviceDriver implements DeviceDriver {
       if (__hterm.bufRequestQueue.length !== 0) {
         let request = __hterm.bufRequestQueue.shift();
 
-        let out = __hterm.buffer.slice(0, request.len);
-        __hterm.buffer = __hterm.buffer.slice(request.len);
-
         request.resolve({
           err: constants.WASI_ESUCCESS,
-          buffer: new TextEncoder().encode(out),
+          buffer: new TextEncoder().encode(__hterm.splitBuf(request.len)),
         });
       }
 
@@ -309,7 +313,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     if (this.hterm.buffer.length !== 0) {
       return {
         err: constants.WASI_ESUCCESS,
-        buffer: new TextEncoder().encode(this.hterm.buffer),
+        buffer: new TextEncoder().encode(this.hterm.splitBuf(len)),
       };
     } else if (this.fdstat.fs_flags & constants.WASI_FDFLAG_NONBLOCK) {
       return {
