@@ -298,9 +298,11 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
   override async write(
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
-    this.hterm.terminal.io.print(
-      new TextDecoder().decode(buffer).replaceAll("\n", "\r\n")
-    );
+    const replaced = new TextDecoder().decode(buffer).replaceAll("\n", "\r\n");
+    this.hterm.terminal.io.print(replaced);
+    if (window.stdoutAttached) {
+      window.buffer += replaced;
+    }
     return { err: constants.WASI_ESUCCESS, written: BigInt(buffer.byteLength) };
   }
 
