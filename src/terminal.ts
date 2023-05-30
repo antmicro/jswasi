@@ -292,15 +292,20 @@ export async function init(
       currentProcessId: 0,
     })
   );
-  let __dsc = await tfs.open("/dev/ttyH0");
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
     "/usr/bin/wash",
     new FdTable({
-      0: __dsc.desc,
-      1: __dsc.desc,
-      2: __dsc.desc,
+      0: (
+        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_RIGHTS_STDIN)
+      ).desc,
+      1: (
+        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_RIGHTS_STDOUT)
+      ).desc,
+      2: (
+        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_RIGHTS_STDERR)
+      ).desc,
       3: (await tfs.open("/")).desc,
     }),
     ["/usr/bin/wash", "/usr/bin/init"],
