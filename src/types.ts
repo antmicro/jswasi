@@ -220,3 +220,9 @@ export type KillArgs = {
   processId: number;
   signalNumber: number;
 };
+
+export type IoctlArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+  command: number;
+};

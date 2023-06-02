@@ -39,6 +39,7 @@ import {
   CleanInodesArgs,
   AttachSigIntArgs,
   KillArgs,
+  IoctlArgs
 } from "./types";
 
 type ptr = number;
@@ -1253,6 +1254,32 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         return {
           exitStatus: Atomics.load(lck, 0),
           outputSize: 0,
+        };
+      }
+      case "ioctl": {
+        const { fd, cmd }: { fd: number; cmd: number } = JSON.parse(json);
+
+        // lock + buffer len + buffer
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        workerConsoleLog(`ioctl(${fd}, ${cmd})`);
+        lck[0] = -1;
+
+        sendToKernel([
+          "ioctl",
+          { sharedBuffer, fd, command: cmd } as IoctlArgs,
+        ]);
+
+        Atomics.wait(lck, 0, -1);
+
+        const err = Atomics.load(lck, 0);
+        const output =
+          err === constants.EXIT_SUCCESS
+            ? new TextDecoder().decode(new Uint8Array(sharedBuffer, 8))
+            : undefined;
+        return {
+          exit_status: err,
+          output,
         };
       }
       default: {

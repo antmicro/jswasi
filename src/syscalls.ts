@@ -32,6 +32,7 @@ import {
   AttachSigIntArgs,
   CleanInodesArgs,
   KillArgs,
+  IoctlArgs
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -1133,6 +1134,25 @@ export default async function syscallCallback(
       }
 
       Atomics.store(lck, 0, exitStatus);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "ioctl": {
+      const { sharedBuffer, fd, command } = data as IoctlArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const argLen = new Int32Array(sharedBuffer, 4, 1);
+      const arg = new Int32Array(sharedBuffer, 8, argLen[0]);
+
+      arg;
+      fd;
+      //TODO: decode command and perform action on fd
+      switch (command) {
+        default: {
+          console.log(`ioctl: ${command} not found.`);
+        }
+      }
+
+      Atomics.store(lck, 0, 0);
       Atomics.notify(lck, 0);
       break;
     }
