@@ -1141,8 +1141,8 @@ export default async function syscallCallback(
     case "ioctl": {
       const { sharedBuffer, fdNum, command } = data as IoctlArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const argLen = new Int32Array(sharedBuffer, 4, 1);
-      const arg = new Int32Array(sharedBuffer, 8, argLen[0]);
+      const argBufferUsed = new Int32Array(sharedBuffer, 4, 1);
+      const argBuffer = new Uint8Array(sharedBuffer, 8);
 
       const { fds } = processManager.processInfos[processId];
       let fd = fds.getFd(fdNum);
@@ -1168,9 +1168,10 @@ export default async function syscallCallback(
 
       let device = fd as AbstractVirtualDeviceDescriptor;
 
-      //TODO: run ioctl func
+      //TODO: run ioctl function
       device;
-      arg;
+      argBufferUsed;
+      argBuffer;
       command;
 
       Atomics.store(lck, exitStatus, 0);

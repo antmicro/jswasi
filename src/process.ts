@@ -1257,13 +1257,35 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         };
       }
       case "ioctl": {
-        const { fdNum, cmd }: { fdNum: number; cmd: number } = JSON.parse(json);
+        const {
+          fdNum,
+          cmd,
+          arg_ptr: argPtr,
+          arg_size: argSize,
+        }: {
+          fdNum: number;
+          cmd: number;
+          arg_ptr: ptr;
+          arg_size: number;
+        } = JSON.parse(json);
 
-        // lock + buffer len + buffer
+        // lock + arg buffer size used + arg buffer
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
+        const sharedBufferUsed = new Int32Array(sharedBuffer, 4, 1);
+        const sharedArgBuffer = new Uint8Array(sharedBuffer, 4, buf_len);
+
         workerConsoleLog(`ioctl(${fdNum}, ${cmd})`);
+
+        const argBuffer = new Uint8Array(
+          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
+          argPtr,
+          argSize
+        );
+
         lck[0] = -1;
+        sharedBufferUsed[0] = 0;
+        sharedArgBuffer.set(argBuffer);
 
         sendToKernel([
           "ioctl",
@@ -1271,15 +1293,24 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         ]);
 
         Atomics.wait(lck, 0, -1);
+        let err = Atomics.load(lck, 0);
 
-        const err = Atomics.load(lck, 0);
-        const output =
-          err === constants.EXIT_SUCCESS
-            ? new TextDecoder().decode(new Uint8Array(sharedBuffer, 8))
-            : undefined;
+        if (err == constants.WASI_ESUCCESS) {
+          // arg buffer is used as output buffer too
+          let bufferUsed = Atomics.load(sharedBufferUsed, 0);
+          if (bufferUsed > argSize) {
+            console.log(
+              `ioctl: bufferUsed = ${bufferUsed} is greater than argSize = ${argSize}!`
+            );
+            err = constants.WASI_ENOBUFS;
+          } else if (bufferUsed > 0) {
+            argBuffer.set(sharedArgBuffer.slice(0, bufferUsed));
+          }
+        }
+
         return {
           exit_status: err,
-          output,
+          output: undefined,
         };
       }
       default: {
