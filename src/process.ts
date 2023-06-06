@@ -1257,17 +1257,17 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         };
       }
       case "ioctl": {
-        const { fd, cmd }: { fd: number; cmd: number } = JSON.parse(json);
+        const { fdNum, cmd }: { fdNum: number; cmd: number } = JSON.parse(json);
 
         // lock + buffer len + buffer
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        workerConsoleLog(`ioctl(${fd}, ${cmd})`);
+        workerConsoleLog(`ioctl(${fdNum}, ${cmd})`);
         lck[0] = -1;
 
         sendToKernel([
           "ioctl",
-          { sharedBuffer, fd, command: cmd } as IoctlArgs,
+          { sharedBuffer, fdNum, command: cmd } as IoctlArgs,
         ]);
 
         Atomics.wait(lck, 0, -1);

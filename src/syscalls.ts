@@ -39,6 +39,7 @@ import ProcessManager from "./process-manager.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
+import { AbstractVirtualDeviceDescriptor } from "./filesystem/virtual-filesystem/device-filesystem.js";
 
 declare global {
   interface Window {
@@ -1138,21 +1139,41 @@ export default async function syscallCallback(
       break;
     }
     case "ioctl": {
-      const { sharedBuffer, fd, command } = data as IoctlArgs;
+      const { sharedBuffer, fdNum, command } = data as IoctlArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const argLen = new Int32Array(sharedBuffer, 4, 1);
       const arg = new Int32Array(sharedBuffer, 8, argLen[0]);
 
-      arg;
-      fd;
-      //TODO: decode command and perform action on fd
-      switch (command) {
-        default: {
-          console.log(`ioctl: ${command} not found.`);
-        }
+      const { fds } = processManager.processInfos[processId];
+      let fd = fds.getFd(fdNum);
+
+      if (fd === undefined) {
+        Atomics.store(lck, constants.WASI_EBADF, 0);
+        Atomics.notify(lck, 0);
+        break;
       }
 
-      Atomics.store(lck, 0, 0);
+      const stat = await fd.getFdstat();
+
+      if (
+        stat.fs_filetype != constants.WASI_FILETYPE_CHARACTER_DEVICE ||
+        !(fd instanceof AbstractVirtualDeviceDescriptor)
+      ) {
+        Atomics.store(lck, constants.WASI_ENOTTY, 0);
+        Atomics.notify(lck, 0);
+        break;
+      }
+
+      let exitStatus = constants.EXIT_SUCCESS;
+
+      let device = fd as AbstractVirtualDeviceDescriptor;
+
+      //TODO: run ioctl func
+      device;
+      arg;
+      command;
+
+      Atomics.store(lck, exitStatus, 0);
       Atomics.notify(lck, 0);
       break;
     }
