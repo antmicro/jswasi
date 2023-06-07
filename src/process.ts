@@ -39,7 +39,7 @@ import {
   CleanInodesArgs,
   AttachSigIntArgs,
   KillArgs,
-  IoctlArgs
+  IoctlArgs,
 } from "./types";
 
 type ptr = number;
@@ -1309,8 +1309,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         }
 
         return {
-          exit_status: err,
-          output: undefined,
+          exitStatus: err,
+          outputSize: undefined,
         };
       }
       default: {
