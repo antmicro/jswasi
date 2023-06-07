@@ -4,7 +4,10 @@ import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
 import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
-import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
+import {
+  DriverManager,
+  major,
+} from "./filesystem/virtual-filesystem/driver-manager.js";
 
 declare global {
   interface Window {
@@ -281,9 +284,9 @@ export async function init(
   // attempt to pass Terminal to initAll as a parameter would fail
   // @ts-ignore
 
-  const processManager = new ProcessManager("process.js", tfs);
-
   const driverManager = new DriverManager();
+
+  const processManager = new ProcessManager("process.js", tfs, driverManager);
 
   await tfs.addMount(
     "/dev",
@@ -292,6 +295,7 @@ export async function init(
       currentProcessId: 0,
     })
   );
+
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
@@ -311,6 +315,7 @@ export async function init(
     ["/usr/bin/wash", "/usr/bin/init"],
     DEFAULT_ENV,
     false,
-    DEFAULT_WORK_DIR
+    DEFAULT_WORK_DIR,
+    { maj: major.MAJ_HTERM, min: 0 } // TODO: this should not be hardcoded
   );
 }

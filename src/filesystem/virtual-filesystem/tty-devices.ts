@@ -14,21 +14,34 @@ import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
 
 type BufferRequest = {
   len: number;
+  pid: number;
   resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
 };
 
-class Hterm {
+interface Terminal {
+  echo: boolean;
+  raw: boolean;
+  foregroundPid: number;
+
+  getScreenSize(): Promise<[number, number]>;
+}
+
+class Hterm implements Terminal {
   bufRequestQueue: BufferRequest[];
+  foregroundPid: number;
+
   buffer: string;
 
-  rawMode: boolean;
+  raw: boolean;
   echo: boolean;
 
   constructor(public terminal: any) {
     this.buffer = "";
     this.bufRequestQueue = [];
+    this.foregroundPid = undefined;
+
     this.echo = false;
-    this.rawMode = true;
+    this.raw = true;
   }
 
   splitBuf(len: number): string {
@@ -37,16 +50,8 @@ class Hterm {
     return out;
   }
 
-  getScreenSize(): [number, number] {
+  async getScreenSize(): Promise<[number, number]> {
     return [this.terminal.screenSize.width, this.terminal.screenSize.height];
-  }
-
-  setEcho(echo: boolean) {
-    this.echo = echo;
-  }
-
-  setRawMode(mode: boolean) {
-    this.rawMode = mode;
   }
 }
 
@@ -58,18 +63,20 @@ const enum ioctlRequests {
 
 type InitDeviceArgs = {
   anchor: HTMLElement;
-  currentProcessId: number;
 };
 
-export type InitDriverArgs = {
-  processManager: ProcessManager;
-};
+export type InitDriverArgs = { processManager: ProcessManager };
 
-export class HtermDeviceDriver implements DeviceDriver {
+export interface TerminalDriver extends DeviceDriver {
+  terminals: Record<number, Terminal>;
+}
+
+export class HtermDeviceDriver implements TerminalDriver {
   private maxTty: number;
-  private terminals: Record<number, Hterm>;
   private freedTerminals: number[];
   private processManager: ProcessManager;
+
+  terminals: Record<number, Hterm>;
 
   async initDriver(args: Object): Promise<number> {
     const __args = args as InitDriverArgs;
@@ -166,7 +173,7 @@ export class HtermDeviceDriver implements DeviceDriver {
     });
   }
 
-  private __initTerminal(anchor: HTMLElement, currentProcessId: number): Hterm {
+  private __initTerminal(anchor: HTMLElement): Hterm {
     // @ts-ignore
     let __hterm = new Hterm(new hterm.Terminal());
 
@@ -185,10 +192,20 @@ export class HtermDeviceDriver implements DeviceDriver {
 
       if (code === 3 || code === 4 || code === 81) {
         // control characters
-        if (code === 3) {
-          this.processManager.sendSigInt(currentProcessId);
-        } else if (code === 4) {
-          this.processManager.sendEndOfFile(currentProcessId, -1);
+        if (__hterm.foregroundPid !== undefined) {
+          if (code === 3) {
+            this.processManager.sendSigInt(__hterm.foregroundPid);
+          } else if (code === 4) {
+            // this.processManager.sendEndOfFile(currentProcessId, -1);
+            for (const req of __hterm.bufRequestQueue) {
+              if (req.pid === __hterm.foregroundPid) {
+                req.resolve({
+                  err: constants.WASI_ESUCCESS,
+                  buffer: new ArrayBuffer(0),
+                });
+              }
+            }
+          }
         }
       } else {
         // regular characters
@@ -228,7 +245,7 @@ export class HtermDeviceDriver implements DeviceDriver {
       __ttyMin = this.maxTty++;
     }
 
-    const __term = this.__initTerminal(__args.anchor, __args.currentProcessId);
+    const __term = this.__initTerminal(__args.anchor);
     this.terminals[__ttyMin] = __term;
     this.__initFsaDropImport(
       __ttyMin,
@@ -308,7 +325,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
 
   override async read(
     len: number,
-    _workerId?: number
+    workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     if (this.hterm.buffer.length !== 0) {
       return {
@@ -324,6 +341,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
       return new Promise<{ err: number; buffer: ArrayBuffer }>((resolve) => {
         this.hterm.bufRequestQueue.push({
           len,
+          pid: workerId,
           resolve,
         });
       });
@@ -336,7 +354,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         if (buf.byteLength < 8) return constants.WASI_ENOBUFS;
 
         let view32 = new Int32Array(buf);
-        const [width, height] = this.hterm.getScreenSize();
+        const [width, height] = await this.hterm.getScreenSize();
 
         view32[0] = width;
         view32[1] = height;
@@ -351,7 +369,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         let view32 = new Int32Array(buf);
 
         if (view32[0] !== 0 && view32[0] !== 1)
-          this.hterm.setEcho(view32[0] === 1);
+          this.hterm.echo = view32[0] === 1;
         else return constants.WASI_EINVAL;
         return constants.WASI_ESUCCESS;
       }
@@ -363,7 +381,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         let view32 = new Int32Array(buf);
 
         if (view32[0] !== 0 && view32[0] !== 1)
-          this.hterm.setRawMode(view32[0] === 1);
+          this.hterm.raw = view32[0] === 1;
         else return constants.WASI_EINVAL;
         return constants.WASI_ESUCCESS;
       }

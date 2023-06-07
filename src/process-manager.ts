@@ -2,8 +2,10 @@ import * as constants from "./constants.js";
 import { EventSource } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
-import { BufferRequest, PollEntry, HtermEventSub } from "./types.js";
+import { PollEntry, HtermEventSub } from "./types.js";
 import syscallCallback from "./syscalls.js";
+import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
+import { TerminalDriver } from "./filesystem/virtual-filesystem/tty-devices.js";
 
 export const DEFAULT_WORK_DIR = "/home/ant";
 export const DEFAULT_ENV = {
@@ -93,14 +95,15 @@ export class FdTable {
   }
 }
 
+type Foreground = { maj: number; min: number } | null;
+
 class ProcessInfo {
-  public bufferRequestQueue: BufferRequest[] = [];
   public stdinPollSub: PollEntry | null = null;
   public terminationNotifier: EventSource | null = null;
 
   public shouldEcho = true;
-
   public timestamp: number;
+  children: number[];
 
   constructor(
     public id: number,
@@ -115,9 +118,11 @@ class ProcessInfo {
     ) => Promise<void>,
     public env: Record<string, string>,
     public cwd: string,
-    public isJob: boolean
+    public isJob: boolean,
+    public foreground: Foreground
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
+    this.children = [];
   }
 }
 
@@ -180,7 +185,8 @@ export default class ProcessManager {
 
   constructor(
     private readonly scriptName: string,
-    public readonly filesystem: TopLevelFs
+    public readonly filesystem: TopLevelFs,
+    private driverManager: DriverManager
   ) {}
 
   async spawnProcess(
@@ -191,11 +197,27 @@ export default class ProcessManager {
     args: string[],
     env: Record<string, string>,
     isJob: boolean,
-    workingDir: string
+    workingDir: string,
+    foreground: Foreground = null
   ): Promise<number> {
     const id = this.nextProcessId;
     this.nextProcessId += 1;
     const worker = new Worker(this.scriptName, { type: "module" });
+
+    if (foreground === null)
+      foreground = this.processInfos[parentId].foreground;
+
+    if (parentId !== null) {
+      this.processInfos[parentId].children.push(id);
+
+      if (parentLock !== null) this.processInfos[parentId].foreground = null;
+    }
+
+    if (foreground !== null) {
+      const __driver = this.driverManager.getDriver(foreground.maj);
+      (__driver as TerminalDriver).terminals[foreground.min].foregroundPid = id;
+    }
+
     this.processInfos[id] = new ProcessInfo(
       id,
       command,
@@ -206,14 +228,9 @@ export default class ProcessManager {
       syscallCallback,
       env,
       workingDir,
-      isJob
+      isJob,
+      foreground
     );
-    if (
-      parentId == null ||
-      (parentId === this.currentProcess && parentLock != null)
-    ) {
-      this.currentProcess = id;
-    }
     worker.onmessage = (event) => syscallCallback(event, this);
 
     // save compiled module to cache
@@ -278,7 +295,28 @@ export default class ProcessManager {
     // close/flush all opened files to make sure written contents are saved to persistent storage
     this.processInfos[id].fds.tearDown();
 
+    if (process.parentId !== null) {
+      this.processInfos[this.processInfos[id].parentId].foreground =
+        process.foreground;
+      this.processInfos[process.parentId].children.splice(
+        process.children.indexOf(id),
+        1
+      );
+
+      // Pass foreground process id to the terminal driver
+      if (process.foreground !== null) {
+        const __driver = this.driverManager.getDriver(process.foreground.maj);
+        (__driver as TerminalDriver).terminals[
+          process.foreground.min
+        ].foregroundPid = process.parentId;
+      }
+    }
+
     process.worker.terminate();
+    process.children.forEach((child) =>
+      this.terminateProcess(child, 128 + constants.WASI_SIGKILL)
+    );
+
     // notify parent that they can resume operation
     if (id !== 0 && process.parentLock != null) {
       Atomics.store(process.parentLock, 0, exitNo);
@@ -301,14 +339,5 @@ export default class ProcessManager {
     //   this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     // }
     this.terminateProcess(id);
-  }
-
-  sendEndOfFile(id: number, lockValue: number) {
-    const worker = this.processInfos[id];
-    if (worker.bufferRequestQueue.length !== 0) {
-      const { lck } = worker.bufferRequestQueue[0];
-      Atomics.store(lck, 0, lockValue);
-      Atomics.notify(lck, 0);
-    }
   }
 }
