@@ -1,34 +1,31 @@
 // @ts-ignore
-import * as vfs from "../../vendor/vfs.js";
-import { Fdflags, Rights, Descriptor } from "../filesystem.js";
-import ProcessManager from "../../process-manager.js";
+import * as vfs from "../../../vendor/vfs.js";
+import {
+  TerminalDriver,
+  Terminal,
+  BufferRequest,
+  ioctlRequests,
+} from "./terminal.js";
 import {
   DEFAULT_ENV,
   DEFAULT_WORK_DIR,
   FdTable,
-} from "../../process-manager.js";
-import { DeviceDriver } from "./driver-manager.js";
-import * as constants from "../../constants.js";
-import { getFilesystem } from "../top-level-fs.js";
-import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
+} from "../../../process-manager.js";
+import { Fdflags, Rights, Descriptor } from "../../filesystem.js";
+import * as constants from "../../../constants.js";
+import { getFilesystem } from "../../top-level-fs.js";
+import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
+import ProcessManager from "../../../process-manager.js";
 
-type BufferRequest = {
-  len: number;
-  pid: number;
-  resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
+type InitDeviceArgs = {
+  anchor: HTMLElement;
 };
 
-interface Terminal {
-  echo: boolean;
-  raw: boolean;
-  foregroundPid: number;
-
-  getScreenSize(): Promise<[number, number]>;
-}
+export type InitDriverArgs = { processManager: ProcessManager };
 
 class Hterm implements Terminal {
+  foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
-  foregroundPid: number;
 
   buffer: string;
 
@@ -38,7 +35,7 @@ class Hterm implements Terminal {
   constructor(public terminal: any) {
     this.buffer = "";
     this.bufRequestQueue = [];
-    this.foregroundPid = undefined;
+    this.foregroundPid = null;
 
     this.echo = false;
     this.raw = true;
@@ -53,22 +50,6 @@ class Hterm implements Terminal {
   async getScreenSize(): Promise<[number, number]> {
     return [this.terminal.screenSize.width, this.terminal.screenSize.height];
   }
-}
-
-const enum ioctlRequests {
-  GET_SCREEN_SIZE = 0,
-  SET_RAW = 1,
-  SET_ECHO = 2,
-}
-
-type InitDeviceArgs = {
-  anchor: HTMLElement;
-};
-
-export type InitDriverArgs = { processManager: ProcessManager };
-
-export interface TerminalDriver extends DeviceDriver {
-  terminals: Record<number, Terminal>;
 }
 
 export class HtermDeviceDriver implements TerminalDriver {
@@ -103,11 +84,13 @@ export class HtermDeviceDriver implements TerminalDriver {
       },
       false
     );
-    const __pid = this.terminals[min].terminal.currentProcessId;
+
+    const __this = this;
     terminalContentWindow.addEventListener("drop", async function (evt) {
       evt.stopPropagation();
       evt.preventDefault();
-      const pwd = processManager.processInfos[__pid].cwd;
+      const pwd =
+        processManager.processInfos[__this.terminals[min].foregroundPid].cwd;
 
       await Promise.all(
         (Object.values(evt.dataTransfer!.items) || []).map(async (item) => {
@@ -192,7 +175,7 @@ export class HtermDeviceDriver implements TerminalDriver {
 
       if (code === 3 || code === 4 || code === 81) {
         // control characters
-        if (__hterm.foregroundPid !== undefined) {
+        if (__hterm.foregroundPid !== null) {
           if (code === 3) {
             this.processManager.sendSigInt(__hterm.foregroundPid);
           } else if (code === 4) {
@@ -215,9 +198,9 @@ export class HtermDeviceDriver implements TerminalDriver {
       if (__hterm.bufRequestQueue.length !== 0) {
         let request = __hterm.bufRequestQueue.shift();
 
-        request.resolve({
+        request!.resolve({
           err: constants.WASI_ESUCCESS,
-          buffer: new TextEncoder().encode(__hterm.splitBuf(request.len)),
+          buffer: new TextEncoder().encode(__hterm.splitBuf(request!.len)),
         });
       }
 
@@ -325,7 +308,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
 
   override async read(
     len: number,
-    workerId?: number
+    workerId: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
     if (this.hterm.buffer.length !== 0) {
       return {
@@ -338,6 +321,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         buffer: new ArrayBuffer(0),
       };
     } else {
+      // Return custom promise which is resolved in onTerminalInput hterm callback
       return new Promise<{ err: number; buffer: ArrayBuffer }>((resolve) => {
         this.hterm.bufRequestQueue.push({
           len,

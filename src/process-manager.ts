@@ -5,7 +5,7 @@ import { Descriptor } from "./filesystem/filesystem";
 import { PollEntry, HtermEventSub } from "./types.js";
 import syscallCallback from "./syscalls.js";
 import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
-import { TerminalDriver } from "./filesystem/virtual-filesystem/tty-devices.js";
+import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
 
 export const DEFAULT_WORK_DIR = "/home/ant";
 export const DEFAULT_ENV = {
