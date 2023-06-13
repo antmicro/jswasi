@@ -35,7 +35,7 @@ export interface Out {
 export class Stdin implements Descriptor, In {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  rightsBase = constants.WASI_RIGHTS_STDIN;
+  rightsBase = constants.WASI_EXT_RIGHTS_STDIN;
   rightsInheriting = 0n;
   fdFlags = 0;
 
@@ -234,7 +234,7 @@ export class Stdin implements Descriptor, In {
 export class Stdout implements Descriptor, Out {
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  rightsBase = constants.WASI_RIGHTS_STDOUT;
+  rightsBase = constants.WASI_EXT_RIGHTS_STDOUT;
   rightsInheriting = 0n;
   fdFlags = constants.WASI_FDFLAG_APPEND;
 
@@ -393,7 +393,7 @@ export class Stdout implements Descriptor, Out {
 }
 
 export class Stderr extends Stdout {
-  override rightsBase = constants.WASI_RIGHTS_STDERR;
+  override rightsBase = constants.WASI_EXT_RIGHTS_STDERR;
 
   constructor(workerTable: ProcessManager) {
     super(workerTable);
@@ -419,11 +419,11 @@ export class EventSource implements Descriptor, In {
   // Wasi doesn't define filetype pipe/fifo so it's defined as char device
   fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
   isPreopened = true;
-  rightsBase = constants.WASI_RIGHTS_STDIN;
+  rightsBase = constants.WASI_EXT_RIGHTS_STDIN;
   rightsInheriting = 0n;
   fdFlags = 0;
 
-  occuredEvents = constants.WASI_NO_EVENT;
+  occuredEvents = constants.WASI_EXT_NO_EVENT;
   eventSub: HtermEventSub;
   poolSub: PollEntry | null = null;
 
@@ -600,9 +600,9 @@ export class EventSource implements Descriptor, In {
 
   readEvents(requestedLen: number, readLen: Int32Array, buf: Uint8Array): void {
     readLen[0] =
-      requestedLen < constants.WASI_EVENT_MASK_SIZE
+      requestedLen < constants.WASI_EXT_EVENT_MASK_SIZE
         ? requestedLen
-        : constants.WASI_EVENT_MASK_SIZE;
+        : constants.WASI_EXT_EVENT_MASK_SIZE;
 
     let mask = 0xffn;
     for (let i = 0; i < readLen[0]; i++) {
@@ -618,9 +618,11 @@ export class EventSource implements Descriptor, In {
     if (this.poolSub !== null) {
       const entry = this.poolSub;
       this.poolSub = null;
-      if (Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID) {
-        Atomics.store(entry.data, 1, constants.WASI_EVENT_MASK_SIZE);
-        Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
+      if (
+        Atomics.load(entry.data, 0) == constants.WASI_EXT_POLL_BUF_STATUS_VALID
+      ) {
+        Atomics.store(entry.data, 1, constants.WASI_EXT_EVENT_MASK_SIZE);
+        Atomics.store(entry.data, 0, constants.WASI_EXT_POLL_BUF_STATUS_READY);
         Atomics.store(entry.lck, 0, 0);
         Atomics.notify(entry.lck, 0);
       }
@@ -628,8 +630,8 @@ export class EventSource implements Descriptor, In {
   }
 
   availableBytes(_workerId: number): number {
-    return this.occuredEvents != constants.WASI_NO_EVENT
-      ? constants.WASI_EVENT_MASK_SIZE
+    return this.occuredEvents != constants.WASI_EXT_NO_EVENT
+      ? constants.WASI_EXT_EVENT_MASK_SIZE
       : 0;
   }
 

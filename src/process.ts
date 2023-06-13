@@ -1172,7 +1172,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         if (
           eventMask === 0n ||
-          eventMask >= BigInt(1n) << BigInt(constants.WASI_EVENTS_NUM)
+          eventMask >= BigInt(1n) << BigInt(constants.WASI_EXT_EVENTS_NUM)
         ) {
           return {
             exitStatus: constants.WASI_EINVAL,
@@ -1605,7 +1605,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     function invalidateEventBuffers() {
       for (var i = 0; i < events.length; i++) {
         const buffer = new Int32Array(events[i], 0, 2);
-        Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
+        Atomics.store(buffer, 0, constants.WASI_EXT_POLL_BUF_STATUS_NVALID);
       }
     }
 
@@ -1727,9 +1727,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       let status = Atomics.load(buffer, 0);
       let data = Atomics.load(buffer, 1);
 
-      Atomics.store(buffer, 0, constants.WASI_POLL_BUF_STATUS_NVALID);
+      Atomics.store(buffer, 0, constants.WASI_EXT_POLL_BUF_STATUS_NVALID);
 
-      if (status == constants.WASI_POLL_BUF_STATUS_READY) {
+      if (status == constants.WASI_EXT_POLL_BUF_STATUS_READY) {
         view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
         eventsPtr += 8; // userdata offset
         view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
@@ -1742,7 +1742,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         eventsPtr += 8; // flags offset + padding to 8
 
         gotEvents += 1;
-      } else if (status == constants.WASI_POLL_BUF_STATUS_ERR) {
+      } else if (status == constants.WASI_EXT_POLL_BUF_STATUS_ERR) {
         view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
         eventsPtr += 8; // userdata offset
         view.setUint16(eventsPtr, data, true);

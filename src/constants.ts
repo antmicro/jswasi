@@ -185,21 +185,21 @@ export const WASI_RIGHT_POLL_FD_READWRITE = BigInt(0x0000000008000000);
 export const WASI_RIGHT_SOCK_SHUTDOWN = BigInt(0x0000000010000000);
 
 export const WASI_RIGHTS_ALL = BigInt(0x1fff_ffff);
-export const WASI_RIGHTS_STDIN =
+export const WASI_EXT_RIGHTS_STDIN =
   WASI_RIGHT_FD_DATASYNC |
   WASI_RIGHT_FD_READ |
   WASI_RIGHT_FD_SYNC |
   WASI_RIGHT_FD_ADVISE |
   WASI_RIGHT_FD_FILESTAT_GET |
   WASI_RIGHT_POLL_FD_READWRITE;
-export const WASI_RIGHTS_STDOUT =
+export const WASI_EXT_RIGHTS_STDOUT =
   WASI_RIGHT_FD_DATASYNC |
   WASI_RIGHT_FD_WRITE |
   WASI_RIGHT_FD_SYNC |
   WASI_RIGHT_FD_ADVISE |
   WASI_RIGHT_FD_FILESTAT_GET |
   WASI_RIGHT_POLL_FD_READWRITE;
-export const WASI_RIGHTS_STDERR = WASI_RIGHTS_STDOUT;
+export const WASI_EXT_RIGHTS_STDERR = WASI_EXT_RIGHTS_STDOUT;
 
 export const WASI_CLOCK_REALTIME = 0;
 export const WASI_CLOCK_MONOTONIC = 1;
@@ -224,9 +224,9 @@ export const WASI_PREOPENTYPE_DIR = 0;
 
 export const WASI_DIRCOOKIE_START = 0;
 
-export const WASI_STDIN_FILENO = 0;
-export const WASI_STDOUT_FILENO = 1;
-export const WASI_STDERR_FILENO = 2;
+export const WASI_FD_STDIN = 0;
+export const WASI_FD_STDOUT = 1;
+export const WASI_FD_STDERR = 2;
 
 export const WASI_WHENCE_SET = 0;
 export const WASI_WHENCE_CUR = 1;
@@ -237,15 +237,15 @@ export const WASI_FSTFLAGS_ATIM_NOW = 0x0002;
 export const WASI_FSTFLAGS_MTIM = 0x0004;
 export const WASI_FSTFLAGS_MTIM_NOW = 0x0008;
 
-export const WASI_POLL_BUF_STATUS_NVALID = -1;
-export const WASI_POLL_BUF_STATUS_VALID = 0;
-export const WASI_POLL_BUF_STATUS_READY = 1;
-export const WASI_POLL_BUF_STATUS_ERR = 2;
+export const WASI_EXT_POLL_BUF_STATUS_NVALID = -1;
+export const WASI_EXT_POLL_BUF_STATUS_VALID = 0;
+export const WASI_EXT_POLL_BUF_STATUS_READY = 1;
+export const WASI_EXT_POLL_BUF_STATUS_ERR = 2;
 
 // Events
-export const WASI_NO_EVENT = BigInt(0x0000000000000000);
-export const WASI_EVENT_MASK_SIZE = 4;
-export const WASI_EVENTS_NUM = 2;
+export const WASI_EXT_NO_EVENT = BigInt(0x0000000000000000);
+export const WASI_EXT_EVENT_MASK_SIZE = 4;
+export const WASI_EXT_EVENTS_NUM = 2;
 
-export const WASI_EVENT_WINCH = 1n << 0n;
-export const WASI_EVENT_SIGINT = 1n << 1n;
+export const WASI_EXT_EVENT_WINCH = 1n << 0n;
+export const WASI_EXT_EVENT_SIGINT = 1n << 1n;

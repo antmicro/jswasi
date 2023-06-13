@@ -293,7 +293,7 @@ export default async function syscallCallback(
             processManager.processInfos[processId].terminationNotifier;
           let sigintOccurred =
             events !== null
-              ? events.obtainEvents(constants.WASI_EVENT_SIGINT) != 0n
+              ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0n
               : false;
 
           if (sigintOccurred) {
@@ -335,7 +335,7 @@ export default async function syscallCallback(
             // Wash should break execution of commands chain
             let sigintOccurred =
               events !== null
-                ? events.obtainEvents(constants.WASI_EVENT_SIGINT) != 0n
+                ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0n
                 : false;
             if (sigintOccurred) {
               exit_code = constants.EXIT_INTERRUPTED;
@@ -407,7 +407,7 @@ export default async function syscallCallback(
       if (fds.getFd(oldFd) !== undefined) {
         err = (
           await fds
-            .getFd(constants.WASI_STDERR_FILENO)
+            .getFd(constants.WASI_FD_STDERR)
             .write(new TextEncoder().encode("hard links are not supported"))
         ).err;
       } else {
@@ -958,7 +958,7 @@ export default async function syscallCallback(
         let fdNum = (sub.event as FdReadSub).fd;
         let fd = fds.getFd(fdNum);
         if (fd === undefined) {
-          event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+          event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
           event[1] = constants.WASI_EBADF;
           isEvent = true;
 
@@ -976,7 +976,7 @@ export default async function syscallCallback(
                   let bytes = stdin.availableBytes(processId);
 
                   if (bytes > 0) {
-                    event[0] = constants.WASI_POLL_BUF_STATUS_READY;
+                    event[0] = constants.WASI_EXT_POLL_BUF_STATUS_READY;
                     event[1] = bytes;
                     isEvent = true;
                   }
@@ -985,12 +985,12 @@ export default async function syscallCallback(
                   let bytes = eventSource.availableBytes(processId);
 
                   if (bytes > 0) {
-                    event[0] = constants.WASI_POLL_BUF_STATUS_READY;
+                    event[0] = constants.WASI_EXT_POLL_BUF_STATUS_READY;
                     event[1] = bytes;
                     isEvent = true;
                   }
                 } else {
-                  event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+                  event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
                   event[1] = constants.WASI_EBADF;
                   isEvent = true;
                 }
@@ -999,14 +999,14 @@ export default async function syscallCallback(
               }
               case constants.WASI_FILETYPE_DIRECTORY:
               case constants.WASI_FILETYPE_REGULAR_FILE: {
-                event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+                event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
                 event[1] = constants.WASI_EPERM;
                 isEvent = true;
 
                 break;
               }
               default: {
-                event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+                event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
                 event[1] = constants.WASI_ENOTSUP;
                 isEvent = true;
               }
@@ -1015,14 +1015,14 @@ export default async function syscallCallback(
             break;
           }
           case constants.WASI_EVENTTYPE_FD_WRITE: {
-            event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+            event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
             event[1] = constants.WASI_ENOTSUP;
             isEvent = true;
 
             break;
           }
           default: {
-            event[0] = constants.WASI_POLL_BUF_STATUS_ERR;
+            event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
             event[1] = constants.WASI_EINVAL;
             isEvent = true;
           }
@@ -1105,8 +1105,8 @@ export default async function syscallCallback(
         let eventSource = eventFd as EventSource;
         if (
           (BigInt(eventSource.subscribedEvents) &
-            constants.WASI_EVENT_SIGINT) ===
-          constants.WASI_NO_EVENT
+            constants.WASI_EXT_EVENT_SIGINT) ===
+          constants.WASI_EXT_NO_EVENT
         ) {
           console.log(
             `attach_sigint: fd=${fd} does not subscribe WASI_EVENT_SIGINT!`

@@ -397,7 +397,7 @@ export async function init(
   // TODO: maybe save all output and rewrite it on adjusted size?
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   io.onTerminalResize = (columns: number, rows: number) => {
-    processManager.events.publishEvent(constants.WASI_EVENT_WINCH);
+    processManager.events.publishEvent(constants.WASI_EXT_EVENT_WINCH);
   };
 
   initFsaDropImport(

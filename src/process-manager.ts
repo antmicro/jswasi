@@ -107,7 +107,9 @@ class PubSubEvent {
   public subsTable: Array<Set<HtermEventSub>>;
 
   constructor() {
-    this.subsTable = new Array<Set<HtermEventSub>>(constants.WASI_EVENTS_NUM);
+    this.subsTable = new Array<Set<HtermEventSub>>(
+      constants.WASI_EXT_EVENTS_NUM
+    );
     for (var i = 0; i < this.subsTable.length; i++) {
       this.subsTable[i] = new Set<HtermEventSub>([]);
     }
@@ -249,7 +251,7 @@ export default class ProcessManager {
       parentId != null &&
       this.processInfos[parentId].terminationNotifier !== null &&
       this.processInfos[parentId].terminationNotifier.obtainEvents(
-        constants.WASI_EVENT_SIGINT
+        constants.WASI_EXT_EVENT_SIGINT
       ) != 0n
     ) {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
@@ -293,7 +295,7 @@ export default class ProcessManager {
       this.processInfos[currentProcess].cmd === "/usr/bin/wash"
     ) {
       console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
-      this.events.publishEvent(constants.WASI_EVENT_SIGINT);
+      this.events.publishEvent(constants.WASI_EXT_EVENT_SIGINT);
     } else {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     }
@@ -335,10 +337,15 @@ export default class ProcessManager {
         const entry = process.stdinPollSub;
         process.stdinPollSub = null;
         if (
-          Atomics.load(entry.data, 0) == constants.WASI_POLL_BUF_STATUS_VALID
+          Atomics.load(entry.data, 0) ==
+          constants.WASI_EXT_POLL_BUF_STATUS_VALID
         ) {
           Atomics.store(entry.data, 1, this.buffer.length);
-          Atomics.store(entry.data, 0, constants.WASI_POLL_BUF_STATUS_READY);
+          Atomics.store(
+            entry.data,
+            0,
+            constants.WASI_EXT_POLL_BUF_STATUS_READY
+          );
           Atomics.store(entry.lck, 0, 0);
           Atomics.notify(entry.lck, 0);
         }
