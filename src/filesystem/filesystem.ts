@@ -237,7 +237,10 @@ export interface Descriptor {
    *
    * @returns status code
    */
-  ioctl(request: number, buf?: ArrayBuffer): Promise<number>;
+  ioctl(
+    request: number,
+    buf?: ArrayBuffer
+  ): Promise<{ err: number; written: number }>;
 }
 
 export abstract class AbstractDescriptor implements Descriptor {
@@ -270,8 +273,14 @@ export abstract class AbstractDescriptor implements Descriptor {
     return constants.WASI_ESUCCESS;
   }
 
-  async ioctl(_request: number, _buf: ArrayBuffer): Promise<number> {
-    return constants.WASI_ENOTTY;
+  async ioctl(
+    _request: number,
+    _buf: ArrayBuffer
+  ): Promise<{ err: number; written: number }> {
+    return {
+      err: constants.WASI_ENOTTY,
+      written: 0,
+    };
   }
 
   abstract getFilestat(): Promise<Filestat>;

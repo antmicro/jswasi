@@ -332,10 +332,16 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     }
   }
 
-  override async ioctl(request: number, buf: ArrayBuffer): Promise<number> {
+  override async ioctl(
+    request: number,
+    buf: ArrayBuffer
+  ): Promise<{ err: number; written: number }> {
+    let err = constants.WASI_ENOBUFS;
+    let written = 0;
+
     switch (request) {
       case ioctlRequests.GET_SCREEN_SIZE: {
-        if (buf.byteLength < 8) return constants.WASI_ENOBUFS;
+        if (buf.byteLength < 8) break;
 
         let view32 = new Int32Array(buf);
         const [width, height] = await this.hterm.getScreenSize();
@@ -343,35 +349,33 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         view32[0] = width;
         view32[1] = height;
 
-        return constants.WASI_ESUCCESS;
+        err = constants.WASI_ESUCCESS;
+        written = 0;
+        break;
       }
       case ioctlRequests.SET_ECHO: {
-        if (buf.byteLength < 4) {
-          return constants.WASI_EINVAL;
-        }
+        if (buf.byteLength < 4) err = constants.WASI_ENOBUFS;
 
         let view32 = new Int32Array(buf);
 
-        if (view32[0] !== 0 && view32[0] !== 1)
-          this.hterm.echo = view32[0] === 1;
-        else return constants.WASI_EINVAL;
-        return constants.WASI_ESUCCESS;
+        this.hterm.echo = view32[0] !== 0;
+
+        err = constants.WASI_ESUCCESS;
+        written = 4;
+        break;
       }
       case ioctlRequests.SET_RAW: {
-        if (buf.byteLength < 4) {
-          return constants.WASI_EINVAL;
-        }
+        if (buf.byteLength < 4) break;
 
         let view32 = new Int32Array(buf);
 
-        if (view32[0] !== 0 && view32[0] !== 1)
-          this.hterm.raw = view32[0] === 1;
-        else return constants.WASI_EINVAL;
-        return constants.WASI_ESUCCESS;
-      }
-      default: {
-        return constants.WASI_EINVAL;
+        this.hterm.raw = view32[0] !== 0;
+
+        err = constants.WASI_ESUCCESS;
+        written = 4;
+        break;
       }
     }
+    return { err, written };
   }
 }

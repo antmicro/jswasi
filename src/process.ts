@@ -1258,12 +1258,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       }
       case "ioctl": {
         const {
-          fdNum,
+          fd,
           cmd,
           arg_ptr: argPtr,
           arg_size: argSize,
         }: {
-          fdNum: number;
+          fd: number;
           cmd: number;
           arg_ptr: ptr;
           arg_size: number;
@@ -1275,7 +1275,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const sharedBufferUsed = new Int32Array(sharedBuffer, 4, 1);
         const sharedArgBuffer = new Uint8Array(sharedBuffer, 4, buf_len);
 
-        workerConsoleLog(`ioctl(${fdNum}, ${cmd})`);
+        workerConsoleLog(`ioctl(${fd}, ${cmd})`);
 
         const argBuffer = new Uint8Array(
           (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
@@ -1289,28 +1289,14 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         sendToKernel([
           "ioctl",
-          { sharedBuffer, fdNum, command: cmd } as IoctlArgs,
+          { sharedBuffer, fd, command: cmd } as IoctlArgs,
         ]);
 
         Atomics.wait(lck, 0, -1);
-        let err = Atomics.load(lck, 0);
-
-        if (err == constants.WASI_ESUCCESS) {
-          // arg buffer is used as output buffer too
-          let bufferUsed = Atomics.load(sharedBufferUsed, 0);
-          if (bufferUsed > argSize) {
-            console.log(
-              `ioctl: bufferUsed = ${bufferUsed} is greater than argSize = ${argSize}!`
-            );
-            err = constants.WASI_ENOBUFS;
-          } else if (bufferUsed > 0) {
-            argBuffer.set(sharedArgBuffer.slice(0, bufferUsed));
-          }
-        }
 
         return {
-          exitStatus: err,
-          outputSize: undefined,
+          exitStatus: Atomics.load(lck, 0),
+          outputSize: Atomics.load(sharedBufferUsed, 0),
         };
       }
       default: {

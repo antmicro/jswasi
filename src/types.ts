@@ -223,6 +223,6 @@ export type KillArgs = {
 
 export type IoctlArgs = {
   sharedBuffer: SharedArrayBuffer;
-  fdNum: number;
+  fd: number;
   command: number;
 };

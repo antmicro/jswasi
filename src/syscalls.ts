@@ -32,14 +32,13 @@ import {
   AttachSigIntArgs,
   CleanInodesArgs,
   KillArgs,
-  IoctlArgs
+  IoctlArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
-import { AbstractVirtualDeviceDescriptor } from "./filesystem/virtual-filesystem/device-filesystem.js";
 
 declare global {
   interface Window {
@@ -1139,42 +1138,25 @@ export default async function syscallCallback(
       break;
     }
     case "ioctl": {
-      const { sharedBuffer, fdNum, command } = data as IoctlArgs;
+      const { sharedBuffer, fd, command } = data as IoctlArgs;
+
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const argBufferUsed = new Int32Array(sharedBuffer, 4, 1);
       const argBuffer = new Uint8Array(sharedBuffer, 8);
 
       const { fds } = processManager.processInfos[processId];
-      let fd = fds.getFd(fdNum);
+      let desc = fds.getFd(fd);
 
       if (fd === undefined) {
-        Atomics.store(lck, constants.WASI_EBADF, 0);
+        Atomics.store(lck, 0, constants.WASI_EBADF);
         Atomics.notify(lck, 0);
         break;
       }
 
-      const stat = await fd.getFdstat();
+      const { err, written } = await desc.ioctl(command, argBuffer);
+      argBufferUsed[0] = written;
 
-      if (
-        stat.fs_filetype != constants.WASI_FILETYPE_CHARACTER_DEVICE ||
-        !(fd instanceof AbstractVirtualDeviceDescriptor)
-      ) {
-        Atomics.store(lck, constants.WASI_ENOTTY, 0);
-        Atomics.notify(lck, 0);
-        break;
-      }
-
-      let exitStatus = constants.EXIT_SUCCESS;
-
-      let device = fd as AbstractVirtualDeviceDescriptor;
-
-      //TODO: run ioctl function
-      device;
-      argBufferUsed;
-      argBuffer;
-      command;
-
-      Atomics.store(lck, exitStatus, 0);
+      Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
       break;
     }
