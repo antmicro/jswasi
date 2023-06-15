@@ -263,7 +263,7 @@ export class EventSource implements Descriptor, In {
 
   async ioctl(
     _request: number,
-    _buf: ArrayBuffer
+    _buf: Uint8Array
   ): Promise<{ err: number; written: number }> {
     return {
       err: constants.WASI_ENOTTY,

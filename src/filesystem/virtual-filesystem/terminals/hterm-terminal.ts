@@ -334,7 +334,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
 
   override async ioctl(
     request: number,
-    buf: ArrayBuffer
+    buf: Uint8Array
   ): Promise<{ err: number; written: number }> {
     let err = constants.WASI_ENOBUFS;
     let written = 0;
@@ -343,33 +343,29 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
       case ioctlRequests.GET_SCREEN_SIZE: {
         if (buf.byteLength < 8) break;
 
-        let view32 = new Int32Array(buf);
         const [width, height] = await this.hterm.getScreenSize();
+        const __buf = new Int32Array(buf.buffer, buf.byteOffset);
 
-        view32[0] = width;
-        view32[1] = height;
+        __buf[0] = width;
+        __buf[1] = height;
 
         err = constants.WASI_ESUCCESS;
         written = 0;
         break;
       }
       case ioctlRequests.SET_ECHO: {
-        if (buf.byteLength < 4) err = constants.WASI_ENOBUFS;
+        if (buf.byteLength < 1) err = constants.WASI_ENOBUFS;
 
-        let view32 = new Int32Array(buf);
-
-        this.hterm.echo = view32[0] !== 0;
+        this.hterm.echo = buf[0] !== 0;
 
         err = constants.WASI_ESUCCESS;
         written = 4;
         break;
       }
       case ioctlRequests.SET_RAW: {
-        if (buf.byteLength < 4) break;
+        if (buf.byteLength < 1) break;
 
-        let view32 = new Int32Array(buf);
-
-        this.hterm.raw = view32[0] !== 0;
+        this.hterm.raw = buf[0] !== 0;
 
         err = constants.WASI_ESUCCESS;
         written = 4;

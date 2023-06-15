@@ -239,7 +239,7 @@ export interface Descriptor {
    */
   ioctl(
     request: number,
-    buf?: ArrayBuffer
+    buf?: Uint8Array
   ): Promise<{ err: number; written: number }>;
 }
 
@@ -275,7 +275,7 @@ export abstract class AbstractDescriptor implements Descriptor {
 
   async ioctl(
     _request: number,
-    _buf: ArrayBuffer
+    _buf: Uint8Array
   ): Promise<{ err: number; written: number }> {
     return {
       err: constants.WASI_ENOTTY,

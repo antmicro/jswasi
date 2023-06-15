@@ -1260,32 +1260,22 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const {
           fd,
           cmd,
-          arg_ptr: argPtr,
-          arg_size: argSize,
         }: {
           fd: number;
           cmd: number;
-          arg_ptr: ptr;
-          arg_size: number;
         } = JSON.parse(json);
 
         // lock + arg buffer size used + arg buffer
-        const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + outputBuffer.length);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         const sharedBufferUsed = new Int32Array(sharedBuffer, 4, 1);
-        const sharedArgBuffer = new Uint8Array(sharedBuffer, 4, buf_len);
+        const sharedArgBuffer = new Uint8Array(sharedBuffer, 8);
 
         workerConsoleLog(`ioctl(${fd}, ${cmd})`);
 
-        const argBuffer = new Uint8Array(
-          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
-          argPtr,
-          argSize
-        );
-
         lck[0] = -1;
         sharedBufferUsed[0] = 0;
-        sharedArgBuffer.set(argBuffer);
+        sharedArgBuffer.set(outputBuffer); // in this case it is either input or output buffer
 
         sendToKernel([
           "ioctl",
@@ -1293,6 +1283,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         ]);
 
         Atomics.wait(lck, 0, -1);
+        outputBuffer.set(sharedArgBuffer);
 
         return {
           exitStatus: Atomics.load(lck, 0),
