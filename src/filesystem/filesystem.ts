@@ -13,10 +13,18 @@ export type Filesize = bigint;
 export type Timestamp = bigint;
 
 export type Whence = number;
-
 export type Fstflags = number;
-
 export type Dircookie = bigint;
+
+export type UserData = bigint;
+export type EventType = number;
+
+export type PollEvent = {
+  userdata: UserData;
+  error: number;
+  eventType: EventType;
+  nbytes: number;
+};
 
 export type Filestat = {
   dev: Device;
@@ -241,6 +249,20 @@ export interface Descriptor {
     request: number,
     buf?: Uint8Array
   ): Promise<{ err: number; written: number }>;
+
+  /*
+   * Add poll subscription
+   *
+   * @param eventType - type of event for which to poll
+   * @oaram workerId - process id of the calling process
+   *
+   * @returns Promise which resolves with an event once it happens
+   */
+  addPollSub(
+    userData: UserData,
+    eventType: number,
+    workerId: number
+  ): Promise<PollEvent>;
 }
 
 export abstract class AbstractDescriptor implements Descriptor {
@@ -280,6 +302,19 @@ export abstract class AbstractDescriptor implements Descriptor {
     return {
       err: constants.WASI_ENOTTY,
       written: 0,
+    };
+  }
+
+  async addPollSub(
+    userdata: UserData,
+    eventType: number,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return {
+      userdata,
+      error: constants.WASI_ESUCCESS,
+      eventType,
+      nbytes: 0,
     };
   }
 

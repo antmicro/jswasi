@@ -11,7 +11,14 @@ import {
   DEFAULT_WORK_DIR,
   FdTable,
 } from "../../../process-manager.js";
-import { Fdflags, Rights, Descriptor } from "../../filesystem.js";
+import {
+  UserData,
+  EventType,
+  PollEvent,
+  Fdflags,
+  Rights,
+  Descriptor,
+} from "../../filesystem.js";
 import * as constants from "../../../constants.js";
 import { getFilesystem } from "../../top-level-fs.js";
 import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
@@ -23,9 +30,17 @@ type InitDeviceArgs = {
 
 export type InitDriverArgs = { processManager: ProcessManager };
 
+export type PollSub = {
+  pid: number;
+  userdata: UserData;
+  tag: number;
+  resolve: (event: PollEvent) => void;
+};
+
 class Hterm implements Terminal {
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
+  subs: PollSub[];
 
   buffer: string;
 
@@ -35,6 +50,7 @@ class Hterm implements Terminal {
   constructor(public terminal: any) {
     this.buffer = "";
     this.bufRequestQueue = [];
+    this.subs = [];
     this.foregroundPid = null;
 
     this.echo = false;
@@ -203,6 +219,18 @@ export class HtermDeviceDriver implements TerminalDriver {
           buffer: new TextEncoder().encode(__hterm.splitBuf(request!.len)),
         });
       }
+
+      for (const sub of __hterm.subs) {
+        sub.resolve({
+          userdata: sub.userdata,
+          error: constants.WASI_ESUCCESS,
+          nbytes: __hterm.buffer.length,
+          eventType:
+            constants.WASI_EVENTTYPE_FD_READ |
+            constants.WASI_EVENTTYPE_FD_WRITE,
+        });
+      }
+      __hterm.subs.length = 0;
 
       if (__hterm.echo && (code === 10 || code >= 32)) {
         __hterm.terminal.io.print(code === 10 ? "\r\n" : data);
@@ -373,5 +401,44 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
       }
     }
     return { err, written };
+  }
+
+  override async addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    workerId: number
+  ): Promise<PollEvent> {
+    switch (eventType) {
+      case constants.WASI_EVENTTYPE_FD_WRITE: {
+        let __evType = constants.WASI_EVENTTYPE_FD_WRITE;
+        const __nBytes = this.hterm.buffer.length;
+        if (__nBytes > 0) __evType |= constants.WASI_EVENTTYPE_FD_READ;
+
+        return {
+          userdata,
+          error: constants.WASI_ESUCCESS,
+          eventType: __evType,
+          nbytes: __nBytes,
+        };
+      }
+      case constants.WASI_EVENTTYPE_FD_READ: {
+        return new Promise((resolve: (event: PollEvent) => void) => {
+          this.hterm.subs.push({
+            pid: workerId,
+            userdata,
+            tag: eventType,
+            resolve,
+          });
+        });
+      }
+      default: {
+        return {
+          userdata,
+          error: constants.WASI_EINVAL,
+          eventType: 0,
+          nbytes: 0,
+        };
+      }
+    }
   }
 }

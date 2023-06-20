@@ -1,6 +1,8 @@
 import * as constants from "./constants.js";
 import ProcessManager from "./process-manager.js";
 import {
+  UserData,
+  PollEvent,
   Dirent,
   Fdflags,
   Fdstat,
@@ -268,6 +270,19 @@ export class EventSource implements Descriptor, In {
     return {
       err: constants.WASI_ENOTTY,
       written: 0,
+    };
+  }
+
+  async addPollSub(
+    userdata: UserData,
+    eventType: number,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return {
+      userdata,
+      error: constants.WASI_ESUCCESS,
+      eventType,
+      nbytes: 0,
     };
   }
 }
