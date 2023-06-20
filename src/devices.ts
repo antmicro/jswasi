@@ -1,74 +1,50 @@
 import * as constants from "./constants.js";
-import ProcessManager from "./process-manager.js";
 import {
   UserData,
   PollEvent,
-  Dirent,
+  PollSub,
+  EventType,
   Fdflags,
-  Fdstat,
   Filestat,
-  Filetype,
   Rights,
   Timestamp,
-  Whence,
+  AbstractDeviceDescriptor,
 } from "./filesystem/filesystem.js";
-import { PollEntry, HtermEventSub } from "./types.js";
-import { Descriptor } from "./filesystem/filesystem";
+import { Descriptor } from "./filesystem/filesystem.js";
 
-export interface In {
-  fileType: Filetype;
-  isPreopened: boolean;
-  rightsBase: Rights;
-  rightsInheriting: Rights;
-  fdFlags: Fdflags;
-}
+export interface EventSourceDescriptor extends Descriptor {
+  eventMask: bigint;
 
-export interface Out {
-  fileType: Filetype;
-  isPreopened: boolean;
-  rightsBase: Rights;
-  rightsInheriting: Rights;
-  fdFlags: Fdflags;
+  sendEvents(events: bigint): void;
 }
 
 // EventSource implements write end fifo features
-export class EventSource implements Descriptor, In {
+export class EventSource
+  extends AbstractDeviceDescriptor
+  implements EventSourceDescriptor
+{
   // In unix, crossterm uses pipe as event source
   // Wasi doesn't define filetype pipe/fifo so it's defined as char device
-  fileType = constants.WASI_FILETYPE_CHARACTER_DEVICE;
-  isPreopened = true;
-  rightsBase = constants.WASI_EXT_RIGHTS_STDIN;
-  rightsInheriting = 0n;
-  fdFlags = 0;
-
-  occuredEvents = constants.WASI_EXT_NO_EVENT;
-  eventSub: HtermEventSub;
-  poolSub: PollEntry | null = null;
+  private signalSub?: PollSub;
+  private events: bigint;
 
   constructor(
-    private workerTable: ProcessManager,
-    private processId: number,
-    public readonly subscribedEvents: bigint
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    public readonly eventMask: bigint
   ) {
-    this.eventSub = { processId, eventSourceFd: this } as HtermEventSub;
-    this.workerTable.events.subscribeEvent(this.eventSub, subscribedEvents);
+    super(fs_flags, fs_rights_base, fs_rights_inheriting);
+    this.signalSub = undefined;
+    this.events = constants.WASI_EXT_NO_EVENT;
   }
 
-  getFdstat(): Promise<Fdstat> {
-    return Promise.resolve({
-      fs_filetype: this.fileType,
-      fs_flags: this.fdFlags,
-      fs_rights_base: this.rightsBase,
-      fs_rights_inheriting: this.rightsInheriting,
-    } as Fdstat);
-  }
-
-  getFilestat(): Promise<Filestat> {
+  override getFilestat(): Promise<Filestat> {
     // TODO: Mostly dummy values
     return Promise.resolve({
       dev: 0n,
       ino: 0n,
-      filetype: this.fileType,
+      filetype: this.fdstat.fs_filetype,
       nlink: 0n,
       size: 0n,
       mtim: 0n,
@@ -77,49 +53,29 @@ export class EventSource implements Descriptor, In {
     } as Filestat);
   }
 
-  initialize(_path: string): Promise<void> {
-    // TODO: For now ignore it
-    return Promise.resolve();
-  }
-
-  getPath(): string {
-    // TODO: return /dev/{event-source-device} ?
-    return undefined;
-  }
-
-  setFilestatTimes(_atim: Timestamp, _mtim: Timestamp): Promise<number> {
-    // TODO: set atim and mtim
-    return Promise.resolve(constants.WASI_ESUCCESS);
-  }
-
-  setFdstatFlags(flags: Fdflags): Promise<number> {
-    this.fdFlags = flags;
-    return Promise.resolve(constants.WASI_ESUCCESS);
-  }
-
-  setFdstatRights(
-    rightsBase: Rights,
-    rightsInheriting: Rights
+  override async setFilestatTimes(
+    _atim: Timestamp,
+    _mtim: Timestamp
   ): Promise<number> {
-    this.rightsBase = rightsBase;
-    this.rightsInheriting = rightsInheriting;
-    return Promise.resolve(constants.WASI_ESUCCESS);
+    // TODO: set atim and mtim
+    return constants.WASI_ESUCCESS;
   }
 
-  close(): Promise<number> {
-    this.workerTable.events.unsubscribeEvent(
-      this.eventSub,
-      this.subscribedEvents
-    );
-    let termination =
-      this.workerTable.processInfos[this.processId].terminationNotifier;
-    if (termination !== null && termination == this) {
-      this.workerTable.processInfos[this.processId].terminationNotifier = null;
-    }
-    return Promise.resolve(constants.WASI_ESUCCESS);
-  }
+  // TODO: implement close
+  // close(): Promise<number> {
+  //   this.workerTable.events.unsubscribeEvent(
+  //     this.eventSub,
+  //     this.subscribedEvents
+  //   );
+  //   let termination =
+  //     this.workerTable.processInfos[this.processId].terminationNotifier;
+  //   if (termination !== null && termination == this) {
+  //     this.workerTable.processInfos[this.processId].terminationNotifier = null;
+  //   }
+  //   return Promise.resolve(constants.WASI_ESUCCESS);
+  // }
 
-  read(
+  override async read(
     _len: number,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
@@ -140,149 +96,38 @@ export class EventSource implements Descriptor, In {
     });
   }
 
-  read_str(): Promise<{ err: number; content: string }> {
-    // TODO: For now ignore it
-    return Promise.resolve({
-      err: constants.WASI_ENOTSUP,
-      content: undefined,
-    });
-  }
-
-  pread(
-    _len: number,
-    _pos: bigint
-  ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    // TODO: For now ignore it
-    return Promise.resolve({
-      err: constants.WASI_ENOTSUP,
-      buffer: undefined,
-    });
-  }
-
-  arrayBuffer(): Promise<{ err: number; buffer: ArrayBuffer }> {
-    return Promise.resolve({
-      err: constants.WASI_EBADF,
-      buffer: undefined,
-    });
-  }
-
-  write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
-    return Promise.resolve({
-      err: constants.WASI_EBADF,
-      written: 0n,
-    });
-  }
-
-  pwrite(
-    _buffer: ArrayBuffer,
-    _offset: bigint
-  ): Promise<{ err: number; written: bigint }> {
-    return Promise.resolve({
-      err: constants.WASI_EBADF,
-      written: 0n,
-    });
-  }
-
-  seek(
-    _offset: bigint,
-    _whence: Whence
-  ): Promise<{ err: number; offset: bigint }> {
-    return Promise.resolve({
-      err: constants.WASI_EBADF,
-      offset: 0n,
-    });
-  }
-
-  readdir(_refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
-    return Promise.resolve({
-      err: constants.WASI_ENOTDIR,
-      dirents: undefined,
-    });
-  }
-
-  writableStream(): Promise<{ err: number; stream: WritableStream }> {
-    return Promise.resolve({
-      err: constants.WASI_EBADF,
-      stream: undefined,
-    });
-  }
-
-  isatty(): boolean {
+  isatty() {
     return false;
   }
 
-  truncate(_size: bigint): Promise<number> {
-    // TODO: check error code is ok
-    return Promise.resolve(constants.WASI_EBADF);
-  }
-
-  readEvents(requestedLen: number, readLen: Int32Array, buf: Uint8Array): void {
-    readLen[0] =
-      requestedLen < constants.WASI_EXT_EVENT_MASK_SIZE
-        ? requestedLen
-        : constants.WASI_EXT_EVENT_MASK_SIZE;
-
-    let mask = 0xffn;
-    for (let i = 0; i < readLen[0]; i++) {
-      let val = this.occuredEvents & (mask << BigInt(i * 8));
-      buf[i] = Number(val >> BigInt(i * 8));
-      this.occuredEvents ^= val;
-    }
+  override async addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    workerId: number
+  ): Promise<PollEvent> {
+    return new Promise((resolve: (event: PollEvent) => void) => {
+      this.signalSub = {
+        pid: workerId,
+        userdata,
+        tag: eventType,
+        resolve,
+      };
+    });
   }
 
   sendEvents(events: bigint): void {
-    this.occuredEvents |= events;
+    this.events |= events;
 
-    if (this.poolSub !== null) {
-      const entry = this.poolSub;
-      this.poolSub = null;
-      if (
-        Atomics.load(entry.data, 0) == constants.WASI_EXT_POLL_BUF_STATUS_VALID
-      ) {
-        Atomics.store(entry.data, 1, constants.WASI_EXT_EVENT_MASK_SIZE);
-        Atomics.store(entry.data, 0, constants.WASI_EXT_POLL_BUF_STATUS_READY);
-        Atomics.store(entry.lck, 0, 0);
-        Atomics.notify(entry.lck, 0);
-      }
+    if (this.signalSub !== undefined) {
+      this.signalSub.resolve({
+        userdata: this.signalSub.userdata,
+        error: constants.WASI_ESUCCESS,
+        eventType: this.events,
+        nbytes: 8,
+      });
+
+      this.signalSub = undefined;
+      this.events = constants.WASI_EXT_NO_EVENT;
     }
-  }
-
-  availableBytes(_workerId: number): number {
-    return this.occuredEvents != constants.WASI_EXT_NO_EVENT
-      ? constants.WASI_EXT_EVENT_MASK_SIZE
-      : 0;
-  }
-
-  setPollEntry(userLock: Int32Array, userBuffer: Int32Array): void {
-    this.poolSub = { lck: userLock, data: userBuffer } as PollEntry;
-  }
-
-  obtainEvents(events: bigint): bigint {
-    let result = this.occuredEvents & events;
-    this.occuredEvents ^= result;
-    return result;
-  }
-
-  async ioctl(
-    _request: number,
-    _buf: Uint8Array
-  ): Promise<{ err: number; written: number }> {
-    return {
-      err: constants.WASI_ENOTTY,
-      written: 0,
-    };
-  }
-
-  async addPollSub(
-    userdata: UserData,
-    eventType: number,
-    _workerId: number
-  ): Promise<PollEvent> {
-    return {
-      userdata,
-      error: constants.WASI_ESUCCESS,
-      eventType,
-      nbytes: 0,
-    };
   }
 }

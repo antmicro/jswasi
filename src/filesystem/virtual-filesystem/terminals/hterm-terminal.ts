@@ -15,6 +15,7 @@ import {
   UserData,
   EventType,
   PollEvent,
+  PollSub,
   Fdflags,
   Rights,
   Descriptor,
@@ -30,17 +31,11 @@ type InitDeviceArgs = {
 
 export type InitDriverArgs = { processManager: ProcessManager };
 
-export type PollSub = {
-  pid: number;
-  userdata: UserData;
-  tag: number;
-  resolve: (event: PollEvent) => void;
-};
-
 class Hterm implements Terminal {
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
   subs: PollSub[];
+  signalSubs: PollSub[];
 
   buffer: string;
 
@@ -51,6 +46,7 @@ class Hterm implements Terminal {
     this.buffer = "";
     this.bufRequestQueue = [];
     this.subs = [];
+    this.signalSubs = [];
     this.foregroundPid = null;
 
     this.echo = false;
@@ -193,7 +189,21 @@ export class HtermDeviceDriver implements TerminalDriver {
         // control characters
         if (__hterm.foregroundPid !== null) {
           if (code === 3) {
-            this.processManager.sendSigInt(__hterm.foregroundPid);
+            if (
+              __hterm.signalSubs.length !== 0 &&
+              __hterm.signalSubs[0].tag | BigInt(constants.WASI_SIGINT)
+            ) {
+              const sub = __hterm.signalSubs.shift();
+
+              sub.resolve({
+                userdata: sub.userdata,
+                error: constants.WASI_ESUCCESS,
+                nbytes: 0,
+                eventType: BigInt(constants.WASI_SIGINT),
+              });
+            } else {
+              this.processManager.sendSigInt(__hterm.foregroundPid);
+            }
           } else if (code === 4) {
             // this.processManager.sendEndOfFile(currentProcessId, -1);
             for (const req of __hterm.bufRequestQueue) {
@@ -225,9 +235,9 @@ export class HtermDeviceDriver implements TerminalDriver {
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
           nbytes: __hterm.buffer.length,
-          eventType:
-            constants.WASI_EVENTTYPE_FD_READ |
-            constants.WASI_EVENTTYPE_FD_WRITE,
+          eventType: BigInt(
+            constants.WASI_EVENTTYPE_FD_READ | constants.WASI_EVENTTYPE_FD_WRITE
+          ),
         });
       }
       __hterm.subs.length = 0;
@@ -243,7 +253,19 @@ export class HtermDeviceDriver implements TerminalDriver {
     // TODO: maybe save all output and rewrite it on adjusted size?
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     io.onTerminalResize = (_columns: number, _rows: number) => {
-      this.processManager.events.publishEvent(constants.WASI_EVENT_WINCH);
+      if (
+        __hterm.signalSubs.length !== 0 &&
+        __hterm.signalSubs[0].tag | BigInt(constants.WASI_SIGINT)
+      ) {
+        const sub = __hterm.signalSubs.shift();
+
+        sub.resolve({
+          userdata: sub.userdata,
+          error: constants.WASI_ESUCCESS,
+          nbytes: 0,
+          eventType: BigInt(constants.WASI_EVENT_WINCH),
+        });
+      }
     };
     return __hterm;
   }
@@ -305,6 +327,23 @@ export class HtermDeviceDriver implements TerminalDriver {
         this.terminals[min]
       ),
     };
+  }
+
+  async promiseSignal(
+    userdata: UserData,
+    workerId: number,
+    eventType: EventType,
+    min: number
+  ): Promise<PollEvent> {
+    const __term = this.terminals[min];
+    return new Promise((resolve: (event: PollEvent) => void) => {
+      __term.signalSubs.push({
+        pid: workerId,
+        userdata,
+        tag: eventType,
+        resolve,
+      });
+    });
   }
 }
 
@@ -409,10 +448,10 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     workerId: number
   ): Promise<PollEvent> {
     switch (eventType) {
-      case constants.WASI_EVENTTYPE_FD_WRITE: {
-        let __evType = constants.WASI_EVENTTYPE_FD_WRITE;
+      case BigInt(constants.WASI_EVENTTYPE_FD_WRITE): {
+        let __evType = BigInt(constants.WASI_EVENTTYPE_FD_WRITE);
         const __nBytes = this.hterm.buffer.length;
-        if (__nBytes > 0) __evType |= constants.WASI_EVENTTYPE_FD_READ;
+        if (__nBytes > 0) __evType |= BigInt(constants.WASI_EVENTTYPE_FD_READ);
 
         return {
           userdata,
@@ -421,7 +460,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
           nbytes: __nBytes,
         };
       }
-      case constants.WASI_EVENTTYPE_FD_READ: {
+      case BigInt(constants.WASI_EVENTTYPE_FD_READ): {
         return new Promise((resolve: (event: PollEvent) => void) => {
           this.hterm.subs.push({
             pid: workerId,
@@ -435,7 +474,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         return {
           userdata,
           error: constants.WASI_EINVAL,
-          eventType: 0,
+          eventType: 0n,
           nbytes: 0,
         };
       }

@@ -186,7 +186,7 @@ export default class ProcessManager {
   constructor(
     private readonly scriptName: string,
     public readonly filesystem: TopLevelFs,
-    private driverManager: DriverManager
+    public driverManager: DriverManager
   ) {}
 
   async spawnProcess(

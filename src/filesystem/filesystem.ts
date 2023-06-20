@@ -17,13 +17,20 @@ export type Fstflags = number;
 export type Dircookie = bigint;
 
 export type UserData = bigint;
-export type EventType = number;
+export type EventType = bigint;
 
 export type PollEvent = {
   userdata: UserData;
   error: number;
   eventType: EventType;
   nbytes: number;
+};
+
+export type PollSub = {
+  pid: number;
+  userdata: UserData;
+  tag: EventType;
+  resolve: (event: PollEvent) => void;
 };
 
 export type Filestat = {
@@ -260,7 +267,7 @@ export interface Descriptor {
    */
   addPollSub(
     userData: UserData,
-    eventType: number,
+    eventType: EventType,
     workerId: number
   ): Promise<PollEvent>;
 }
@@ -307,7 +314,7 @@ export abstract class AbstractDescriptor implements Descriptor {
 
   async addPollSub(
     userdata: UserData,
-    eventType: number,
+    eventType: EventType,
     _workerId: number
   ): Promise<PollEvent> {
     return {

@@ -1010,13 +1010,13 @@ export default async function syscallCallback(
         let sub = subs[i];
         const buffer = new Int32Array(events[i], 0, 2);
         let fdNum = (sub.event as FdReadSub).fd;
-        let fd = fds.getFd(fdNum);
+        let desc = fds.getFd(fdNum);
         let stat = await fd.getFdstat();
 
         switch (stat.fs_filetype) {
           case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
-            if (fd instanceof EventSource) {
-              let eventSource = fd as EventSource;
+            if (desc instanceof EventSource) {
+              let eventSource = desc as EventSource;
               eventSource.setPollEntry(endLock, buffer);
             } else {
               //! We have processed data earlier, it should be not executed
