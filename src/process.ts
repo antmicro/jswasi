@@ -1072,7 +1072,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         sendToKernel(["getpid", { sharedBuffer } as GetPidArgs]);
         Atomics.wait(lck, 0, -1);
 
-        outputBuffer.set(pidPtr, 0);
+        const pidArray = new Uint8Array(sharedBuffer, 4, 4);
+        outputBuffer.set(pidArray, 0);
 
         return {
           exitStatus: constants.EXIT_SUCCESS,
