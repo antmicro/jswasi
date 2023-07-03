@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import { EventSource } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
-import { PollEntry, HtermEventSub } from "./types.js";
+import { HtermEventSub } from "./types.js";
 import syscallCallback from "./syscalls.js";
 import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
@@ -25,7 +25,7 @@ export const DEFAULT_ENV = {
 };
 
 export class FdTable {
-  private fdt: Record<number, Descriptor> = {};
+  fdt: Record<number, Descriptor> = {};
   private freeFds: number[] = [];
   private topFd: number;
 
@@ -98,10 +98,8 @@ export class FdTable {
 type Foreground = { maj: number; min: number } | null;
 
 class ProcessInfo {
-  public stdinPollSub: PollEntry | null = null;
-  public terminationNotifier: EventSource | null = null;
-
   public shouldEcho = true;
+  public terminationNotifier: EventSource | null = null;
   public timestamp: number;
   children: number[];
 
@@ -123,6 +121,12 @@ class ProcessInfo {
   ) {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
     this.children = [];
+  }
+
+  publishEvent(events: bigint) {
+    Object.entries(this.fds.fdt).forEach((desc) => {
+      if (desc instanceof EventSource) desc.sendEvents(events);
+    });
   }
 }
 
@@ -154,23 +158,6 @@ class PubSubEvent {
           console.log(
             `PubSubEvent: attemp to unsubscribe process=${processId} fd=${eventSourceFd} that wasn't subcribed`
           );
-        }
-      }
-    }
-  }
-
-  publishEvent(events: bigint) {
-    for (var i = 0; i < this.subsTable.length; i++) {
-      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) != 0n) {
-        for (const { processId, eventSourceFd } of this.subsTable[i]) {
-          let fd = eventSourceFd;
-          if (fd instanceof EventSource) {
-            fd.sendEvents(events);
-          } else {
-            console.log(
-              `PubSubEvent: there is fd=${fd} that is not EventSource object in fds table of process=${processId}`
-            );
-          }
         }
       }
     }
@@ -272,7 +259,7 @@ export default class ProcessManager {
       this.processInfos[parentId].terminationNotifier !== null &&
       this.processInfos[parentId].terminationNotifier.obtainEvents(
         constants.WASI_EXT_EVENT_SIGINT
-      ) != 0n
+      ) != constants.WASI_EXT_NO_EVENT
     ) {
       this.terminateProcess(id, constants.EXIT_INTERRUPTED);
     } else {

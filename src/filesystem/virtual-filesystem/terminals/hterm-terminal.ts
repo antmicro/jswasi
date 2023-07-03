@@ -189,21 +189,9 @@ export class HtermDeviceDriver implements TerminalDriver {
         // control characters
         if (__hterm.foregroundPid !== null) {
           if (code === 3) {
-            if (
-              __hterm.signalSubs.length !== 0 &&
-              __hterm.signalSubs[0].tag | BigInt(constants.WASI_SIGINT)
-            ) {
-              const sub = __hterm.signalSubs.shift();
-
-              sub.resolve({
-                userdata: sub.userdata,
-                error: constants.WASI_ESUCCESS,
-                nbytes: 0,
-                eventType: BigInt(constants.WASI_SIGINT),
-              });
-            } else {
-              this.processManager.sendSigInt(__hterm.foregroundPid);
-            }
+            this.processManager.processInfos[
+              __hterm.foregroundPid
+            ].publishEvent(constants.WASI_EVENT_SIGINT);
           } else if (code === 4) {
             // this.processManager.sendEndOfFile(currentProcessId, -1);
             for (const req of __hterm.bufRequestQueue) {

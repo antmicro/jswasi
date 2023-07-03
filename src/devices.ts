@@ -13,18 +13,17 @@ import {
 import { Descriptor } from "./filesystem/filesystem.js";
 
 export interface EventSourceDescriptor extends Descriptor {
-  eventMask: bigint;
-
-  sendEvents(events: bigint): void;
+  sendEvents(workerId: number, events: bigint): void;
+  obtainEvents(workerId: number, events: bigint): EventType;
 }
 
 // EventSource implements write end fifo features
 export class EventSource
+  // In unix, crossterm uses pipe as event source
+  // Wasi doesn't define filetype pipe/fifo so it's defined as char device
   extends AbstractDeviceDescriptor
   implements EventSourceDescriptor
 {
-  // In unix, crossterm uses pipe as event source
-  // Wasi doesn't define filetype pipe/fifo so it's defined as char device
   private signalSub?: PollSub;
   private events: bigint;
 
@@ -32,7 +31,7 @@ export class EventSource
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    public readonly eventMask: bigint
+    private readonly eventMask: EventType
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.signalSub = undefined;
@@ -106,19 +105,31 @@ export class EventSource
     workerId: number
   ): Promise<PollEvent> {
     return new Promise((resolve: (event: PollEvent) => void) => {
-      this.signalSub = {
-        pid: workerId,
-        userdata,
-        tag: eventType,
-        resolve,
-      };
+      if (this.events !== constants.WASI_NO_EVENT) {
+        resolve({
+          userdata,
+          eventType: this.events,
+          nbytes: 8,
+          error: constants.WASI_ESUCCESS,
+        });
+      } else {
+        this.signalSub = {
+          pid: workerId,
+          userdata,
+          tag: eventType,
+          resolve,
+        };
+      }
     });
   }
 
-  sendEvents(events: bigint): void {
-    this.events |= events;
+  sendEvents(workerId: number, events: bigint): void {
+    this.events |= events & this.eventMask;
 
-    if (this.signalSub !== undefined) {
+    if (
+      this.events !== constants.WASI_NO_EVENT &&
+      this.signalSub !== undefined
+    ) {
       this.signalSub.resolve({
         userdata: this.signalSub.userdata,
         error: constants.WASI_ESUCCESS,
@@ -129,5 +140,11 @@ export class EventSource
       this.signalSub = undefined;
       this.events = constants.WASI_EXT_NO_EVENT;
     }
+  }
+
+  obtainEvents(events: bigint): EventType {
+    const __events = this.events & events;
+    this.events ^= events;
+    return __events;
   }
 }
