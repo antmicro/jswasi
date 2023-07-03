@@ -30,9 +30,8 @@ import {
   HtermConfArgs,
   PathRenameArgs,
   FilestatSetTimesArgs,
-  ClockEvent,
-  FdReadSub,
-  FdWriteSub,
+  ClockSub,
+  FdReadWriteSub,
   FdEventSub,
   PollOneoffArgs,
   EventSourceArgs,
@@ -40,6 +39,7 @@ import {
   AttachSigIntArgs,
   KillArgs,
   IoctlArgs,
+  POLL_EVENT_BUFSIZE,
 } from "./types";
 
 type ptr = number;
@@ -1630,19 +1630,16 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const view = new DataView(
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
     );
+    // Buffer for sending occured events from kernel back to the process
+    // it can hold up to nSubscriptions events
+    const eventBuf = new SharedArrayBuffer(POLL_EVENT_BUFSIZE * nSubscriptions);
 
     var minWaitEnd = BigInt(Number.MAX_SAFE_INTEGER);
 
     const fdSubs = new Array<FdEventSub>();
-    const events = new Array<SharedArrayBuffer>();
-    var lastClock: null | ClockEvent;
 
-    function invalidateEventBuffers() {
-      for (var i = 0; i < events.length; i++) {
-        const buffer = new Int32Array(events[i], 0, 2);
-        Atomics.store(buffer, 0, constants.WASI_EXT_POLL_BUF_STATUS_NVALID);
-      }
-    }
+    let lastClockUserdata: bigint;
+    let lastClock: ClockSub = undefined;
 
     for (let i = 0; i < nSubscriptions; i += 1) {
       const userdata = view.getBigUint64(subscriptionsPtr, true);
@@ -1675,15 +1672,16 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           if (minWaitEnd > end) {
             minWaitEnd = end;
             lastClock = {
-              userdata,
               clockId,
               timeout,
               precision,
               flags: subClockFlags,
-            } as ClockEvent;
+            } as ClockSub;
+            lastClockUserdata = userdata;
           }
           continue;
         }
+        case constants.WASI_EVENTTYPE_FD_WRITE:
         case constants.WASI_EVENTTYPE_FD_READ: {
           subscriptionsPtr += 7; // padding to 8
           const fd = view.getUint32(subscriptionsPtr, true);
@@ -1691,17 +1689,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
           workerConsoleLog(`read data from fd = ${fd}`);
 
-          fdSub = { fd } as FdReadSub;
-
-          break;
-        }
-        case constants.WASI_EVENTTYPE_FD_WRITE: {
-          subscriptionsPtr += 7; // padding to 8
-          const fd = view.getUint32(subscriptionsPtr, true);
-          subscriptionsPtr += 32; // file descriptor offset + subscription padding
-          workerConsoleLog(`write data to fd = ${fd}`);
-
-          fdSub = { fd } as FdWriteSub;
+          fdSub = { fd } as FdReadWriteSub;
 
           break;
         }
@@ -1710,87 +1698,44 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           return constants.WASI_EINVAL;
       }
 
-      fdSubs.push({ userdata, eventType, event: fdSub });
-
-      // status + data
-      // status: -1 not valid, 0 valid, 1 ready, 2 error
-      const buffer = new SharedArrayBuffer(4 + 4);
-      const array = new Int32Array(buffer, 0, 2);
-      array[0] = array[1] = 0;
-      events.push(buffer);
+      if (fdSub) fdSubs.push({ userdata, eventType, event: fdSub });
     }
 
-    // 2 locks
-    const sharedBuffer = new SharedArrayBuffer(2 * 4);
+    if (lastClock) {
+      fdSubs.push({
+        userdata: lastClockUserdata,
+        eventType: constants.WASI_EVENTTYPE_CLOCK,
+        event: lastClock,
+      });
+    }
+
+    // lock + number of events that occured
+    const sharedBuffer = new SharedArrayBuffer(4 + 4);
     const lock = new Int32Array(sharedBuffer, 0, 2);
-    lock[0] = lock[1] = -1;
+    lock[0] = -1;
+    lock[1] = 0;
 
     if (fdSubs.length > 0) {
       sendToKernel([
         "poll_oneoff",
-        { sharedBuffer, subs: fdSubs, events } as PollOneoffArgs,
+        {
+          sharedBuffer,
+          subs: fdSubs,
+          eventBuf,
+          timeout: minWaitEnd,
+        } as PollOneoffArgs,
       ]);
       Atomics.wait(lock, 0, -1);
     }
 
-    if (minWaitEnd < BigInt(Number.MAX_SAFE_INTEGER)) {
-      // Wait with timeout
-      const ms = Number(minWaitEnd) / 1000000 - performance.now();
-      if (Atomics.wait(lock, 1, -1, ms) === "timed-out") {
-        // Timeout is reached, there is not more events
-        view.setBigUint64(eventsPtr, lastClock.userdata, true);
-        eventsPtr += 8; // userdata offset
-        view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
-        eventsPtr += 2; // errno offset
-        view.setUint8(eventsPtr, constants.WASI_EVENTTYPE_CLOCK);
-        eventsPtr += 22; // type, nbytes, flags offsets + padding to 8
+    const nOccured = lock[1];
+    new Uint8Array(
+      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
+      eventsPtr,
+      nEvents * POLL_EVENT_BUFSIZE
+    ).set(new Uint8Array(eventBuf, 0, nOccured * POLL_EVENT_BUFSIZE));
 
-        invalidateEventBuffers();
-        view.setUint32(nEvents, 1, true);
-
-        return constants.WASI_ESUCCESS;
-      }
-    } else {
-      // Wait without timeout
-      Atomics.wait(lock, 1, -1);
-    }
-
-    var gotEvents = 0;
-    for (var i = 0; i < events.length; i++) {
-      const buffer = new Int32Array(events[i], 0, 2);
-
-      let status = Atomics.load(buffer, 0);
-      let data = Atomics.load(buffer, 1);
-
-      Atomics.store(buffer, 0, constants.WASI_EXT_POLL_BUF_STATUS_NVALID);
-
-      if (status == constants.WASI_EXT_POLL_BUF_STATUS_READY) {
-        view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
-        eventsPtr += 8; // userdata offset
-        view.setUint16(eventsPtr, constants.WASI_ESUCCESS, true);
-        eventsPtr += 2; // errno offset
-        view.setUint8(eventsPtr, fdSubs[i].eventType);
-        eventsPtr += 6; // type offset + padding to 8
-        view.setUint8(eventsPtr, data);
-        eventsPtr += 8; // nbytes offset
-        // TODO: Event flags
-        eventsPtr += 8; // flags offset + padding to 8
-
-        gotEvents += 1;
-      } else if (status == constants.WASI_EXT_POLL_BUF_STATUS_ERR) {
-        view.setBigUint64(eventsPtr, fdSubs[i].userdata, true);
-        eventsPtr += 8; // userdata offset
-        view.setUint16(eventsPtr, data, true);
-        eventsPtr += 2; // errno offset
-        view.setUint8(eventsPtr, fdSubs[i].eventType);
-        eventsPtr += 22; // type, nbytes, flags offsets + padding to 8
-
-        gotEvents += 1;
-      }
-    }
-
-    invalidateEventBuffers();
-    view.setInt32(nEvents, gotEvents, true);
+    view.setInt32(nEvents, nOccured, true);
     return constants.WASI_ESUCCESS;
   }
 

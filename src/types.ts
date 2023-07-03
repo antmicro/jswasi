@@ -1,6 +1,17 @@
 import { EventSource } from "./devices.js";
 import { LookupFlags } from "./filesystem/filesystem.js";
 
+export type UserData = bigint;
+export type EventType = number;
+
+export const POLL_EVENT_BUFSIZE = 32;
+export type PollEvent = {
+  userdata: UserData;
+  error: number;
+  eventType: EventType;
+  nbytes: bigint;
+};
+
 export type BufferRequest = {
   requestedLen: number;
   lck: Int32Array;
@@ -163,7 +174,7 @@ export type FilestatSetTimesArgs = {
   fst_flags: number;
 };
 
-export type ClockEvent = {
+export type ClockSub = {
   userdata: bigint;
   clockId: number;
   timeout: bigint;
@@ -171,24 +182,21 @@ export type ClockEvent = {
   flags: number;
 };
 
-export type FdReadSub = {
-  fd: number;
-};
-
-export type FdWriteSub = {
+export type FdReadWriteSub = {
   fd: number;
 };
 
 export type FdEventSub = {
   userdata: bigint;
   eventType: number;
-  event: FdReadSub | FdWriteSub;
+  event: FdReadWriteSub | ClockSub;
 };
 
 export type PollOneoffArgs = {
   sharedBuffer: SharedArrayBuffer;
   subs: Array<FdEventSub>;
-  events: Array<SharedArrayBuffer>;
+  eventBuf: SharedArrayBuffer;
+  timeout?: bigint;
 };
 
 export type PollEntry = {

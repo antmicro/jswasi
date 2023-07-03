@@ -1,4 +1,5 @@
 import * as constants from "../constants.js";
+import { PollEvent, UserData, EventType } from "../types.js";
 
 export type LookupFlags = number;
 export type OpenFlags = number;
@@ -15,16 +16,6 @@ export type Timestamp = bigint;
 export type Whence = number;
 export type Fstflags = number;
 export type Dircookie = bigint;
-
-export type UserData = bigint;
-export type EventType = bigint;
-
-export type PollEvent = {
-  userdata: UserData;
-  error: number;
-  eventType: EventType;
-  nbytes: number;
-};
 
 export type PollSub = {
   pid: number;

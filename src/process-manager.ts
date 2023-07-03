@@ -124,6 +124,9 @@ class ProcessInfo {
   }
 
   publishEvent(events: bigint) {
+    // events are stored only in contexts of event source descriptors
+    // if a new event source is opened, it won't be able to read events
+    // that happened in the past
     Object.entries(this.fds.fdt).forEach((desc) => {
       if (desc instanceof EventSource) desc.sendEvents(events);
     });

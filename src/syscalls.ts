@@ -33,6 +33,8 @@ import {
   CleanInodesArgs,
   KillArgs,
   IoctlArgs,
+  ClockSub,
+  PollEvent,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -921,120 +923,67 @@ export default async function syscallCallback(
       break;
     }
     case "poll_oneoff": {
-      const { sharedBuffer, subs, events } = data as PollOneoffArgs;
+      const { sharedBuffer, subs, eventBuf } = data as PollOneoffArgs;
       const lock = new Int32Array(sharedBuffer, 0, 2);
 
       const { fds } = processManager.processInfos[processId];
-      var isEvent = false;
 
-      for (var i = 0; i < subs.length; i++) {
-        let sub = subs[i];
-        const event = new Int32Array(events[i], 0, 2);
-
-        let fdNum = (sub.event as FdReadSub).fd;
-        let fd = fds.getFd(fdNum);
-        if (fd === undefined) {
-          event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-          event[1] = constants.WASI_EBADF;
-          isEvent = true;
-
-          continue;
-        }
-
-        let stat = await fd.getFdstat();
-
-        switch (sub.eventType) {
-          case constants.WASI_EVENTTYPE_FD_READ: {
-            switch (stat.fs_filetype) {
-              case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
-                if (fd instanceof EventSource) {
-                  let eventSource = fd as EventSource;
-                  let bytes = eventSource.availableBytes(processId);
-
-                  if (bytes > 0) {
-                    event[0] = constants.WASI_EXT_POLL_BUF_STATUS_READY;
-                    event[1] = bytes;
-                    isEvent = true;
-                  }
-                } else {
-                  event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-                  event[1] = constants.WASI_EBADF;
-                  isEvent = true;
+      let __events: PollEvent[] = [];
+      await Promise.any(
+        subs.map(async (sub) => {
+          let __subPromise;
+          switch (sub.eventType) {
+            case constants.WASI_EVENTTYPE_CLOCK:
+              __subPromise = new Promise(
+                (resolve: (event: PollEvent) => void) => {
+                  setTimeout(() => {
+                    resolve({
+                      userdata: sub.userdata,
+                      error: constants.WASI_ESUCCESS,
+                      eventType: sub.eventType,
+                      nbytes: 0n,
+                    });
+                  }, Number((sub.event as ClockSub).timeout));
                 }
+              );
+              break;
 
-                break;
-              }
-              case constants.WASI_FILETYPE_DIRECTORY:
-              case constants.WASI_FILETYPE_REGULAR_FILE: {
-                event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-                event[1] = constants.WASI_EPERM;
-                isEvent = true;
+            case constants.WASI_EVENTTYPE_FD_WRITE:
+            case constants.WASI_EVENTTYPE_FD_READ:
+              __subPromise = fds
+                .getFd((sub.event as FdReadSub).fd)
+                .addPollSub(sub.userdata, sub.eventType, processId);
+              break;
 
-                break;
-              }
-              default: {
-                event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-                event[1] = constants.WASI_ENOTSUP;
-                isEvent = true;
-              }
-            }
-
-            break;
+            default:
+              __subPromise = new Promise(
+                (resolve: (event: PollEvent) => void) => {
+                  resolve({
+                    userdata: sub.userdata,
+                    // TODO: Should this be EINVAL?
+                    error: constants.WASI_EINVAL,
+                    eventType: constants.WASI_EXT_NO_EVENT,
+                    nbytes: 0n,
+                  });
+                }
+              );
           }
-          case constants.WASI_EVENTTYPE_FD_WRITE: {
-            event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-            event[1] = constants.WASI_ENOTSUP;
-            isEvent = true;
+          return __subPromise.then((event: PollEvent) => __events.push(event));
+        })
+      );
 
-            break;
-          }
-          default: {
-            event[0] = constants.WASI_EXT_POLL_BUF_STATUS_ERR;
-            event[1] = constants.WASI_EINVAL;
-            isEvent = true;
-          }
-        }
-      }
+      const eventBufView = new DataView(eventBuf);
+      let offset = 0;
+      __events.forEach((event) => {
+        eventBufView.setBigUint64((offset += 8), event.userdata, true);
+        eventBufView.setUint16((offset += 2), event.error, true);
+        eventBufView.setUint8((offset += 6), event.eventType);
+        eventBufView.setBigUint64((offset += 8), event.nbytes, true);
+        // TODO: event flags
+        offset += 8;
+      });
 
-      if (isEvent) {
-        Atomics.store(lock, 0, 0);
-        Atomics.store(lock, 1, 0);
-        Atomics.notify(lock, 0);
-
-        break;
-      }
-
-      const endLock = new Int32Array(sharedBuffer, 4, 1);
-
-      for (var i = 0; i < subs.length; i++) {
-        let sub = subs[i];
-        const buffer = new Int32Array(events[i], 0, 2);
-        let fdNum = (sub.event as FdReadSub).fd;
-        let desc = fds.getFd(fdNum);
-        let stat = await fd.getFdstat();
-
-        switch (stat.fs_filetype) {
-          case constants.WASI_FILETYPE_CHARACTER_DEVICE: {
-            if (desc instanceof EventSource) {
-              let eventSource = desc as EventSource;
-              eventSource.setPollEntry(endLock, buffer);
-            } else {
-              //! We have processed data earlier, it should be not executed
-              console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);
-            }
-
-            break;
-          }
-          case constants.WASI_FILETYPE_DIRECTORY:
-          case constants.WASI_FILETYPE_REGULAR_FILE:
-          default: {
-            //! We have processed data earlier, it should be not executed
-            console.log(`Poll fd[${fdNum}] = ${fd} is handled incorrectly!`);
-          }
-        }
-      }
-
-      Atomics.store(lock, 0, 0);
+      Atomics.store(lock, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lock, 0);
 
       break;

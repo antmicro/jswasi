@@ -13,8 +13,8 @@ import {
 import { Descriptor } from "./filesystem/filesystem.js";
 
 export interface EventSourceDescriptor extends Descriptor {
-  sendEvents(workerId: number, events: bigint): void;
-  obtainEvents(workerId: number, events: bigint): EventType;
+  sendEvents(events: bigint): void;
+  obtainEvents(events: bigint): EventType;
 }
 
 // EventSource implements write end fifo features
@@ -123,7 +123,7 @@ export class EventSource
     });
   }
 
-  sendEvents(workerId: number, events: bigint): void {
+  sendEvents(events: bigint): void {
     this.events |= events & this.eventMask;
 
     if (

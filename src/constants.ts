@@ -243,7 +243,7 @@ export const WASI_EXT_POLL_BUF_STATUS_READY = 1;
 export const WASI_EXT_POLL_BUF_STATUS_ERR = 2;
 
 // Events
-export const WASI_EXT_NO_EVENT = BigInt(0x0000000000000000);
+export const WASI_EXT_NO_EVENT = 0;
 export const WASI_EXT_EVENT_MASK_SIZE = 4;
 export const WASI_EXT_EVENTS_NUM = 2;
 
