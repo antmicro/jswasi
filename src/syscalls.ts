@@ -23,11 +23,9 @@ import {
   SetEchoArgs,
   SetEnvArgs,
   SpawnArgs,
-  HtermConfArgs,
   PathRenameArgs,
   FilestatSetTimesArgs,
   PollOneoffArgs,
-  FdReadSub,
   EventSourceArgs,
   AttachSigIntArgs,
   CleanInodesArgs,
@@ -35,6 +33,7 @@ import {
   IoctlArgs,
   ClockSub,
   PollEvent,
+  FdReadWriteSub,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -951,7 +950,7 @@ export default async function syscallCallback(
             case constants.WASI_EVENTTYPE_FD_WRITE:
             case constants.WASI_EVENTTYPE_FD_READ:
               __subPromise = fds
-                .getFd((sub.event as FdReadSub).fd)
+                .getFd((sub.event as FdReadWriteSub).fd)
                 .addPollSub(sub.userdata, sub.eventType, processId);
               break;
 

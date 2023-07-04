@@ -247,5 +247,5 @@ export const WASI_EXT_NO_EVENT = 0;
 export const WASI_EXT_EVENT_MASK_SIZE = 4;
 export const WASI_EXT_EVENTS_NUM = 2;
 
-export const WASI_EXT_EVENT_WINCH = 1n << 0n;
-export const WASI_EXT_EVENT_SIGINT = 1n << 1n;
+export const WASI_EXT_EVENT_WINCH = 1 << 0;
+export const WASI_EXT_EVENT_SIGINT = 1 << 1;

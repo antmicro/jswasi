@@ -312,7 +312,7 @@ export abstract class AbstractDescriptor implements Descriptor {
       userdata,
       error: constants.WASI_ESUCCESS,
       eventType,
-      nbytes: 0,
+      nbytes: 0n,
     };
   }
 

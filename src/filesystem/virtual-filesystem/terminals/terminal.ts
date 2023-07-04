@@ -1,5 +1,5 @@
 import { DeviceDriver } from "../driver-manager.js";
-import { UserData, EventType, PollEvent } from "../../filesystem.js";
+import { UserData, EventType, PollEvent } from "../../../types.js";
 
 // Ioctl magic numbers for terminal devices
 export const enum ioctlRequests {

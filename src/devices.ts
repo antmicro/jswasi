@@ -1,20 +1,18 @@
 import * as constants from "./constants.js";
 import {
-  UserData,
-  PollEvent,
   PollSub,
-  EventType,
   Fdflags,
   Filestat,
   Rights,
   Timestamp,
   AbstractDeviceDescriptor,
 } from "./filesystem/filesystem.js";
+import { UserData, PollEvent, EventType } from "./types.js";
 import { Descriptor } from "./filesystem/filesystem.js";
 
 export interface EventSourceDescriptor extends Descriptor {
-  sendEvents(events: bigint): void;
-  obtainEvents(events: bigint): EventType;
+  sendEvents(events: EventType): void;
+  obtainEvents(events: EventType): EventType;
 }
 
 // EventSource implements write end fifo features
@@ -25,7 +23,7 @@ export class EventSource
   implements EventSourceDescriptor
 {
   private signalSub?: PollSub;
-  private events: bigint;
+  private events: EventType;
 
   constructor(
     fs_flags: Fdflags,
@@ -109,7 +107,7 @@ export class EventSource
         resolve({
           userdata,
           eventType: this.events,
-          nbytes: 8,
+          nbytes: 8n,
           error: constants.WASI_ESUCCESS,
         });
       } else {
@@ -123,7 +121,7 @@ export class EventSource
     });
   }
 
-  sendEvents(events: bigint): void {
+  sendEvents(events: EventType): void {
     this.events |= events & this.eventMask;
 
     if (
@@ -134,7 +132,7 @@ export class EventSource
         userdata: this.signalSub.userdata,
         error: constants.WASI_ESUCCESS,
         eventType: this.events,
-        nbytes: 8,
+        nbytes: 4n,
       });
 
       this.signalSub = undefined;
@@ -142,7 +140,7 @@ export class EventSource
     }
   }
 
-  obtainEvents(events: bigint): EventType {
+  obtainEvents(events: EventType): EventType {
     const __events = this.events & events;
     this.events ^= events;
     return __events;

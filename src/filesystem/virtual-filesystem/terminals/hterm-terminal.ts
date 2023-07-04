@@ -11,15 +11,8 @@ import {
   DEFAULT_WORK_DIR,
   FdTable,
 } from "../../../process-manager.js";
-import {
-  UserData,
-  EventType,
-  PollEvent,
-  PollSub,
-  Fdflags,
-  Rights,
-  Descriptor,
-} from "../../filesystem.js";
+import { PollSub, Fdflags, Rights, Descriptor } from "../../filesystem.js";
+import { UserData, EventType, PollEvent } from "../../../types.js";
 import * as constants from "../../../constants.js";
 import { getFilesystem } from "../../top-level-fs.js";
 import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
@@ -222,10 +215,10 @@ export class HtermDeviceDriver implements TerminalDriver {
         sub.resolve({
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
-          nbytes: __hterm.buffer.length,
-          eventType: BigInt(
-            constants.WASI_EVENTTYPE_FD_READ | constants.WASI_EVENTTYPE_FD_WRITE
-          ),
+          nbytes: BigInt(__hterm.buffer.length),
+          eventType:
+            constants.WASI_EVENTTYPE_FD_READ |
+            constants.WASI_EVENTTYPE_FD_WRITE,
         });
       }
       __hterm.subs.length = 0;
@@ -243,15 +236,15 @@ export class HtermDeviceDriver implements TerminalDriver {
     io.onTerminalResize = (_columns: number, _rows: number) => {
       if (
         __hterm.signalSubs.length !== 0 &&
-        __hterm.signalSubs[0].tag | BigInt(constants.WASI_SIGINT)
+        __hterm.signalSubs[0].tag | constants.WASI_SIGINT
       ) {
         const sub = __hterm.signalSubs.shift();
 
         sub.resolve({
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
-          nbytes: 0,
-          eventType: BigInt(constants.WASI_EVENT_WINCH),
+          nbytes: 0n,
+          eventType: constants.WASI_EVENT_WINCH,
         });
       }
     };
@@ -436,10 +429,10 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     workerId: number
   ): Promise<PollEvent> {
     switch (eventType) {
-      case BigInt(constants.WASI_EVENTTYPE_FD_WRITE): {
-        let __evType = BigInt(constants.WASI_EVENTTYPE_FD_WRITE);
-        const __nBytes = this.hterm.buffer.length;
-        if (__nBytes > 0) __evType |= BigInt(constants.WASI_EVENTTYPE_FD_READ);
+      case constants.WASI_EVENTTYPE_FD_WRITE: {
+        let __evType = constants.WASI_EVENTTYPE_FD_WRITE;
+        const __nBytes = BigInt(this.hterm.buffer.length);
+        if (__nBytes > 0n) __evType |= constants.WASI_EVENTTYPE_FD_READ;
 
         return {
           userdata,
@@ -448,7 +441,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
           nbytes: __nBytes,
         };
       }
-      case BigInt(constants.WASI_EVENTTYPE_FD_READ): {
+      case constants.WASI_EVENTTYPE_FD_READ: {
         return new Promise((resolve: (event: PollEvent) => void) => {
           this.hterm.subs.push({
             pid: workerId,
@@ -462,8 +455,8 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         return {
           userdata,
           error: constants.WASI_EINVAL,
-          eventType: 0n,
-          nbytes: 0,
+          eventType: constants.WASI_NO_EVENT,
+          nbytes: 0n,
         };
       }
     }

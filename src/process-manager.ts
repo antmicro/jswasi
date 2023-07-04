@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import { EventSource } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
-import { HtermEventSub } from "./types.js";
+import { EventType, HtermEventSub } from "./types.js";
 import syscallCallback from "./syscalls.js";
 import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
@@ -123,7 +123,7 @@ class ProcessInfo {
     this.children = [];
   }
 
-  publishEvent(events: bigint) {
+  publishEvent(events: EventType) {
     // events are stored only in contexts of event source descriptors
     // if a new event source is opened, it won't be able to read events
     // that happened in the past
