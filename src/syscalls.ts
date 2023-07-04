@@ -237,7 +237,7 @@ export default async function syscallCallback(
             processManager.processInfos[processId].terminationNotifier;
           let sigintOccurred =
             events !== null
-              ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0n
+              ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
               : false;
 
           if (sigintOccurred) {
@@ -278,7 +278,7 @@ export default async function syscallCallback(
             // Wash should break execution of commands chain
             let sigintOccurred =
               events !== null
-                ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0n
+                ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
                 : false;
             if (sigintOccurred) {
               exit_code = constants.EXIT_INTERRUPTED;
@@ -924,17 +924,26 @@ export default async function syscallCallback(
         })
       );
 
-      const eventBufView = new DataView(eventBuf);
+      const eventBufView = new DataView(eventBuf, 0);
+      let nOccured = __events.length;
       let offset = 0;
       __events.forEach((event) => {
-        eventBufView.setBigUint64((offset += 8), event.userdata, true);
-        eventBufView.setUint16((offset += 2), event.error, true);
-        eventBufView.setUint8((offset += 6), event.eventType);
-        eventBufView.setBigUint64((offset += 8), event.nbytes, true);
+        eventBufView.setBigUint64(offset, event.userdata, true);
+        offset += 8;
+
+        eventBufView.setUint16(offset, event.error, true);
+        offset += 2;
+
+        eventBufView.setUint8(offset, event.eventType);
+        offset += 6;
+
+        eventBufView.setBigUint64(offset, event.nbytes, true);
+        offset += 8;
         // TODO: event flags
         offset += 8;
       });
 
+      Atomics.store(lock, 1, nOccured);
       Atomics.store(lock, 0, constants.WASI_ESUCCESS);
       Atomics.notify(lock, 0);
 
@@ -946,7 +955,12 @@ export default async function syscallCallback(
       const lck = new Int32Array(sharedBuffer, 0, 1);
       const fileDescriptor = new Int32Array(sharedBuffer, 4, 1);
 
-      let eventSource = new EventSource(processManager, processId, eventMask);
+      let eventSource = new EventSource(
+        0,
+        constants.WASI_RIGHTS_ALL,
+        constants.WASI_RIGHTS_ALL,
+        eventMask
+      );
 
       var fd = processManager.processInfos[processId].fds.addFile(eventSource);
       Atomics.store(fileDescriptor, 0, fd);
@@ -969,8 +983,7 @@ export default async function syscallCallback(
       } else {
         let eventSource = eventFd as EventSource;
         if (
-          (BigInt(eventSource.subscribedEvents) &
-            constants.WASI_EXT_EVENT_SIGINT) ===
+          (eventSource.eventMask & constants.WASI_EXT_EVENT_SIGINT) ===
           constants.WASI_EXT_NO_EVENT
         ) {
           console.log(

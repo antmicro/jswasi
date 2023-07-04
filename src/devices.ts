@@ -29,7 +29,7 @@ export class EventSource
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    private readonly eventMask: EventType
+    public readonly eventMask: EventType
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
     this.signalSub = undefined;

@@ -280,9 +280,6 @@ export async function init(
     }
   );
   await Promise.all(checksumPromises);
-  // FIXME: for now we assume hterm is in scope
-  // attempt to pass Terminal to initAll as a parameter would fail
-  // @ts-ignore
 
   const driverManager = new DriverManager();
 

@@ -38,8 +38,9 @@ import {
   AttachSigIntArgs,
   KillArgs,
   IoctlArgs,
+  EventType,
   POLL_EVENT_BUFSIZE,
-} from "./types";
+} from "./types.js";
 
 type ptr = number;
 
@@ -1088,7 +1089,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           };
         }
 
-        const { event_mask: eventMask }: { event_mask: bigint } =
+        const { event_mask: eventMask }: { event_mask: EventType } =
           JSON.parse(json);
         const sharedBuffer = new SharedArrayBuffer(4 + 4);
         const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -1096,8 +1097,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         workerConsoleLog(`event_source_fd(${eventMask})`);
 
         if (
-          eventMask === 0n ||
-          eventMask >= BigInt(1n) << BigInt(constants.WASI_EXT_EVENTS_NUM)
+          eventMask === constants.WASI_EXT_NO_EVENT ||
+          eventMask >= 1 << constants.WASI_EXT_EVENTS_NUM
         ) {
           return {
             exitStatus: constants.WASI_EINVAL,
@@ -1656,7 +1657,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     new Uint8Array(
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
       eventsPtr,
-      nEvents * POLL_EVENT_BUFSIZE
+      nOccured * POLL_EVENT_BUFSIZE
     ).set(new Uint8Array(eventBuf, 0, nOccured * POLL_EVENT_BUFSIZE));
 
     view.setInt32(nEvents, nOccured, true);

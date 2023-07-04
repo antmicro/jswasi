@@ -216,9 +216,7 @@ export class HtermDeviceDriver implements TerminalDriver {
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
           nbytes: BigInt(__hterm.buffer.length),
-          eventType:
-            constants.WASI_EVENTTYPE_FD_READ |
-            constants.WASI_EVENTTYPE_FD_WRITE,
+          eventType: constants.WASI_EVENTTYPE_FD_READ,
         });
       }
       __hterm.subs.length = 0;

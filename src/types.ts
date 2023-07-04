@@ -204,7 +204,7 @@ export type HtermEventSub = {
 
 export type EventSourceArgs = {
   sharedBuffer: SharedArrayBuffer;
-  eventMask: bigint;
+  eventMask: EventType;
 };
 
 export type AttachSigIntArgs = {
