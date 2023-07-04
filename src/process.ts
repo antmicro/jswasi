@@ -27,7 +27,6 @@ import {
   SetEchoArgs,
   SetEnvArgs,
   SpawnArgs,
-  HtermConfArgs,
   PathRenameArgs,
   FilestatSetTimesArgs,
   ClockSub,
@@ -1079,81 +1078,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           exitStatus: constants.EXIT_SUCCESS,
           outputSize: 4,
         };
-      }
-      case "hterm": {
-        const { attrib, val }: { attrib: string; val: string } =
-          JSON.parse(json);
-
-        workerConsoleLog(`hterm(${attrib}, ${val})`);
-
-        let returnCode;
-        if (val === undefined) {
-          var bufferSize = 64;
-          while (true) {
-            const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufferSize);
-            const lck = new Int32Array(sharedBuffer, 0, 1);
-            const bufferUsed = new Int32Array(sharedBuffer, 4, 1);
-            const buffer = new Uint8Array(sharedBuffer, 8, bufferSize);
-
-            lck[0] = -1;
-            bufferUsed[0] = bufferSize;
-
-            sendToKernel([
-              "hterm",
-              { sharedBuffer, method: "get", attrib, val } as HtermConfArgs,
-            ]);
-            Atomics.wait(lck, 0, -1);
-            returnCode = Atomics.load(lck, 0);
-
-            if (returnCode == constants.WASI_ESUCCESS) {
-              // Check user buffer size is enough
-              if (outputBuffer.byteLength <= bufferUsed[0]) {
-                return {
-                  exitStatus: constants.WASI_ENOBUFS,
-                  outputSize: 0,
-                };
-              }
-
-              // In case sharedBuffer size was not enough then resize buffer and call syscall again
-              if (bufferUsed[0] <= bufferSize) {
-                outputBuffer.set(buffer.slice(0, bufferUsed[0]), 0);
-                outputBuffer.set([0], bufferUsed[0]);
-
-                return {
-                  exitStatus: constants.EXIT_SUCCESS,
-                  outputSize: bufferUsed[0],
-                };
-              }
-
-              while (bufferSize < bufferUsed[0]) {
-                bufferSize *= 2;
-              }
-            } else {
-              return {
-                exitStatus: returnCode,
-                outputSize: 0,
-              };
-            }
-          }
-        } else {
-          const sharedBuffer = new SharedArrayBuffer(4);
-          const lck = new Int32Array(sharedBuffer, 0, 1);
-
-          lck[0] = -1;
-
-          sendToKernel([
-            "hterm",
-            { sharedBuffer, method: "set", attrib, val } as HtermConfArgs,
-          ]);
-          Atomics.wait(lck, 0, -1);
-
-          returnCode = Atomics.load(lck, 0);
-
-          return {
-            exitStatus: returnCode,
-            outputSize: 0,
-          };
-        }
       }
       case "event_source_fd": {
         // wasi_ext_lib::event_source_fd needs: int fd

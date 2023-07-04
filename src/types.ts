@@ -144,13 +144,6 @@ export type PathLinkArgs = {
   newPath: string;
 };
 
-export type HtermConfArgs = {
-  sharedBuffer: SharedArrayBuffer;
-  method: string;
-  attrib: string;
-  val: string;
-};
-
 export type PathRenameArgs = {
   sharedBuffer: SharedArrayBuffer;
   oldFd: number;
