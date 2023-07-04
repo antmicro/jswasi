@@ -86,6 +86,21 @@ export class FdTable {
     return this.fdt[fd];
   }
 
+  public duplicateFd(srcFd: number, dstFd: number) {
+    let idx = this.freeFds.findIndex((element) => element == dstFd);
+    if (idx !== undefined) {
+      this.freeFds.splice(idx, idx);
+    } else if (this.topFd <= dstFd) {
+      while (this.topFd < dstFd) {
+        this.freeFds.push(this.topFd);
+        this.topFd++;
+      }
+      this.topFd++;
+    }
+    // We suppose dstFd is closed!
+    this.fdt[dstFd] = this.fdt[srcFd];
+  }
+
   tearDown() {
     Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {

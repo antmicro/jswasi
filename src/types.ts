@@ -209,3 +209,9 @@ export type IoctlArgs = {
   fd: number;
   command: number;
 };
+
+export type FdRenumberArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+  newFd: number;
+};

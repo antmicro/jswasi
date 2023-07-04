@@ -34,6 +34,7 @@ import {
   ClockSub,
   PollEvent,
   FdReadWriteSub,
+  FdRenumberArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -869,6 +870,30 @@ export default async function syscallCallback(
           }
         }
       }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+
+      break;
+    }
+    case "fd_renumber": {
+      const { sharedBuffer, fd, newFd } = data as FdRenumberArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const { fds } = processManager.processInfos[processId];
+
+      let err = constants.WASI_ESUCCESS;
+      let srcFd = fds.getFd(fd);
+      let desFd = fds.getFd(newFd);
+
+      if (srcFd === undefined) {
+        err = constants.WASI_EBADF;
+      } else {
+        if (desFd !== undefined) {
+          // As dup2 manual said, ignore close errors
+          await desFd.close();
+        }
+        fds.duplicateFd(fd, newFd);
+      }
+
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
 

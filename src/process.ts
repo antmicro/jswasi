@@ -38,6 +38,7 @@ import {
   AttachSigIntArgs,
   KillArgs,
   IoctlArgs,
+  FdRenumberArgs,
   EventType,
   POLL_EVENT_BUFSIZE,
 } from "./types.js";
@@ -1695,8 +1696,21 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return placeholder();
   }
 
-  function fd_renumber() {
-    return placeholder();
+  function fd_renumber(fd: number, newFd: number) {
+    workerConsoleLog(`fd_renumber(${fd}, ${newFd})`);
+
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+
+    sendToKernel([
+      "fd_renumber",
+      { sharedBuffer, fd, newFd } as FdRenumberArgs,
+    ]);
+    Atomics.wait(lck, 0, -1);
+
+    const err = Atomics.load(lck, 0);
+    return err;
   }
 
   function fd_tell(fd: number, pos: ptr) {
