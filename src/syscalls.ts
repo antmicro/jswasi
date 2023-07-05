@@ -760,8 +760,9 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      const fdstat = await fds.getFd(fd).getFdstat();
-      if (fds.getFd(fd) !== undefined) {
+      let desc = fds.getFd(fd);
+      if (desc !== undefined) {
+        const fdstat = await desc.getFdstat();
         fileType[0] = fdstat.fs_filetype;
         fdFlags[0] = fdstat.fs_flags;
         rightsBase[0] = fdstat.fs_rights_base;
