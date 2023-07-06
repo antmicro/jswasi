@@ -142,7 +142,7 @@ export class EventSource
 
   obtainEvents(events: EventType): EventType {
     const __events = this.events & events;
-    this.events ^= events;
+    this.events ^= __events;
     return __events;
   }
 }
