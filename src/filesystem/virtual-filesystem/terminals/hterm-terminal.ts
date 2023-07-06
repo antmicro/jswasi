@@ -428,26 +428,30 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
   ): Promise<PollEvent> {
     switch (eventType) {
       case constants.WASI_EVENTTYPE_FD_WRITE: {
-        let __evType = constants.WASI_EVENTTYPE_FD_WRITE;
-        const __nBytes = BigInt(this.hterm.buffer.length);
-        if (__nBytes > 0n) __evType |= constants.WASI_EVENTTYPE_FD_READ;
-
         return {
           userdata,
           error: constants.WASI_ESUCCESS,
-          eventType: __evType,
-          nbytes: __nBytes,
+          eventType,
+          nbytes: 0n,
         };
       }
       case constants.WASI_EVENTTYPE_FD_READ: {
-        return new Promise((resolve: (event: PollEvent) => void) => {
-          this.hterm.subs.push({
-            pid: workerId,
-            userdata,
-            tag: eventType,
-            resolve,
+        if (this.hterm.buffer.length === 0) {
+          return new Promise((resolve: (event: PollEvent) => void) => {
+            this.hterm.subs.push({
+              pid: workerId,
+              userdata,
+              tag: eventType,
+              resolve,
+            });
           });
-        });
+        }
+        return {
+          userdata,
+          error: constants.WASI_ESUCCESS,
+          eventType,
+          nbytes: BigInt(this.hterm.buffer.length),
+        };
       }
       default: {
         return {
