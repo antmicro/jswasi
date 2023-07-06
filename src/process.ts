@@ -1893,7 +1893,6 @@ async function importWasmModule(
       doExit(0);
     } catch (error: any) {
       workerConsoleLog(`error: ${error}`);
-      sendToKernel(["stderr", `${error.stack}\n`]);
       doExit(255);
     }
   } else {
@@ -1908,7 +1907,6 @@ async function start_wasm() {
       await importWasmModule(mod, WASI);
     } catch (err) {
       workerConsoleLog(`Failed instantiating WASM module: ${err}`);
-      sendToKernel(["stderr", `Failed instantiating WASM module: ${err}`]);
       doExit(255);
     }
     workerConsoleLog("done.");
