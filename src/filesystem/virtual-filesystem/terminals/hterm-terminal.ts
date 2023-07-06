@@ -182,9 +182,10 @@ export class HtermDeviceDriver implements TerminalDriver {
         // control characters
         if (__hterm.foregroundPid !== null) {
           if (code === 3) {
-            this.processManager.processInfos[
+            this.processManager.publishEvent(
+              constants.WASI_EVENT_SIGINT,
               __hterm.foregroundPid
-            ].publishEvent(constants.WASI_EVENT_SIGINT);
+            );
           } else if (code === 4) {
             // this.processManager.sendEndOfFile(currentProcessId, -1);
             for (const req of __hterm.bufRequestQueue) {
@@ -234,7 +235,7 @@ export class HtermDeviceDriver implements TerminalDriver {
     io.onTerminalResize = (_columns: number, _rows: number) => {
       if (
         __hterm.signalSubs.length !== 0 &&
-        __hterm.signalSubs[0].tag | constants.WASI_SIGINT
+        __hterm.signalSubs[0].tag | constants.WASI_EVENT_WINCH
       ) {
         const sub = __hterm.signalSubs.shift();
 

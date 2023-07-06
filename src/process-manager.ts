@@ -122,17 +122,6 @@ class ProcessInfo {
     this.timestamp = Math.floor(new Date().getTime() / 1000);
     this.children = [];
   }
-
-  publishEvent(events: EventType) {
-    // events are stored only in contexts of event source descriptors
-    // if a new event source is opened, it won't be able to read events
-    // that happened in the past
-    for (const desc of Object.values(this.fds.fdt)) {
-      if (desc instanceof EventSource) {
-        desc.sendEvents(events);
-      }
-    }
-  }
 }
 
 class PubSubEvent {
@@ -318,18 +307,23 @@ export default class ProcessManager {
     delete this.processInfos[id];
   }
 
-  sendSigInt(id: number) {
-    // TODO: adapt this to new current process notion
-    // let currentProcess = this.currentProcess;
-    // if (
-    //   currentProcess === 0 ||
-    //   this.processInfos[currentProcess].cmd === "/usr/bin/wash"
-    // ) {
-    //   console.log(`Ctrl-C sent to PROCESS ${this.currentProcess}`);
-    //   this.events.publishEvent(constants.WASI_EVENT_SIGINT);
-    // } else {
-    //   this.terminateProcess(id, constants.EXIT_INTERRUPTED);
-    // }
-    this.terminateProcess(id);
+  publishEvent(events: EventType, pid: number) {
+    // If sigint is published and target process doesn't override SIGINT, terminate process
+    if (
+      events & constants.WASI_EVENT_SIGINT &&
+      !this.processInfos[pid].terminationNotifier
+    ) {
+      this.terminateProcess(pid, 128 + constants.WASI_EVENT_SIGINT);
+      return;
+    }
+
+    // events are stored only in contexts of event source descriptors
+    // if a new event source is opened, it won't be able to read events
+    // that happened in the past
+    for (const desc of Object.values(this.processInfos[pid].fds.fdt)) {
+      if (desc instanceof EventSource) {
+        desc.sendEvents(events);
+      }
+    }
   }
 }
