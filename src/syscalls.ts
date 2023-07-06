@@ -895,7 +895,7 @@ export default async function syscallCallback(
                       eventType: sub.eventType,
                       nbytes: 0n,
                     });
-                  }, Number((sub.event as ClockSub).timeout));
+                  }, Number((sub.event as ClockSub).timeout / 1000000n));
                 }
               );
               break;
