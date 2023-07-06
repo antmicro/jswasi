@@ -73,23 +73,19 @@ export class EventSource
   // }
 
   override async read(
-    _len: number,
+    len: number,
     _workerId?: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    // TODO: handle sharedBuff and processId can be undefined
-    // TODO: adapt this to new read signature
-    // const lck = new Int32Array(sharedBuff, 0, 1);
-    // const readLen = new Int32Array(sharedBuff, 4, 1);
-    // const readBuf = new Uint8Array(sharedBuff, 8, len);
+    if (len < 4) return { err: constants.WASI_ENOBUFS, buffer: undefined };
 
-    // this.readEvents(len, readLen, readBuf);
-
-    // Atomics.store(lck, 0, constants.WASI_ESUCCESS);
-    // Atomics.notify(lck, 0);
+    const buffer = new ArrayBuffer(4);
+    const arr32 = new Uint32Array(buffer);
+    arr32[0] = this.events;
+    this.events = constants.WASI_NO_EVENT;
 
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
-      buffer: undefined,
+      buffer,
     });
   }
 
@@ -125,18 +121,17 @@ export class EventSource
     this.events |= events & this.eventMask;
 
     if (
-      this.events !== constants.WASI_NO_EVENT &&
+      this.events !== constants.WASI_EXT_NO_EVENT &&
       this.signalSub !== undefined
     ) {
       this.signalSub.resolve({
         userdata: this.signalSub.userdata,
         error: constants.WASI_ESUCCESS,
-        eventType: this.events,
+        eventType: constants.WASI_EVENTTYPE_FD_READ,
         nbytes: 4n,
       });
 
       this.signalSub = undefined;
-      this.events = constants.WASI_EXT_NO_EVENT;
     }
   }
 
