@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import { EventSource, EventSourceDescriptor } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
-import { EventType, HtermEventSub } from "./types.js";
+import { EventType } from "./types.js";
 import syscallCallback from "./syscalls.js";
 import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
@@ -124,45 +124,10 @@ class ProcessInfo {
   }
 }
 
-class PubSubEvent {
-  public subsTable: Array<Set<HtermEventSub>>;
-
-  constructor() {
-    this.subsTable = new Array<Set<HtermEventSub>>(
-      constants.WASI_EXT_EVENTS_NUM
-    );
-    for (var i = 0; i < this.subsTable.length; i++) {
-      this.subsTable[i] = new Set<HtermEventSub>([]);
-    }
-  }
-
-  subscribeEvent(sub: HtermEventSub, events: bigint) {
-    for (var i = 0; i < this.subsTable.length; i++) {
-      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) !== 0n) {
-        this.subsTable[i].add(sub as HtermEventSub);
-      }
-    }
-  }
-
-  unsubscribeEvent(sub: HtermEventSub, events: bigint) {
-    for (var i = 0; i < this.subsTable.length; i++) {
-      if ((BigInt(events) & (BigInt(1n) << BigInt(i))) !== 0n) {
-        if (!this.subsTable[i].delete(sub)) {
-          var { processId, eventSourceFd } = sub;
-          console.log(
-            `PubSubEvent: attemp to unsubscribe process=${processId} fd=${eventSourceFd} that wasn't subcribed`
-          );
-        }
-      }
-    }
-  }
-}
-
 export default class ProcessManager {
   public nextProcessId = 0;
   public processInfos: Record<number, ProcessInfo> = {};
   public compiledModules: Record<string, WebAssembly.Module> = {};
-  public events: PubSubEvent = new PubSubEvent();
 
   constructor(
     private readonly scriptName: string,

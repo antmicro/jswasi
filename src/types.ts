@@ -1,4 +1,3 @@
-import { EventSource } from "./devices.js";
 import { LookupFlags } from "./filesystem/filesystem.js";
 
 export type UserData = bigint;
@@ -10,13 +9,6 @@ export type PollEvent = {
   error: number;
   eventType: EventType;
   nbytes: bigint;
-};
-
-export type BufferRequest = {
-  requestedLen: number;
-  lck: Int32Array;
-  readLen: Int32Array;
-  sharedBuffer: Uint8Array;
 };
 
 export type FdFdstatGetArgs = { sharedBuffer: SharedArrayBuffer; fd: number };
@@ -190,16 +182,6 @@ export type PollOneoffArgs = {
   subs: Array<FdEventSub>;
   eventBuf: SharedArrayBuffer;
   timeout?: bigint;
-};
-
-export type PollEntry = {
-  lck: Int32Array;
-  data: Int32Array;
-};
-
-export type HtermEventSub = {
-  processId: number;
-  eventSourceFd: EventSource;
 };
 
 export type EventSourceArgs = {
