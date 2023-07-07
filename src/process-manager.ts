@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import { EventSource } from "./devices.js";
+import { EventSource, EventSourceDescriptor } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor } from "./filesystem/filesystem";
 import { EventType, HtermEventSub } from "./types.js";
@@ -325,5 +325,30 @@ export default class ProcessManager {
         desc.sendEvents(events);
       }
     }
+  }
+
+  attachSigint(fd: number, pid: number): number {
+    const eventDesc = this.processInfos[pid].fds.getFd(fd);
+    if (eventDesc === undefined) return constants.WASI_EBADF;
+
+    if (!(eventDesc instanceof EventSource)) return constants.WASI_EINVAL;
+
+    let stat;
+    new Promise(
+      (resolve: (ev: EventSourceDescriptor) => void, reject: () => void) => {
+        stat = eventDesc.makeNotifier({ resolve, reject });
+
+        if (stat === constants.WASI_ESUCCESS)
+          this.processInfos[pid].terminationNotifier = eventDesc;
+      }
+    ).then((ev: EventSourceDescriptor) => {
+      if (
+        this.processInfos[pid] !== undefined &&
+        this.processInfos[pid].terminationNotifier === ev
+      )
+        this.processInfos[pid].terminationNotifier = null;
+    });
+
+    return stat;
   }
 }

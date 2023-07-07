@@ -972,36 +972,10 @@ export default async function syscallCallback(
     case "attach_sigint": {
       const { sharedBuffer, fd } = data as AttachSigIntArgs;
 
+      const stat = processManager.attachSigint(fd, processId);
+
       const lck = new Int32Array(sharedBuffer, 0, 1);
-
-      let exit_status = constants.WASI_ESUCCESS;
-      let eventFd = processManager.processInfos[processId].fds.getFd(fd);
-
-      if (eventFd === undefined || !(eventFd instanceof EventSource)) {
-        console.log(`attach_sigint: fd=${fd} is not EventSource descriptor!`);
-        exit_status = constants.WASI_EBADF;
-      } else {
-        let eventSource = eventFd as EventSource;
-        if (
-          (eventSource.eventMask & constants.WASI_EXT_EVENT_SIGINT) ===
-          constants.WASI_EXT_NO_EVENT
-        ) {
-          console.log(
-            `attach_sigint: fd=${fd} does not subscribe WASI_EVENT_SIGINT!`
-          );
-          exit_status = constants.WASI_EINVAL;
-        } else {
-          if (
-            processManager.processInfos[processId].terminationNotifier !== null
-          ) {
-            console.log(`Process=${processId} overwrites terminationNotifier!`);
-          }
-          processManager.processInfos[processId].terminationNotifier =
-            eventSource;
-        }
-      }
-
-      Atomics.store(lck, 0, exit_status);
+      Atomics.store(lck, 0, stat);
       Atomics.notify(lck, 0);
 
       break;

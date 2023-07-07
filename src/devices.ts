@@ -10,9 +10,15 @@ import {
 import { UserData, PollEvent, EventType } from "./types.js";
 import { Descriptor } from "./filesystem/filesystem.js";
 
+export type StopResolver = {
+  resolve: (desc: EventSourceDescriptor) => void;
+  reject: () => void;
+};
+
 export interface EventSourceDescriptor extends Descriptor {
   sendEvents(events: EventType): void;
   obtainEvents(events: EventType): EventType;
+  makeNotifier(resolve: StopResolver): number;
 }
 
 // EventSource implements write end fifo features
@@ -24,16 +30,19 @@ export class EventSource
 {
   private signalSub?: PollSub;
   private events: EventType;
+  private stopResolver: StopResolver;
 
   constructor(
     fs_flags: Fdflags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    public readonly eventMask: EventType
+    private readonly eventMask: EventType
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
-    this.signalSub = undefined;
     this.events = constants.WASI_EXT_NO_EVENT;
+
+    this.stopResolver = undefined;
+    this.signalSub = undefined;
   }
 
   override getFilestat(): Promise<Filestat> {
@@ -59,18 +68,11 @@ export class EventSource
   }
 
   // TODO: implement close
-  // close(): Promise<number> {
-  //   this.workerTable.events.unsubscribeEvent(
-  //     this.eventSub,
-  //     this.subscribedEvents
-  //   );
-  //   let termination =
-  //     this.workerTable.processInfos[this.processId].terminationNotifier;
-  //   if (termination !== null && termination == this) {
-  //     this.workerTable.processInfos[this.processId].terminationNotifier = null;
-  //   }
-  //   return Promise.resolve(constants.WASI_ESUCCESS);
-  // }
+  override async close(): Promise<number> {
+    if (this.stopResolver) this.stopResolver.resolve(this);
+
+    return constants.WASI_ESUCCESS;
+  }
 
   override async read(
     len: number,
@@ -139,5 +141,17 @@ export class EventSource
     const __events = this.events & events;
     this.events ^= __events;
     return __events;
+  }
+
+  makeNotifier(stopResolver: StopResolver): number {
+    if (this.eventMask & constants.WASI_EXT_EVENT_SIGINT) {
+      if (this.stopResolver !== undefined) this.stopResolver.resolve(this);
+
+      this.stopResolver = stopResolver;
+      return constants.WASI_ESUCCESS;
+    }
+
+    stopResolver.reject();
+    return constants.WASI_EINVAL;
   }
 }
