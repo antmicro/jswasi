@@ -161,8 +161,8 @@ export async function createDeviceFilesystem(
   );
   await devfs.mknodat(
     undefined,
-    "random",
-    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_RANDOM),
+    "urandom",
+    vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_URANDOM),
     {}
   );
   await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(major.MAJ_HTERM, 0), args);

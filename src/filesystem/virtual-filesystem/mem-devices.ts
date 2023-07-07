@@ -9,7 +9,7 @@ import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
 export const enum minor {
   DEV_NULL = 0,
   DEV_ZERO = 1,
-  DEV_RANDOM = 2,
+  DEV_URANDOM = 2,
 }
 
 export class MemoryDeviceDriver implements DeviceDriver {
@@ -26,7 +26,7 @@ export class MemoryDeviceDriver implements DeviceDriver {
     this.devices = {
       [minor.DEV_NULL]: VirtualNullDescriptor,
       [minor.DEV_ZERO]: VirtualZeroDescriptor,
-      [minor.DEV_RANDOM]: VirtualRandomDescriptor,
+      [minor.DEV_URANDOM]: VirtualUrandomDescriptor,
     };
     return constants.WASI_ESUCCESS;
   }
@@ -149,7 +149,7 @@ class VirtualZeroDescriptor extends VirtualNullDescriptor {
   }
 }
 
-class VirtualRandomDescriptor extends VirtualNullDescriptor {
+class VirtualUrandomDescriptor extends VirtualNullDescriptor {
   override async read(
     len: number,
     _workerId?: number
