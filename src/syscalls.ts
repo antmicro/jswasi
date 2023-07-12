@@ -889,10 +889,10 @@ export default async function syscallCallback(
         err = constants.WASI_EBADF;
       } else {
         if (desFd !== undefined) {
-          // As dup2 manual said, ignore close errors
+          // ignore close errors
           await desFd.close();
         }
-        fds.duplicateFd(fd, newFd);
+        fds.moveFd(fd, newFd);
       }
 
       Atomics.store(lck, 0, err);
