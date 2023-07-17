@@ -161,6 +161,7 @@ async function initFs(fs: TopLevelFs) {
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/purge"),
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tree"),
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tar"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/stty"),
   ]);
 
   await Promise.all([
