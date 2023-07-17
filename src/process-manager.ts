@@ -275,10 +275,10 @@ export default class ProcessManager {
   publishEvent(events: EventType, pid: number) {
     // If sigint is published and target process doesn't override SIGINT, terminate process
     if (
-      events & constants.WASI_EVENT_SIGINT &&
+      events & constants.WASI_EXT_EVENT_SIGINT &&
       !this.processInfos[pid].terminationNotifier
     ) {
-      this.terminateProcess(pid, 128 + constants.WASI_EVENT_SIGINT);
+      this.terminateProcess(pid, 128 + constants.WASI_EXT_EVENT_SIGINT);
       return;
     }
 

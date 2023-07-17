@@ -183,7 +183,7 @@ export class HtermDeviceDriver implements TerminalDriver {
         if (__hterm.foregroundPid !== null) {
           if (code === 3) {
             this.processManager.publishEvent(
-              constants.WASI_EVENT_SIGINT,
+              constants.WASI_EXT_EVENT_SIGINT,
               __hterm.foregroundPid
             );
           } else if (code === 4) {
@@ -235,7 +235,7 @@ export class HtermDeviceDriver implements TerminalDriver {
     io.onTerminalResize = (_columns: number, _rows: number) => {
       if (
         __hterm.signalSubs.length !== 0 &&
-        __hterm.signalSubs[0].tag | constants.WASI_EVENT_WINCH
+        __hterm.signalSubs[0].tag | constants.WASI_EXT_EVENT_WINCH
       ) {
         const sub = __hterm.signalSubs.shift();
 
@@ -243,7 +243,7 @@ export class HtermDeviceDriver implements TerminalDriver {
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
           nbytes: 0n,
-          eventType: constants.WASI_EVENT_WINCH,
+          eventType: constants.WASI_EXT_EVENT_WINCH,
         });
       }
     };
@@ -458,7 +458,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         return {
           userdata,
           error: constants.WASI_EINVAL,
-          eventType: constants.WASI_NO_EVENT,
+          eventType: constants.WASI_EXT_NO_EVENT,
           nbytes: 0n,
         };
       }

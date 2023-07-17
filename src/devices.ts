@@ -83,7 +83,7 @@ export class EventSource
     const buffer = new ArrayBuffer(4);
     const arr32 = new Uint32Array(buffer);
     arr32[0] = this.events;
-    this.events = constants.WASI_NO_EVENT;
+    this.events = constants.WASI_EXT_NO_EVENT;
 
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
@@ -101,7 +101,7 @@ export class EventSource
     workerId: number
   ): Promise<PollEvent> {
     return new Promise((resolve: (event: PollEvent) => void) => {
-      if (this.events !== constants.WASI_NO_EVENT) {
+      if (this.events !== constants.WASI_EXT_NO_EVENT) {
         resolve({
           userdata,
           eventType: this.events,
