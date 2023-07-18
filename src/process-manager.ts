@@ -88,18 +88,19 @@ export class FdTable {
 
   public moveFd(srcFd: number, dstFd: number) {
     let idx = this.freeFds.findIndex((element) => element == dstFd);
-    if (idx !== undefined) {
-      this.freeFds.splice(idx, idx);
-    } else if (this.topFd <= dstFd) {
+    if (idx >= 0) {
+      this.freeFds.splice(idx, 1);
+    } else if (this.topFd < dstFd) {
+      this.topFd++;
       while (this.topFd < dstFd) {
         this.freeFds.push(this.topFd);
         this.topFd++;
       }
-      this.topFd++;
     }
-    // We suppose dstFd is closed!
+    // We assume dstFd is closed!
     this.fdt[dstFd] = this.fdt[srcFd];
     delete this.fdt[srcFd];
+    this.freeFds.push(srcFd);
   }
 
   tearDown() {

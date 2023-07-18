@@ -891,10 +891,10 @@ export default async function syscallCallback(
         if (desFd !== undefined) {
           // ignore close errors
           await desFd.close();
+          fds.freeFd(newFd);
         }
         fds.moveFd(fd, newFd);
       }
-
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
 
