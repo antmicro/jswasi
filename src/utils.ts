@@ -100,6 +100,64 @@ export function dirname(path: string): string {
   return path.slice(0, last_index);
 }
 
+// These constants are compliant with the following
+// description of ioctl magic number:
+// https://docs.kernel.org/userspace-api/ioctl/ioctl-decoding.html
+const IOCTL_RW_MASK = 0xc0000000n;
+const IOCTL_RW_OFFSET = 30n;
+
+const IOCTL_SIZE_MASK = 0x3fff0000n;
+const IOCTL_SIZE_OFFSET = 16n;
+
+const IOCTL_DRIVER_MASK = 0x0000ff00n;
+const IOCTL_DRIVER_OFFSET = 8n;
+
+const IOCTL_FUNC_MASK = 0x000000ffn;
+const IOCTL_FUNC_OFFSET = 0n;
+
+export const enum ioc {
+  IO = 0,
+  IOW = 1,
+  IOR = 2,
+  IOWR = 3,
+}
+
+export function decodeIoctlRequest(magicNum: bigint): {
+  rw: number;
+  size: number;
+  func: number;
+  driver: number;
+} {
+  return {
+    rw: Number((magicNum & IOCTL_RW_MASK) >> IOCTL_RW_OFFSET),
+    size: Number((magicNum & IOCTL_SIZE_MASK) >> IOCTL_SIZE_OFFSET),
+    func: Number((magicNum & IOCTL_FUNC_MASK) >> IOCTL_FUNC_OFFSET),
+    driver: Number((magicNum & IOCTL_DRIVER_MASK) >> IOCTL_DRIVER_OFFSET),
+  };
+}
+
+export function encodeIoctlRequest(
+  rw: number,
+  size: number,
+  func: number,
+  driver: number
+): bigint {
+  const rw_shifted = BigInt(rw) << IOCTL_RW_OFFSET;
+  const size_shifted = BigInt(size) << IOCTL_SIZE_OFFSET;
+  const func_shifted = BigInt(func) << IOCTL_FUNC_OFFSET;
+  const driver_shifted = BigInt(driver) << IOCTL_DRIVER_OFFSET;
+
+  if (
+    (rw_shifted & IOCTL_RW_MASK) != rw_shifted ||
+    (size_shifted & IOCTL_SIZE_MASK) != size_shifted ||
+    (func_shifted & IOCTL_FUNC_MASK) != func_shifted ||
+    (driver_shifted & IOCTL_DRIVER_MASK) != driver_shifted
+  )
+    return -1n;
+
+  return rw_shifted | size_shifted | func_shifted | driver_shifted;
+}
+
 export function humanReadable(bytes: number): string {
   const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;

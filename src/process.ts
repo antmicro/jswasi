@@ -1189,30 +1189,34 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           fd: number;
           cmd: number;
         } = JSON.parse(json);
+        const { size, rw, func } = utils.decodeIoctlRequest(BigInt(cmd));
 
         // lock + arg buffer size used + arg buffer
-        const sharedBuffer = new SharedArrayBuffer(4 + 4 + outputBuffer.length);
+        const sharedBuffer = new SharedArrayBuffer(4 + size);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        const sharedBufferUsed = new Int32Array(sharedBuffer, 4, 1);
-        const sharedArgBuffer = new Uint8Array(sharedBuffer, 8);
+        const sharedArgBuffer = new Uint8Array(sharedBuffer, 4, size);
 
         workerConsoleLog(`ioctl(${fd}, ${cmd})`);
 
         lck[0] = -1;
-        sharedBufferUsed[0] = 0;
-        sharedArgBuffer.set(outputBuffer); // in this case it is either input or output buffer
+        if (rw === utils.ioc.IOWR || rw === utils.ioc.IOW)
+          sharedArgBuffer.set(outputBuffer); // in this case it is either input or output buffer
 
         sendToKernel([
           "ioctl",
-          { sharedBuffer, fd, command: cmd } as IoctlArgs,
+          { sharedBuffer, fd, command: func } as IoctlArgs,
         ]);
 
         Atomics.wait(lck, 0, -1);
-        outputBuffer.set(sharedArgBuffer);
+        let len = 0;
+        if (rw === utils.ioc.IOWR || rw === utils.ioc.IOR) {
+          outputBuffer.set(sharedArgBuffer);
+          len = size;
+        }
 
         return {
           exitStatus: Atomics.load(lck, 0),
-          outputSize: Atomics.load(sharedBufferUsed, 0),
+          outputSize: len,
         };
       }
       default: {

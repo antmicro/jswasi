@@ -1029,8 +1029,7 @@ export default async function syscallCallback(
       const { sharedBuffer, fd, command } = data as IoctlArgs;
 
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const argBufferUsed = new Int32Array(sharedBuffer, 4, 1);
-      const argBuffer = new Uint8Array(sharedBuffer, 8);
+      const argBuffer = new Uint8Array(sharedBuffer, 4);
 
       const { fds } = processManager.processInfos[processId];
       let desc = fds.getFd(fd);
@@ -1041,8 +1040,7 @@ export default async function syscallCallback(
         break;
       }
 
-      const { err, written } = await desc.ioctl(command, argBuffer);
-      argBufferUsed[0] = written;
+      const err = await desc.ioctl(command, argBuffer);
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

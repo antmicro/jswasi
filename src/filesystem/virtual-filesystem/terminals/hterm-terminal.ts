@@ -379,12 +379,8 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     }
   }
 
-  override async ioctl(
-    request: number,
-    buf: Uint8Array
-  ): Promise<{ err: number; written: number }> {
+  override async ioctl(request: number, buf: Uint8Array): Promise<number> {
     let err = constants.WASI_ENOBUFS;
-    let written = 0;
 
     switch (request) {
       case ioctlRequests.GET_SCREEN_SIZE: {
@@ -397,7 +393,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         __buf[1] = height;
 
         err = constants.WASI_ESUCCESS;
-        written = 0;
         break;
       }
       case ioctlRequests.SET_ECHO: {
@@ -406,7 +401,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         this.hterm.echo = buf[0] !== 0;
 
         err = constants.WASI_ESUCCESS;
-        written = 4;
         break;
       }
       case ioctlRequests.SET_RAW: {
@@ -415,11 +409,14 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         this.hterm.raw = buf[0] !== 0;
 
         err = constants.WASI_ESUCCESS;
-        written = 4;
+        break;
+      }
+      default: {
+        err = constants.WASI_EINVAL;
         break;
       }
     }
-    return { err, written };
+    return err;
   }
 
   override async addPollSub(

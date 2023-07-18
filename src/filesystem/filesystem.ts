@@ -243,10 +243,7 @@ export interface Descriptor {
    *
    * @returns status code
    */
-  ioctl(
-    request: number,
-    buf?: Uint8Array
-  ): Promise<{ err: number; written: number }>;
+  ioctl(request: number, buf?: Uint8Array): Promise<number>;
 
   /*
    * Add poll subscription
@@ -293,14 +290,8 @@ export abstract class AbstractDescriptor implements Descriptor {
     return constants.WASI_ESUCCESS;
   }
 
-  async ioctl(
-    _request: number,
-    _buf: Uint8Array
-  ): Promise<{ err: number; written: number }> {
-    return {
-      err: constants.WASI_ENOTTY,
-      written: 0,
-    };
+  async ioctl(_request: number, _buf: Uint8Array): Promise<number> {
+    return constants.WASI_ENOTTY;
   }
 
   async addPollSub(
