@@ -35,6 +35,7 @@ import {
   PollEvent,
   FdReadWriteSub,
   FdRenumberArgs,
+  FdFdstatSetFlagsArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
@@ -871,6 +872,33 @@ export default async function syscallCallback(
           }
         }
       }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+
+      break;
+    }
+    case "fd_fdstat_set_flags": {
+      const { sharedBuffer, fd, flags } = data as FdFdstatSetFlagsArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const { fds } = processManager.processInfos[processId];
+
+      let err = constants.WASI_ESUCCESS;
+      let des = fds.getFd(fd);
+
+      if (des === undefined) {
+        err = constants.WASI_EBADF;
+      } else {
+        // WASI standard flags
+        let newFlags = flags & constants.WASI_STD_FDFLAG_MASK;
+
+        // Flags not covered by WASI
+        if (flags & constants.WASI_EXT_FDFLAG_CTRL_BIT) {
+          newFlags |= flags & constants.WASI_EXT_FDFLAG_MASK;
+        }
+
+        err = await des.setFdstatFlags(newFlags);
+      }
+
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);
 

@@ -41,6 +41,7 @@ import {
   FdRenumberArgs,
   EventType,
   POLL_EVENT_BUFSIZE,
+  FdFdstatSetFlagsArgs,
 } from "./types.js";
 
 type ptr = number;
@@ -1688,8 +1689,23 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     return placeholder();
   }
 
-  function fd_fdstat_set_flags() {
-    return placeholder();
+  function fd_fdstat_set_flags(fd: number, flags: number) {
+    workerConsoleLog(`fd_fdstat_set_flags(${fd}, ${flags})`);
+
+    const sharedBuffer = new SharedArrayBuffer(4); // lock
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+
+    sendToKernel([
+      "fd_fdstat_set_flags",
+      { sharedBuffer, fd, flags } as FdFdstatSetFlagsArgs,
+    ]);
+    Atomics.wait(lck, 0, -1);
+
+    const err = Atomics.load(lck, 0);
+    workerConsoleLog(`fd_fdstat_set_flags returned error: ${err}`);
+
+    return err;
   }
 
   function fd_pwrite() {

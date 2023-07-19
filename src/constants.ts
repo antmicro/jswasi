@@ -146,11 +146,16 @@ export const WASI_FILETYPE_SOCKET_DGRAM = 5;
 export const WASI_FILETYPE_SOCKET_STREAM = 6;
 export const WASI_FILETYPE_SYMBOLIC_LINK = 7;
 
+export const WASI_STD_FDFLAG_MASK = 0x001f;
 export const WASI_FDFLAG_APPEND = 0x0001;
 export const WASI_FDFLAG_DSYNC = 0x0002;
 export const WASI_FDFLAG_NONBLOCK = 0x0004;
 export const WASI_FDFLAG_RSYNC = 0x0008;
 export const WASI_FDFLAG_SYNC = 0x0010;
+
+export const WASI_EXT_FDFLAG_CTRL_BIT = 0x0020;
+export const WASI_EXT_FDFLAG_MASK = 0xffc0;
+export const WASI_EXT_FDFLAG_CLOEXEC = 0x0040;
 
 export const WASI_LOOKUPFLAGS_SYMLINK_FOLLOW = 0x0001;
 

@@ -215,3 +215,9 @@ export type FdRenumberArgs = {
   fd: number;
   newFd: number;
 };
+
+export type FdFdstatSetFlagsArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  fd: number;
+  flags: number;
+};
