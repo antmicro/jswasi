@@ -300,13 +300,34 @@ export async function init(
     "/usr/bin/wash",
     new FdTable({
       0: (
-        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN)
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          0,
+          constants.WASI_EXT_RIGHTS_STDIN,
+          0n
+        )
       ).desc,
       1: (
-        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDOUT)
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          constants.WASI_FDFLAG_APPEND,
+          constants.WASI_EXT_RIGHTS_STDOUT,
+          0n
+        )
       ).desc,
       2: (
-        await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDERR)
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          constants.WASI_FDFLAG_APPEND,
+          constants.WASI_EXT_RIGHTS_STDERR,
+          0n
+        )
       ).desc,
       3: (await tfs.open("/")).desc,
     }),
