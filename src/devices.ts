@@ -95,7 +95,7 @@ export class EventSource
     return false;
   }
 
-  override async addPollSub(
+  override addPollSub(
     userdata: UserData,
     eventType: EventType,
     workerId: number

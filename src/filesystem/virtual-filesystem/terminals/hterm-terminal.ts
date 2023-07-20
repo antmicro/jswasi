@@ -419,19 +419,19 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     return err;
   }
 
-  override async addPollSub(
+  override addPollSub(
     userdata: UserData,
     eventType: EventType,
     workerId: number
   ): Promise<PollEvent> {
     switch (eventType) {
       case constants.WASI_EVENTTYPE_FD_WRITE: {
-        return {
+        return Promise.resolve({
           userdata,
           error: constants.WASI_ESUCCESS,
           eventType,
           nbytes: 0n,
-        };
+        });
       }
       case constants.WASI_EVENTTYPE_FD_READ: {
         if (this.hterm.buffer.length === 0) {
@@ -444,20 +444,20 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
             });
           });
         }
-        return {
+        return Promise.resolve({
           userdata,
           error: constants.WASI_ESUCCESS,
           eventType,
           nbytes: BigInt(this.hterm.buffer.length),
-        };
+        });
       }
       default: {
-        return {
+        return Promise.resolve({
           userdata,
           error: constants.WASI_EINVAL,
           eventType: constants.WASI_EXT_NO_EVENT,
           nbytes: 0n,
-        };
+        });
       }
     }
   }

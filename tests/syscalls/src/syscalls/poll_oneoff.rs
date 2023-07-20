@@ -58,7 +58,7 @@ unsafe fn expect_success(
 ) -> Result<(), String> {
     let expected = events.len();
     let mut out: Vec<wasi::Event> = vec![mem::zeroed(); nsubscriptions];
-    
+
     let result = wasi::poll_oneoff(in_, out.as_mut_ptr(), nsubscriptions);
     expected_errno_returned(result, Ok(expected))?;
 
@@ -281,21 +281,23 @@ pub fn test_poll_oneoff() -> Result<(), String> {
         let events = vec![
             wasi::Event {
                 userdata: 2,
-                error: wasi::ERRNO_NOTSUP,
+                error: wasi::ERRNO_SUCCESS,
                 type_: wasi::EVENTTYPE_FD_WRITE,
                 fd_readwrite: mem::zeroed()
             },
             wasi::Event {
                 userdata: 4,
-                error: wasi::ERRNO_NOTSUP,
+                error: wasi::ERRNO_SUCCESS,
                 type_: wasi::EVENTTYPE_FD_WRITE,
-                fd_readwrite: mem::zeroed()
+                fd_readwrite: wasi::EventFdReadwrite {
+                    nbytes: constants::SAMPLE_TEXT_LEN as u64,
+                    flags: 0
+                }
             },
         ];
 
         // Writing to any file type is unsupported right now
         expect_error_event(in_.as_ptr(), in_.len(), &events)?;
-    
         let in_ = [
            clock_sub, stdout_sub, file_write_sub,
         ];
@@ -310,9 +312,12 @@ pub fn test_poll_oneoff() -> Result<(), String> {
         let events = vec![
             wasi::Event {
                 userdata: 3,
-                error: wasi::ERRNO_PERM,
+                error: wasi::ERRNO_SUCCESS,
                 type_: wasi::EVENTTYPE_FD_READ,
-                fd_readwrite: mem::zeroed()
+                fd_readwrite: wasi::EventFdReadwrite {
+                    nbytes: constants::SAMPLE_TEXT_LEN as u64,
+                    flags: 0
+                }
             },
         ];
 
@@ -332,7 +337,7 @@ pub fn test_poll_oneoff() -> Result<(), String> {
         let events = vec![
             wasi::Event {
                 userdata: 5,
-                error: wasi::ERRNO_PERM,
+                error: wasi::ERRNO_NOTSUP,
                 type_: wasi::EVENTTYPE_FD_READ,
                 fd_readwrite: mem::zeroed()
             },

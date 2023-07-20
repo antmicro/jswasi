@@ -882,7 +882,7 @@ export default async function syscallCallback(
 
       let __events: PollEvent[] = [];
       await Promise.any(
-        subs.map(async (sub) => {
+        subs.map((sub) => {
           let __subPromise;
           switch (sub.eventType) {
             case constants.WASI_EVENTTYPE_CLOCK:
@@ -901,11 +901,26 @@ export default async function syscallCallback(
               break;
 
             case constants.WASI_EVENTTYPE_FD_WRITE:
-            case constants.WASI_EVENTTYPE_FD_READ:
-              __subPromise = fds
-                .getFd((sub.event as FdReadWriteSub).fd)
-                .addPollSub(sub.userdata, sub.eventType, processId);
+            case constants.WASI_EVENTTYPE_FD_READ: {
+              const fd = (__subPromise = fds.getFd(
+                (sub.event as FdReadWriteSub).fd
+              ));
+              if (fd === undefined) {
+                __subPromise = Promise.resolve({
+                  userdata: sub.userdata,
+                  error: constants.WASI_EBADF,
+                  eventType: sub.eventType,
+                  nbytes: 0n,
+                });
+              } else {
+                __subPromise = fd.addPollSub(
+                  sub.userdata,
+                  sub.eventType,
+                  processId
+                );
+              }
               break;
+            }
 
             default:
               __subPromise = new Promise(

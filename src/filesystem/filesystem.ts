@@ -247,6 +247,10 @@ export interface Descriptor {
 
   /*
    * Add poll subscription
+   * Note:
+   * addPollSub functions should not use await unless it is absolutely necessary
+   * Any await usages might lead to the poll subscriptions not being resolved on
+   * time before the syscall exits
    *
    * @param eventType - type of event for which to poll
    * @oaram workerId - process id of the calling process
@@ -294,17 +298,17 @@ export abstract class AbstractDescriptor implements Descriptor {
     return constants.WASI_ENOTTY;
   }
 
-  async addPollSub(
+  addPollSub(
     userdata: UserData,
     eventType: EventType,
     _workerId: number
   ): Promise<PollEvent> {
-    return {
+    return Promise.resolve({
       userdata,
-      error: constants.WASI_ESUCCESS,
+      error: constants.WASI_ENOTSUP,
       eventType,
       nbytes: 0n,
-    };
+    });
   }
 
   abstract getFilestat(): Promise<Filestat>;
@@ -350,6 +354,19 @@ export abstract class AbstractFileDescriptor extends AbstractDescriptor {
       err: constants.WASI_ENOTDIR,
       dirents: undefined,
     };
+  }
+
+  override addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return Promise.resolve({
+      userdata,
+      error: constants.WASI_ESUCCESS,
+      eventType,
+      nbytes: 0n,
+    });
   }
 }
 

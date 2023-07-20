@@ -16,6 +16,7 @@ import {
 import { basename, dirname } from "../utils.js";
 import * as constants from "../constants.js";
 import { delStoredData, getStoredData, setStoredData } from "./metadata.js";
+import { UserData, EventType, PollEvent } from "../types.js";
 
 async function initMetadataPath(handle: FileSystemHandle): Promise<string> {
   const components = await (
@@ -846,6 +847,24 @@ class FsaFileDescriptor
       : FsaFileDescriptor.defaultFilestat;
     meta.size = BigInt((await this.__getFile()).file?.size);
     return meta;
+  }
+
+  // This function should not be async, in case the local file variable is not
+  // present, this call might not resolve on time
+  override async addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent> {
+    const nbytes = BigInt(
+      this.file ? this.file.size : (await this.__getFile()).file.size
+    );
+    return {
+      userdata,
+      error: constants.WASI_ESUCCESS,
+      eventType,
+      nbytes,
+    };
   }
 }
 
