@@ -893,7 +893,7 @@ export default async function syscallCallback(
           await desFd.close();
           fds.freeFd(newFd);
         }
-        fds.moveFd(fd, newFd);
+        fds.duplicateFd(fd, newFd);
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

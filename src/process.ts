@@ -1697,6 +1697,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   function fd_renumber(fd: number, newFd: number) {
+    // We ignore WASI spec, fd_renumber behaves like dup2 in unix
     workerConsoleLog(`fd_renumber(${fd}, ${newFd})`);
 
     const sharedBuffer = new SharedArrayBuffer(4); // lock
@@ -1710,6 +1711,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
+    workerConsoleLog(`fd_renumber returned error: ${err}`);
     return err;
   }
 

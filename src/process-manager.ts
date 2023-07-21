@@ -86,7 +86,7 @@ export class FdTable {
     return this.fdt[fd];
   }
 
-  public moveFd(srcFd: number, dstFd: number) {
+  public duplicateFd(srcFd: number, dstFd: number) {
     let idx = this.freeFds.findIndex((element) => element == dstFd);
     if (idx >= 0) {
       this.freeFds.splice(idx, 1);
@@ -99,8 +99,6 @@ export class FdTable {
     }
     // We assume dstFd is closed!
     this.fdt[dstFd] = this.fdt[srcFd];
-    delete this.fdt[srcFd];
-    this.freeFds.push(srcFd);
   }
 
   tearDown() {
