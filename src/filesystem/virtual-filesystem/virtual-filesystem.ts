@@ -17,6 +17,7 @@ import * as constants from "../../constants.js";
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
 import { basename } from "../../utils.js";
+import { UserData, EventType, PollEvent } from "../../types.js";
 
 function wasiFiletype(stat: vfs.Stat): number {
   switch (stat.mode & vfs.constants.S_IFMT) {
@@ -543,6 +544,19 @@ class VirtualFilesystemFileDescriptor
 
   async close(): Promise<number> {
     return constants.WASI_ESUCCESS;
+  }
+
+  override addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return Promise.resolve({
+      userdata,
+      eventType,
+      error: constants.WASI_ESUCCESS,
+      nbytes: BigInt(this.desc._iNode._data.byteLength),
+    });
   }
 }
 
