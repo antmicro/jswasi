@@ -851,7 +851,7 @@ class FsaFileDescriptor
 
   // This function should not be async, in case the local file variable is not
   // present, this call might not resolve on time
-  override async addPollSub(
+  async addPollSub(
     userdata: UserData,
     eventType: EventType,
     _workerId: number

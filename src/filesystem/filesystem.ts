@@ -252,6 +252,9 @@ export interface Descriptor {
    * Any await usages might lead to the poll subscriptions not being resolved on
    * time before the syscall exits
    *
+   * Polling regular files should immediately return with success and return file
+   * size in the nbytes field
+   *
    * @param eventType - type of event for which to poll
    * @oaram workerId - process id of the calling process
    *
@@ -298,19 +301,6 @@ export abstract class AbstractDescriptor implements Descriptor {
     return constants.WASI_ENOTTY;
   }
 
-  addPollSub(
-    userdata: UserData,
-    eventType: EventType,
-    _workerId: number
-  ): Promise<PollEvent> {
-    return Promise.resolve({
-      userdata,
-      error: constants.WASI_ENOTSUP,
-      eventType,
-      nbytes: 0n,
-    });
-  }
-
   abstract getFilestat(): Promise<Filestat>;
   abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
   abstract close(): Promise<number>;
@@ -341,12 +331,18 @@ export abstract class AbstractDescriptor implements Descriptor {
   abstract writableStream(): Promise<{ err: number; stream: WritableStream }>;
   abstract isatty(): boolean;
   abstract truncate(size: bigint): Promise<number>;
+  abstract addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent>;
 }
 
 export abstract class AbstractFileDescriptor extends AbstractDescriptor {
   isatty(): boolean {
     return false;
   }
+
   async readdir(
     _refresh: boolean
   ): Promise<{ err: number; dirents: Dirent[] }> {
@@ -354,19 +350,6 @@ export abstract class AbstractFileDescriptor extends AbstractDescriptor {
       err: constants.WASI_ENOTDIR,
       dirents: undefined,
     };
-  }
-
-  override addPollSub(
-    userdata: UserData,
-    eventType: EventType,
-    _workerId: number
-  ): Promise<PollEvent> {
-    return Promise.resolve({
-      userdata,
-      error: constants.WASI_ESUCCESS,
-      eventType,
-      nbytes: 0n,
-    });
   }
 }
 
@@ -425,6 +408,19 @@ export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
 
   async truncate(_size: bigint): Promise<number> {
     return constants.WASI_EISDIR;
+  }
+
+  addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return Promise.resolve({
+      userdata,
+      error: constants.WASI_ENOTSUP,
+      eventType,
+      nbytes: 0n,
+    });
   }
 }
 
@@ -506,6 +502,19 @@ export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
 
   async truncate(_size: bigint): Promise<number> {
     return constants.WASI_EBADF;
+  }
+
+  addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    _workerId: number
+  ): Promise<PollEvent> {
+    return Promise.resolve({
+      userdata,
+      error: constants.WASI_ENOTSUP,
+      eventType,
+      nbytes: 0n,
+    });
   }
 }
 

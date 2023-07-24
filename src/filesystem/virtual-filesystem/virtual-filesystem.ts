@@ -546,7 +546,7 @@ class VirtualFilesystemFileDescriptor
     return constants.WASI_ESUCCESS;
   }
 
-  override addPollSub(
+  addPollSub(
     userdata: UserData,
     eventType: EventType,
     _workerId: number
