@@ -179,10 +179,10 @@ export class VirtualFilesystem implements Filesystem {
         );
       } else {
         if (
-          navigated.target instanceof vfs.File ||
-          navigated.target instanceof vfs.Symlink
+          (navigated.target instanceof vfs.File ||
+            navigated.target instanceof vfs.Symlink) &&
+          !(oflags & constants.WASI_O_DIRECTORY)
         ) {
-          err = constants.WASI_ESUCCESS;
           desc = new VirtualFilesystemFileDescriptor(
             fdflags,
             fs_rights_base,
