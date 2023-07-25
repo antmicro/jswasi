@@ -86,19 +86,29 @@ export class FdTable {
     return this.fdt[fd];
   }
 
+  public setFd(fd: number, entry: Descriptor) {
+    this.prepareToStoreFd(fd);
+    // We assume dstFd is closed!
+    this.fdt[fd] = entry;
+  }
+
   public duplicateFd(srcFd: number, dstFd: number) {
-    let idx = this.freeFds.findIndex((element) => element == dstFd);
+    this.prepareToStoreFd(dstFd);
+    // We assume dstFd is closed!
+    this.fdt[dstFd] = this.fdt[srcFd];
+  }
+
+  prepareToStoreFd(fd: number) {
+    let idx = this.freeFds.findIndex((element) => element == fd);
     if (idx >= 0) {
       this.freeFds.splice(idx, 1);
-    } else if (this.topFd < dstFd) {
+    } else if (this.topFd < fd) {
       this.topFd++;
-      while (this.topFd < dstFd) {
+      while (this.topFd < fd) {
         this.freeFds.push(this.topFd);
         this.topFd++;
       }
     }
-    // We assume dstFd is closed!
-    this.fdt[dstFd] = this.fdt[srcFd];
   }
 
   tearDown() {

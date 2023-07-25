@@ -861,18 +861,77 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           path,
           args,
           extended_env,
-          redirects,
+          redirects_ptr,
+          n_redirects,
           background,
         }: {
           path: string;
           args: string[];
           extended_env: Record<string, string>;
           background: boolean;
-          redirects: Redirect[];
+          redirects_ptr: number;
+          n_redirects: number;
         } = JSON.parse(json);
         workerConsoleLog(
-          `${path} ${args} ${extended_env} ${background} ${redirects}`
+          `${path} ${args} ${extended_env} ${background} ${redirects_ptr}, ${n_redirects}`
         );
+
+        const view = new DataView(
+          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+        );
+        let redirectsBuf: Redirect[] = [];
+        let redirectsPtr = redirects_ptr;
+        for (let i = 0; i < n_redirects; i++) {
+          const data_ptr = redirectsPtr;
+          const fd_dst = view.getUint32(redirectsPtr + 8, true);
+          const type = view.getUint32(redirectsPtr + 8 + 4, true);
+
+          // 8 data bytes, 4 fd_dst bytes, 4 tag bytes, 0 bytes of padding
+          redirectsPtr += 8 + 4 + 4;
+
+          let redirect = {
+            type,
+            fd_dst,
+            path: undefined,
+            fd_src: undefined,
+          } as Redirect;
+
+          switch (type) {
+            case constants.WASI_EXT_REDIRECT_TYPE_READ:
+            case constants.WASI_EXT_REDIRECT_TYPE_WRITE:
+            case constants.WASI_EXT_REDIRECT_TYPE_APPEND:
+            case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
+              let path_ptr = view.getUint32(data_ptr, true);
+              let path_len = view.getUint32(data_ptr + 4, true);
+              let path = new TextDecoder().decode(
+                view.buffer.slice(path_ptr, path_ptr + path_len)
+              );
+
+              redirect.path = path;
+              break;
+            }
+            case constants.WASI_EXT_REDIRECT_TYPE_PIPEIN:
+            case constants.WASI_EXT_REDIRECT_TYPE_PIPEOUT:
+            case constants.WASI_EXT_REDIRECT_TYPE_DUPLICATE: {
+              let fd_src = view.getUint32(data_ptr, true);
+
+              redirect.fd_src = fd_src;
+              break;
+            }
+            case constants.WASI_EXT_REDIRECT_TYPE_CLOSE: {
+              // just skip
+              break;
+            }
+            default: {
+              workerConsoleLog(`Spawn: redirect type ${type} not found.`);
+              throw Error(`Spawn: redirect type ${type} not found.`);
+            }
+          }
+          redirectsBuf.push(redirect);
+          workerConsoleLog(
+            `Red[${i}] = type: ${redirect.type}, fd_dst: ${redirect.fd_dst}, path: ${redirect.path}, fd_src: ${redirect.fd_src}`
+          );
+        }
 
         sendToKernel([
           "spawn",
@@ -882,7 +941,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             env: { ...env, ...extended_env },
             sharedBuffer,
             background,
-            redirects,
+            redirects: redirectsBuf,
           } as SpawnArgs,
         ]);
 

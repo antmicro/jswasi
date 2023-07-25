@@ -66,7 +66,12 @@ export type PathOpenArgs = {
   fdFlags: number;
 };
 
-export type Redirect = { mode: string; path: string; fd: number };
+export type Redirect = {
+  type: number;
+  fd_dst: number;
+  path: string;
+  fd_src: number;
+};
 
 export type SpawnArgs = {
   path: string;

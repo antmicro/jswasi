@@ -171,19 +171,81 @@ export default async function syscallCallback(
       args.splice(0, 0, path.split("/").pop());
 
       // replace child's descriptor table with shallow copy of parent's
+      // TODO: implement cloexec
       const fds = processManager.processInfos[processId].fds.clone();
-      await Promise.all(
-        redirects.map(async ({ mode, path, fd }) => {
-          const { desc } = await processManager.filesystem.open(
-            path,
-            constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
-            constants.WASI_O_CREAT |
-              (mode === "write" ? constants.WASI_O_TRUNC : 0),
-            mode === "append" ? constants.WASI_FDFLAG_APPEND : 0
-          );
-          fds.replaceFd(fd, desc);
-        })
-      );
+
+      for (let i = 0; i < redirects.length; i++) {
+        const redirect = redirects[i];
+        const type = redirect.type;
+        const fd_dst = redirect.fd_dst;
+        switch (type) {
+          case constants.WASI_EXT_REDIRECT_TYPE_READ:
+          case constants.WASI_EXT_REDIRECT_TYPE_WRITE:
+          case constants.WASI_EXT_REDIRECT_TYPE_APPEND:
+          case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
+            const path = redirect.path;
+            // for read if file does not exist should be returned error
+            let openFlags = constants.WASI_O_CREAT;
+            let fdFlags = 0;
+            let fdRights = 0n;
+
+            switch (type) {
+              case constants.WASI_EXT_REDIRECT_TYPE_READ: {
+                openFlags = 0;
+                fdRights |= constants.WASI_RIGHT_FD_READ;
+                break;
+              }
+              case constants.WASI_EXT_REDIRECT_TYPE_WRITE: {
+                openFlags |= constants.WASI_O_TRUNC;
+                fdRights |= constants.WASI_RIGHT_FD_WRITE;
+              }
+              case constants.WASI_EXT_REDIRECT_TYPE_APPEND: {
+                fdFlags |= constants.WASI_FDFLAG_APPEND;
+                fdRights |= constants.WASI_RIGHT_FD_WRITE;
+              }
+              case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
+                fdRights |=
+                  constants.WASI_RIGHT_FD_READ | constants.WASI_RIGHT_FD_WRITE;
+              }
+              default: {
+                console.log(
+                  `Spawn: program for redirect type ${redirect.type} should not enter here.`
+                );
+              }
+            }
+
+            const { desc } = await processManager.filesystem.open(
+              path,
+              constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+              openFlags,
+              fdFlags,
+              fdRights
+            );
+
+            let oldDesc = fds.getFd(fd);
+            if (oldDesc !== undefined) {
+              oldDesc.close();
+            }
+            fds.setFd(fd_dst, desc);
+
+            break;
+          }
+          case constants.WASI_EXT_REDIRECT_TYPE_PIPEIN:
+          case constants.WASI_EXT_REDIRECT_TYPE_PIPEOUT:
+          case constants.WASI_EXT_REDIRECT_TYPE_DUPLICATE: {
+            // TODO
+            break;
+          }
+          case constants.WASI_EXT_REDIRECT_TYPE_CLOSE: {
+            // TODO
+            break;
+          }
+          default: {
+            console.log(`Spawn: redirect type ${redirect.type} not found.`);
+            // TODO: return erorr
+          }
+        }
+      }
       let isBrowserApp = true;
 
       // TODO: Intentionally ignore SigInt, do not check termiantionOccured is set
