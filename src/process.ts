@@ -881,12 +881,13 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         );
         let redirectsBuf: Redirect[] = [];
         let redirectsPtr = redirects_ptr;
+
         for (let i = 0; i < n_redirects; i++) {
           const data_ptr = redirectsPtr;
           const fd_dst = view.getUint32(redirectsPtr + 8, true);
           const type = view.getUint32(redirectsPtr + 8 + 4, true);
 
-          // 8 data bytes, 4 fd_dst bytes, 4 tag bytes, 0 bytes of padding
+          // 8 data bytes, 4 fd_dst bytes, 4 type bytes, 0 bytes of padding
           redirectsPtr += 8 + 4 + 4;
 
           let redirect = {
@@ -924,12 +925,15 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             }
             default: {
               workerConsoleLog(`Spawn: redirect type ${type} not found.`);
-              throw Error(`Spawn: redirect type ${type} not found.`);
+              return {
+                exitStatus: constants.EXIT_FAILURE,
+                outputSize: 0,
+              };
             }
           }
           redirectsBuf.push(redirect);
           workerConsoleLog(
-            `Red[${i}] = type: ${redirect.type}, fd_dst: ${redirect.fd_dst}, path: ${redirect.path}, fd_src: ${redirect.fd_src}`
+            `Redirect[${i}] = type: ${redirect.type}, fd_dst: ${redirect.fd_dst}, path: ${redirect.path}, fd_src: ${redirect.fd_src}`
           );
         }
 

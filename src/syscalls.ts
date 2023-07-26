@@ -170,11 +170,17 @@ export default async function syscallCallback(
       childPID[0] = -1;
       args.splice(0, 0, path.split("/").pop());
 
+      let exit_staus = constants.EXIT_SUCCESS;
+
       // replace child's descriptor table with shallow copy of parent's
       // TODO: implement cloexec
       const fds = processManager.processInfos[processId].fds.clone();
 
-      for (let i = 0; i < redirects.length; i++) {
+      for (
+        let i = 0;
+        i < redirects.length && exit_staus == constants.EXIT_SUCCESS;
+        i++
+      ) {
         const redirect = redirects[i];
         const type = redirect.type;
         const fd_dst = redirect.fd_dst;
@@ -184,7 +190,6 @@ export default async function syscallCallback(
           case constants.WASI_EXT_REDIRECT_TYPE_APPEND:
           case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
             const path = redirect.path;
-            // for read if file does not exist should be returned error
             let openFlags = constants.WASI_O_CREAT;
             let fdFlags = 0;
             let fdRights = 0n;
@@ -198,29 +203,40 @@ export default async function syscallCallback(
               case constants.WASI_EXT_REDIRECT_TYPE_WRITE: {
                 openFlags |= constants.WASI_O_TRUNC;
                 fdRights |= constants.WASI_RIGHT_FD_WRITE;
+                break;
               }
               case constants.WASI_EXT_REDIRECT_TYPE_APPEND: {
                 fdFlags |= constants.WASI_FDFLAG_APPEND;
                 fdRights |= constants.WASI_RIGHT_FD_WRITE;
+                break;
               }
               case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
                 fdRights |=
                   constants.WASI_RIGHT_FD_READ | constants.WASI_RIGHT_FD_WRITE;
+                break;
               }
               default: {
+                exit_staus = constants.EXIT_FAILURE;
                 console.log(
                   `Spawn: program for redirect type ${redirect.type} should not enter here.`
                 );
+                continue;
               }
             }
 
-            const { desc } = await processManager.filesystem.open(
+            const { desc, err } = await processManager.filesystem.open(
               path,
               constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
               openFlags,
               fdFlags,
               fdRights
             );
+
+            if (err !== constants.WASI_ESUCCESS) {
+              console.log(`Spawn: cannot open file, error: ${err}`);
+              exit_staus = constants.EXIT_FAILURE;
+              break;
+            }
 
             let oldDesc = fds.getFd(fd);
             if (oldDesc !== undefined) {
@@ -233,19 +249,43 @@ export default async function syscallCallback(
           case constants.WASI_EXT_REDIRECT_TYPE_PIPEIN:
           case constants.WASI_EXT_REDIRECT_TYPE_PIPEOUT:
           case constants.WASI_EXT_REDIRECT_TYPE_DUPLICATE: {
-            // TODO
+            if (fds.getFd(redirect.fd_src) !== undefined) {
+              fds.getFd(fd_dst).close();
+              fds.duplicateFd(redirect.fd_src, fd_dst);
+            } else {
+              console.log(
+                `Spawn: cannot duplicate fd=${redirect.fd_src}, it is closed.`
+              );
+              exit_staus = constants.EXIT_FAILURE;
+            }
             break;
           }
           case constants.WASI_EXT_REDIRECT_TYPE_CLOSE: {
-            // TODO
+            let desc = fds.getFd(fd_dst);
+            if (desc !== undefined) {
+              desc.close();
+            } else {
+              console.log(
+                `Spawn: cannot close fd=${redirect.fd_src}, it is already closed.`
+              );
+              exit_staus = constants.EXIT_FAILURE;
+            }
             break;
           }
           default: {
             console.log(`Spawn: redirect type ${redirect.type} not found.`);
-            // TODO: return erorr
+            exit_staus = constants.EXIT_FAILURE;
           }
         }
       }
+
+      if (exit_staus != constants.EXIT_SUCCESS) {
+        // Redirections failed
+        Atomics.store(parentLck, 0, exit_staus);
+        Atomics.notify(parentLck, 0);
+        break;
+      }
+
       let isBrowserApp = true;
 
       // TODO: Intentionally ignore SigInt, do not check termiantionOccured is set
