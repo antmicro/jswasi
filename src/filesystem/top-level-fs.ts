@@ -271,56 +271,85 @@ export class TopLevelFs {
     desc_t: Descriptor,
     target: string
   ): Promise<number> {
-    let __source = this.abspath(desc_s, source);
-    let __target = this.abspath(desc_t, target);
-    let dinfo1 = await this.getDescInfo(
+    const __source = this.abspath(desc_s, source);
+    const __source_dirname = dirname(__source);
+    const __target = this.abspath(desc_t, target);
+    const __target_dirname = dirname(__target);
+
+    // If any mount point starts with the source path
+    // or if target path is starts with source path, return EBUSY
+    if (
+      Object.keys(this.mounts).some((key) => {
+        key.startsWith(__source);
+      }) ||
+      __source.startsWith(__target)
+    )
+      return constants.WASI_EBUSY;
+
+    const dinfo1 = await this.getDescInfo(
+      __source_dirname,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+      constants.WASI_O_DIRECTORY
+    );
+
+    // If parent directory descriptor of the source path cannot be found,
+    // return with error
+    if (dinfo1.err !== constants.WASI_ESUCCESS) return dinfo1.err;
+
+    const __dinfo1 = await this.getDescInfo(
       __source,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
-    if (dinfo1.err !== constants.WASI_ESUCCESS) {
-      return dinfo1.err;
-    }
 
-    let dinfo2 = await this.getDescInfo(
+    // If the source path doesn't correspond to an existing filesystem entry,
+    // return with error
+    if (__dinfo1.err !== constants.WASI_ESUCCESS) return __dinfo1.err;
+
+    const filestat1 = await __dinfo1.desc.getFilestat();
+
+    const dinfo2 = await this.getDescInfo(
+      __target_dirname,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+      constants.WASI_O_DIRECTORY
+    );
+
+    // If parent directory descriptor of the target path cannot be found,
+    // return with error
+    if (dinfo2.err !== constants.WASI_ESUCCESS) return dinfo2.err;
+
+    const __dinfo2 = await this.getDescInfo(
       __target,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
-    if (dinfo2.err !== constants.WASI_ESUCCESS) {
-      return dinfo2.err;
-    }
 
-    let filestat1 = await dinfo1.desc.getFilestat();
-    if (
-      Object.keys(this.mounts).some((key) => {
-        key.startsWith(dinfo1.path);
-      }) ||
-      dinfo1.path.startsWith(dinfo2.path)
-    ) {
-      return constants.WASI_EBUSY;
-    }
+    // target path exists, additional checks need to be performed to check
+    // if the rename is feasible
+    if (__dinfo2.err === constants.WASI_ESUCCESS) {
+      const filestat2 = await __dinfo2.desc.getFilestat();
 
-    const { filetype, dev } = await dinfo2.desc.getFilestat();
-    if (filestat1.dev !== dev) {
-      return constants.WASI_EXDEV;
+      // if paths are on different mount points, return EXDEV
+      if (filestat1.dev !== filestat2.dev) return constants.WASI_EXDEV;
+
+      if (filestat2.filetype === constants.WASI_FILETYPE_DIRECTORY) {
+        // If target is a directory and the source isn't, return with ENOTDIR
+        if (filestat1.filetype !== constants.WASI_FILETYPE_DIRECTORY)
+          return constants.WASI_ENOTDIR;
+
+        const { err, dirents } = await __dinfo2.desc.readdir(false);
+
+        // If contents of the target directory cannot be read, return with error
+        if (err !== constants.WASI_ESUCCESS) return err;
+
+        // if the target directory is not empty, return ENOTEMPTY
+        if (dirents.length !== 0) return constants.WASI_ENOTEMPTY;
+      }
     }
-    if (filetype === constants.WASI_FILETYPE_DIRECTORY) {
-      if (filestat1.filetype !== constants.WASI_FILETYPE_DIRECTORY) {
-        return constants.WASI_ENOTDIR;
-      }
-      const { err, dirents } = await dinfo2.desc.readdir(false);
-      if (err !== constants.WASI_ESUCCESS) {
-        return err;
-      }
-      if (dirents.length !== 0) {
-        return constants.WASI_ENOTEMPTY;
-      }
-      return dinfo2.fs.renameat(dinfo1.desc, "", dinfo2.desc, "");
-    } else {
-      if (filestat1.filetype === constants.WASI_FILETYPE_DIRECTORY) {
-        return constants.WASI_EISDIR;
-      }
-      return dinfo2.fs.renameat(dinfo1.desc, "", dinfo2.desc, "");
-    }
+    return dinfo2.fs.renameat(
+      dinfo1.desc,
+      basename(__source),
+      dinfo2.desc,
+      basename(__target)
+    );
   }
 
   async addMount(path: string, fs: Filesystem): Promise<number> {

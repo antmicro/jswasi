@@ -16,7 +16,6 @@ import {
 import * as constants from "../../constants.js";
 // @ts-ignore
 import * as vfs from "../../vendor/vfs.js";
-import { basename } from "../../utils.js";
 import { UserData, EventType, PollEvent } from "../../types.js";
 
 function wasiFiletype(stat: vfs.Stat): number {
@@ -290,7 +289,7 @@ export class VirtualFilesystem implements Filesystem {
     }
 
     if (!newNavigated.target) {
-      if (newNavigated.remaining !== basename(newPath)) {
+      if (newNavigated.remaining.length !== 0) {
         return constants.WASI_ENOENT;
       }
     } else {
