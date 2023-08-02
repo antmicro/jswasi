@@ -1,5 +1,4 @@
 import { DeviceDriver } from "../driver-manager.js";
-import { UserData, EventType, PollEvent } from "../../../types.js";
 
 // Ioctl magic numbers for terminal devices
 export const enum ioctlRequests {
@@ -32,11 +31,4 @@ export interface Terminal {
 // device drivers
 export interface TerminalDriver extends DeviceDriver {
   terminals: Record<number, Terminal>;
-
-  promiseSignal(
-    userdata: UserData,
-    workerId: number,
-    eventType: EventType,
-    min: number
-  ): Promise<PollEvent>;
 }

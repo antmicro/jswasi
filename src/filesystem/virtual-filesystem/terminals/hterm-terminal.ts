@@ -28,7 +28,6 @@ class Hterm implements Terminal {
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
   subs: PollSub[];
-  signalSubs: PollSub[];
 
   buffer: string;
 
@@ -39,7 +38,6 @@ class Hterm implements Terminal {
     this.buffer = "";
     this.bufRequestQueue = [];
     this.subs = [];
-    this.signalSubs = [];
     this.foregroundPid = null;
 
     this.echo = false;
@@ -233,19 +231,11 @@ export class HtermDeviceDriver implements TerminalDriver {
     // TODO: maybe save all output and rewrite it on adjusted size?
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     io.onTerminalResize = (_columns: number, _rows: number) => {
-      if (
-        __hterm.signalSubs.length !== 0 &&
-        __hterm.signalSubs[0].tag | constants.WASI_EXT_EVENT_WINCH
-      ) {
-        const sub = __hterm.signalSubs.shift();
-
-        sub.resolve({
-          userdata: sub.userdata,
-          error: constants.WASI_ESUCCESS,
-          nbytes: 0n,
-          eventType: constants.WASI_EXT_EVENT_WINCH,
-        });
-      }
+      if (__hterm.foregroundPid !== null)
+        this.processManager.publishEvent(
+          constants.WASI_EXT_EVENT_WINCH,
+          __hterm.foregroundPid
+        );
     };
     return __hterm;
   }
@@ -307,23 +297,6 @@ export class HtermDeviceDriver implements TerminalDriver {
         this.terminals[min]
       ),
     };
-  }
-
-  async promiseSignal(
-    userdata: UserData,
-    workerId: number,
-    eventType: EventType,
-    min: number
-  ): Promise<PollEvent> {
-    const __term = this.terminals[min];
-    return new Promise((resolve: (event: PollEvent) => void) => {
-      __term.signalSubs.push({
-        pid: workerId,
-        userdata,
-        tag: eventType,
-        resolve,
-      });
-    });
   }
 }
 

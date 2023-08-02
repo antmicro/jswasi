@@ -105,7 +105,7 @@ export class EventSource
         resolve({
           userdata,
           eventType: this.events,
-          nbytes: 8n,
+          nbytes: 4n,
           error: constants.WASI_ESUCCESS,
         });
       } else {
