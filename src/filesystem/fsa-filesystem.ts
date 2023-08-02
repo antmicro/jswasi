@@ -455,56 +455,90 @@ export class FsaFilesystem implements Filesystem {
   }
 
   async renameat(
-    _oldDesc: Descriptor,
-    _oldPath: string,
-    _newDesc: Descriptor,
-    _newPath: string
+    oldDesc: Descriptor,
+    oldPath: string,
+    newDesc: Descriptor,
+    newPath: string
   ): Promise<number> {
     // Filesystem Access API doesn't support renaming entries at this point
-    // This feature is now under development, it's progress can be tracked here
+    // This feature is now under development, the progress can be tracked here
     // https://chromestatus.com/feature/5640802622504960
     // Once it is stabilized, this implementation should use it
     // EXDEV indicates that user attempted to move files between mount points
     // most userspace apps will handle it by copying source and then removing it
-    return constants.WASI_EXDEV;
+    // Since clang uses path_rename and doesn't implement a fallback, a simple,
+    // temporary solution is kept that is able to move a regular file by copying
+    // TODO: remove this once fsapi implements renaming or use vfs temporary mount
+    // in clang wrapper to avoid moving on fsa filesystem
+    const BUFSIZE = 2048;
+    if (oldDesc !== undefined && !(oldDesc instanceof FsaDirectoryDescriptor))
+      return constants.WASI_EINVAL;
+
+    const { handle: srcHandle, err: errSrc } = await this.getHandle(
+      oldPath,
+      false,
+      (oldDesc as FsaDirectoryDescriptor).handle
+    );
+    if (errSrc === constants.WASI_EISDIR) return constants.WASI_EXDEV;
+    else if (errSrc !== constants.WASI_ESUCCESS) return errSrc;
+
+    // Creating descriptors this way is dangerous and error-prone, this is just
+    // a temporary workaround
+    const srcDesc = new FsaFileDescriptor(
+      srcHandle as FileSystemFileHandle,
+      0,
+      constants.WASI_RIGHTS_ALL,
+      constants.WASI_RIGHTS_ALL,
+      this.keepMetadata
+    );
+    await initializeFsaDesc(srcDesc);
+
+    const srcFilestat = await srcDesc.getFilestat();
+    console.log(srcFilestat);
+    if (srcFilestat.filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK)
+      return constants.WASI_EXDEV;
+
+    if (newDesc !== undefined && !(newDesc instanceof FsaDirectoryDescriptor))
+      return constants.WASI_EINVAL;
+
+    const { handle: __destHandle, err: __errDest } = await this.getHandle(
+      dirname(newPath),
+      true,
+      (newDesc as FsaDirectoryDescriptor).handle
+    );
+    if (__errDest !== constants.WASI_ESUCCESS) return __errDest;
+
+    const destHandle = await (
+      __destHandle as FileSystemDirectoryHandle
+    ).getFileHandle(basename(newPath), { create: true });
+    const destDesc = new FsaFileDescriptor(
+      destHandle as FileSystemFileHandle,
+      0,
+      constants.WASI_RIGHTS_ALL,
+      constants.WASI_RIGHTS_ALL,
+      this.keepMetadata
+    );
+    await initializeFsaDesc(destDesc);
+
+    while (true) {
+      const { err, buffer } = await srcDesc.read(BUFSIZE);
+      if (err !== constants.WASI_ESUCCESS) return err;
+      if (buffer.byteLength === 0) break;
+
+      const write = await destDesc.write(buffer);
+      if (write.err !== constants.WASI_ESUCCESS) return err;
+    }
+
+    await srcDesc.close();
+    await destDesc.close();
+
+    await setStoredData(destDesc.metadataPath, srcFilestat);
+
+    await this.unlinkat(oldDesc, oldPath, false);
+
+    return constants.WASI_ESUCCESS;
   }
 
-  /*export async function createFsaFilesystem(
-    name: string,
-    keepMetadata: boolean
-  ): Promise<FsaFilesystem> {
-    const topLevelHandle = await navigator.storage.getDirectory();
-    let rootHandle;
-    try {
-      rootHandle = await topLevelHandle.getDirectoryHandle(name);
-    } catch (e) {
-      if (
-        e instanceof DOMException &&
-        (e as DOMException).name == "NotFoundError"
-      ) {
-        rootHandle = await topLevelHandle.getDirectoryHandle(name, {
-          create: true,
-        });
-      } else {
-        return undefined;
-      }
-    }
-
-    const rootStoredData = await getStoredData(name);
-    if (keepMetadata && !rootStoredData) {
-      await setStoredData(name, {
-        dev: 0n,
-        ino: 0n,
-        filetype: constants.WASI_FILETYPE_DIRECTORY,
-        nlink: 1n,
-        size: 4096n,
-        atim: 0n,
-        mtim: 0n,
-        ctim: 0n,
-      });
-    }
-    return new FsaFilesystem(rootHandle, keepMetadata);
-  }*/
   async initialize(opts: Object): Promise<number> {
     const __opts = opts as FsaFilesystemOpts;
     if (__opts.keepMetadata === undefined || (__opts.dir && __opts.name)) {
@@ -648,6 +682,7 @@ class FsaFileDescriptor
     keepMetadata: boolean
   ) {
     super();
+    this.cursor = 0n;
     initFsaDesc(
       this,
       fs_flags,
@@ -669,8 +704,6 @@ class FsaFileDescriptor
     ).filetype;
     if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) {
       this.cursor = size;
-    } else {
-      this.cursor = 0n;
     }
   }
 
