@@ -18,6 +18,7 @@ test ! -f /usr/local/bin/ruby && echo "downloading ruby..." && wget https://regi
 test ! -f /usr/local/bin/clang && echo "downloading clang..." && wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/clang.wasm /usr/local/bin/clang
 test ! -f /usr/local/bin/wasm-ld && echo "downloading wasm-ld..." && wget https://registry-cdn.wapm.io/contents/_/clang/0.1.0/wasm-ld.wasm /usr/local/bin/wasm-ld
 test ! -f /usr/local/bin/wasibox && echo "downloading wasibox..." && wget resources/wasibox.wasm /usr/local/bin/wasibox
+test ! -f /usr/local/bin/space-invaders && echo "downloading space-invaders..." && wget resources/space-invader.wasm /usr/local/bin/space-invaders
 if test ! -f /usr/local/bin/kibi; then
     echo "downloading kibi..."
     wget resources/kibi.wasm /usr/local/bin/kibi
@@ -44,6 +45,12 @@ if test ! -d /usr/lib || test ! -d /usr/local || test ! -d /usr/share; then
     cd /usr
     tar -xvf wasi-sysroot.tar.gz
     rm wasi-sysroot.tar.gz
+fi
+
+if test ! -d /etc/space-invaders; then
+    echo "downloading space-invaders config..."
+    mkdir -p /etc/space-invaders
+    wget resources/invaders_config.ini /etc/space-invaders/config.ini
 fi
 
 cd $HOME
