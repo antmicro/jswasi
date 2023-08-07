@@ -264,6 +264,7 @@ export default async function syscallCallback(
             let desc = fds.getFd(fd_dst);
             if (desc !== undefined) {
               desc.close();
+              fds.freeFd(fd_dst);
             } else {
               console.log(
                 `Spawn: cannot close fd=${redirect.fd_src}, it is already closed.`
