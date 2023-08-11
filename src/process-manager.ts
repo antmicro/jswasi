@@ -54,13 +54,17 @@ export class FdTable {
     if (entry === undefined) {
       throw "Entry is undefined";
     }
-    const fd = this.freeFds.shift();
+    let fd = this.freeFds.shift();
     if (fd !== undefined) {
       this.fdt[fd] = entry;
       return fd;
     } else {
-      this.fdt[++this.topFd] = entry;
-      return this.topFd;
+      fd = ++this.topFd;
+      while (this.fdt[fd] !== undefined) {
+        fd = ++this.topFd;
+      }
+      this.fdt[fd] = entry;
+      return fd;
     }
   }
 
@@ -89,12 +93,18 @@ export class FdTable {
   public setFd(fd: number, entry: Descriptor) {
     this.prepareToStoreFd(fd);
     // We assume dstFd is closed!
+    if (this.fdt[fd] !== undefined) {
+      console.log(`setFd: overwrite opened fd = ${fd}`);
+    }
     this.fdt[fd] = entry;
   }
 
   public duplicateFd(srcFd: number, dstFd: number) {
     this.prepareToStoreFd(dstFd);
     // We assume dstFd is closed!
+    if (this.fdt[dstFd] !== undefined) {
+      console.log(`duplicateFd: overwrite opened fd = ${dstFd}`);
+    }
     this.fdt[dstFd] = this.fdt[srcFd];
   }
 
@@ -102,12 +112,6 @@ export class FdTable {
     let idx = this.freeFds.findIndex((element) => element == fd);
     if (idx >= 0) {
       this.freeFds.splice(idx, 1);
-    } else if (this.topFd < fd) {
-      this.topFd++;
-      while (this.topFd < fd) {
-        this.freeFds.push(this.topFd);
-        this.topFd++;
-      }
     }
   }
 

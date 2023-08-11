@@ -879,7 +879,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const view = new DataView(
           (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
         );
-        let redirectsBuf: Redirect[] = [];
+        let redirects: Redirect[] = [];
         let redirectsPtr = redirects_ptr;
 
         for (let i = 0; i < n_redirects; i++) {
@@ -926,12 +926,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             default: {
               workerConsoleLog(`Spawn: redirect type ${type} not found.`);
               return {
-                exitStatus: constants.EXIT_FAILURE,
+                exitStatus: constants.WASI_EINVAL,
                 outputSize: 0,
               };
             }
           }
-          redirectsBuf.push(redirect);
+          redirects.push(redirect);
           workerConsoleLog(
             `Redirect[${i}] = type: ${redirect.type}, fd_dst: ${redirect.fd_dst}, path: ${redirect.path}, fd_src: ${redirect.fd_src}`
           );
@@ -945,7 +945,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
             env: { ...env, ...extended_env },
             sharedBuffer,
             background,
-            redirects: redirectsBuf,
+            redirects: redirects,
           } as SpawnArgs,
         ]);
 
