@@ -60,6 +60,8 @@ export class FdTable {
       return fd;
     } else {
       fd = ++this.topFd;
+      // User could take arbitrary fd number above topFd before so
+      // we need to find first free fd
       while (this.fdt[fd] !== undefined) {
         fd = ++this.topFd;
       }
@@ -108,7 +110,9 @@ export class FdTable {
     this.fdt[dstFd] = this.fdt[srcFd];
   }
 
-  prepareToStoreFd(fd: number) {
+  private prepareToStoreFd(fd: number) {
+    // When user want to use arbitary fd number then we drop
+    // this number from freeFds array if exists
     let idx = this.freeFds.findIndex((element) => element == fd);
     if (idx >= 0) {
       this.freeFds.splice(idx, 1);
