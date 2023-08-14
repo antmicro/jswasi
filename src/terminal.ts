@@ -379,6 +379,9 @@ export async function init(
     })
   );
 
+  await tfs.createDir("/tmp");
+  await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, "");
+
   let fdTable;
   try {
     fdTable = await getDefaultFdTable(tfs);
