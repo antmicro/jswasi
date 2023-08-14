@@ -285,7 +285,9 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
   let __configFs = (
     await getFilesystem("fsa", { name: INIT_FSA_ID, keepMetadata: false })
   ).filesystem;
-  await tfs.addMount("/", __configFs);
+  // TODO: this should use mountFs Descriptor method once fsa filesystems
+  // are listed as devices in /dev and can be mounted
+  await tfs.addMountFs("/", __configFs);
   let mountConfig: MountConfig = DEFAULT_MOUNT_CONFIG;
 
   const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
@@ -302,7 +304,7 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
 
   let __filesystem = (await getFilesystem(mountConfig.fsType, mountConfig.opts))
     .filesystem;
-  await tfs.addMount("/", __filesystem);
+  await tfs.addMountFs("/", __filesystem);
   return tfs;
 }
 
@@ -355,13 +357,13 @@ export async function init(
   if (
     (await essentialBins(tfs)).some((err) => err !== constants.WASI_ESUCCESS)
   ) {
-    await tfs.removeMount("/");
+    tfs.removeMount("/");
     const conf = RECOVERY_MOUNT_CONFIG;
 
     const __filesystem = await getFilesystem(conf.fsType, conf.opts);
 
     // If there is an error, nothing can be done
-    await tfs.addMount("/", __filesystem.filesystem);
+    await tfs.addMountFs("/", __filesystem.filesystem);
 
     await initFs(tfs);
     await essentialBins(tfs);
@@ -369,7 +371,7 @@ export async function init(
   }
 
   await tfs.createDir("/dev");
-  await tfs.addMount(
+  await tfs.addMountFs(
     "/dev",
     await createDeviceFilesystem(driverManager, processManager, {
       terminal,

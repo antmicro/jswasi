@@ -226,3 +226,14 @@ export type FdFdstatSetFlagsArgs = {
   fd: number;
   flags: number;
 };
+
+export type MountArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  sourceFd: number;
+  sourcePath: string;
+  targetFd: number;
+  targetPath: string;
+  filesystemType: string;
+  mountFlags: bigint;
+  data: string;
+};

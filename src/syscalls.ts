@@ -36,6 +36,7 @@ import {
   FdReadWriteSub,
   FdRenumberArgs,
   FdFdstatSetFlagsArgs,
+  MountArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
@@ -1220,6 +1221,51 @@ export default async function syscallCallback(
       }
 
       const err = await desc.ioctl(command, argBuffer);
+
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "mount": {
+      const {
+        sharedBuffer,
+        sourceFd,
+        sourcePath,
+        targetFd,
+        targetPath,
+        filesystemType,
+        mountFlags,
+        data: data_,
+      } = data as MountArgs;
+
+      let err = constants.WASI_ESUCCESS;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      const { fds } = processManager.processInfos[processId];
+      let sourceDesc = undefined;
+
+      if (sourceFd >= 0) {
+        sourceDesc = fds.getDesc(sourceFd);
+        if (sourceDesc === undefined) err = constants.WASI_EBADF;
+      }
+
+      let targetDesc = undefined;
+      if (targetFd >= 0) {
+        targetDesc = fds.getDesc(targetFd);
+        if (targetDesc === undefined) err = constants.WASI_EBADF;
+      }
+
+      if (err === constants.WASI_ESUCCESS) {
+        err = await processManager.filesystem.addMount(
+          sourceDesc,
+          sourcePath,
+          targetDesc,
+          targetPath,
+          filesystemType,
+          mountFlags,
+          data_
+        );
+      }
 
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

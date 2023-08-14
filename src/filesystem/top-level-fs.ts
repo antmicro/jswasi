@@ -360,7 +360,75 @@ export class TopLevelFs {
     );
   }
 
-  async addMount(path: string, fs: Filesystem): Promise<number> {
+  async addMount(
+    sourceDesc: Descriptor,
+    sourcePath: string,
+    targetDesc: Descriptor,
+    targetPath: string,
+    filesystemType: string,
+    // mountFlags is not used but it is present in linux and might
+    // be useful in the future
+    _mountFlags: bigint,
+    data: string
+  ): Promise<number> {
+    const __targetPath = this.abspath(targetDesc, targetPath);
+
+    const dinfoTarget = await this.getDescInfo(
+      __targetPath,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+      constants.WASI_O_DIRECTORY
+    );
+
+    if (dinfoTarget.err !== constants.WASI_ESUCCESS) return dinfoTarget.err;
+
+    const dirents = await dinfoTarget.desc.readdir(true);
+    if (dirents.dirents.length !== 0) return constants.WASI_ENOTEMPTY;
+
+    const __sourcePath = this.abspath(sourceDesc, sourcePath);
+
+    let opts: Record<string, string> = {};
+
+    for (const opt of data.split(",")) {
+      if (opt === "") continue;
+
+      const split = opt.split("=");
+
+      if (split.length !== 2) return constants.WASI_EINVAL;
+
+      opts[split[0]] = split[1];
+    }
+
+    let fs;
+
+    if (__sourcePath === "") {
+      const getFilesystemErr = await getFilesystem(filesystemType, opts);
+      if (getFilesystemErr.err !== constants.WASI_ESUCCESS)
+        return getFilesystemErr.err;
+
+      fs = getFilesystemErr.filesystem;
+    } else {
+      const dinfoSource = await this.getDescInfo(
+        __sourcePath,
+        constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+        constants.WASI_O_DIRECTORY
+      );
+
+      if (dinfoSource.err !== constants.WASI_ESUCCESS) return dinfoSource.err;
+
+      const mountResult = await dinfoSource.desc.mountFs(opts);
+
+      if (mountResult.err !== constants.WASI_ESUCCESS) return mountResult.err;
+
+      fs = mountResult.fs;
+    }
+
+    this.mounts[__targetPath] = fs;
+    return constants.WASI_ESUCCESS;
+  }
+
+  // TODO: This should be removed once we have some userspace tool
+  // (or better kernelspace implementation) to manage devices
+  async addMountFs(path: string, fs: Filesystem): Promise<number> {
     if (this.mounts[path] !== undefined) {
       return constants.WASI_EBUSY;
     } else if (path === "/") {

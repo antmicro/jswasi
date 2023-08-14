@@ -265,6 +265,17 @@ export interface Descriptor {
     eventType: EventType,
     workerId: number
   ): Promise<PollEvent>;
+
+  /*
+   * Get special file filesystem that can be mounted
+   *
+   * @param opts - object containing filesystem-specific mount options
+   *
+   * @returns an object containing:
+   * err - status code
+   * fs - filesystem instance
+   */
+  mountFs(opts: Object): Promise<{ err: number; fs: Filesystem }>;
 }
 
 export abstract class AbstractDescriptor implements Descriptor {
@@ -300,6 +311,10 @@ export abstract class AbstractDescriptor implements Descriptor {
 
   async ioctl(_request: number, _buf: Uint8Array): Promise<number> {
     return constants.WASI_ENOTTY;
+  }
+
+  async mountFs(_opts: Object): Promise<{ err: number; fs: Filesystem }> {
+    return { err: constants.WASI_ENOTSUP, fs: undefined };
   }
 
   abstract getFilestat(): Promise<{ err: number; filestat: Filestat }>;

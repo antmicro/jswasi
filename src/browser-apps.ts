@@ -61,7 +61,7 @@ export async function mount(
         dir: mountPoint,
         keepMetadata: false,
       });
-      return await processManager.filesystem.addMount(path, filesystem);
+      return await processManager.filesystem.addMountFs(path, filesystem);
     }
     case 3: {
       // TODO: this is ugly and temporary, do it right when implementing
@@ -71,7 +71,7 @@ export async function mount(
           name: "fsa0",
           keepMetadata: false,
         });
-        return await processManager.filesystem.addMount(args[2], filesystem);
+        return await processManager.filesystem.addMountFs(args[2], filesystem);
       }
     }
     default: {

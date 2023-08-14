@@ -132,7 +132,7 @@ export class HtermDeviceDriver implements TerminalDriver {
             if (err !== constants.WASI_ESUCCESS) {
               return;
             }
-            await processManager.filesystem.addMount(tmp_mount, filesystem);
+            await processManager.filesystem.addMountFs(tmp_mount, filesystem);
             // this process is spawned as a child of init, this isn't very elegant
             await processManager.spawnProcess(
               0, // parent_id

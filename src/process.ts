@@ -36,6 +36,7 @@ import {
   EventSourceArgs,
   CleanInodesArgs,
   AttachSigIntArgs,
+  MountArgs,
   KillArgs,
   IoctlArgs,
   FdRenumberArgs,
@@ -1282,6 +1283,81 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         return {
           exitStatus: Atomics.load(lck, 0),
           outputSize: len,
+        };
+      }
+      case "mount": {
+        const {
+          source_fd,
+          source,
+          source_len,
+          target_fd,
+          target,
+          target_len,
+          filesystemtype,
+          filesystemtype_len,
+          mountflags,
+          data,
+          data_len,
+        }: {
+          source_fd: number;
+          source: ptr;
+          source_len: number;
+          target_fd: number;
+          target: ptr;
+          target_len: number;
+          filesystemtype: ptr;
+          filesystemtype_len: number;
+          mountflags: bigint;
+          data: ptr;
+          data_len: number;
+        } = JSON.parse(json);
+
+        const view8 = new Uint8Array(
+          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+        );
+
+        const sourcePath = new TextDecoder().decode(
+          view8.slice(source, source + source_len)
+        );
+        const targetPath = new TextDecoder().decode(
+          view8.slice(target, target + target_len)
+        );
+        const filesystemType = new TextDecoder().decode(
+          view8.slice(filesystemtype, filesystemtype + filesystemtype_len)
+        );
+        const data_ = new TextDecoder().decode(
+          view8.slice(data, data + data_len)
+        );
+
+        workerConsoleLog(
+          `mount(${source_fd}, "${sourcePath}", ${source_len}, ${target_fd}, "${targetPath}", ${target_len}, "${filesystemType}", ${filesystemtype_len}, ${mountflags}, "${data_}", ${data_len})`
+        );
+
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+        sendToKernel([
+          "mount",
+          {
+            sharedBuffer,
+            sourceFd: source_fd,
+            sourcePath,
+            targetFd: target_fd,
+            targetPath,
+            filesystemType,
+            mountFlags: mountflags,
+            data: data_,
+          } as MountArgs,
+        ]);
+
+        Atomics.wait(lck, 0, -1);
+        const exitStatus = Atomics.load(lck, 0);
+
+        workerConsoleLog(`mount returned ${exitStatus}`);
+
+        return {
+          exitStatus,
+          outputSize: 0,
         };
       }
       default: {
