@@ -373,16 +373,21 @@ export class TopLevelFs {
   ): Promise<number> {
     const __targetPath = this.abspath(targetDesc, targetPath);
 
-    const dinfoTarget = await this.getDescInfo(
-      __targetPath,
-      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
-      constants.WASI_O_DIRECTORY
-    );
+    let dinfoTarget;
+    if (__targetPath !== "/") {
+      dinfoTarget = await this.getDescInfo(
+        __targetPath,
+        constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+        constants.WASI_O_DIRECTORY
+      );
 
-    if (dinfoTarget.err !== constants.WASI_ESUCCESS) return dinfoTarget.err;
+      if (dinfoTarget.err !== constants.WASI_ESUCCESS) return dinfoTarget.err;
 
-    const dirents = await dinfoTarget.desc.readdir(true);
-    if (dirents.dirents.length !== 0) return constants.WASI_ENOTEMPTY;
+      const dirents = await dinfoTarget.desc.readdir(true);
+      if (dirents.dirents.length !== 0) return constants.WASI_ENOTEMPTY;
+    } else if (this.mounts["/"] !== undefined) {
+      return constants.WASI_EBUSY;
+    }
 
     const __sourcePath = this.abspath(sourceDesc, sourcePath);
 

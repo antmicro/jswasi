@@ -2,5 +2,5 @@
   "mountPoint": "/",
   "createMissing": false,
   "fsType": "vfs",
-  "opts": {}
+  "opts": ""
 }

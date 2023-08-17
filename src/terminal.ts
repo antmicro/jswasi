@@ -267,10 +267,7 @@ const DEFAULT_MOUNT_CONFIG: MountConfig = {
   mountPoint: "/",
   createMissing: false,
   fsType: "fsa",
-  opts: {
-    name: "fsa1",
-    keepMetadata: true,
-  },
+  opts: "name=fsa1,keepMetadata=true",
 };
 
 const RECOVERY_MOUNT_CONFIG: MountConfig = {
@@ -302,9 +299,15 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
   }
   await tfs.removeMount("/");
 
-  let __filesystem = (await getFilesystem(mountConfig.fsType, mountConfig.opts))
-    .filesystem;
-  await tfs.addMountFs("/", __filesystem);
+  await tfs.addMount(
+    undefined,
+    "",
+    undefined,
+    "/",
+    mountConfig.fsType,
+    0n,
+    mountConfig.opts
+  );
   return tfs;
 }
 
