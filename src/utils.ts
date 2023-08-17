@@ -158,6 +158,20 @@ export function encodeIoctlRequest(
   return rw_shifted | size_shifted | func_shifted | driver_shifted;
 }
 
+export function stringToBool(str: string): boolean {
+  switch (str.toLowerCase().trim()) {
+    case "yes":
+    case "on":
+    case "true":
+      return true;
+    case "no":
+    case "off":
+    case "false":
+      return false;
+    default:
+      return undefined;
+  }
+}
 export function humanReadable(bytes: number): string {
   const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;
