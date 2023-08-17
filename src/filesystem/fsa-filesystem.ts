@@ -62,7 +62,7 @@ function mapErr(e: DOMException, isDir: boolean): number {
 type FsaFilesystemOpts = {
   name?: string;
   keepMetadata?: boolean;
-  dir?: FileSystemDirectoryHandle;
+  prompt?: boolean; // prompt for local directory
 };
 
 export class FsaFilesystem implements Filesystem {
@@ -556,37 +556,35 @@ export class FsaFilesystem implements Filesystem {
 
   async initialize(opts: Object): Promise<number> {
     const __opts = opts as FsaFilesystemOpts;
-    if (__opts.keepMetadata === undefined || (__opts.dir && __opts.name)) {
-      return constants.WASI_EINVAL;
-    }
-    this.keepMetadata = __opts.keepMetadata;
 
-    if (__opts.dir !== undefined) {
-      this.rootHandle = __opts.dir;
-    } else if (__opts.name !== undefined) {
-      const topLevelHandle = await navigator.storage.getDirectory();
+    if (__opts.prompt) {
+      // Metadata is not yet supported for local directories
+      // name and prompt options cannot be used together
+      if (__opts.keepMetadata || __opts.name) return constants.WASI_EINVAL;
+
       try {
-        this.rootHandle = await topLevelHandle.getDirectoryHandle(__opts.name);
-      } catch (e) {
-        if (
-          e instanceof DOMException &&
-          (e as DOMException).name == "NotFoundError"
-        ) {
-          this.rootHandle = await topLevelHandle.getDirectoryHandle(
-            __opts.name,
-            {
-              create: true,
-            }
-          );
-        } else {
-          return constants.WASI_ENOENT;
-        }
+        this.rootHandle = await showDirectoryPicker();
+      } catch (_) {
+        // TODO: Catch error and return proper error code
+        return constants.WASI_ENOENT;
+      }
+    } else if (__opts.name) {
+      if (__opts.keepMetadata === undefined) this.keepMetadata = false;
+      else this.keepMetadata = __opts.keepMetadata;
+
+      const handle = await (
+        await navigator.storage.getDirectory()
+      ).getDirectoryHandle(__opts.name, { create: true });
+      this.rootHandle = handle;
+
+      const rootStoredData = await getStoredData(__opts.name);
+      if (__opts.keepMetadata && !rootStoredData) {
+        await setStoredData(
+          __opts.name,
+          FsaDirectoryDescriptor.defaultFilestat
+        );
       }
     }
-
-    const rootStoredData = await getStoredData(__opts.name);
-    if (__opts.keepMetadata && !rootStoredData)
-      await setStoredData(__opts.name, FsaDirectoryDescriptor.defaultFilestat);
 
     return constants.WASI_ESUCCESS;
   }
