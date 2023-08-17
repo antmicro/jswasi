@@ -13,7 +13,7 @@ import {
   LookupFlags,
   AbstractDescriptor,
 } from "./filesystem.js";
-import { basename, dirname } from "../utils.js";
+import { stringToBool, basename, dirname } from "../utils.js";
 import * as constants from "../constants.js";
 import {
   listStoredKeys,
@@ -61,9 +61,9 @@ function mapErr(e: DOMException, isDir: boolean): number {
 
 type FsaFilesystemOpts = {
   name?: string;
-  keepMetadata?: boolean;
-  prompt?: boolean; // prompt for local directory
-  create?: boolean; // create partition if not present
+  keepMetadata?: string;
+  prompt?: string; // prompt for local directory
+  create?: string; // create partition if not present
 };
 
 export class FsaFilesystem implements Filesystem {
@@ -555,7 +555,7 @@ export class FsaFilesystem implements Filesystem {
     return constants.WASI_ESUCCESS;
   }
 
-  async initialize(opts: Object): Promise<number> {
+  async initialize(opts: Record<string, string>): Promise<number> {
     const __opts = opts as FsaFilesystemOpts;
 
     if (__opts.prompt) {
@@ -573,12 +573,13 @@ export class FsaFilesystem implements Filesystem {
       }
     } else if (__opts.name) {
       if (__opts.keepMetadata === undefined) this.keepMetadata = false;
-      else this.keepMetadata = __opts.keepMetadata;
+      else this.keepMetadata = stringToBool(__opts.keepMetadata);
 
       const handle = await (
         await navigator.storage.getDirectory()
       ).getDirectoryHandle(__opts.name, {
-        create: __opts.create === undefined ? false : __opts.create,
+        create:
+          __opts.create === undefined ? false : stringToBool(__opts.create),
       });
       this.rootHandle = handle;
 

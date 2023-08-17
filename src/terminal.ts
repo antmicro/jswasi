@@ -267,7 +267,11 @@ const DEFAULT_MOUNT_CONFIG: MountConfig = {
   mountPoint: "/",
   createMissing: false,
   fsType: "fsa",
-  opts: "name=fsa1,keepMetadata=true,create=true",
+  opts: {
+    name: "fsa1",
+    keepMetadata: "true",
+    create: "true",
+  },
 };
 
 const RECOVERY_MOUNT_CONFIG: MountConfig = {
@@ -279,15 +283,11 @@ const RECOVERY_MOUNT_CONFIG: MountConfig = {
 
 async function getTopLevelFs(): Promise<TopLevelFs> {
   const tfs = new TopLevelFs();
-  await tfs.addMount(
-    undefined,
-    "",
-    undefined,
-    "/",
-    "fsa",
-    0n,
-    `name=${INIT_FSA_ID},create=true,keepMetadata=false`
-  );
+  await tfs.addMount(undefined, "", undefined, "/", "fsa", 0n, {
+    name: INIT_FSA_ID,
+    create: "true",
+    keepMetadata: "false",
+  });
   let mountConfig: MountConfig = DEFAULT_MOUNT_CONFIG;
 
   const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
@@ -386,7 +386,7 @@ export async function init(
   );
 
   await tfs.createDir("/tmp");
-  await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, "");
+  await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
 
   let fdTable;
   try {

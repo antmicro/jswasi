@@ -1255,6 +1255,20 @@ export default async function syscallCallback(
         if (targetDesc === undefined) err = constants.WASI_EBADF;
       }
 
+      let opts: Record<string, string> = {};
+      for (const opt in data_.split(",")) {
+        if (opt === "") continue;
+
+        const split = opt.split("=");
+
+        if (split.length !== 2) {
+          err = constants.WASI_EINVAL;
+          break;
+        }
+
+        opts[split[0]] = opts[split[1]];
+      }
+
       if (err === constants.WASI_ESUCCESS) {
         err = await processManager.filesystem.addMount(
           sourceDesc,
@@ -1263,7 +1277,7 @@ export default async function syscallCallback(
           targetPath,
           filesystemType,
           mountFlags,
-          data_
+          opts
         );
       }
 

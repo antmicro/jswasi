@@ -369,7 +369,7 @@ export class TopLevelFs {
     // mountFlags is not used but it is present in linux and might
     // be useful in the future
     _mountFlags: bigint,
-    data: string
+    data: Record<string, string>
   ): Promise<number> {
     const __targetPath = this.abspath(targetDesc, targetPath);
 
@@ -391,22 +391,9 @@ export class TopLevelFs {
 
     const __sourcePath = this.abspath(sourceDesc, sourcePath);
 
-    let opts: Record<string, string> = {};
-
-    for (const opt of data.split(",")) {
-      if (opt === "") continue;
-
-      const split = opt.split("=");
-
-      if (split.length !== 2) return constants.WASI_EINVAL;
-
-      opts[split[0]] = split[1];
-    }
-
     let fs;
-
     if (__sourcePath === "") {
-      const getFilesystemErr = await getFilesystem(filesystemType, opts);
+      const getFilesystemErr = await getFilesystem(filesystemType, data);
       if (getFilesystemErr.err !== constants.WASI_ESUCCESS)
         return getFilesystemErr.err;
 
@@ -420,7 +407,7 @@ export class TopLevelFs {
 
       if (dinfoSource.err !== constants.WASI_ESUCCESS) return dinfoSource.err;
 
-      const mountResult = await dinfoSource.desc.mountFs(opts);
+      const mountResult = await dinfoSource.desc.mountFs(data);
 
       if (mountResult.err !== constants.WASI_ESUCCESS) return mountResult.err;
 
