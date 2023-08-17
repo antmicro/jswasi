@@ -267,7 +267,7 @@ const DEFAULT_MOUNT_CONFIG: MountConfig = {
   mountPoint: "/",
   createMissing: false,
   fsType: "fsa",
-  opts: "name=fsa1,keepMetadata=true",
+  opts: "name=fsa1,keepMetadata=true,create=true",
 };
 
 const RECOVERY_MOUNT_CONFIG: MountConfig = {
@@ -279,12 +279,15 @@ const RECOVERY_MOUNT_CONFIG: MountConfig = {
 
 async function getTopLevelFs(): Promise<TopLevelFs> {
   const tfs = new TopLevelFs();
-  let __configFs = (
-    await getFilesystem("fsa", { name: INIT_FSA_ID, keepMetadata: false })
-  ).filesystem;
-  // TODO: this should use mountFs Descriptor method once fsa filesystems
-  // are listed as devices in /dev and can be mounted
-  await tfs.addMountFs("/", __configFs);
+  await tfs.addMount(
+    undefined,
+    "",
+    undefined,
+    "/",
+    "fsa",
+    0n,
+    `name=${INIT_FSA_ID},create=true,keepMetadata=false`
+  );
   let mountConfig: MountConfig = DEFAULT_MOUNT_CONFIG;
 
   const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);

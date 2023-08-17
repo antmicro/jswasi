@@ -63,6 +63,7 @@ type FsaFilesystemOpts = {
   name?: string;
   keepMetadata?: boolean;
   prompt?: boolean; // prompt for local directory
+  create?: boolean; // create partition if not present
 };
 
 export class FsaFilesystem implements Filesystem {
@@ -560,7 +561,9 @@ export class FsaFilesystem implements Filesystem {
     if (__opts.prompt) {
       // Metadata is not yet supported for local directories
       // name and prompt options cannot be used together
-      if (__opts.keepMetadata || __opts.name) return constants.WASI_EINVAL;
+      // create makes no sense with prompt
+      if (__opts.keepMetadata || __opts.name || __opts.create)
+        return constants.WASI_EINVAL;
 
       try {
         this.rootHandle = await showDirectoryPicker();
@@ -574,7 +577,9 @@ export class FsaFilesystem implements Filesystem {
 
       const handle = await (
         await navigator.storage.getDirectory()
-      ).getDirectoryHandle(__opts.name, { create: true });
+      ).getDirectoryHandle(__opts.name, {
+        create: __opts.create === undefined ? false : __opts.create,
+      });
       this.rootHandle = handle;
 
       const rootStoredData = await getStoredData(__opts.name);
