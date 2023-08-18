@@ -13,8 +13,8 @@ export async function mount(
 ): Promise<number> {
   console.log(`mount(${processId}, ${args})`);
 
-  const stdout = fds.getFd(1);
-  const stderr = fds.getFd(2);
+  const stdout = fds.getDesc(1);
+  const stderr = fds.getDesc(2);
 
   switch (args.length) {
     case 1: {
@@ -90,8 +90,8 @@ export async function umount(
   env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stdout = fds.getFd(1);
-  const stderr = fds.getFd(2);
+  const stdout = fds.getDesc(1);
+  const stderr = fds.getDesc(2);
 
   let arg = args[1];
   // handle relative path
@@ -136,7 +136,7 @@ export async function wget(
   env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stderr = fds.getFd(2);
+  const stderr = fds.getDesc(2);
 
   let path: string;
   let address: string;
@@ -247,7 +247,7 @@ export async function ps(
   _env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stdout = fds.getFd(1);
+  const stdout = fds.getDesc(1);
 
   let psData = "  PID TTY          TIME CMD\r\n";
   for (const [id, workerInfo] of Object.entries(processManager.processInfos)) {
@@ -279,7 +279,7 @@ export async function free(
   _env: Record<string, string>,
   fds: FdTable
 ): Promise<number> {
-  const stdout = fds.getFd(1);
+  const stdout = fds.getDesc(1);
 
   // @ts-ignore memory is non-standard API available only in Chrome
   const totalMemoryRaw = performance.memory.jsHeapSizeLimit;

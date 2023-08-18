@@ -1,7 +1,7 @@
 import * as constants from "./constants.js";
 import { EventSource, EventSourceDescriptor } from "./devices.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
-import { Descriptor } from "./filesystem/filesystem";
+import { Descriptor, Fdflags } from "./filesystem/filesystem";
 import { EventType } from "./types.js";
 import syscallCallback from "./syscalls.js";
 import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
@@ -24,12 +24,22 @@ export const DEFAULT_ENV = {
   DEBUG: "1",
 };
 
+export class DescriptorEntry {
+  desc: Descriptor;
+  fdFlags: Fdflags;
+
+  constructor(desc: Descriptor) {
+    this.desc = desc;
+    this.fdFlags = 0;
+  }
+}
+
 export class FdTable {
-  fdt: Record<number, Descriptor> = {};
+  fdt: Record<number, DescriptorEntry> = {};
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, Descriptor | undefined>) {
+  constructor(fds: Record<number, DescriptorEntry | undefined>) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
   }
@@ -54,9 +64,10 @@ export class FdTable {
     if (entry === undefined) {
       throw "Entry is undefined";
     }
+    let desc_entry = new DescriptorEntry(entry);
     let fd = this.freeFds.shift();
     if (fd !== undefined) {
-      this.fdt[fd] = entry;
+      this.fdt[fd] = desc_entry;
       return fd;
     } else {
       fd = ++this.topFd;
@@ -65,7 +76,7 @@ export class FdTable {
       while (this.fdt[fd] !== undefined) {
         fd = ++this.topFd;
       }
-      this.fdt[fd] = entry;
+      this.fdt[fd] = desc_entry;
       return fd;
     }
   }
@@ -78,7 +89,7 @@ export class FdTable {
     this.freeFds.push(fd);
   }
 
-  public replaceFd(fd: number, entry: Descriptor) {
+  public replaceFd(fd: number, entry: DescriptorEntry) {
     if (!(fd in this.fdt)) {
       throw "descriptor not present in descriptor table";
     }
@@ -88,11 +99,15 @@ export class FdTable {
     this.fdt[fd] = entry;
   }
 
-  public getFd(fd: number): Descriptor {
+  public getFdEntry(fd: number): DescriptorEntry {
     return this.fdt[fd];
   }
 
-  public setFd(fd: number, entry: Descriptor) {
+  public getDesc(fd: number): Descriptor {
+    return this.fdt[fd] !== undefined ? this.fdt[fd].desc : undefined;
+  }
+
+  public setFd(fd: number, entry: DescriptorEntry) {
     this.prepareToStoreFd(fd);
     // We assume dstFd is closed!
     if (this.fdt[fd] !== undefined) {
@@ -107,7 +122,7 @@ export class FdTable {
     if (this.fdt[dstFd] !== undefined) {
       console.log(`duplicateFd: overwrite opened fd = ${dstFd}`);
     }
-    this.fdt[dstFd] = this.fdt[srcFd];
+    this.fdt[dstFd] = new DescriptorEntry(this.fdt[srcFd].desc);
   }
 
   private prepareToStoreFd(fd: number) {
@@ -122,7 +137,7 @@ export class FdTable {
   tearDown() {
     Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {
-        fileDescriptor?.close();
+        fileDescriptor?.desc.close();
       })
     );
   }
@@ -327,7 +342,7 @@ export default class ProcessManager {
   }
 
   attachSigint(fd: number, pid: number): number {
-    const eventDesc = this.processInfos[pid].fds.getFd(fd);
+    const eventDesc = this.processInfos[pid].fds.getDesc(fd);
     if (eventDesc === undefined) return constants.WASI_EBADF;
 
     if (!(eventDesc instanceof EventSource)) return constants.WASI_EINVAL;

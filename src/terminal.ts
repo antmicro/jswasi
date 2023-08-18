@@ -1,5 +1,5 @@
 import * as constants from "./constants.js";
-import ProcessManager from "./process-manager.js";
+import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
@@ -55,30 +55,34 @@ async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
 
 async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
   return new FdTable({
-    0: (
+    0: new DescriptorEntry((
       await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n)
-    ).desc,
-    1: (
-      await tfs.open(
-        "/dev/ttyH0",
-        0,
-        0,
-        constants.WASI_FDFLAG_APPEND,
-        constants.WASI_EXT_RIGHTS_STDOUT,
-        0n
-      )
-    ).desc,
-    2: (
-      await tfs.open(
-        "/dev/ttyH0",
-        0,
-        0,
-        constants.WASI_FDFLAG_APPEND,
-        constants.WASI_EXT_RIGHTS_STDERR,
-        0n
-      )
-    ).desc,
-    3: (await tfs.open("/")).desc,
+    ).desc),
+    1: new DescriptorEntry(
+      (
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          constants.WASI_FDFLAG_APPEND,
+          constants.WASI_EXT_RIGHTS_STDOUT,
+          0n
+        )
+      ).desc
+    ),
+    2: new DescriptorEntry(
+      (
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          constants.WASI_FDFLAG_APPEND,
+          constants.WASI_EXT_RIGHTS_STDERR,
+          0n
+        )
+      ).desc
+    ),
+    3: new DescriptorEntry((await tfs.open("/")).desc),
   });
 }
 

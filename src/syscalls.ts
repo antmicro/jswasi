@@ -38,7 +38,7 @@ import {
   FdFdstatSetFlagsArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
-import ProcessManager from "./process-manager.js";
+import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { FsaFilesystem } from "./filesystem/fsa-filesystem.js";
@@ -121,8 +121,8 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        isatty[0] = Number(fds.getFd(fd).isatty());
+      if (fds.getDesc(fd) !== undefined) {
+        isatty[0] = Number(fds.getDesc(fd).isatty());
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -238,19 +238,19 @@ export default async function syscallCallback(
               break;
             }
 
-            let oldDesc = fds.getFd(fd);
+            let oldDesc = fds.getDesc(fd);
             if (oldDesc !== undefined) {
               oldDesc.close();
             }
-            fds.setFd(fd_dst, desc);
+            fds.setFd(fd_dst, new DescriptorEntry(desc));
 
             break;
           }
           case constants.WASI_EXT_REDIRECT_TYPE_PIPEIN:
           case constants.WASI_EXT_REDIRECT_TYPE_PIPEOUT:
           case constants.WASI_EXT_REDIRECT_TYPE_DUPLICATE: {
-            if (fds.getFd(redirect.fd_src) !== undefined) {
-              fds.getFd(fd_dst).close();
+            if (fds.getDesc(redirect.fd_src) !== undefined) {
+              fds.getDesc(fd_dst).close();
               fds.duplicateFd(redirect.fd_src, fd_dst);
             } else {
               console.log(
@@ -261,7 +261,7 @@ export default async function syscallCallback(
             break;
           }
           case constants.WASI_EXT_REDIRECT_TYPE_CLOSE: {
-            let desc = fds.getFd(fd_dst);
+            let desc = fds.getDesc(fd_dst);
             if (desc !== undefined) {
               desc.close();
               fds.freeFd(fd_dst);
@@ -412,7 +412,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (fd > 2 && fd < 4) {
         preopenType[0] = constants.WASI_PREOPENTYPE_DIR;
-        nameLen[0] = basename(fds.getFd(fd).getPath()).length;
+        nameLen[0] = basename(fds.getDesc(fd).getPath()).length;
         err = constants.WASI_ESUCCESS;
       } else {
         err = constants.WASI_EBADF;
@@ -430,13 +430,13 @@ export default async function syscallCallback(
 
       const { fds } = processManager.processInfos[processId];
       let err;
-      if (fds.getFd(linkFd) === undefined) {
+      if (fds.getDesc(linkFd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
         err = await processManager.filesystem.addSymlink(
           targetPath,
           linkPath,
-          fds.getFd(linkFd)
+          fds.getDesc(linkFd)
         );
       }
 
@@ -452,10 +452,10 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(oldFd) !== undefined) {
+      if (fds.getDesc(oldFd) !== undefined) {
         err = (
           await fds
-            .getFd(constants.WASI_FD_STDERR)
+            .getDesc(constants.WASI_FD_STDERR)
             .write(new TextEncoder().encode("hard links are not supported"))
         ).err;
       } else {
@@ -475,10 +475,10 @@ export default async function syscallCallback(
 
       let err = constants.WASI_ESUCCESS;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
+      if (fds.getDesc(fd) !== undefined) {
         let __path;
         ({ err, path: __path } = await processManager.filesystem.readLink(
-          fds.getFd(fd),
+          fds.getDesc(fd),
           path
         ));
         if (err === constants.WASI_ESUCCESS) {
@@ -507,9 +507,9 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
+      if (fds.getDesc(fd) !== undefined) {
         path.set(
-          new TextEncoder().encode(basename(fds.getFd(fd).getPath())),
+          new TextEncoder().encode(basename(fds.getDesc(fd).getPath())),
           0
         );
         err = constants.WASI_ESUCCESS;
@@ -529,8 +529,8 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       let err;
       let ftype;
-      if (fds.getFd(fd) !== undefined) {
-        const fdstat = await fds.getFd(fd).getFdstat();
+      if (fds.getDesc(fd) !== undefined) {
+        const fdstat = await fds.getDesc(fd).getFdstat();
         ftype = fdstat.fs_filetype;
         if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
           err = constants.WASI_EISDIR;
@@ -542,7 +542,7 @@ export default async function syscallCallback(
         ) {
           err = constants.WASI_EACCES;
         } else {
-          err = (await fds.getFd(fd).write(content.buffer)).err;
+          err = (await fds.getDesc(fd).write(content.buffer)).err;
         }
       } else {
         err = constants.WASI_EBADF;
@@ -563,10 +563,10 @@ export default async function syscallCallback(
       const readLen = new Int32Array(sharedBuffer, 4, 1);
 
       let fdstat;
-      if (fds.getFd(fd) === undefined) {
+      if (fds.getDesc(fd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        fdstat = await fds.getFd(fd).getFdstat();
+        fdstat = await fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) == 0n) {
           err = constants.WASI_EACCES;
         } else if (fdstat.fs_filetype === constants.WASI_FILETYPE_DIRECTORY) {
@@ -578,9 +578,9 @@ export default async function syscallCallback(
         } else {
           let res;
           if (offset) {
-            res = await fds.getFd(fd).pread(len, offset);
+            res = await fds.getDesc(fd).pread(len, offset);
           } else {
-            res = await fds.getFd(fd).read(len, processId);
+            res = await fds.getDesc(fd).read(len, processId);
           }
           err = res.err;
           readBuf.set(new Uint8Array(res.buffer));
@@ -608,7 +608,7 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(dirFd) !== undefined) {
+      if (fds.getDesc(dirFd) !== undefined) {
         if (
           !(
             openFlags & constants.WASI_O_CREAT &&
@@ -617,7 +617,7 @@ export default async function syscallCallback(
         ) {
           let desc;
           ({ err, desc } = await processManager.filesystem.openat(
-            fds.getFd(dirFd),
+            fds.getDesc(dirFd),
             path,
             lookupFlags,
             openFlags,
@@ -645,8 +645,8 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        await fds.getFd(fd).close();
+      if (fds.getDesc(fd) !== undefined) {
+        await fds.getDesc(fd).close();
         fds.freeFd(fd);
         err = constants.WASI_ESUCCESS;
       } else {
@@ -666,7 +666,7 @@ export default async function syscallCallback(
       let err = constants.WASI_ESUCCESS;
 
       const { fds } = processManager.processInfos[processId];
-      let desc = fds.getFd(fd);
+      let desc = fds.getDesc(fd);
       if (desc === undefined) {
         err = constants.WASI_EBADF;
       } else {
@@ -732,13 +732,13 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) === undefined) {
+      if (fds.getDesc(fd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        const fdstat = await fds.getFd(fd).getFdstat();
+        const fdstat = await fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_SEEK) !== 0n) {
           if (fdstat.fs_filetype !== constants.WASI_FILETYPE_DIRECTORY) {
-            const result = await fds.getFd(fd).seek(offset, whence);
+            const result = await fds.getDesc(fd).seek(offset, whence);
             filePos[0] = result.offset;
             err = result.err;
           } else {
@@ -763,11 +763,11 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (
-        fds.getFd(fd) !== undefined &&
-        (await fds.getFd(fd).getFdstat()).fs_filetype ===
+        fds.getDesc(fd) !== undefined &&
+        (await fds.getDesc(fd).getFdstat()).fs_filetype ===
           constants.WASI_FILETYPE_DIRECTORY
       ) {
-        let entries = (await fds.getFd(fd).readdir(cookie === 0n)).dirents;
+        let entries = (await fds.getDesc(fd).readdir(cookie === 0n)).dirents;
         for (let i = Number(cookie); i < entries.length; i += 1) {
           const entry = entries[i];
           const nameBuf = new TextEncoder().encode(entry.name);
@@ -828,11 +828,11 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
+      if (fds.getDesc(fd) !== undefined) {
         err = await processManager.filesystem.removeEntry(
           path,
           action !== "path_unlink_file",
-          fds.getFd(fd)
+          fds.getDesc(fd)
         );
       } else {
         err = constants.WASI_EBADF;
@@ -848,8 +848,8 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      if (fds.getFd(fd) !== undefined) {
-        err = await processManager.filesystem.createDir(path, fds.getFd(fd));
+      if (fds.getDesc(fd) !== undefined) {
+        err = await processManager.filesystem.createDir(path, fds.getDesc(fd));
       } else {
         err = constants.WASI_EBADF;
       }
@@ -868,11 +868,11 @@ export default async function syscallCallback(
 
       let err;
       const { fds } = processManager.processInfos[processId];
-      let desc = fds.getFd(fd);
-      if (desc !== undefined) {
-        const fdstat = await desc.getFdstat();
+      let fdEntry = fds.getFdEntry(fd);
+      if (fdEntry !== undefined) {
+        const fdstat = await fdEntry.desc.getFdstat();
         fileType[0] = fdstat.fs_filetype;
-        fdFlags[0] = fdstat.fs_flags;
+        fdFlags[0] = fdstat.fs_flags | fdEntry.fdFlags;
         rightsBase[0] = fdstat.fs_rights_base;
         rightsInheriting[0] = fdstat.fs_rights_inheriting;
         err = constants.WASI_ESUCCESS;
@@ -890,9 +890,9 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
 
       let err = await processManager.filesystem.move(
-        fds.getFd(oldFd),
+        fds.getDesc(oldFd),
         oldPath,
-        fds.getFd(newFd),
+        fds.getDesc(newFd),
         newPath
       );
 
@@ -907,15 +907,15 @@ export default async function syscallCallback(
 
       const { fds } = processManager.processInfos[processId];
       let err;
-      if (fds.getFd(fd) !== undefined) {
-        let fdstat = await fds.getFd(fd).getFdstat();
+      if (fds.getDesc(fd) !== undefined) {
+        let fdstat = await fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_TELL) !== 0n) {
           if (
             fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE ||
             fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
           ) {
             offset[0] = BigInt(
-              (await fds.getFd(fd).seek(0n, constants.WASI_WHENCE_CUR)).offset
+              (await fds.getDesc(fd).seek(0n, constants.WASI_WHENCE_CUR)).offset
             );
             err = constants.WASI_ESUCCESS;
           } else {
@@ -940,7 +940,7 @@ export default async function syscallCallback(
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
       const { fds } = processManager.processInfos[processId];
-      let desc = fds.getFd(fd);
+      let desc = fds.getDesc(fd);
       if (desc && path !== undefined) {
         const res = await processManager.filesystem.openat(desc, path, flags);
         desc = res.desc;
@@ -990,9 +990,9 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
 
       let err = constants.WASI_ESUCCESS;
-      let des = fds.getFd(fd);
+      let fdEntry = fds.getFdEntry(fd);
 
-      if (des === undefined) {
+      if (fdEntry === undefined) {
         err = constants.WASI_EBADF;
       } else {
         // WASI standard flags
@@ -1000,10 +1000,10 @@ export default async function syscallCallback(
 
         // Flags not covered by WASI
         if (flags & constants.WASI_EXT_FDFLAG_CTRL_BIT) {
-          newFlags |= flags & constants.WASI_EXT_FDFLAG_MASK;
+          fdEntry.fdFlags = flags & constants.WASI_EXT_FDFLAG_MASK;
         }
 
-        err = await des.setFdstatFlags(newFlags);
+        err = await fdEntry.desc.setFdstatFlags(newFlags);
       }
 
       Atomics.store(lck, 0, err);
@@ -1017,15 +1017,15 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
 
       let err = constants.WASI_ESUCCESS;
-      let srcFd = fds.getFd(fd);
-      let desFd = fds.getFd(newFd);
+      let srcEntry = fds.getFdEntry(fd);
+      let dstEntry = fds.getFdEntry(newFd);
 
-      if (srcFd === undefined) {
+      if (srcEntry === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        if (desFd !== undefined) {
+        if (dstEntry !== undefined) {
           // ignore close errors
-          await desFd.close();
+          await dstEntry.desc.close();
           fds.freeFd(newFd);
         }
         fds.duplicateFd(fd, newFd);
@@ -1063,7 +1063,7 @@ export default async function syscallCallback(
 
             case constants.WASI_EVENTTYPE_FD_WRITE:
             case constants.WASI_EVENTTYPE_FD_READ: {
-              const fd = (__subPromise = fds.getFd(
+              const fd = (__subPromise = fds.getDesc(
                 (sub.event as FdReadWriteSub).fd
               ));
               if (fd === undefined) {
@@ -1206,7 +1206,7 @@ export default async function syscallCallback(
       const argBuffer = new Uint8Array(sharedBuffer, 4);
 
       const { fds } = processManager.processInfos[processId];
-      let desc = fds.getFd(fd);
+      let desc = fds.getDesc(fd);
 
       if (fd === undefined) {
         Atomics.store(lck, 0, constants.WASI_EBADF);

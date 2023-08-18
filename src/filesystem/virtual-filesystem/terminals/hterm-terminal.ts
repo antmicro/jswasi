@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_ENV,
   DEFAULT_WORK_DIR,
+  DescriptorEntry,
   FdTable,
 } from "../../../process-manager.js";
 import { PollSub, Fdflags, Rights, Descriptor } from "../../filesystem.js";
@@ -142,7 +143,11 @@ export class HtermDeviceDriver implements TerminalDriver {
                 0: undefined,
                 1: undefined,
                 2: undefined,
-                3: (await processManager.filesystem.open("/")).desc,
+                3: new DescriptorEntry(
+                  (
+                    await processManager.filesystem.open("/")
+                  ).desc
+                ),
               }),
               [
                 "/usr/bin/wash",
