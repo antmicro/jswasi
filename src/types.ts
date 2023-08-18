@@ -237,3 +237,8 @@ export type MountArgs = {
   mountFlags: bigint;
   data: string;
 };
+
+export type UmountArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  path: string;
+};

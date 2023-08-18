@@ -43,6 +43,7 @@ import {
   EventType,
   POLL_EVENT_BUFSIZE,
   FdFdstatSetFlagsArgs,
+  UmountArgs,
 } from "./types.js";
 
 type ptr = number;
@@ -1354,6 +1355,47 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         const exitStatus = Atomics.load(lck, 0);
 
         workerConsoleLog(`mount returned ${exitStatus}`);
+
+        return {
+          exitStatus,
+          outputSize: 0,
+        };
+      }
+      case "umount": {
+        const {
+          path,
+          path_len,
+        }: {
+          path: ptr;
+          path_len: number;
+        } = JSON.parse(json);
+
+        const view8 = new Uint8Array(
+          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
+        );
+
+        const path_ = new TextDecoder().decode(
+          view8.slice(path, path + path_len)
+        );
+
+        workerConsoleLog(`umount("${path_}", ${path_len}`);
+
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+
+        sendToKernel([
+          "umount",
+          {
+            path: path_,
+            sharedBuffer,
+          } as UmountArgs,
+        ]);
+
+        Atomics.wait(lck, 0, -1);
+        const exitStatus = Atomics.load(lck, 0);
+
+        workerConsoleLog(`umount returned ${exitStatus}`);
 
         return {
           exitStatus,

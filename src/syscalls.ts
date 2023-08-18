@@ -37,6 +37,7 @@ import {
   FdRenumberArgs,
   FdFdstatSetFlagsArgs,
   MountArgs,
+  UmountArgs,
 } from "./types.js";
 import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
@@ -1282,6 +1283,14 @@ export default async function syscallCallback(
       }
 
       Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+    case "umount": {
+      const { sharedBuffer, path } = data as UmountArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      Atomics.store(lck, 0, await processManager.filesystem.removeMount(path));
       Atomics.notify(lck, 0);
       break;
     }
