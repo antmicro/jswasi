@@ -222,6 +222,7 @@ export default class ProcessManager {
         );
         if (err !== constants.WASI_ESUCCESS) {
           console.error(`No such binary: ${command}`);
+          await this.terminateProcess(id, err);
           return err;
         }
 
