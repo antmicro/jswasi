@@ -300,7 +300,7 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
     }
     await desc.close();
   }
-  await tfs.removeMount("/");
+  tfs.removeMount("/");
 
   await tfs.addMount(
     undefined,

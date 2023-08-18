@@ -101,7 +101,7 @@ export async function umount(
       processManager.filesystem.getMounts()
     )) {
       if (mountPoint !== "/") {
-        let err = await processManager.filesystem.removeMount(mountPoint);
+        let err = processManager.filesystem.removeMount(mountPoint);
         if (err !== constants.WASI_ESUCCESS) {
           return err;
         }

@@ -1290,7 +1290,7 @@ export default async function syscallCallback(
       const { sharedBuffer, path } = data as UmountArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
-      Atomics.store(lck, 0, await processManager.filesystem.removeMount(path));
+      Atomics.store(lck, 0, processManager.filesystem.removeMount(path));
       Atomics.notify(lck, 0);
       break;
     }

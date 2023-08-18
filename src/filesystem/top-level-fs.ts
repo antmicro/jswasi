@@ -445,7 +445,7 @@ export class TopLevelFs {
     return constants.WASI_ENOTEMPTY;
   }
 
-  async removeMount(path: string): Promise<number> {
+  removeMount(path: string): number {
     // TODO: check if there are descriptors from this filesystem before unmounting
     if (
       Object.keys(this.mounts).every((mountPoint) => {
