@@ -47,14 +47,15 @@ export class FdTable {
   public clone(): FdTable {
     var fdTable = new FdTable([]);
     fdTable.freeFds = this.freeFds.slice(0);
-    // TODO: It is temporary fix, we should look at fd_flags here
+
     for (let key in this.fdt) {
-      if (!(this.fdt[key] instanceof EventSource)) {
-        fdTable.fdt[key] = this.fdt[key];
+      if ((this.fdt[key].fdFlags & constants.WASI_EXT_FDFLAG_CLOEXEC) === 0) {
+        fdTable.fdt[key] = new DescriptorEntry(this.fdt[key].desc);
       } else {
         fdTable.freeFds.push(Number(key));
       }
     }
+
     fdTable.freeFds.sort();
     fdTable.topFd = this.topFd;
     return fdTable;
