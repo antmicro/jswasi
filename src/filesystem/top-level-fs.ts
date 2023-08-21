@@ -71,7 +71,8 @@ export class TopLevelFs {
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0,
-    symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT
+    symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT,
+    workerId: number = 0
   ): Promise<DescInfo> {
     let rpath = realpath(path);
     let lastSeparator, fs;
@@ -97,7 +98,8 @@ export class TopLevelFs {
       oflags,
       fs_rights_base,
       fs_rights_inheriting,
-      fdflags
+      fdflags,
+      workerId
     );
 
     if (desc) {
@@ -155,7 +157,8 @@ export class TopLevelFs {
               fs_rights_base,
               fs_rights_inheriting,
               fdflags,
-              symlink_depth - 1
+              symlink_depth - 1,
+              workerId
             );
           }
           break;
@@ -200,7 +203,8 @@ export class TopLevelFs {
     oflags: OpenFlags = 0,
     fdflags: Fdflags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
-    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
+    workerId: number = 0
   ): Promise<{ desc: Descriptor; err: number }> {
     let __path = this.abspath(desc, path);
     return await this.getDescInfo(
@@ -209,7 +213,8 @@ export class TopLevelFs {
       oflags,
       fs_rights_base,
       fs_rights_inheriting,
-      fdflags
+      fdflags,
+      workerId
     );
   }
 

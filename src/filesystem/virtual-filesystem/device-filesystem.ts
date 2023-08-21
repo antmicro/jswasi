@@ -80,7 +80,8 @@ export class DeviceFilesystem extends VirtualFilesystem {
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    fdflags: Fdflags
+    fdflags: Fdflags,
+    workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
     let result = await super.open(
       path,
@@ -88,7 +89,8 @@ export class DeviceFilesystem extends VirtualFilesystem {
       oflags,
       fs_rights_base,
       fs_rights_inheriting,
-      fdflags
+      fdflags,
+      workerId
     );
 
     if (result.err !== constants.WASI_ENODEV) {

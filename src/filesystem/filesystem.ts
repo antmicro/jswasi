@@ -544,7 +544,8 @@ export interface Filesystem {
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    fdflags: Fdflags
+    fdflags: Fdflags,
+    workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }>;
   unlinkat(desc: Descriptor, path: string, is_dir: boolean): Promise<number>;
   renameat(

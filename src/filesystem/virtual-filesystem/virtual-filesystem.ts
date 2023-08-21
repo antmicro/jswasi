@@ -152,7 +152,8 @@ export class VirtualFilesystem implements Filesystem {
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    fdflags: Fdflags
+    fdflags: Fdflags,
+    _workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
     const navigated = this.virtualFs._navigate(path, false);
     if (navigated.target) {

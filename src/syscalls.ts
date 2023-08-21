@@ -628,7 +628,8 @@ export default async function syscallCallback(
             openFlags,
             fdFlags,
             fsRightsBase,
-            fsRightsInheriting
+            fsRightsInheriting,
+            processId
           ));
           if (err === constants.WASI_ESUCCESS) {
             openedFd[0] = fds.addFile(desc);

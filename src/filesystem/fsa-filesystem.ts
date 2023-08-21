@@ -336,7 +336,8 @@ export class FsaFilesystem implements Filesystem {
     oflags: OpenFlags,
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
-    fdflags: Fdflags
+    fdflags: Fdflags,
+    _workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
     let result = await this.getHandle(path, true, undefined);
     let err = result.err,
@@ -621,6 +622,7 @@ export class FsaFilesystem implements Filesystem {
             0,
             constants.WASI_RIGHTS_ALL,
             constants.WASI_RIGHTS_ALL,
+            0,
             0
           );
 
