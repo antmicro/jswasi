@@ -15,7 +15,12 @@ import {
 } from "./filesystem.js";
 import { basename, dirname } from "../utils.js";
 import * as constants from "../constants.js";
-import { delStoredData, getStoredData, setStoredData } from "./metadata.js";
+import {
+  listStoredKeys,
+  delStoredData,
+  getStoredData,
+  setStoredData,
+} from "./metadata.js";
 import { UserData, EventType, PollEvent } from "../types.js";
 
 async function initMetadataPath(handle: FileSystemHandle): Promise<string> {
@@ -593,6 +598,32 @@ export class FsaFilesystem implements Filesystem {
     _args: Object
   ): Promise<number> {
     return constants.WASI_EINVAL;
+  }
+
+  async cleanup(): Promise<void> {
+    // TODO: this should be callable using ioctl
+    if (!this.keepMetadata) return;
+
+    const label = this.rootHandle.name;
+
+    await Promise.all(
+      (
+        await listStoredKeys()
+      ).map(async (key) => {
+        if (key.startsWith(label)) {
+          const result = await this.open(
+            key.replace(label, ""),
+            0,
+            0,
+            constants.WASI_RIGHTS_ALL,
+            constants.WASI_RIGHTS_ALL,
+            0
+          );
+
+          if (result.err === constants.WASI_ENOENT) await delStoredData(key);
+        }
+      })
+    );
   }
 }
 

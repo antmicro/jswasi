@@ -41,7 +41,7 @@ import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager from "./process-manager.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
-import { listStoredKeys, delStoredData } from "./filesystem/metadata.js";
+import { FsaFilesystem } from "./filesystem/fsa-filesystem.js";
 
 declare global {
   interface Window {
@@ -1154,17 +1154,15 @@ export default async function syscallCallback(
     }
     case "clean_inodes": {
       // This syscall removes indexedDB entries that don't correspond to any file or directory
+      // TODO: this should be fsa filesystem ioctl rather than syscall
       const { sharedBuffer } = data as CleanInodesArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
 
-      let keys = await listStoredKeys();
-
-      for (let key of keys) {
-        const { err } = await processManager.filesystem.open(key);
-        if (err === constants.WASI_ENOENT) {
-          delStoredData(key);
-        }
-      }
+      await Promise.all(
+        Object.values(processManager.filesystem.getMounts()).map(async (fs) => {
+          if (fs instanceof FsaFilesystem) (fs as FsaFilesystem).cleanup();
+        })
+      );
 
       Atomics.store(lck, 0, 0);
       Atomics.notify(lck, 0);
