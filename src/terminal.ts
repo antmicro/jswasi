@@ -4,6 +4,7 @@ import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
 import { md5sum } from "./utils.js";
 import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
 import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
+import { ProcFilesystem } from "./filesystem/proc-filesystem/proc-filesystem.js";
 import {
   DriverManager,
   major,
@@ -384,6 +385,9 @@ export async function init(
       currentProcessId: 0,
     })
   );
+
+  await tfs.createDir("/sys");
+  await tfs.addMountFs("/sys", new ProcFilesystem(processManager));
 
   await tfs.createDir("/tmp");
   await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});

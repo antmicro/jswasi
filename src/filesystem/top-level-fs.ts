@@ -71,8 +71,8 @@ export class TopLevelFs {
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0,
-    symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT,
-    workerId: number = 0
+    workerId: number = 0,
+    symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT
   ): Promise<DescInfo> {
     let rpath = realpath(path);
     let lastSeparator, fs;
