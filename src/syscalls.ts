@@ -218,7 +218,7 @@ export default async function syscallCallback(
               default: {
                 exit_staus = constants.EXIT_FAILURE;
                 console.log(
-                  `Spawn: program for redirect type ${redirect.type} should not enter here.`
+                  `Spawn: program should not enter here for redirect type ${redirect.type}.`
                 );
                 continue;
               }
@@ -238,7 +238,7 @@ export default async function syscallCallback(
               break;
             }
 
-            let oldDesc = fds.getDesc(fd);
+            let oldDesc = fds.getDesc(fd_dst);
             if (oldDesc !== undefined) {
               oldDesc.close();
             }
@@ -995,15 +995,14 @@ export default async function syscallCallback(
       if (fdEntry === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        // WASI standard flags
-        let newFlags = flags & constants.WASI_STD_FDFLAG_MASK;
-
-        // Flags not covered by WASI
-        if (flags & constants.WASI_EXT_FDFLAG_CTRL_BIT) {
+        if ((flags & constants.WASI_EXT_FDFLAG_CTRL_BIT) === 0) {
+          // Manipulate standard flags only
+          let newFlags = flags & constants.WASI_STD_FDFLAG_MASK;
+          err = await fdEntry.desc.setFdstatFlags(newFlags);
+        } else {
+          // Control bit is set, manipulate flags not covered by WASI only
           fdEntry.fdFlags = flags & constants.WASI_EXT_FDFLAG_MASK;
         }
-
-        err = await fdEntry.desc.setFdstatFlags(newFlags);
       }
 
       Atomics.store(lck, 0, err);
