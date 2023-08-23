@@ -250,7 +250,10 @@ export default async function syscallCallback(
           case constants.WASI_EXT_REDIRECT_TYPE_PIPEOUT:
           case constants.WASI_EXT_REDIRECT_TYPE_DUPLICATE: {
             if (fds.getDesc(redirect.fd_src) !== undefined) {
-              fds.getDesc(fd_dst).close();
+              let desc_dst = fds.getDesc(fd_dst);
+              if (desc_dst !== undefined) {
+                desc_dst.close();
+              }
               fds.duplicateFd(redirect.fd_src, fd_dst);
             } else {
               console.log(
