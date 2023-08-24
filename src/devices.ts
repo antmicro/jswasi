@@ -45,18 +45,21 @@ export class EventSource
     this.signalSub = undefined;
   }
 
-  override getFilestat(): Promise<Filestat> {
+  override getFilestat(): Promise<{ err: number; filestat: Filestat }> {
     // TODO: Mostly dummy values
     return Promise.resolve({
-      dev: 0n,
-      ino: 0n,
-      filetype: this.fdstat.fs_filetype,
-      nlink: 0n,
-      size: 0n,
-      mtim: 0n,
-      atim: 0n,
-      ctim: 0n,
-    } as Filestat);
+      err: constants.WASI_ESUCCESS,
+      filestat: {
+        dev: 0n,
+        ino: 0n,
+        filetype: this.fdstat.fs_filetype,
+        nlink: 0n,
+        size: 0n,
+        mtim: 0n,
+        atim: 0n,
+        ctim: 0n,
+      } as Filestat,
+    });
   }
 
   override async setFilestatTimes(

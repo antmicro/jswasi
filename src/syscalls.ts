@@ -700,15 +700,19 @@ export default async function syscallCallback(
                 fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET)
             ) {
               if (err === constants.WASI_ESUCCESS) {
-                let filestat = await __desc.getFilestat();
-                buf.setBigUint64(0, filestat.dev, true);
-                buf.setBigUint64(8, filestat.ino, true);
-                buf.setUint8(16, filestat.filetype);
-                buf.setBigUint64(24, filestat.nlink, true);
-                buf.setBigUint64(32, filestat.size, true);
-                buf.setBigUint64(40, filestat.atim, true);
-                buf.setBigUint64(48, filestat.mtim, true);
-                buf.setBigUint64(56, filestat.ctim, true);
+                let result = await __desc.getFilestat();
+                if (result.err != constants.WASI_ESUCCESS) {
+                  err = result.err;
+                } else {
+                  buf.setBigUint64(0, result.filestat.dev, true);
+                  buf.setBigUint64(8, result.filestat.ino, true);
+                  buf.setUint8(16, result.filestat.filetype);
+                  buf.setBigUint64(24, result.filestat.nlink, true);
+                  buf.setBigUint64(32, result.filestat.size, true);
+                  buf.setBigUint64(40, result.filestat.atim, true);
+                  buf.setBigUint64(48, result.filestat.mtim, true);
+                  buf.setBigUint64(56, result.filestat.ctim, true);
+                }
               }
             }
           }
@@ -760,7 +764,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (
         fds.getFd(fd) !== undefined &&
-        (await fds.getFd(fd).getFilestat()).filetype ===
+        (await fds.getFd(fd).getFdstat()).fs_filetype ===
           constants.WASI_FILETYPE_DIRECTORY
       ) {
         let entries = (await fds.getFd(fd).readdir(cookie === 0n)).dirents;

@@ -57,7 +57,7 @@ export async function fetchFile(
   }
 
   // only fetch binary if not yet present
-  if (refetch || (await desc.getFilestat()).size === 0n) {
+  if (refetch || (await desc.getFilestat()).filestat.size === 0n) {
     const response = await fetch(address);
     if (response.status != 200) {
       return constants.WASI_ENOENT;
@@ -109,7 +109,7 @@ async function initFs(fs: TopLevelFs) {
       0,
       constants.WASI_O_CREAT
     );
-    if ((await washrc.desc.getFilestat()).size === 0n) {
+    if ((await washrc.desc.getFilestat()).filestat.size === 0n) {
       await washrc.desc.write(
         new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1")
       );

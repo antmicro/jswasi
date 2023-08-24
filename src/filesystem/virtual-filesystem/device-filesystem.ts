@@ -132,8 +132,11 @@ export abstract class AbstractVirtualDeviceDescriptor extends AbstractDeviceDesc
     super(fs_flags, fs_rights_base, fs_rights_inheriting);
   }
 
-  override async getFilestat(): Promise<Filestat> {
-    return wasiFilestat(this.ino._metadata);
+  override async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
+    return {
+      err: constants.WASI_ESUCCESS,
+      filestat: wasiFilestat(this.ino._metadata),
+    };
   }
 }
 

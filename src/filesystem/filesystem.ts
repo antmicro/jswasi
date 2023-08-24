@@ -60,7 +60,7 @@ export interface Descriptor {
   /*
    * Returns descriptor filestat structutre
    */
-  getFilestat(): Promise<Filestat>;
+  getFilestat(): Promise<{ err: number; filestat: Filestat }>;
 
   /*
    * Initializes the descriptor using async functions that cannot be executed in the constructor
@@ -301,7 +301,7 @@ export abstract class AbstractDescriptor implements Descriptor {
     return constants.WASI_ENOTTY;
   }
 
-  abstract getFilestat(): Promise<Filestat>;
+  abstract getFilestat(): Promise<{ err: number; filestat: Filestat }>;
   abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;
   abstract close(): Promise<number>;
   abstract read(
@@ -438,8 +438,8 @@ export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
       fs_filetype: constants.WASI_FILETYPE_CHARACTER_DEVICE,
     };
   }
-  async getFilestat(): Promise<Filestat> {
-    return undefined;
+  async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
+    return { err: constants.WASI_EBADF, filestat: undefined };
   }
 
   async setFilestatTimes(_atim: Timestamp, _mtim: Timestamp): Promise<number> {

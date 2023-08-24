@@ -499,8 +499,9 @@ export class FsaFilesystem implements Filesystem {
     await initializeFsaDesc(srcDesc);
 
     const srcFilestat = await srcDesc.getFilestat();
-    console.log(srcFilestat);
-    if (srcFilestat.filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK)
+    if (srcFilestat.err !== constants.WASI_ESUCCESS) return srcFilestat.err;
+
+    if (srcFilestat.filestat.filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK)
       return constants.WASI_EXDEV;
 
     if (newDesc !== undefined && !(newDesc instanceof FsaDirectoryDescriptor))
@@ -537,7 +538,7 @@ export class FsaFilesystem implements Filesystem {
     await srcDesc.close();
     await destDesc.close();
 
-    await setStoredData(destDesc.metadataPath, srcFilestat);
+    await setStoredData(destDesc.metadataPath, srcFilestat.filestat);
 
     await this.unlinkat(oldDesc, oldPath, false);
 
@@ -905,12 +906,17 @@ class FsaFileDescriptor
     return constants.WASI_ESUCCESS;
   }
 
-  async getFilestat() {
-    let meta = this.keepMetadata
+  async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
+    let filestat = this.keepMetadata
       ? await getStoredData(this.metadataPath)
       : FsaFileDescriptor.defaultFilestat;
-    meta.size = BigInt((await this.__getFile()).file?.size);
-    return meta;
+
+    // TODO: revisit errno choice
+    if (filestat === undefined)
+      return { err: constants.WASI_ENOTRECOVERABLE, filestat: undefined };
+
+    filestat.size = BigInt((await this.__getFile()).file?.size);
+    return { err: constants.WASI_ESUCCESS, filestat };
   }
 
   // This function should not be async, in case the local file variable is not
@@ -974,11 +980,17 @@ class FsaDirectoryDescriptor
     await initializeFsaDesc(this);
   }
 
-  async getFilestat(): Promise<Filestat> {
+  async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
     if (this.keepMetadata) {
-      return getStoredData(this.metadataPath);
+      const filestat = await getStoredData(this.metadataPath);
+      if (filestat === undefined)
+        return { err: constants.WASI_ENOTRECOVERABLE, filestat: undefined };
+      return { err: constants.WASI_ESUCCESS, filestat };
     } else {
-      return FsaDirectoryDescriptor.defaultFilestat;
+      return {
+        err: constants.WASI_ESUCCESS,
+        filestat: FsaDirectoryDescriptor.defaultFilestat,
+      };
     }
   }
 

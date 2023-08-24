@@ -305,7 +305,9 @@ export class TopLevelFs {
     // return with error
     if (__dinfo1.err !== constants.WASI_ESUCCESS) return __dinfo1.err;
 
-    const filestat1 = await __dinfo1.desc.getFilestat();
+    const __res = await __dinfo1.desc.getFilestat();
+    if (__res.err !== constants.WASI_ESUCCESS) return __res.err;
+    const filestat1 = __res.filestat;
 
     const dinfo2 = await this.getDescInfo(
       __target_dirname,
@@ -325,7 +327,9 @@ export class TopLevelFs {
     // target path exists, additional checks need to be performed to check
     // if the rename is feasible
     if (__dinfo2.err === constants.WASI_ESUCCESS) {
-      const filestat2 = await __dinfo2.desc.getFilestat();
+      const __res = await __dinfo2.desc.getFilestat();
+      if (__res.err !== constants.WASI_ESUCCESS) return __res.err;
+      const filestat2 = __res.filestat;
 
       // if paths are on different mount points, return EXDEV
       if (filestat1.dev !== filestat2.dev) return constants.WASI_EXDEV;

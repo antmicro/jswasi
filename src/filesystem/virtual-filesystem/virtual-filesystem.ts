@@ -531,8 +531,11 @@ class VirtualFilesystemFileDescriptor
     }
   }
 
-  async getFilestat(): Promise<Filestat> {
-    return wasiFilestat(this.desc._iNode.getMetadata());
+  async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
+    return {
+      err: constants.WASI_ESUCCESS,
+      filestat: wasiFilestat(this.desc._iNode.getMetadata()),
+    };
   }
 
   async setFilestatTimes(atim?: Timestamp, mtim?: Timestamp): Promise<number> {
@@ -614,8 +617,11 @@ export class VirtualFilesystemDirectoryDescriptor
     }
   }
 
-  async getFilestat(): Promise<Filestat> {
-    return wasiFilestat(this.dir.getMetadata());
+  async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
+    return {
+      err: constants.WASI_ESUCCESS,
+      filestat: wasiFilestat(this.dir.getMetadata()),
+    };
   }
 
   async setFilestatTimes(atim?: Timestamp, mtim?: Timestamp): Promise<number> {
