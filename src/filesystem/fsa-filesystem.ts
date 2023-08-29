@@ -554,12 +554,10 @@ export class FsaFilesystem implements Filesystem {
 
     if (__opts.dir !== undefined) {
       this.rootHandle = __opts.dir;
-      return constants.WASI_ESUCCESS;
     } else if (__opts.name !== undefined) {
       const topLevelHandle = await navigator.storage.getDirectory();
       try {
         this.rootHandle = await topLevelHandle.getDirectoryHandle(__opts.name);
-        return constants.WASI_ESUCCESS;
       } catch (e) {
         if (
           e instanceof DOMException &&
@@ -575,21 +573,13 @@ export class FsaFilesystem implements Filesystem {
           return constants.WASI_ENOENT;
         }
       }
-      const rootStoredData = await getStoredData(__opts.name);
-      if (__opts.keepMetadata && !rootStoredData) {
-        await setStoredData(__opts.name, {
-          dev: 0n,
-          ino: 0n,
-          filetype: constants.WASI_FILETYPE_DIRECTORY,
-          nlink: 1n,
-          size: 4096n,
-          atim: 0n,
-          mtim: 0n,
-          ctim: 0n,
-        });
-      }
     }
-    return constants.WASI_EINVAL;
+
+    const rootStoredData = await getStoredData(__opts.name);
+    if (__opts.keepMetadata && !rootStoredData)
+      await setStoredData(__opts.name, FsaDirectoryDescriptor.defaultFilestat);
+
+    return constants.WASI_ESUCCESS;
   }
 
   async mknodat(
