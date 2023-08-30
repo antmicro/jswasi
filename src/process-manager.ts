@@ -65,10 +65,10 @@ export class FdTable {
     if (entry === undefined) {
       throw "Entry is undefined";
     }
-    let desc_entry = new DescriptorEntry(entry);
+    let descEntry = new DescriptorEntry(entry);
     let fd = this.freeFds.shift();
     if (fd !== undefined) {
-      this.fdt[fd] = desc_entry;
+      this.fdt[fd] = descEntry;
       return fd;
     } else {
       fd = ++this.topFd;
@@ -77,7 +77,7 @@ export class FdTable {
       while (this.fdt[fd] !== undefined) {
         fd = ++this.topFd;
       }
-      this.fdt[fd] = desc_entry;
+      this.fdt[fd] = descEntry;
       return fd;
     }
   }

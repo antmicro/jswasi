@@ -1140,7 +1140,10 @@ export default async function syscallCallback(
         eventMask
       );
 
-      var fd = processManager.processInfos[processId].fds.addFile(eventSource);
+      let fds = processManager.processInfos[processId].fds;
+      var fd = fds.addFile(eventSource);
+      fds.fdt[fd].fdFlags = constants.WASI_EXT_FDFLAG_CLOEXEC;
+
       Atomics.store(fileDescriptor, 0, fd);
       Atomics.store(lck, 0, 0);
       Atomics.notify(lck, 0);
