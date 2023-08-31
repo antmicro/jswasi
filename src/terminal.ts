@@ -122,6 +122,8 @@ export async function fetchFile(
       await response.body?.pipeTo(stream);
     }
   }
+
+  await desc.close();
   return constants.WASI_ESUCCESS;
 }
 
