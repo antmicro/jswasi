@@ -99,12 +99,16 @@ export class TopLevelFs {
       fs_rights_inheriting,
       fdflags
     );
+
     if (desc) {
-      if (index > -1) {
-        await desc.initialize(rpath.slice(0, lastSeparator));
-      } else {
-        await desc.initialize(rpath);
-      }
+      const __path = index > -1 ? rpath.slice(0, lastSeparator) : rpath;
+      if ((await desc.initialize(__path)) !== constants.WASI_ESUCCESS)
+        return {
+          desc: undefined,
+          err: constants.WASI_ENOTRECOVERABLE,
+          fs: undefined,
+          path: rpath,
+        };
     }
 
     if (dirflags & constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) {

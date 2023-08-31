@@ -29,6 +29,59 @@ const ALWAYS_FETCH_BINARIES = {
   "/usr/bin/coreutils": "resources/coreutils.wasm",
 };
 
+async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
+  // verify if wash and init are up to date and refetch them if they are not
+  await tfs.createDir("/usr");
+  await tfs.createDir("/usr/bin");
+  const checksumPromises = Object.entries(CHECKSUM_BINARIES).map(
+    async ([filename, [address, checksum]]) => {
+      const file = await tfs.open(filename);
+      if (file.err === constants.EXIT_SUCCESS) {
+        // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
+        let actual_sum = await md5sum(file.desc, 1 << (16 + 1));
+        let exp_sum = new TextDecoder().decode(
+          (await (await fetch(checksum)).arrayBuffer()).slice(0, 32)
+        );
+        if (actual_sum === exp_sum) {
+          return constants.WASI_ESUCCESS;
+        }
+      }
+      return fetchFile(tfs, filename, address, true);
+    }
+  );
+
+  return await Promise.all(checksumPromises);
+}
+
+async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
+  return new FdTable({
+    0: (
+      await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n)
+    ).desc,
+    1: (
+      await tfs.open(
+        "/dev/ttyH0",
+        0,
+        0,
+        constants.WASI_FDFLAG_APPEND,
+        constants.WASI_EXT_RIGHTS_STDOUT,
+        0n
+      )
+    ).desc,
+    2: (
+      await tfs.open(
+        "/dev/ttyH0",
+        0,
+        0,
+        constants.WASI_FDFLAG_APPEND,
+        constants.WASI_EXT_RIGHTS_STDERR,
+        0n
+      )
+    ).desc,
+    3: (await tfs.open("/")).desc,
+  });
+}
+
 export async function fetchFile(
   fs: TopLevelFs,
   filename: string,
@@ -208,6 +261,13 @@ const DEFAULT_MOUNT_CONFIG: MountConfig = {
   },
 };
 
+const RECOVERY_MOUNT_CONFIG: MountConfig = {
+  mountPoint: "/",
+  createMissing: false,
+  fsType: "vfs",
+  opts: {},
+};
+
 async function getTopLevelFs(): Promise<TopLevelFs> {
   const tfs = new TopLevelFs();
   let __configFs = (
@@ -233,6 +293,22 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
   await tfs.addMount("/", __filesystem);
   return tfs;
 }
+
+async function recoveryMotd(tfs: TopLevelFs) {
+  const { err, desc } = await tfs.open(
+    "/etc/motd",
+    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    constants.WASI_O_CREAT | constants.WASI_O_TRUNC
+  );
+  if (err !== constants.WASI_ESUCCESS) return;
+
+  await desc.write(
+    new TextEncoder().encode(
+      "\n[WARNING] Could not mount filesystem, volatile filesystem used as root for recovery\n"
+    )
+  );
+}
+
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
@@ -249,42 +325,34 @@ export async function init(
   }
 
   const tfs = await getTopLevelFs();
-
   initServiceWorker();
+  const driverManager = new DriverManager();
+  const processManager = new ProcessManager("process.js", tfs, driverManager);
+
   // create flag file to indicate that the filesystem was already initiated
   const { err } = await tfs.open(
     "/filesystem-initiated",
     constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
     constants.WASI_O_CREAT | constants.WASI_O_EXCL
   );
-  if (err === constants.WASI_ESUCCESS) {
+
+  if (err === constants.WASI_ESUCCESS) await initFs(tfs);
+
+  if (
+    (await essentialBins(tfs)).some((err) => err !== constants.WASI_ESUCCESS)
+  ) {
+    await tfs.removeMount("/");
+    const conf = RECOVERY_MOUNT_CONFIG;
+
+    const __filesystem = await getFilesystem(conf.fsType, conf.opts);
+
+    // If there is an error, nothing can be done
+    await tfs.addMount("/", __filesystem.filesystem);
+
     await initFs(tfs);
+    await essentialBins(tfs);
+    await recoveryMotd(tfs);
   }
-
-  // verify if wash and init are up to date and refetch them if they are not
-  await tfs.createDir("/usr");
-  await tfs.createDir("/usr/bin");
-  const checksumPromises = Object.entries(CHECKSUM_BINARIES).map(
-    async ([filename, [address, checksum]]) => {
-      const file = await tfs.open(filename);
-      if (file.err === constants.EXIT_SUCCESS) {
-        // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
-        let actual_sum = await md5sum(file.desc, 1 << (16 + 1));
-        let exp_sum = new TextDecoder().decode(
-          (await (await fetch(checksum)).arrayBuffer()).slice(0, 32)
-        );
-        if (actual_sum === exp_sum) {
-          return undefined;
-        }
-      }
-      return fetchFile(tfs, filename, address, true);
-    }
-  );
-  await Promise.all(checksumPromises);
-
-  const driverManager = new DriverManager();
-
-  const processManager = new ProcessManager("process.js", tfs, driverManager);
 
   await tfs.addMount(
     "/dev",
@@ -298,39 +366,7 @@ export async function init(
     null, // parent_id
     null, // parent_lock
     "/usr/bin/wash",
-    new FdTable({
-      0: (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          0,
-          constants.WASI_EXT_RIGHTS_STDIN,
-          0n
-        )
-      ).desc,
-      1: (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          constants.WASI_FDFLAG_APPEND,
-          constants.WASI_EXT_RIGHTS_STDOUT,
-          0n
-        )
-      ).desc,
-      2: (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          constants.WASI_FDFLAG_APPEND,
-          constants.WASI_EXT_RIGHTS_STDERR,
-          0n
-        )
-      ).desc,
-      3: (await tfs.open("/")).desc,
-    }),
+    await getDefaultFdTable(tfs),
     ["/usr/bin/wash", "/usr/bin/init"],
     DEFAULT_ENV,
     false,
