@@ -66,7 +66,7 @@ export interface Descriptor {
    * Initializes the descriptor using async functions that cannot be executed in the constructor
    * @param path - path of a file associated with the descriptor
    */
-  initialize(path: string): Promise<void>;
+  initialize(path: string): Promise<number>;
 
   /*
    * Getter for descriptor path
@@ -275,8 +275,9 @@ export abstract class AbstractDescriptor implements Descriptor {
     return this.fdstat;
   }
 
-  async initialize(path: string): Promise<void> {
+  async initialize(path: string): Promise<number> {
     this.path = path;
+    return constants.WASI_ESUCCESS;
   }
 
   getPath(): string {

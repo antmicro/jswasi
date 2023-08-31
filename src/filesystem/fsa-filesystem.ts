@@ -715,18 +715,28 @@ class FsaFileDescriptor
     this.file = undefined;
   }
 
-  override async initialize(path: string) {
-    await super.initialize(path);
+  override async initialize(path: string): Promise<number> {
+    const err = await super.initialize(path);
+    if (err !== constants.WASI_ESUCCESS) return err;
+
     await initializeFsaDesc(this);
+
     const size = BigInt((await this.__getFile()).file?.size);
-    this.fdstat.fs_filetype = (
-      this.keepMetadata
-        ? await getStoredData(this.metadataPath)
-        : FsaFileDescriptor.defaultFilestat
-    ).filetype;
-    if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) {
-      this.cursor = size;
+    let filetype;
+    if (this.keepMetadata) {
+      const filestat = await getStoredData(this.metadataPath);
+
+      if (filestat == undefined) return constants.WASI_ENOENT;
+
+      filetype = filestat.filetype;
+    } else {
+      filetype = FsaFileDescriptor.defaultFilestat.filetype;
     }
+
+    this.fdstat.fs_filetype = filetype;
+    if (this.fdstat.fs_flags & constants.WASI_FDFLAG_APPEND) this.cursor = size;
+
+    return constants.WASI_ESUCCESS;
   }
 
   async getWriter(): Promise<FileSystemWritableFileStream> {
@@ -965,9 +975,13 @@ class FsaDirectoryDescriptor
     this.entries = [];
   }
 
-  override async initialize(path: string): Promise<void> {
-    await super.initialize(path);
+  override async initialize(path: string): Promise<number> {
+    const err = await super.initialize(path);
+    if (err !== constants.WASI_ESUCCESS) return err;
+
     await initializeFsaDesc(this);
+
+    return constants.WASI_ESUCCESS;
   }
 
   async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
