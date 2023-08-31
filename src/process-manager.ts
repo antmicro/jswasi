@@ -192,11 +192,6 @@ export default class ProcessManager {
       if (parentLock !== null) this.processInfos[parentId].foreground = null;
     }
 
-    if (foreground !== null) {
-      const __driver = this.driverManager.getDriver(foreground.maj);
-      (__driver as TerminalDriver).terminals[foreground.min].foregroundPid = id;
-    }
-
     this.processInfos[id] = new ProcessInfo(
       id,
       command,
@@ -211,6 +206,11 @@ export default class ProcessManager {
       foreground
     );
     worker.onmessage = (event) => syscallCallback(event, this);
+
+    if (foreground !== null) {
+      const __driver = this.driverManager.getDriver(foreground.maj);
+      (__driver as TerminalDriver).terminals[foreground.min].foregroundPid = id;
+    }
 
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
