@@ -1015,6 +1015,7 @@ class FsaDirectoryDescriptor
   }
 
   async readdir(refresh: boolean): Promise<{ err: number; dirents: Dirent[] }> {
+    let err = constants.WASI_ESUCCESS;
     if (refresh || this.entries.length === 0) {
       this.entries = [];
       var i = 1n;
@@ -1023,16 +1024,23 @@ class FsaDirectoryDescriptor
           continue;
         }
         let filestat = this.keepMetadata
-          ? await getStoredData(`${this.metadataPath}/${name}`)
+          ? // TODO: Directory filestat should not be default here
+            await getStoredData(`${this.metadataPath}/${name}`)
           : FsaDirectoryDescriptor.defaultFilestat;
-        this.entries.push({
-          d_next: i++,
-          d_ino: filestat.ino,
-          name,
-          d_type: filestat.filetype,
-        });
+
+        // TODO: revisit errno choice
+        if (filestat === undefined) {
+          err = constants.WASI_ENOTRECOVERABLE;
+        } else {
+          this.entries.push({
+            d_next: i++,
+            d_ino: filestat.ino,
+            name,
+            d_type: filestat.filetype,
+          });
+        }
       }
     }
-    return { err: constants.WASI_ESUCCESS, dirents: this.entries };
+    return { err, dirents: this.entries };
   }
 }
