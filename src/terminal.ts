@@ -124,6 +124,7 @@ export async function fetchFile(
 
   // only fetch binary if not yet present
   if (refetch || (await desc.getFilestat()).filestat.size === 0n) {
+    await desc.truncate(0n);
     const response = await fetch(address);
     if (response.status != 200) {
       return constants.WASI_ENOENT;
