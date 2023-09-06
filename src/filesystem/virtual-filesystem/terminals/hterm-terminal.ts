@@ -300,6 +300,20 @@ export class HtermDeviceDriver implements TerminalDriver {
       ),
     };
   }
+
+  // Auxiliary function to print uncaught exceptions to all terminals
+  async wrapCallback(callback: () => Promise<void>) {
+    try {
+      await callback();
+    } catch (e) {
+      Object.values(this.terminals).forEach((terminal) => {
+        terminal.terminal.io.println(
+          `[ERROR] Unrecoverable kernel error: ${e}`
+        );
+      });
+      throw e;
+    }
+  }
 }
 
 class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {

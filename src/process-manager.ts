@@ -4,8 +4,12 @@ import { TopLevelFs } from "./filesystem/top-level-fs";
 import { Descriptor, Fdflags } from "./filesystem/filesystem";
 import { EventType } from "./types.js";
 import syscallCallback from "./syscalls.js";
-import { DriverManager } from "./filesystem/virtual-filesystem/driver-manager.js";
+import {
+  DriverManager,
+  major,
+} from "./filesystem/virtual-filesystem/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
+import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
 
 export const DEFAULT_WORK_DIR = "/home/ant";
 export const DEFAULT_ENV = {
@@ -184,6 +188,25 @@ export default class ProcessManager {
     public driverManager: DriverManager
   ) {}
 
+  // This method wraps syscallCallback with HtermDeviceDriver.wrapCallback method that
+  // prints the error message to all terminals upon catching a exception so that user knows
+  // what caused the kernel panic
+  private async syscallCallback(
+    event: MessageEvent,
+    processManager: ProcessManager
+  ): Promise<void> {
+    if (this.driverManager !== undefined) {
+      const driver = this.driverManager.getDriver(major.MAJ_HTERM);
+      if (driver !== undefined) {
+        (driver as HtermDeviceDriver).wrapCallback(async () => {
+          await syscallCallback(event, processManager);
+        });
+        return;
+      }
+    }
+    syscallCallback;
+  }
+
   async spawnProcess(
     parentId: number | null,
     parentLock: Int32Array | null,
@@ -215,13 +238,13 @@ export default class ProcessManager {
       fds,
       parentId,
       parentLock,
-      syscallCallback,
+      this.syscallCallback,
       env,
       workingDir,
       isJob,
       foreground
     );
-    worker.onmessage = (event) => syscallCallback(event, this);
+    worker.onmessage = (event) => this.syscallCallback(event, this);
 
     if (foreground !== null) {
       const __driver = this.driverManager.getDriver(foreground.maj);
