@@ -55,9 +55,18 @@ async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
 
 async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
   return new FdTable({
-    0: new DescriptorEntry((
-      await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n)
-    ).desc),
+    0: new DescriptorEntry(
+      (
+        await tfs.open(
+          "/dev/ttyH0",
+          0,
+          0,
+          0,
+          constants.WASI_EXT_RIGHTS_STDIN,
+          0n
+        )
+      ).desc
+    ),
     1: new DescriptorEntry(
       (
         await tfs.open(
@@ -319,14 +328,16 @@ async function recoveryMotd(tfs: TopLevelFs) {
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
 export async function init(
-  anchor: HTMLElement,
+  terminal: any,
   notifyDroppedFileSaved:
     | ((path: string, entryName: string) => void)
     | null = null
 ): Promise<void> {
   if (!navigator.storage.getDirectory) {
-    anchor.innerHTML =
-      "Your browser doesn't support File System Access API yet.<br/>We recommend using Chrome for the time being.";
+    terminal.io.println(
+      "Your browser doesn't support File System Access API yet."
+    );
+    terminal.io.println("We recommend using Chrome for the time being.");
     return;
   }
 
@@ -363,7 +374,7 @@ export async function init(
   await tfs.addMount(
     "/dev",
     await createDeviceFilesystem(driverManager, processManager, {
-      anchor,
+      terminal,
       currentProcessId: 0,
     })
   );

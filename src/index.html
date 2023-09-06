@@ -24,7 +24,9 @@
       script.src = "./vendor/hterm_all.js";
       script.onload = async () => {
         await lib.init();
-        await init(document.querySelector("#terminal"), (path, entryName) =>
+        const terminal = new hterm.Terminal();
+        terminal.decorate(document.querySelector("#terminal"));
+        await init(terminal, (path, entryName) =>
           console.log(`[added dropped file as '${path}/${entryName}]`)
         );
       };

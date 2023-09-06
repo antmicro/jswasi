@@ -20,7 +20,7 @@ import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
 import ProcessManager from "../../../process-manager.js";
 
 type InitDeviceArgs = {
-  anchor: HTMLElement;
+  terminal: any;
 };
 
 export type InitDriverArgs = { processManager: ProcessManager };
@@ -164,11 +164,8 @@ export class HtermDeviceDriver implements TerminalDriver {
     });
   }
 
-  private __initTerminal(anchor: HTMLElement): Hterm {
-    // @ts-ignore
-    let __hterm = new Hterm(new hterm.Terminal());
-
-    __hterm.terminal.decorate(anchor);
+  private __initTerminal(terminal: any): Hterm {
+    const __hterm = new Hterm(terminal);
     __hterm.terminal.installKeyboard();
     __hterm.terminal.keyboard.bindings.addBindings({
       "Ctrl-R": "PASS",
@@ -253,11 +250,11 @@ export class HtermDeviceDriver implements TerminalDriver {
       __ttyMin = this.maxTty++;
     }
 
-    const __term = this.__initTerminal(__args.anchor);
+    const __term = this.__initTerminal(__args.terminal);
     this.terminals[__ttyMin] = __term;
     this.__initFsaDropImport(
       __ttyMin,
-      __args.anchor.getElementsByTagName("iframe")[0].contentWindow!,
+      __args.terminal.div_.getElementsByTagName("iframe")[0].contentWindow!,
       () => {},
       this.processManager
     );
