@@ -52,6 +52,8 @@ function mapErr(e: DOMException, isDir: boolean): number {
       return constants.WASI_ENOENT;
     case "InvalidModificationError":
       return constants.WASI_ENOTEMPTY;
+    case "QuotaExceededError":
+      return constants.WASI_EDQUOT;
     default:
       return constants.WASI_EINVAL;
   }
@@ -208,12 +210,19 @@ export class FsaFilesystem implements Filesystem {
     if (err !== constants.WASI_ENOENT) {
       return err;
     }
-    handle = await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
-      path,
-      {
-        create: true,
+    try {
+      handle = await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
+        path,
+        {
+          create: true,
+        }
+      );
+    } catch (e) {
+      if (e instanceof DOMException) {
+        const __err = mapErr(e, true);
+        if (__err !== constants.WASI_ESUCCESS) return __err;
       }
-    );
+    }
     if (this.keepMetadata) {
       await setStoredData(await initMetadataPath(handle), {
         dev: 0n,
