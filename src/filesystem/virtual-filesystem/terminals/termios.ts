@@ -26,8 +26,8 @@ export const IEXTEN: TcFlag = 0x0100000;
 
 // Termios struct allows to manipulate terminal behavior
 export type Termios = {
-  IFlag: TcFlag;
-  OFlag: TcFlag;
-  CFlag: TcFlag;
-  LFlag: TcFlag;
+  iFlag: TcFlag;
+  oFlag: TcFlag;
+  cFlag: TcFlag;
+  lFlag: TcFlag;
 };

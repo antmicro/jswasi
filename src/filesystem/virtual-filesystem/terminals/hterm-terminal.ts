@@ -47,18 +47,19 @@ class Hterm implements Terminal {
     this.raw = true;
 
     this.termios = {
-      IFlag:
+      iFlag:
         termios.IGNBRK |
         termios.BRKINT |
         termios.PARMRK |
-        termios.ISTRIP |
+        // It zeroes eighth bit of each byte, I suppose it shoulde be disabled by default
+        //termios.ISTRIP |
         termios.INLCR |
         termios.IGNCR |
         termios.ICRNL |
         termios.IXON,
-      OFlag: termios.OPOST,
-      CFlag: termios.CS8 | termios.PARENB,
-      LFlag:
+      oFlag: termios.OPOST,
+      cFlag: termios.CS8 | termios.PARENB,
+      lFlag:
         termios.ECHO |
         termios.ECHONL |
         termios.ICANON |
@@ -193,6 +194,36 @@ export class HtermDeviceDriver implements TerminalDriver {
     });
     const onTerminalInput = (data: string): void => {
       let code = data.charCodeAt(0);
+      let iFlag = __hterm.termios.iFlag;
+
+      if (code === 0 && data.length > 1 && data.charCodeAt(1) === 0) {
+        const breakOffset = this.detectBreakCondition(data);
+
+        if ((iFlag & termios.IGNBRK) !== 0) {
+          if ((iFlag & termios.BRKINT) !== 0) {
+            if ((iFlag & termios.PARMRK) === 0) {
+              __hterm.buffer += "\x00";
+            } else {
+              __hterm.buffer += "\xFF\x00\x00";
+            }
+          } else {
+            // TODO: Flush input and output buffers and it should be sent
+            // SIGINT to foreground process group
+          }
+        }
+
+        if (breakOffset === data.length) {
+          // TODO: jump to flushing procedure
+        } else {
+          data = data.slice(breakOffset);
+          code = data.charCodeAt(0);
+        }
+      }
+
+      if ((iFlag & termios.ISTRIP) !== 0) {
+        data = this.stripOffBytes(data);
+        code = data.charCodeAt(0);
+      }
 
       if (code === 13) {
         code = 10;
@@ -334,6 +365,25 @@ export class HtermDeviceDriver implements TerminalDriver {
       });
       throw e;
     }
+  }
+
+  private detectBreakCondition(data: string): number {
+    for (let i = 2; i < data.length; ++i) {
+      if (data.charCodeAt(i) !== 0) {
+        return i;
+      }
+    }
+
+    return data.length;
+  }
+
+  private stripOffBytes(data: string): string {
+    let stripped = "";
+    for (let i = 0; i < data.length; ++i) {
+      let c = data.charCodeAt(i);
+      stripped += String.fromCharCode(c & 0x7f)[0];
+    }
+    return stripped;
   }
 }
 
