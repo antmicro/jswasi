@@ -1,4 +1,5 @@
 import { DeviceDriver } from "../driver-manager.js";
+import { Termios } from "./termios.js";
 
 // Ioctl magic numbers for terminal devices
 export const enum ioctlRequests {
@@ -23,6 +24,7 @@ export interface Terminal {
   raw: boolean;
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
+  termios: Termios;
 
   getScreenSize(): Promise<[number, number]>;
 }

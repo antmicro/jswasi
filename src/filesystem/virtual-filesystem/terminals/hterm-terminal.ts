@@ -1,5 +1,6 @@
 // @ts-ignore
 import * as vfs from "../../../vendor/vfs.js";
+import * as termios from "./termios.js";
 import {
   TerminalDriver,
   Terminal,
@@ -28,6 +29,7 @@ export type InitDriverArgs = { processManager: ProcessManager };
 class Hterm implements Terminal {
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
+  termios: termios.Termios;
   subs: PollSub[];
 
   buffer: string;
@@ -43,6 +45,26 @@ class Hterm implements Terminal {
 
     this.echo = false;
     this.raw = true;
+
+    this.termios = {
+      IFlag:
+        termios.IGNBRK |
+        termios.BRKINT |
+        termios.PARMRK |
+        termios.ISTRIP |
+        termios.INLCR |
+        termios.IGNCR |
+        termios.ICRNL |
+        termios.IXON,
+      OFlag: termios.OPOST,
+      CFlag: termios.CS8 | termios.PARENB,
+      LFlag:
+        termios.ECHO |
+        termios.ECHONL |
+        termios.ICANON |
+        termios.ISIG |
+        termios.IEXTEN,
+    } as termios.Termios;
   }
 
   splitBuf(len: number): string {
