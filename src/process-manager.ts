@@ -142,7 +142,7 @@ export class FdTable {
   tearDown() {
     Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {
-        fileDescriptor?.desc.close();
+        fileDescriptor?.desc?.close();
       })
     );
   }
