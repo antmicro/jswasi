@@ -372,6 +372,7 @@ export async function init(
     await recoveryMotd(tfs);
   }
 
+  await tfs.createDir("/dev");
   await tfs.addMount(
     "/dev",
     await createDeviceFilesystem(driverManager, processManager, {
