@@ -454,17 +454,17 @@ export class TopLevelFs {
     // TODO: check if there are descriptors from this filesystem before unmounting
     if (
       Object.keys(this.mounts).every((mountPoint) => {
-        return !mountPoint.startsWith(path) && mountPoint.length < path.length;
+        return mountPoint === path || !mountPoint.startsWith(path);
       })
     ) {
-      return constants.WASI_EBUSY;
-    } else {
       if (this.mounts[path]) {
         delete this.mounts[path];
         return constants.WASI_ESUCCESS;
       } else {
         return constants.WASI_ENOENT;
       }
+    } else {
+      return constants.WASI_EBUSY;
     }
   }
 
