@@ -88,9 +88,9 @@ export class TopLevelFs {
       }
     }
 
-    if (fs === undefined) {
-      fs = this.mounts["/"];
-    }
+    if (fs === undefined) fs = this.mounts["/"];
+
+    if (fs === undefined) throw new Error("No filesystem mounted at root");
 
     let { err, index, desc } = await fs.open(
       rpath.slice(lastSeparator),
