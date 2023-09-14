@@ -39,8 +39,8 @@ import {
   MountArgs,
   UmountArgs,
 } from "./types.js";
-import { free, mount, ps, reset, wget, umount } from "./browser-apps.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
+import { free, ps, reset, wget } from "./browser-apps.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { FsaFilesystem } from "./filesystem/fsa-filesystem.js";
@@ -303,12 +303,6 @@ export default async function syscallCallback(
           Atomics.notify(parentLck, 0);
           break;
         }
-        case "/usr/bin/mount": {
-          const result = await mount(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
         case "/usr/bin/free": {
           const result = await free(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
@@ -323,18 +317,6 @@ export default async function syscallCallback(
         }
         case "/usr/bin/reset": {
           const result = await reset(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/umount": {
-          const result = await umount(
-            processManager,
-            processId,
-            args,
-            env,
-            fds
-          );
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;

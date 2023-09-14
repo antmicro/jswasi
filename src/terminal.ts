@@ -184,8 +184,6 @@ async function initFs(fs: TopLevelFs) {
   })();
 
   const dummyBinariesPromise = Promise.all([
-    fs.open("/usr/bin/mount", 0, constants.WASI_O_CREAT),
-    fs.open("/usr/bin/umount", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/wget", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/download", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/ps", 0, constants.WASI_O_CREAT),
@@ -228,6 +226,8 @@ async function initFs(fs: TopLevelFs) {
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tree"),
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tar"),
     fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/stty"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/mount"),
+    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/umount"),
   ]);
 
   await Promise.all([
@@ -386,8 +386,8 @@ export async function init(
     })
   );
 
-  await tfs.createDir("/sys");
-  await tfs.addMountFs("/sys", new ProcFilesystem(processManager));
+  await tfs.createDir("/proc");
+  await tfs.addMountFs("/proc", new ProcFilesystem(processManager));
 
   await tfs.createDir("/tmp");
   await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
