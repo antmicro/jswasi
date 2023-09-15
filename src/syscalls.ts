@@ -1240,7 +1240,7 @@ export default async function syscallCallback(
       }
 
       let opts: Record<string, string> = {};
-      for (const opt in data_.split(",")) {
+      for (const opt of data_.split(",")) {
         if (opt === "") continue;
 
         const split = opt.split("=");
@@ -1250,7 +1250,7 @@ export default async function syscallCallback(
           break;
         }
 
-        opts[split[0]] = opts[split[1]];
+        opts[split[0]] = split[1];
       }
 
       if (err === constants.WASI_ESUCCESS) {
