@@ -1025,14 +1025,20 @@ class FsaDirectoryDescriptor
     if (refresh || this.entries.length === 0) {
       this.entries = [];
       var i = 1n;
-      for await (const name of this.handle.keys()) {
+      for await (const [name, handle] of this.handle.entries()) {
         if (name.endsWith(".crswap")) {
           continue;
         }
-        let filestat = this.keepMetadata
-          ? // TODO: Directory filestat should not be default here
-            await getStoredData(`${this.metadataPath}/${name}`)
-          : FsaDirectoryDescriptor.defaultFilestat;
+
+        let filestat;
+        if (this.keepMetadata) {
+          filestat = await getStoredData(`${this.metadataPath}/${name}`);
+        } else {
+          filestat =
+            handle instanceof FileSystemDirectoryHandle
+              ? FsaDirectoryDescriptor.defaultFilestat
+              : FsaFileDescriptor.defaultFilestat;
+        }
 
         // TODO: revisit errno choice
         if (filestat === undefined) {
