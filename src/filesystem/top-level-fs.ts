@@ -139,15 +139,14 @@ export class TopLevelFs {
               if (index === -1) {
                 index = rpath.lastIndexOf("/");
               }
-              let __index = lastSeparator + index;
-              let left_path = rpath.slice(0, __index + 1);
+              let __index =
+                lastSeparator + desc.getPath().lastIndexOf("/", index - 1);
+              let leftPath = rpath.slice(0, __index + 1);
               if (err === constants.WASI_ESUCCESS) {
-                __path = left_path.concat(content);
+                __path = leftPath.concat(content);
               } else {
-                let right_path = rpath.slice(
-                  __index + rpath.indexOf("/", __index + 1)
-                );
-                __path = left_path.concat(content, right_path);
+                let rightPath = rpath.slice(lastSeparator + index);
+                __path = leftPath.concat(content, rightPath);
               }
             }
             return await this.getDescInfo(

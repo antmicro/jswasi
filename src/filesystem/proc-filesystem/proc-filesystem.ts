@@ -43,32 +43,38 @@ export class ProcFilesystem implements Filesystem {
     workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
     let currentNode: proc.ProcNode = proc.getTopLevelNode(workerId);
-    let err = constants.WASI_ESUCCESS;
+    let err = constants.WASI_ESUCCESS,
+      index = -1;
 
-    let start = path.startsWith("/") ? 1 : 0,
-      stop = path.indexOf("/", start);
+    let start = path.startsWith("/") ? 0 : -1,
+      stop = path.indexOf("/", start + 1);
+
     do {
       if (
         currentNode.getFilestat().filetype !== constants.WASI_FILETYPE_DIRECTORY
       ) {
         err = constants.WASI_ENOTDIR;
+        index = start;
         break;
       }
 
-      const __path = stop === -1 ? path.slice(start) : path.slice(start, stop);
+      const __path =
+        stop === -1 ? path.slice(start + 1) : path.slice(start + 1, stop);
       const nextNode = (currentNode as proc.ProcDirectory).getNode(__path);
       if (nextNode.err !== constants.WASI_ESUCCESS) {
         err = nextNode.err;
+        index = start;
         break;
       }
 
       currentNode = nextNode.node!;
       const __stop = path.indexOf("/", stop + 1);
-      start = stop + 1;
+      start = stop;
       stop = __stop;
-    } while (start !== 0);
+    } while (start !== -1);
 
-    if (stop === -1) {
+    if (stop === 0) {
+      index = -1;
       if (err === constants.WASI_ESUCCESS) {
         if (
           oflags & constants.WASI_O_DIRECTORY &&
@@ -112,11 +118,7 @@ export class ProcFilesystem implements Filesystem {
         __node
       );
     }
-    return Promise.resolve({
-      err,
-      index: stop,
-      desc,
-    });
+    return Promise.resolve({ err, index, desc });
   }
 
   unlinkat(
