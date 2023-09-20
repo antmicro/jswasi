@@ -231,7 +231,9 @@ export default async function syscallCallback(
               constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
               openFlags,
               fdFlags,
-              fdRights
+              fdRights,
+              fdRights,
+              processId
             );
 
             if (err !== constants.WASI_ESUCCESS) {
@@ -423,7 +425,8 @@ export default async function syscallCallback(
         err = await processManager.filesystem.addSymlink(
           targetPath,
           linkPath,
-          fds.getDesc(linkFd)
+          fds.getDesc(linkFd),
+          processId
         );
       }
 
@@ -466,7 +469,8 @@ export default async function syscallCallback(
         let __path;
         ({ err, path: __path } = await processManager.filesystem.readLink(
           fds.getDesc(fd),
-          path
+          path,
+          processId
         ));
         if (err === constants.WASI_ESUCCESS) {
           if (__path.length > bufferLen) {
@@ -670,7 +674,12 @@ export default async function syscallCallback(
             let res = await processManager.filesystem.openat(
               desc,
               path,
-              lookupFlags
+              lookupFlags,
+              0,
+              0,
+              constants.WASI_RIGHTS_ALL,
+              constants.WASI_RIGHTS_ALL,
+              processId
             );
             err = res.err;
             if (res.err === constants.WASI_ESUCCESS) {
@@ -820,7 +829,8 @@ export default async function syscallCallback(
         err = await processManager.filesystem.removeEntry(
           path,
           action !== "path_unlink_file",
-          fds.getDesc(fd)
+          fds.getDesc(fd),
+          processId
         );
       } else {
         err = constants.WASI_EBADF;
@@ -837,7 +847,11 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getDesc(fd) !== undefined) {
-        err = await processManager.filesystem.createDir(path, fds.getDesc(fd));
+        err = await processManager.filesystem.createDir(
+          path,
+          fds.getDesc(fd),
+          processId
+        );
       } else {
         err = constants.WASI_EBADF;
       }
@@ -881,7 +895,8 @@ export default async function syscallCallback(
         fds.getDesc(oldFd),
         oldPath,
         fds.getDesc(newFd),
-        newPath
+        newPath,
+        processId
       );
 
       Atomics.store(lck, 0, err);
@@ -1261,7 +1276,8 @@ export default async function syscallCallback(
           targetPath,
           filesystemType,
           mountFlags,
-          opts
+          opts,
+          processId
         );
       }
 

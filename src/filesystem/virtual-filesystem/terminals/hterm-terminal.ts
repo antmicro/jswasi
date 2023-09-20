@@ -106,7 +106,6 @@ export class HtermDeviceDriver implements TerminalDriver {
             ).stream();
             const result = await processManager.filesystem.open(
               path,
-              0,
               constants.WASI_O_CREAT
             );
             if (result.err !== constants.WASI_ESUCCESS) {

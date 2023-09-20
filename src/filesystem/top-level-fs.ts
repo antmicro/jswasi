@@ -66,12 +66,12 @@ export class TopLevelFs {
 
   private async getDescInfo(
     path: string,
+    workerId: number,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
     fdflags: Fdflags = 0,
-    workerId: number = 0,
     symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT
   ): Promise<DescInfo> {
     let rpath = realpath(path);
@@ -152,13 +152,13 @@ export class TopLevelFs {
             }
             return await this.getDescInfo(
               __path,
+              workerId,
               dirflags,
               oflags,
               fs_rights_base,
               fs_rights_inheriting,
               fdflags,
-              symlink_depth - 1,
-              workerId
+              symlink_depth - 1
             );
           }
           break;
@@ -178,16 +178,20 @@ export class TopLevelFs {
     }
   }
 
+  // workerId = -1 means that no process called the function
+  // this happens during kernel initialization before spawning init
   async open(
     path: string,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
     fdflags: Fdflags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
-    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL
+    fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
+    workerId: number = -1
   ): Promise<{ desc: Descriptor; err: number }> {
     return await this.getDescInfo(
       path,
+      workerId,
       dirflags,
       oflags,
       fs_rights_base,
@@ -204,33 +208,38 @@ export class TopLevelFs {
     fdflags: Fdflags = 0,
     fs_rights_base: Rights = constants.WASI_RIGHTS_ALL,
     fs_rights_inheriting: Rights = constants.WASI_RIGHTS_ALL,
-    workerId: number = 0
+    workerId: number = -1
   ): Promise<{ desc: Descriptor; err: number }> {
     let __path = this.abspath(desc, path);
     return await this.getDescInfo(
       __path,
+      workerId,
       dirflags,
       oflags,
       fs_rights_base,
       fs_rights_inheriting,
-      fdflags,
-      workerId
+      fdflags
     );
   }
 
-  async createDir(path: string, desc: Descriptor = undefined): Promise<number> {
+  async createDir(
+    path: string,
+    desc: Descriptor = undefined,
+    workerId: number = -1
+  ): Promise<number> {
     let __path = this.abspath(desc, path);
-    if (__path.endsWith("/")) {
-      __path = __path.slice(0, -1);
-    }
+    if (__path.endsWith("/")) __path = __path.slice(0, -1);
+
     const {
       desc: __desc,
       fs,
       err,
     } = await this.getDescInfo(
       dirname(__path),
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
+
     if (err !== constants.WASI_ESUCCESS) return err;
     return await fs.mkdirat(__desc, basename(__path));
   }
@@ -239,7 +248,8 @@ export class TopLevelFs {
   async addSymlink(
     target: string,
     linkpath: string,
-    linkdesc: Descriptor = undefined
+    linkdesc: Descriptor = undefined,
+    workerId: number = -1
   ): Promise<number> {
     let path;
     if (linkdesc !== undefined && !linkpath.startsWith("/")) {
@@ -249,6 +259,7 @@ export class TopLevelFs {
     }
     const { desc, fs, err } = await this.getDescInfo(
       dirname(path),
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
@@ -258,7 +269,8 @@ export class TopLevelFs {
   async removeEntry(
     path: string,
     is_dir: boolean,
-    desc: Descriptor = undefined
+    desc: Descriptor = undefined,
+    workerId: number = -1
   ): Promise<number> {
     let __path = this.abspath(desc, path);
     const {
@@ -267,6 +279,7 @@ export class TopLevelFs {
       err,
     } = await this.getDescInfo(
       dirname(__path),
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
     if (err !== constants.WASI_ESUCCESS) return err;
@@ -278,7 +291,8 @@ export class TopLevelFs {
     desc_s: Descriptor,
     source: string,
     desc_t: Descriptor,
-    target: string
+    target: string,
+    workerId: number = -1
   ): Promise<number> {
     const __source = this.abspath(desc_s, source);
     const __source_dirname = dirname(__source);
@@ -297,6 +311,7 @@ export class TopLevelFs {
 
     const dinfo1 = await this.getDescInfo(
       __source_dirname,
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
       constants.WASI_O_DIRECTORY
     );
@@ -307,6 +322,7 @@ export class TopLevelFs {
 
     const __dinfo1 = await this.getDescInfo(
       __source,
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
 
@@ -320,6 +336,7 @@ export class TopLevelFs {
 
     const dinfo2 = await this.getDescInfo(
       __target_dirname,
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
       constants.WASI_O_DIRECTORY
     );
@@ -330,6 +347,7 @@ export class TopLevelFs {
 
     const __dinfo2 = await this.getDescInfo(
       __target,
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
     );
 
@@ -374,7 +392,8 @@ export class TopLevelFs {
     // mountFlags is not used but it is present in linux and might
     // be useful in the future
     _mountFlags: bigint,
-    data: Record<string, string>
+    data: Record<string, string>,
+    workerId: number = -1
   ): Promise<number> {
     const __targetPath = this.abspath(targetDesc, targetPath);
 
@@ -382,6 +401,7 @@ export class TopLevelFs {
     if (__targetPath !== "/") {
       dinfoTarget = await this.getDescInfo(
         __targetPath,
+        workerId,
         constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
         constants.WASI_O_DIRECTORY
       );
@@ -406,6 +426,7 @@ export class TopLevelFs {
     } else {
       const dinfoSource = await this.getDescInfo(
         __sourcePath,
+        workerId,
         constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
         constants.WASI_O_DIRECTORY
       );
@@ -425,7 +446,11 @@ export class TopLevelFs {
 
   // TODO: This should be removed once we have some userspace tool
   // (or better kernelspace implementation) to manage devices
-  async addMountFs(path: string, fs: Filesystem): Promise<number> {
+  async addMountFs(
+    path: string,
+    fs: Filesystem,
+    workerId: number = -1
+  ): Promise<number> {
     if (this.mounts[path] !== undefined) {
       return constants.WASI_EBUSY;
     } else if (path === "/") {
@@ -437,6 +462,7 @@ export class TopLevelFs {
     // TODO: expand symlinks in path and ensure it points to an empty directory
     let descInfo = await this.getDescInfo(
       path,
+      workerId,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
       constants.WASI_O_DIRECTORY
     );
@@ -470,9 +496,19 @@ export class TopLevelFs {
 
   async readLink(
     desc: Descriptor,
-    path: string
+    path: string,
+    workerId: number = -1
   ): Promise<{ err: number; path: string }> {
-    let { err: __err, desc: __desc } = await this.openat(desc, path);
+    let { err: __err, desc: __desc } = await this.openat(
+      desc,
+      path,
+      0,
+      0,
+      0,
+      constants.WASI_RIGHTS_ALL,
+      constants.WASI_RIGHTS_ALL,
+      workerId
+    );
     if (__err !== constants.WASI_ESUCCESS) {
       return { err: __err, path: undefined };
     }
