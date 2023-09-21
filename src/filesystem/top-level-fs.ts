@@ -136,11 +136,10 @@ export class TopLevelFs {
               __path = content;
             } else {
               // replace symlink filename with it's content
-              if (index === -1) {
-                index = rpath.lastIndexOf("/");
-              }
               let __index =
-                lastSeparator + desc.getPath().lastIndexOf("/", index - 1);
+                index === -1
+                  ? lastSeparator + desc.getPath().lastIndexOf("/")
+                  : desc.getPath().lastIndexOf("/", index - 1);
               let leftPath = rpath.slice(0, __index + 1);
               if (err === constants.WASI_ESUCCESS) {
                 __path = leftPath.concat(content);
