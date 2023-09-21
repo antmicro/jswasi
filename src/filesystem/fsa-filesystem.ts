@@ -408,7 +408,7 @@ export class FsaFilesystem implements Filesystem {
           // If some component in the middle of the path is not a directory, it might be
           // a symlink, if symlink follow flag is set, return a descriptor to the symlink
           const __result = await this.getHandle(
-            path.slice(index + 1),
+            basename(path.slice(0, index)),
             false,
             result.handle as FileSystemDirectoryHandle
           );
@@ -420,8 +420,8 @@ export class FsaFilesystem implements Filesystem {
               fs_rights_inheriting,
               this.keepMetadata
             );
-            break;
           }
+          break;
         }
       }
       case constants.WASI_ENOENT: {

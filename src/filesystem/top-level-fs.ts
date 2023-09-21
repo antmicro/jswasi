@@ -103,7 +103,7 @@ export class TopLevelFs {
     );
 
     if (desc) {
-      const __path = index > -1 ? rpath.slice(0, lastSeparator) : rpath;
+      const __path = index > -1 ? rpath.slice(0, index) : rpath;
       if ((await desc.initialize(__path)) !== constants.WASI_ESUCCESS)
         return {
           desc: undefined,
