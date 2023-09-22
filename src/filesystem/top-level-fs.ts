@@ -103,7 +103,7 @@ export class TopLevelFs {
     );
 
     if (desc) {
-      const __path = index > -1 ? rpath.slice(0, index) : rpath;
+      const __path = index > -1 ? rpath.slice(0, lastSeparator + index) : rpath;
       if ((await desc.initialize(__path)) !== constants.WASI_ESUCCESS)
         return {
           desc: undefined,
@@ -131,15 +131,21 @@ export class TopLevelFs {
             if (err_ !== constants.WASI_ESUCCESS) {
               return { desc: undefined, err, fs, path: undefined };
             }
+
             let __path: string;
             if (content.startsWith("/")) {
-              __path = content;
+              if (index !== -1) {
+                const __right = rpath.slice(lastSeparator + index);
+                __path = content.concat(__right);
+              } else {
+                __path = content;
+              }
             } else {
               // replace symlink filename with it's content
               let __index =
                 index === -1
-                  ? lastSeparator + desc.getPath().lastIndexOf("/")
-                  : desc.getPath().lastIndexOf("/", index - 1);
+                  ? desc.getPath().lastIndexOf("/")
+                  : desc.getPath().lastIndexOf("/", lastSeparator + index - 1);
               let leftPath = rpath.slice(0, __index + 1);
               if (err === constants.WASI_ESUCCESS) {
                 __path = leftPath.concat(content);

@@ -50,6 +50,9 @@ export class ProcFilesystem implements Filesystem {
       stop = path.indexOf("/", start + 1);
 
     do {
+      const __path =
+        stop === -1 ? path.slice(start + 1) : path.slice(start + 1, stop);
+
       if (
         currentNode.getFilestat().filetype !== constants.WASI_FILETYPE_DIRECTORY
       ) {
@@ -58,16 +61,15 @@ export class ProcFilesystem implements Filesystem {
         break;
       }
 
-      const __path =
-        stop === -1 ? path.slice(start + 1) : path.slice(start + 1, stop);
       const nextNode = (currentNode as proc.ProcDirectory).getNode(__path);
       if (nextNode.err !== constants.WASI_ESUCCESS) {
         err = nextNode.err;
-        index = start;
+        index = stop;
         break;
       }
 
-      currentNode = nextNode.node!;
+      currentNode = nextNode.node;
+
       const __stop = path.indexOf("/", stop + 1);
       start = stop;
       stop = __stop;
