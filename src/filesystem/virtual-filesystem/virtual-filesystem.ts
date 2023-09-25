@@ -160,7 +160,8 @@ export class VirtualFilesystem implements Filesystem {
       let err: number, index: number;
       if (navigated.remaining) {
         err = constants.WASI_ENOTDIR;
-        index = path.length - navigated.remaining.length;
+        // navigated.remaining doesn't include leading slash, hence -1
+        index = path.length - navigated.remaining.length - 1;
       } else {
         index = -1;
         if (oflags & constants.WASI_O_CREAT && oflags & constants.WASI_O_EXCL) {
