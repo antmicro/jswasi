@@ -33,6 +33,9 @@ export class DescriptorEntry {
   fdFlags: Fdflags;
 
   constructor(desc: Descriptor) {
+    if (desc === undefined) {
+      throw "DescriptorEntry must not contain undefined descriptor!";
+    }
     this.desc = desc;
     this.fdFlags = 0;
   }
@@ -43,7 +46,7 @@ export class FdTable {
   private freeFds: number[] = [];
   private topFd: number;
 
-  constructor(fds: Record<number, DescriptorEntry | undefined>) {
+  constructor(fds: Record<number, DescriptorEntry>) {
     this.fdt = { ...fds };
     this.topFd = Object.keys(fds).length - 1;
   }
@@ -142,7 +145,15 @@ export class FdTable {
   tearDown() {
     Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {
-        fileDescriptor?.desc?.close();
+        if (fileDescriptor !== undefined) {
+          if (fileDescriptor.desc !== undefined) {
+            fileDescriptor.desc.close();
+          } else {
+            console.error("Descriptor entry has undefined descriptor!");
+          }
+        } else {
+          console.error("Descriptor entry is undefined!");
+        }
       })
     );
   }

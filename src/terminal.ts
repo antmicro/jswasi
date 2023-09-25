@@ -54,44 +54,40 @@ async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
 }
 
 async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
+  const descs = [
+    await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n),
+    await tfs.open(
+      "/dev/ttyH0",
+      0,
+      0,
+      constants.WASI_FDFLAG_APPEND,
+      constants.WASI_EXT_RIGHTS_STDOUT,
+      0n
+    ),
+    await tfs.open(
+      "/dev/ttyH0",
+      0,
+      0,
+      constants.WASI_FDFLAG_APPEND,
+      constants.WASI_EXT_RIGHTS_STDERR,
+      0n
+    ),
+    await tfs.open("/"),
+  ];
+
+  for (var i = 0; i < descs.length; i++) {
+    if (descs[i].err !== constants.WASI_ESUCCESS) {
+      throw `Cannot open fd=${i}, error code=${descs[i].err}!`;
+    } else if (descs[i] === undefined) {
+      throw `Cannot open fd=${i}, descriptor is undefined!`;
+    }
+  }
+
   return new FdTable({
-    0: new DescriptorEntry(
-      (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          0,
-          constants.WASI_EXT_RIGHTS_STDIN,
-          0n
-        )
-      ).desc
-    ),
-    1: new DescriptorEntry(
-      (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          constants.WASI_FDFLAG_APPEND,
-          constants.WASI_EXT_RIGHTS_STDOUT,
-          0n
-        )
-      ).desc
-    ),
-    2: new DescriptorEntry(
-      (
-        await tfs.open(
-          "/dev/ttyH0",
-          0,
-          0,
-          constants.WASI_FDFLAG_APPEND,
-          constants.WASI_EXT_RIGHTS_STDERR,
-          0n
-        )
-      ).desc
-    ),
-    3: new DescriptorEntry((await tfs.open("/")).desc),
+    0: new DescriptorEntry(descs[0].desc),
+    1: new DescriptorEntry(descs[1].desc),
+    2: new DescriptorEntry(descs[2].desc),
+    3: new DescriptorEntry(descs[3].desc),
   });
 }
 
@@ -381,11 +377,21 @@ export async function init(
     })
   );
 
+  let fdTable;
+  try {
+    fdTable = await getDefaultFdTable(tfs);
+  } catch (error) {
+    terminal.io.println(
+      `Cannot create file descriptor table for init process: ${error}`
+    );
+    return;
+  }
+
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock
     "/usr/bin/wash",
-    await getDefaultFdTable(tfs),
+    fdTable,
     ["/usr/bin/wash", "/usr/bin/init"],
     DEFAULT_ENV,
     false,
