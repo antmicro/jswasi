@@ -369,9 +369,9 @@ export default class ProcessManager {
     // events are stored only in contexts of event source descriptors
     // if a new event source is opened, it won't be able to read events
     // that happened in the past
-    for (const desc of Object.values(this.processInfos[pid].fds.fdt)) {
-      if (desc instanceof EventSource) {
-        desc.sendEvents(events);
+    for (const descEntry of Object.values(this.processInfos[pid].fds.fdt)) {
+      if (descEntry.desc instanceof EventSource) {
+        descEntry.desc.sendEvents(events);
       }
     }
   }
