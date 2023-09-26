@@ -195,11 +195,13 @@ export class HtermDeviceDriver implements TerminalDriver {
     const onTerminalInput = (data: string): void => {
       let code = data.charCodeAt(0);
       let iFlag = __hterm.termios.iFlag;
+      let lFlag = __hterm.termios.lFlag;
 
       if (code === 0 && data.length > 1 && data.charCodeAt(1) === 0) {
         const breakOffset = this.detectBreakCondition(data);
 
         if ((iFlag & termios.IGNBRK) !== 0) {
+          // Do not ignore break condition
           if ((iFlag & termios.BRKINT) !== 0) {
             if ((iFlag & termios.PARMRK) === 0) {
               __hterm.buffer += "\x00";
@@ -222,8 +224,23 @@ export class HtermDeviceDriver implements TerminalDriver {
 
       if ((iFlag & termios.ISTRIP) !== 0) {
         data = this.stripOffBytes(data);
-        code = data.charCodeAt(0);
       }
+
+      if ((iFlag & termios.INLCR) !== 0) {
+        data = data.replaceAll("\n", "\r");
+      }
+
+      if ((iFlag & termios.IGNCR) !== 0) {
+        // Ignore '\r' chars
+        data = data.replaceAll("\r", "");
+      } else if (
+        (iFlag & termios.ICRNL) !== 0 &&
+        (lFlag & termios.ICANON) !== 0
+      ) {
+        data = data.replaceAll("\r", "\n");
+      }
+
+      code = data.charCodeAt(0);
 
       if (code === 13) {
         code = 10;
