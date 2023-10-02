@@ -414,3 +414,26 @@ export async function init(
     { maj: major.MAJ_HTERM, min: 0 } // TODO: this should not be hardcoded
   );
 }
+
+export async function tearDown(println: (a: string) => void) {
+  println("Starting purge...");
+  const handle = await navigator.storage.getDirectory();
+
+  println("Cleaning storage...");
+  for await (const name of handle.keys()) {
+    println(`Removing ${name}...`);
+    await handle.removeEntry(name, { recursive: true });
+  }
+
+  println("Cleaning metadata...");
+  await new Promise((resolve) => {
+    window.indexedDB.databases().then((r) => {
+      Promise.all(
+        r.map((database) => {
+          window.indexedDB.deleteDatabase(database.name);
+        })
+      ).then(resolve);
+    });
+  });
+  println("Purge complete");
+}
