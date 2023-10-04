@@ -4,6 +4,7 @@
     "target": "esnext",
     "module": "esnext",
     "watch": false,
+    "esModuleInterop": true,
     "removeComments": false,
     "skipLibCheck": true,
     "sourceMap": false,
