@@ -1,6 +1,6 @@
 // @ts-ignore TODO: port idb-keyval to Typescript with no implicit any
-import { del, get, set, keys } from "../vendor/idb-keyval.js";
-import { Filestat } from "./filesystem";
+import { del, get, set, keys } from "../../vendor/idb-keyval.js";
+import { Filestat } from "../filesystem";
 
 export async function delStoredData(path: string) {
   del(path);

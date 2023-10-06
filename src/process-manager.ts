@@ -161,7 +161,7 @@ export class FdTable {
 
 type Foreground = { maj: number; min: number } | null;
 
-class ProcessInfo {
+export class ProcessInfo {
   public shouldEcho = true;
   public terminationNotifier: EventSource | null = null;
   public timestamp: number;
@@ -190,13 +190,13 @@ class ProcessInfo {
 
 export default class ProcessManager {
   public nextProcessId = 0;
-  public processInfos: Record<number, ProcessInfo> = {};
   public compiledModules: Record<string, WebAssembly.Module> = {};
 
   constructor(
     private readonly scriptName: string,
     public readonly filesystem: TopLevelFs,
-    public driverManager: DriverManager
+    public driverManager: DriverManager,
+    public processInfos: Record<number, ProcessInfo> = {}
   ) {}
 
   // This method wraps syscallCallback with HtermDeviceDriver.wrapCallback method that

@@ -1,4 +1,4 @@
-import { FsaFilesystem } from "./fsa-filesystem.js";
+import { FsaFilesystem } from "./fsa-filesystem/fsa-filesystem.js";
 import { VirtualFilesystem } from "./virtual-filesystem/virtual-filesystem.js";
 import { DeviceFilesystem } from "./virtual-filesystem/device-filesystem.js";
 import {

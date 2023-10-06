@@ -12,16 +12,16 @@ import {
   OpenFlags,
   LookupFlags,
   AbstractDescriptor,
-} from "./filesystem.js";
-import { stringToBool, basename, dirname } from "../utils.js";
-import * as constants from "../constants.js";
+} from "../filesystem.js";
+import { stringToBool, basename, dirname } from "../../utils.js";
+import * as constants from "../../constants.js";
 import {
   listStoredKeys,
   delStoredData,
   getStoredData,
   setStoredData,
 } from "./metadata.js";
-import { UserData, EventType, PollEvent } from "../types.js";
+import { UserData, EventType, PollEvent } from "../../types.js";
 
 async function initMetadataPath(handle: FileSystemHandle): Promise<string> {
   const components = await (
