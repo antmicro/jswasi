@@ -33,6 +33,7 @@ class Hterm implements Terminal {
   subs: PollSub[];
 
   driverBuffer: string;
+  driverBufferCursor: number;
   userBuffer: string;
 
   raw: boolean;
@@ -40,6 +41,7 @@ class Hterm implements Terminal {
 
   constructor(public terminal: any) {
     this.driverBuffer = "";
+    this.driverBufferCursor = 0;
     this.userBuffer = "";
     this.bufRequestQueue = [];
     this.subs = [];
@@ -91,19 +93,44 @@ class Hterm implements Terminal {
     if ((this.termios.lFlag & termios.ECHO) !== 0) {
       this.terminal.io.print(data);
     }
-    this.driverBuffer += data;
+    this.driverBuffer =
+      this.driverBuffer.slice(0, this.driverBufferCursor) +
+      data +
+      this.driverBuffer.slice(this.driverBufferCursor);
+    this.driverBufferCursor += data.length;
   }
 
   pushNLDriverInputBuffer() {
     if ((this.termios.lFlag & termios.ECHONL) !== 0) {
       this.terminal.io.println("");
     }
-    this.driverBuffer += "\n";
+    this.driverBuffer =
+      this.driverBuffer.slice(0, this.driverBufferCursor) +
+      "\n" +
+      this.driverBuffer.slice(this.driverBufferCursor);
+    this.driverBufferCursor += 1;
+  }
+
+  deleteCharDriverInputBuffer() {
+    // TODO: handle ECHOE
+    // if ((this.termios.lFlag & termios.ECHONL) !== 0) {
+    //
+    // }
+    if (this.driverBufferCursor > 0) {
+      this.terminal.cursorLeft(1);
+      // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
+      this.terminal.io.print("\x1b\x5b\x50");
+      this.driverBuffer =
+        this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
+        this.driverBuffer.slice(this.driverBufferCursor);
+      this.driverBufferCursor -= 1;
+    }
   }
 
   flushDriverInputBuffer() {
     this.userBuffer += this.driverBuffer;
     this.driverBuffer = "";
+    this.driverBufferCursor = 0;
   }
 }
 
@@ -338,6 +365,15 @@ export class HtermDeviceDriver implements TerminalDriver {
                   });
                 }
               }
+            } else {
+              __hterm.pushDriverInputBuffer(data[0]);
+            }
+            break;
+          }
+          // DEL
+          case 0x7f: {
+            if ((lFlag & termios.ICANON) !== 0) {
+              __hterm.deleteCharDriverInputBuffer();
             } else {
               __hterm.pushDriverInputBuffer(data[0]);
             }
