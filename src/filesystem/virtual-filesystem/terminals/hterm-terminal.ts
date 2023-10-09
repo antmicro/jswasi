@@ -101,28 +101,43 @@ class Hterm implements Terminal {
   }
 
   pushNLDriverInputBuffer() {
-    if ((this.termios.lFlag & termios.ECHONL) !== 0) {
-      this.terminal.io.println("");
+    this.driverBuffer += "\n";
+    if ((this.termios.lFlag & termios.ICANON) !== 0) {
+      if ((this.termios.lFlag & termios.ECHONL) !== 0) {
+        this.terminal.io.println("");
+      }
+      this.flushDriverInputBuffer();
     }
-    this.driverBuffer =
-      this.driverBuffer.slice(0, this.driverBufferCursor) +
-      "\n" +
-      this.driverBuffer.slice(this.driverBufferCursor);
-    this.driverBufferCursor += 1;
   }
 
   deleteCharDriverInputBuffer() {
     // TODO: handle ECHOE
-    // if ((this.termios.lFlag & termios.ECHONL) !== 0) {
+    // if ((this.termios.lFlag & termios.ECHOE) !== 0) {
     //
     // }
     if (this.driverBufferCursor > 0) {
       this.terminal.cursorLeft(1);
-      // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
+      // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
       this.terminal.io.print("\x1b\x5b\x50");
       this.driverBuffer =
         this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
         this.driverBuffer.slice(this.driverBufferCursor);
+      this.driverBufferCursor -= 1;
+    }
+  }
+
+  moveCursorRight() {
+    if (this.driverBufferCursor < this.driverBuffer.length - 1) {
+      // CSI Ps C  Cursor Forward Ps Times (default = 1) (CUF)
+      this.terminal.io.print("\x1b\x5bC");
+      this.driverBufferCursor += 1;
+    }
+  }
+
+  moveCursorLeft() {
+    if (this.driverBufferCursor > 0) {
+      // CSI Ps D  Cursor Backward Ps Times (default = 1) (CUB)
+      this.terminal.io.print("\x1b\x5bD");
       this.driverBufferCursor -= 1;
     }
   }
@@ -379,6 +394,38 @@ export class HtermDeviceDriver implements TerminalDriver {
             }
             break;
           }
+          case 0x1b: {
+            if ((lFlag & termios.ICANON) !== 0) {
+              if (data[1] === "[") {
+                switch (data[2]) {
+                  // Move cursor right
+                  case "C": {
+                    __hterm.moveCursorRight();
+                    break;
+                  }
+                  // Move cursor left
+                  case "D": {
+                    __hterm.moveCursorLeft();
+                    break;
+                  }
+                  default: {
+                    break;
+                  }
+                }
+                // ignore rest of CSIs, for now...
+                data = data.slice(3);
+                continue;
+              } else {
+                // ignore, for now...
+                data = data.slice(2);
+                continue;
+              }
+            } else {
+              __hterm.pushDriverInputBuffer(data[0]);
+            }
+
+            break;
+          }
           default: {
             __hterm.pushDriverInputBuffer(data[0]);
             break;
@@ -412,10 +459,6 @@ export class HtermDeviceDriver implements TerminalDriver {
         }
         __hterm.subs.length = 0;
       }
-
-      // if (__hterm.echo && (code === 10 || code >= 32)) {
-      //   __hterm.terminal.io.print(code === 10 ? "\r\n" : data);
-      // }
     };
     const io = __hterm.terminal.io.push();
     io.onVTKeystroke = onTerminalInput;
