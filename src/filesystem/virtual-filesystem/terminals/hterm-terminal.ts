@@ -77,6 +77,8 @@ class Hterm implements Terminal {
       // https://www.ibm.com/docs/en/zos/2.3.0?topic=functions-tcsetattr-set-attributes-terminal
       // termios.IEXTEN,
     } as termios.Termios;
+
+    this.terminal.setInsertMode(true);
   }
 
   splitBuf(len: number): string {
@@ -127,7 +129,7 @@ class Hterm implements Terminal {
   }
 
   moveCursorRight() {
-    if (this.driverBufferCursor < this.driverBuffer.length - 1) {
+    if (this.driverBufferCursor < this.driverBuffer.length) {
       // CSI Ps C  Cursor Forward Ps Times (default = 1) (CUF)
       this.terminal.io.print("\x1b\x5bC");
       this.driverBufferCursor += 1;
@@ -439,9 +441,11 @@ export class HtermDeviceDriver implements TerminalDriver {
         __hterm.flushDriverInputBuffer();
       }
 
-      if (__hterm.bufRequestQueue.length !== 0) {
+      if (
+        __hterm.bufRequestQueue.length !== 0 &&
+        __hterm.userBuffer.length > 0
+      ) {
         let request = __hterm.bufRequestQueue.shift();
-
         request!.resolve({
           err: constants.WASI_ESUCCESS,
           buffer: new TextEncoder().encode(__hterm.splitBuf(request!.len)),
