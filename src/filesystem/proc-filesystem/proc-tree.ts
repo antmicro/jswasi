@@ -111,7 +111,7 @@ class SelfSymlink extends AbstractProcSymlink {
   }
 }
 
-class TopLevelDirectory extends AbstractProcDirectory {
+export class TopLevelDirectory extends AbstractProcDirectory {
   static specialNodes: Record<string, new (pid: number) => ProcNode> = {
     self: SelfSymlink,
   };
