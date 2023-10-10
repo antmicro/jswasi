@@ -120,7 +120,7 @@ class Hterm implements Terminal {
     if (this.driverBufferCursor > 0) {
       this.terminal.cursorLeft(1);
       // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
-      this.terminal.io.print("\x1b\x5b\x50");
+      this.terminal.io.print("\x1b[P");
       this.driverBuffer =
         this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
         this.driverBuffer.slice(this.driverBufferCursor);
@@ -131,7 +131,7 @@ class Hterm implements Terminal {
   moveCursorRight() {
     if (this.driverBufferCursor < this.driverBuffer.length) {
       // CSI Ps C  Cursor Forward Ps Times (default = 1) (CUF)
-      this.terminal.io.print("\x1b\x5bC");
+      this.terminal.io.print("\x1b[C");
       this.driverBufferCursor += 1;
     }
   }
@@ -139,7 +139,7 @@ class Hterm implements Terminal {
   moveCursorLeft() {
     if (this.driverBufferCursor > 0) {
       // CSI Ps D  Cursor Backward Ps Times (default = 1) (CUB)
-      this.terminal.io.print("\x1b\x5bD");
+      this.terminal.io.print("\x1b[D");
       this.driverBufferCursor -= 1;
     }
   }
@@ -148,6 +148,37 @@ class Hterm implements Terminal {
     this.userBuffer += this.driverBuffer;
     this.driverBuffer = "";
     this.driverBufferCursor = 0;
+  }
+
+  resolveUserReadRequests() {
+    if (this.userBuffer.length > 0) {
+      // In case EOF arrives when line is not empty flush requests
+      // until there are data in user buffer
+      while (this.userBuffer.length > 0 && this.bufRequestQueue.length > 0) {
+        let req = this.bufRequestQueue.shift();
+        let buff = this.userBuffer.slice(0, req.len);
+        this.userBuffer = this.userBuffer.slice(req.len);
+
+        req.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: new TextEncoder().encode(buff),
+        });
+      }
+    } else {
+      // Resolve all foreground process requests with empty buffers
+      let foreground_reqs = this.bufRequestQueue.filter(
+        (req) => req.pid === this.foregroundPid
+      );
+      this.bufRequestQueue = this.bufRequestQueue.filter(
+        (req) => req.pid !== this.foregroundPid
+      );
+      foreground_reqs.forEach((req) =>
+        req.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: new ArrayBuffer(0),
+        })
+      );
+    }
   }
 }
 
@@ -297,7 +328,7 @@ export class HtermDeviceDriver implements TerminalDriver {
 
         switch (code) {
           // 0x0a - LN
-          case "\n".charCodeAt(0): {
+          case 0x0a: {
             if ((iFlag & termios.INLCR) !== 0) {
               __hterm.driverBuffer += "\r";
             } else if ((lFlag & termios.ICANON) !== 0) {
@@ -308,7 +339,7 @@ export class HtermDeviceDriver implements TerminalDriver {
             break;
           }
           // 0x0d - CR
-          case "\r".charCodeAt(0): {
+          case 0x0d: {
             if ((iFlag & termios.IGNCR) === 0) {
               if (
                 (iFlag & termios.ICRNL) !== 0 &&
@@ -365,23 +396,7 @@ export class HtermDeviceDriver implements TerminalDriver {
           case 0x04: {
             if ((lFlag & termios.ICANON) !== 0) {
               __hterm.flushDriverInputBuffer();
-              for (const req of __hterm.bufRequestQueue) {
-                if (req.pid === __hterm.foregroundPid) {
-                  let buff = "";
-
-                  if (__hterm.userBuffer.length > 0) {
-                    buff = __hterm.userBuffer.slice(0, req.len);
-                    __hterm.userBuffer = __hterm.userBuffer.slice(req.len);
-                  } else {
-                    buff = "";
-                  }
-
-                  req.resolve({
-                    err: constants.WASI_ESUCCESS,
-                    buffer: new TextEncoder().encode(buff),
-                  });
-                }
-              }
+              __hterm.resolveUserReadRequests();
             } else {
               __hterm.pushDriverInputBuffer(data[0]);
             }
@@ -396,6 +411,7 @@ export class HtermDeviceDriver implements TerminalDriver {
             }
             break;
           }
+          // Start of escape sequence
           case 0x1b: {
             if ((lFlag & termios.ICANON) !== 0) {
               if (data[1] === "[") {
@@ -441,15 +457,8 @@ export class HtermDeviceDriver implements TerminalDriver {
         __hterm.flushDriverInputBuffer();
       }
 
-      if (
-        __hterm.bufRequestQueue.length !== 0 &&
-        __hterm.userBuffer.length > 0
-      ) {
-        let request = __hterm.bufRequestQueue.shift();
-        request!.resolve({
-          err: constants.WASI_ESUCCESS,
-          buffer: new TextEncoder().encode(__hterm.splitBuf(request!.len)),
-        });
+      if (__hterm.userBuffer.length > 0) {
+        __hterm.resolveUserReadRequests();
       }
 
       if (__hterm.userBuffer.length > 0) {
