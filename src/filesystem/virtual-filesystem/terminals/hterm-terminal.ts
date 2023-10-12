@@ -52,30 +52,20 @@ class Hterm implements Terminal {
 
     this.termios = {
       iFlag:
-        termios.IGNBRK |
-        termios.BRKINT |
-        termios.PARMRK |
-        // It zeroes eighth bit of each byte, I suppose it shoulde be disabled by default
-        //termios.ISTRIP |
-        termios.INLCR |
-        // IGNCR removes \r from inpu data
-        // termios.IGNCR |
         termios.ICRNL |
-        // Enable handling START/STOP characters (0x11/0x13)
-        termios.IXON,
-      oFlag: termios.OPOST,
-      cFlag: termios.CS8 | termios.PARENB,
+        // Enable handling START/STOP characters (0x11/0x13) on output
+        termios.IXON |
+        // Enable handling START/STOP characters (0x11/0x13) on input
+        termios.IXOFF,
+      oFlag: termios.OPOST | termios.ONLCR,
+      cFlag: termios.CS8 | termios.CREAD,
       lFlag:
         termios.ECHO |
-        // ICANON controls of recognize ERASE
-        // Bit set -> ERASE will remove last charcter, bit not set -> just echo
+        termios.ECHOE |
+        termios.ECHOK |
         termios.ECHONL |
         termios.ICANON |
-        // ISIG controls wheter INTR(0x03), QUIT(0x1c), SUSP(0x1a) are recognized
-        termios.ISIG, // |
-      // Enables extended implementation-defined functions. These are not defined, and IEXTEN is always set to 0.
-      // https://www.ibm.com/docs/en/zos/2.3.0?topic=functions-tcsetattr-set-attributes-terminal
-      // termios.IEXTEN,
+        termios.ISIG,
     } as termios.Termios;
 
     this.terminal.setInsertMode(true);
@@ -113,10 +103,6 @@ class Hterm implements Terminal {
   }
 
   deleteCharDriverInputBuffer() {
-    // TODO: handle ECHOE
-    // if ((this.termios.lFlag & termios.ECHOE) !== 0) {
-    //
-    // }
     if (this.driverBufferCursor > 0) {
       this.terminal.cursorLeft(1);
       // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
@@ -297,7 +283,13 @@ export class HtermDeviceDriver implements TerminalDriver {
     });
     const onTerminalInput = (data: string): void => {
       let iFlag = __hterm.termios.iFlag;
+      let cFlag = __hterm.termios.cFlag;
       let lFlag = __hterm.termios.lFlag;
+
+      if ((cFlag & termios.CREAD) === 0) {
+        // Discard input
+        return;
+      }
 
       if ((iFlag & termios.ISTRIP) !== 0) {
         data = this.stripOffBytes(data);
@@ -357,13 +349,11 @@ export class HtermDeviceDriver implements TerminalDriver {
           // 0x11 - START, 0x13 - STOP
           case 0x11:
           case 0x13: {
-            if ((iFlag & termios.IXON) !== 0) {
+            if ((iFlag & termios.IXOFF) !== 0) {
               if (code === 0x11) {
-                // TODO: store input in driver buffer but do not echo it, add extra buffer for it?
-                // TODO: block all `write()`s
+                // TODO: do not flush driver input buffer
               } else if (code === 0x13) {
-                // TODO: flush input buffer
-                // TODO: release all `write()`s
+                // TODO: flush driver input buffer
               }
             } else {
               __hterm.pushDriverInputBuffer(data[0]);
@@ -402,9 +392,29 @@ export class HtermDeviceDriver implements TerminalDriver {
             }
             break;
           }
+          // KILL - remove line
+          case 0x15: {
+            if (
+              (lFlag & termios.ICANON) !== 0 &&
+              (lFlag & termios.ECHOK) !== 0
+            ) {
+              // Remove all characters from driver buffer to the left from the cursor
+              __hterm.driverBuffer = __hterm.driverBuffer.slice(
+                __hterm.driverBufferCursor
+              );
+              __hterm.terminal.cursorLeft(__hterm.driverBufferCursor);
+              __hterm.terminal.io.print(`\x1b[${__hterm.driverBufferCursor}P`);
+            } else {
+              __hterm.pushDriverInputBuffer(data[0]);
+            }
+            break;
+          }
           // DEL
           case 0x7f: {
-            if ((lFlag & termios.ICANON) !== 0) {
+            if (
+              (lFlag & termios.ICANON) !== 0 &&
+              (lFlag & termios.ECHOE) !== 0
+            ) {
               __hterm.deleteCharDriverInputBuffer();
             } else {
               __hterm.pushDriverInputBuffer(data[0]);
