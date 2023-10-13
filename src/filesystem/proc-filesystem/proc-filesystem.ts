@@ -73,7 +73,7 @@ export class ProcFilesystem implements Filesystem {
       stop = __stop;
     } while (start !== -1);
 
-    if (stop === 0) {
+    if (start === -1) {
       index = -1;
       if (err === constants.WASI_ESUCCESS) {
         if (
