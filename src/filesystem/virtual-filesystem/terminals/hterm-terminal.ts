@@ -676,8 +676,46 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         err = constants.WASI_ESUCCESS;
         break;
       }
+      case ioctlRequests.TCGETS: {
+        if (buf.byteLength < 16) break;
+
+        const __buf = new Int32Array(buf.buffer, buf.byteOffset);
+
+        __buf[0] = this.hterm.termios.iFlag;
+        __buf[1] = this.hterm.termios.oFlag;
+        __buf[2] = this.hterm.termios.cFlag;
+        __buf[3] = this.hterm.termios.lFlag;
+
+        err = constants.WASI_ESUCCESS;
+        break;
+      }
+      case ioctlRequests.TCSETS: {
+        if (buf.byteLength < 16) break;
+
+        const __buf = new Int32Array(buf.buffer, buf.byteOffset);
+
+        this.hterm.termios.iFlag = __buf[0];
+        this.hterm.termios.oFlag = __buf[1];
+        this.hterm.termios.cFlag = __buf[2];
+        this.hterm.termios.lFlag = __buf[3];
+
+        err = constants.WASI_ESUCCESS;
+
+        break;
+      }
       default: {
-        err = constants.WASI_EINVAL;
+        if (
+          ioctlRequests.TCGETS <= request &&
+          request <= ioctlRequests.FIOQSIZE &&
+          ioctlRequests.TIOCGPTN <= request &&
+          request <= ioctlRequests.TIOCGEXCL &&
+          ioctlRequests.FIOSETOWN <= request &&
+          request <= ioctlRequests.SIOCGSTAMPNS
+        ) {
+          err = constants.WASI_ENOTSUP;
+        } else {
+          err = constants.WASI_EINVAL;
+        }
         break;
       }
     }
