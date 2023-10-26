@@ -660,22 +660,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         err = constants.WASI_ESUCCESS;
         break;
       }
-      case ioctlRequests.SET_ECHO: {
-        if (buf.byteLength < 1) err = constants.WASI_ENOBUFS;
-
-        this.hterm.echo = buf[0] !== 0;
-
-        err = constants.WASI_ESUCCESS;
-        break;
-      }
-      case ioctlRequests.SET_RAW: {
-        if (buf.byteLength < 1) break;
-
-        this.hterm.raw = buf[0] !== 0;
-
-        err = constants.WASI_ESUCCESS;
-        break;
-      }
       case ioctlRequests.TCGETS: {
         if (buf.byteLength < 16) break;
 
