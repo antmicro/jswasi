@@ -349,7 +349,7 @@ export class HtermDeviceDriver implements TerminalDriver {
           // 0x11 - START, 0x13 - STOP
           case 0x11:
           case 0x13: {
-            if ((iFlag & termios.IXOFF) !== 0) {
+            if ((iFlag & termios.IXON) !== 0) {
               if (code === 0x11) {
                 // TODO: do not flush driver input buffer
               } else if (code === 0x13) {
