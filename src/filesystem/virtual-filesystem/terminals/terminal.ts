@@ -3,7 +3,6 @@ import { Termios } from "./termios.js";
 
 // Ioctl magic numbers for terminal devices
 export const enum ioctlRequests {
-  GET_SCREEN_SIZE = 0,
   TCGETS = 0x01,
   TCSETS = 0x02,
   TCSETSW = 0x03,
@@ -104,6 +103,13 @@ export const enum ioctlRequests {
   SIOCGSTAMPNS = 0x8907,
 }
 
+export type Winsize = {
+  cellsWidth: number;
+  cellsHeight: number;
+  pxWidth: number;
+  pxHeight: number;
+};
+
 // Buffer request is enqueued each read call, once data is available,
 // calling resolve resolves promise returned by the read call
 export type BufferRequest = {
@@ -122,7 +128,7 @@ export interface Terminal {
   bufRequestQueue: BufferRequest[];
   termios: Termios;
 
-  getScreenSize(): Promise<[number, number]>;
+  getScreenSize(): Promise<Winsize>;
 }
 
 // Extended device driver interface for interacting with terminal

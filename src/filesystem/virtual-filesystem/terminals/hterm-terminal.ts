@@ -4,6 +4,7 @@ import * as termios from "./termios.js";
 import {
   TerminalDriver,
   Terminal,
+  Winsize,
   BufferRequest,
   ioctlRequests,
 } from "./terminal.js";
@@ -77,8 +78,14 @@ class Hterm implements Terminal {
     return out;
   }
 
-  async getScreenSize(): Promise<[number, number]> {
-    return [this.terminal.screenSize.width, this.terminal.screenSize.height];
+  async getScreenSize(): Promise<Winsize> {
+    let scrollPort = this.terminal.scrollPort_.getScreenSize();
+    return {
+      cellsWidth: this.terminal.screenSize.width,
+      cellsHeight: this.terminal.screenSize.height,
+      pxWidth: scrollPort.width,
+      pxHeight: scrollPort.height,
+    } as Winsize;
   }
 
   pushDriverInputBuffer(data: string) {
@@ -648,18 +655,6 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     let err = constants.WASI_ENOBUFS;
 
     switch (request) {
-      case ioctlRequests.GET_SCREEN_SIZE: {
-        if (buf.byteLength < 8) break;
-
-        const [width, height] = await this.hterm.getScreenSize();
-        const __buf = new Int32Array(buf.buffer, buf.byteOffset);
-
-        __buf[0] = width;
-        __buf[1] = height;
-
-        err = constants.WASI_ESUCCESS;
-        break;
-      }
       case ioctlRequests.TCGETS: {
         if (buf.byteLength < 16) break;
 
@@ -685,6 +680,20 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
 
         err = constants.WASI_ESUCCESS;
 
+        break;
+      }
+      case ioctlRequests.TIOCGWINSZ: {
+        if (buf.byteLength < 8) break;
+
+        const winsize = await this.hterm.getScreenSize();
+        const __buf = new Uint16Array(buf.buffer, buf.byteOffset);
+
+        __buf[0] = winsize.cellsHeight;
+        __buf[1] = winsize.cellsWidth;
+        __buf[2] = winsize.pxWidth;
+        __buf[3] = winsize.pxHeight;
+
+        err = constants.WASI_ESUCCESS;
         break;
       }
       default: {
