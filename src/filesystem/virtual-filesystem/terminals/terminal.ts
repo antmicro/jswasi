@@ -122,8 +122,6 @@ export type BufferRequest = {
 // device driver. One Terminal implementator instance is assigned to
 // one minor number
 export interface Terminal {
-  echo: boolean;
-  raw: boolean;
   foregroundPid: number | null;
   bufRequestQueue: BufferRequest[];
   termios: Termios;

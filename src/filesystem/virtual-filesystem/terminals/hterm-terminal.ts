@@ -37,9 +37,6 @@ class Hterm implements Terminal {
   driverBufferCursor: number;
   userBuffer: string;
 
-  raw: boolean;
-  echo: boolean;
-
   constructor(public terminal: any) {
     this.driverBuffer = "";
     this.driverBufferCursor = 0;
@@ -47,9 +44,6 @@ class Hterm implements Terminal {
     this.bufRequestQueue = [];
     this.subs = [];
     this.foregroundPid = null;
-
-    this.echo = false;
-    this.raw = true;
 
     this.termios = {
       iFlag:
@@ -61,10 +55,10 @@ class Hterm implements Terminal {
       oFlag: termios.OPOST | termios.ONLCR,
       cFlag: termios.CS8 | termios.CREAD,
       lFlag:
-        termios.ECHO |
-        termios.ECHOE |
         termios.ECHOK |
-        termios.ECHONL |
+        termios.ECHOE |
+        termios.ECHO |
+        termios.IEXTEN |
         termios.ICANON |
         termios.ISIG,
     } as termios.Termios;
