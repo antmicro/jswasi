@@ -322,27 +322,36 @@ export class HtermDeviceDriver implements TerminalDriver {
         switch (code) {
           // 0x0a - LN
           case 0x0a: {
-            if ((iFlag & termios.INLCR) !== 0) {
-              __hterm.driverBuffer += "\r";
-            } else if ((lFlag & termios.ICANON) !== 0) {
+            if ((lFlag & termios.ICANON) !== 0) {
+              if ((iFlag & termios.INLCR) !== 0) {
+                if ((iFlag & termios.IGNCR) === 0) {
+                  if ((iFlag & termios.ICRNL) !== 0) {
+                    __hterm.pushNLDriverInputBuffer();
+                  } else {
+                    __hterm.pushDriverInputBuffer("\r");
+                  }
+                }
+              } else {
+                __hterm.pushNLDriverInputBuffer();
+              }
+            } else {
               __hterm.pushNLDriverInputBuffer();
-              __hterm.flushDriverInputBuffer();
             }
 
             break;
           }
           // 0x0d - CR
           case 0x0d: {
-            if ((iFlag & termios.IGNCR) === 0) {
-              if (
-                (iFlag & termios.ICRNL) !== 0 &&
-                (lFlag & termios.ICANON) !== 0
-              ) {
-                __hterm.pushNLDriverInputBuffer();
-                __hterm.flushDriverInputBuffer();
-              } else {
-                __hterm.pushDriverInputBuffer("\r");
+            if ((lFlag & termios.ICANON) !== 0) {
+              if ((iFlag & termios.IGNCR) === 0) {
+                if ((iFlag & termios.ICRNL) !== 0) {
+                  __hterm.pushNLDriverInputBuffer();
+                } else {
+                  __hterm.pushDriverInputBuffer("\r");
+                }
               }
+            } else {
+              __hterm.pushDriverInputBuffer("\r");
             }
 
             break;
@@ -611,10 +620,14 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
   override async write(
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
-    const replaced = new TextDecoder().decode(buffer).replaceAll("\n", "\r\n");
-    this.hterm.terminal.io.print(replaced);
+    const data =
+      this.hterm.termios.oFlag & termios.ONLCR
+        ? new TextDecoder().decode(buffer).replaceAll("\n", "\r\n")
+        : new TextDecoder().decode(buffer);
+
+    this.hterm.terminal.io.print(data);
     if (window.stdoutAttached) {
-      window.buffer += replaced;
+      window.buffer += data;
     }
     return { err: constants.WASI_ESUCCESS, written: BigInt(buffer.byteLength) };
   }
