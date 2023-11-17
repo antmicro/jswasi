@@ -258,26 +258,11 @@ function initServiceWorker() {
 }
 
 type MountConfig = {
-  mountPoint: string;
-  createMissing: boolean;
   fsType: string;
   opts: any;
 };
 
-const DEFAULT_MOUNT_CONFIG: MountConfig = {
-  mountPoint: "/",
-  createMissing: false,
-  fsType: "fsa",
-  opts: {
-    name: "fsa1",
-    keepMetadata: "true",
-    create: "true",
-  },
-};
-
 const RECOVERY_MOUNT_CONFIG: MountConfig = {
-  mountPoint: "/",
-  createMissing: false,
   fsType: "vfs",
   opts: {},
 };
@@ -289,7 +274,7 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
     create: "true",
     keepMetadata: "false",
   });
-  let mountConfig: MountConfig = DEFAULT_MOUNT_CONFIG;
+  let mountConfig: MountConfig;
 
   const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
   if (err === constants.WASI_ESUCCESS) {
@@ -300,7 +285,13 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
       } catch (_) {}
     }
     await desc.close();
+  } else {
+    await fetchFile(tfs, BOOT_MOUNT_CONFIG_PATH, "resources/mounts.json");
+    const { desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
+    const { content } = await desc.read_str();
+    mountConfig = JSON.parse(content);
   }
+
   tfs.removeMount("/");
 
   await tfs.addMount(
