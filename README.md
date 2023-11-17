@@ -16,8 +16,8 @@ npm install
 
 The kernel can be built in two modes:
 
-- Standalone mode: `npm run build` - build kernel and provide it with default index and init system
-- Embed mode: `npm run build:embed` - build just the kernel
+- Standalone mode: `make build` - build kernel and provide it with default index and init system
+- Embed mode: `make embed` - build just the kernel
 
 Both of these commands produce the output in `dist/` directory
 
@@ -48,6 +48,6 @@ More configuration options like choosing the init system or root filesystem imag
 # Testing
 
 This repository contains two sets of tests: unit tests and syscalls tests.
-The first set can be ran using `npm run test` command and it tests the integrity of internal kernel structures.
+The first set can be ran using `npm run test:unit` command and it tests the integrity of internal kernel structures.
 The latter is a userspace rust program that invokes raw syscalls to check whether the kernel responds to them correctly.
 These tests can be ran by using the executable as an init system to the kernel or by just executing it using the kernel.

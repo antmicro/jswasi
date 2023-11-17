@@ -22,16 +22,12 @@
     "typescript": "4.4.4"
   },
   "scripts": {
-    "build": "make build",
-    "start": "cd dist && ../custom_server.py ${PORT:-8000}",
+    "build": "npx tsc",
     "lint": "eslint . --ext .ts",
     "prettier": "npx prettier --write .",
     "prettier-check": "npx prettier . --check",
-    "record": "make record",
     "prepare": "husky install",
-    "test:robot": "export platform=${PLATFORM:-browser}; [ \"$platform\" = \"browser\" ] && make cache_base || [ \"$platform\" = \"browser_virtual\" ] && make cache_vfs; cd tests/robot && robot --variable cache:$(realpath ../../work/browser_cache/) --variable platform:$platform -i $platform .",
-    "test:unit": "jest --config=tests/unit/jest.config.ts",
-    "test:stability": "jest --config=tests/stability/jest.config.js"
+    "test:unit": "jest --config=tests/unit/jest.config.ts"
   },
   "lint-staged": {
     "*.ts": [
