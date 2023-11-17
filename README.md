@@ -1,70 +1,53 @@
-# Rust Shell
+# JSWASI
 
 Copyright (c) 2022-2023 [Antmicro](https://www.antmicro.com)
 
 This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib) api.
-Along with [wash](https://github.com/antmicro/wash) shell and some terminal apps, it strives to provide a linux terminal experience.
+`JSWASI` is just a _kernel_, complete applications that can be served or embedded, can be build using [jswasi-rootfs](https://github.com/antmicro/wasi_ext_lib) repository.
 
-# Dependencies
+# Building
 
-Make sure you have the following programs installed:
-
-- [rust](https://www.rust-lang.org/) along with `rustup` and `cargo`
-- [node.js](https://nodejs.org/)
-
-To install rust, you can use the following commands:
-
-```
-# install rustc, rustup, cargo
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh # proceed with defaults
-source $HOME/.cargo/env
-```
-
-To install node, you can use the following commands:
-
-```
-# install newest node via nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install node
-```
-
-# Installation
-
-Run the following commands to build the project:
+To build the project, you're going to need `nodejs` installed (preferably `v18`).
+Before building the project, don't forget to install `npm` dependencies:
 
 ```
 npm install
-npm run build
 ```
 
-This will package all the necessary files in `dist/` directory.
+The kernel can be built in two modes:
+
+- Standalone mode: `npm run build` - build kernel and provide it with default index and init system
+- Embed mode: `npm run build:embed` - build just the kernel
+
+Both of these commands produce the output in `dist/` directory
 
 # Running
 
-Once the project is built, it can be started using:
+The project can be ran in the standalone mode by serving the `dist/` directory with a http server of your choice. Note that this mode is not going to work without including some essential binaries.
+We are working on making the kernel more independent and flexible so that it is not necessary, fixes should be ready soon.
 
-```
-npm run start
-```
+As for the embed mode, the `dist/terminal.js` exposes two functions that allow to controll the kernel:
 
-This will setup an `http` server that listens on `8000` port.
-To choose a different port, you can use:
+- `init`: this function accepts one parameter - a hterm object that is going to serve a purpose of a terminal for interacting with the init system. Note that efforts to make the `init` function independent from `hterm` are in progress
+- `tearDown`: this function accepts one parameter - a print feedback callback. This function can be used to clean all persistent elements of the application without interracting with the kernel in case the kernel enters an unrecoverable state.
 
-```
-PORT=1234 npm run start
-```
+# Configuration
 
-# Running tests
+The kernel supports a basic configuration that allows to configure the root filesystem type:
 
-The project uses `robot framework` and `pexpect` library for running a wide variety of end-to-end tests.
-Install dependencies (you need `python3` and `pip3` installed for that):
+- `fsType`: type of the filesystem to mount at `/`
+- `opts`: options specific to the chosen filesystem.
 
-```
-pip3 install robotframework PexpectLibrary
-```
+To review available filesystems, read our [documentation](https://antmicro.com) TODO
 
-To run the tests against the browser runtime use:
+The configuration is read from the `fsa0/mounts.json` file in the device filesystem.
+If no such file is in this location, the default configuration from `dist/resources/mounts.json` is going to be saved there.
 
-```
-npm run test
-```
+More configuration options like choosing the init system or root filesystem image are going to be implemented soon.
+
+# Testing
+
+This repository contains two sets of tests: unit tests and syscalls tests.
+The first set can be ran using `npm run test` command and it tests the integrity of internal kernel structures.
+The latter is a userspace rust program that invokes raw syscalls to check whether the kernel responds to them correctly.
+These tests can be ran by using the executable as an init system to the kernel or by just executing it using the kernel.
