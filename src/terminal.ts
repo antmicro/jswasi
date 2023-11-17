@@ -333,12 +333,7 @@ async function recoveryMotd(tfs: TopLevelFs) {
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
-export async function init(
-  terminal: any,
-  notifyDroppedFileSaved:
-    | ((path: string, entryName: string) => void)
-    | null = null
-): Promise<void> {
+export async function init(terminal: any): Promise<void> {
   if (!navigator.storage.getDirectory) {
     terminal.io.println(
       "Your browser doesn't support File System Access API yet."
