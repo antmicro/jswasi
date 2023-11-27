@@ -15,38 +15,57 @@ index_dist := $(dist_dir)/index.html
 resources := $(subst $(assets_dir),$(resources_dir),$(wildcard $(assets_dir)/*))
 vendor_sources := $(subst $(vendor_dir),$(vendor_dist_dir),$(wildcard $(vendor_dir)/*.js))
 
+wash := $(resources_dir)/wash
+wash_url := https://github.com/antmicro/wash/releases/download/v0.1.0/wash.wasm
+
+wasibox := $(resources_dir)/wasibox
+wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.0/wasibox.wasm
+
+coreutils := $(resources_dir)/coreutils
+coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/coreutils.wasm
+
+
 .PHONY: embed
 embed: $(js_virtualfs_dist) $(vendor_sources)
-	@npm run build
+	npm run build
 
 .PHONY: build
-build: embed $(resources) $(index_dist)
+build: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
 
 $(dist_dir):
-	@mkdir -p $(dist_dir)
+	mkdir -p $(dist_dir)
 
-$(resources_dist_dir):
-	@mkdir -p $(resources_dist_dir)
+$(resources_dir):
+	mkdir -p $(resources_dir)
 
 $(vendor_dist_dir):
-	@mkdir -p $(vendor_dist_dir)
+	mkdir -p $(vendor_dist_dir)
 
 $(js_virtualfs_dir)/node_modules: $(js_virtualfs_dir)/package.json
-	@cd $(js_virtualfs_dir) && \
+	cd $(js_virtualfs_dir) && \
 	npm install
 
 $(js_virtualfs): $(js_virtualfs_dir)/lib/*.js $(js_virtualfs_dir)/node_modules
-	@cd $(js_virtualfs_dir) && \
+	cd $(js_virtualfs_dir) && \
 	npm run build
 
 $(resources_dir)/%: $(assets_dir)/% | $(resources_dir)
 	cp $< $@
 
 $(js_virtualfs_dist): $(js_virtualfs) | $(vendor_dist_dir)
-	@cp $(js_virtualfs) $(vendor_dist_dir)
+	cp $(js_virtualfs) $(vendor_dist_dir)
 
 $(vendor_dist_dir)/%.js: $(vendor_dir)/%.js | $(vendor_dist_dir)
-	@cp $< $@
+	cp $< $@
 
 $(index_dist): $(index)
-	@cp $(index) $(index_dist)
+	cp $(index) $(index_dist)
+
+$(wash): | $(resources_dir)
+	wget -qO $(wash) $(wash_url) || { rm -f $(wash); exit 1; }
+
+$(wasibox): | $(resources_dir)
+	wget -qO $(wasibox) $(wasibox_url) || { rm -f $(wasibox); exit 1; }
+
+$(coreutils): | $(resources_dir)
+	wget -qO $(coreutils) $(coreutils_url) || { rm -f $(coreutils); exit 1; }

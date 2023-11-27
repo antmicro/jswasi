@@ -22,12 +22,12 @@ const INIT_FSA_ID = "fsa0";
 const BOOT_MOUNT_CONFIG_PATH = "/mounts.json";
 // binaries which need to be verified
 const CHECKSUM_BINARIES = {
-  "/usr/bin/wash": ["resources/wash.wasm", "resources/wash.md5"],
+  "/usr/bin/wash": ["resources/wash", "resources/wash.md5"],
   "/usr/bin/init": ["resources/init.sh", "resources/init.md5"],
 };
-const ALWAYS_FETCH_BINARIES = {
+const ALWAYS_FETCH_FILES = {
   "/etc/motd": "resources/motd.txt",
-  "/usr/bin/coreutils": "resources/coreutils.wasm",
+  "/usr/bin/coreutils": "resources/coreutils",
 };
 
 async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
@@ -236,11 +236,11 @@ async function initFs(fs: TopLevelFs) {
     symlinkCreationPromise,
   ]);
 
-  const alwaysFetchPromises = Object.entries(ALWAYS_FETCH_BINARIES).map(
-    ([filename, address]) => fetchFile(fs, filename, address, true)
+  await Promise.all(
+    Object.entries(ALWAYS_FETCH_FILES).map(([filename, address]) =>
+      fetchFile(fs, filename, address, true)
+    )
   );
-
-  await Promise.all(alwaysFetchPromises);
 }
 
 function initServiceWorker() {
