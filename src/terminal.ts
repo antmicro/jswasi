@@ -19,15 +19,15 @@ declare global {
 }
 
 const INIT_FSA_ID = "fsa0";
-const BOOT_MOUNT_CONFIG_PATH = "/mounts.json";
+const BOOT_KERNEL_CONFIG_PATH = "/config.json";
 // binaries which need to be verified
 const CHECKSUM_BINARIES = {
   "/usr/bin/wash": ["resources/wash", "resources/wash.md5"],
-  "/usr/bin/init": ["resources/init.sh", "resources/init.md5"],
 };
 const ALWAYS_FETCH_FILES = {
   "/etc/motd": "resources/motd.txt",
   "/usr/bin/coreutils": "resources/coreutils",
+  "/usr/local/bin/wasibox": "resources/wasibox",
 };
 
 async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
@@ -257,6 +257,11 @@ function initServiceWorker() {
   });
 }
 
+type KernelConfig = {
+  init: string[];
+  mountConfig: MountConfig;
+};
+
 type MountConfig = {
   fsType: string;
   opts: any;
@@ -267,34 +272,41 @@ const RECOVERY_MOUNT_CONFIG: MountConfig = {
   opts: {},
 };
 
-async function getTopLevelFs(): Promise<TopLevelFs> {
-  const tfs = new TopLevelFs();
+async function getKernelConfig(tfs: TopLevelFs): Promise<KernelConfig> {
   await tfs.addMount(undefined, "", undefined, "/", "fsa", 0n, {
     name: INIT_FSA_ID,
     create: "true",
     keepMetadata: "false",
   });
-  let mountConfig: MountConfig;
 
-  const { err, desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
+  let kernelConfig: KernelConfig;
+
+  const { err, desc } = await tfs.open(BOOT_KERNEL_CONFIG_PATH);
   if (err === constants.WASI_ESUCCESS) {
     let { err, content } = await desc.read_str();
     if (err === constants.WASI_ESUCCESS) {
       try {
-        mountConfig = JSON.parse(content);
+        kernelConfig = JSON.parse(content);
       } catch (_) {}
     }
     await desc.close();
   } else {
-    await fetchFile(tfs, BOOT_MOUNT_CONFIG_PATH, "resources/mounts.json");
-    const { desc } = await tfs.open(BOOT_MOUNT_CONFIG_PATH);
-    const { content } = await desc.read_str();
-    mountConfig = JSON.parse(content);
-  }
+    await fetchFile(tfs, BOOT_KERNEL_CONFIG_PATH, "resources/config.json");
 
+    const { desc } = await tfs.open(BOOT_KERNEL_CONFIG_PATH);
+    const { content } = await desc.read_str();
+    kernelConfig = JSON.parse(content);
+  }
   tfs.removeMount("/");
 
-  await tfs.addMount(
+  return kernelConfig;
+}
+
+function mountRootfs(
+  tfs: TopLevelFs,
+  mountConfig: MountConfig
+): Promise<number> {
+  return tfs.addMount(
     undefined,
     "",
     undefined,
@@ -303,7 +315,6 @@ async function getTopLevelFs(): Promise<TopLevelFs> {
     0n,
     mountConfig.opts
   );
-  return tfs;
 }
 
 async function recoveryMotd(tfs: TopLevelFs) {
@@ -333,7 +344,15 @@ export async function init(terminal: any): Promise<void> {
     return;
   }
 
-  const tfs = await getTopLevelFs();
+  const tfs = new TopLevelFs();
+  const kernelConfig = await getKernelConfig(tfs);
+  if (
+    (await mountRootfs(tfs, kernelConfig.mountConfig)) !==
+    constants.WASI_ESUCCESS
+  ) {
+    terminal.io.println("Failed to mount root filesystem");
+  }
+
   initServiceWorker();
   const driverManager = new DriverManager();
   const processManager = new ProcessManager("process.js", tfs, driverManager);
@@ -393,7 +412,7 @@ export async function init(terminal: any): Promise<void> {
     null, // parent_lock
     "/usr/bin/wash",
     fdTable,
-    ["/usr/bin/wash", "/usr/bin/init"],
+    kernelConfig.init,
     DEFAULT_ENV,
     false,
     DEFAULT_WORK_DIR,

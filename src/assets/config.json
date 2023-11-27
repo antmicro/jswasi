@@ -1,0 +1,11 @@
+{
+  "init": ["/usr/bin/wash"],
+  "mountConfig": {
+    "fsType": "fsa",
+    "opts": {
+      "name": "fsa1",
+      "keepMetadata": "true",
+      "create": "true"
+    }
+  }
+}

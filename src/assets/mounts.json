@@ -1,8 +1,0 @@
-{
-  "fsType": "fsa",
-  "opts": {
-    "name": "fsa1",
-    "keepMetadata": "true",
-    "create": "true"
-  }
-}
