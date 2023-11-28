@@ -1,6 +1,6 @@
 const CACHE_NAME = "wash-cache";
 const urlsToCache = [
-  "favicon.ico",
+  "resources/favicon.ico",
 
   "browser-apps.js",
   "constants.js",
