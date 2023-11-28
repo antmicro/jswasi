@@ -8,15 +8,9 @@ This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://gi
 # Building
 
 To build the project, you're going to need `nodejs` installed (preferably `v18`).
-Before building the project, don't forget to install `npm` dependencies:
-
-```
-npm install
-```
-
 The kernel can be built in two modes:
 
-- Standalone mode: `make build` - build kernel and provide it with default index and init system
+- Standalone mode (default): `make standalone` - build kernel and provide it with default index, init system and minimal userspace applications
 - Embed mode: `make embed` - build just the kernel
 
 Both of these commands produce the output in `dist/` directory

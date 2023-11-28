@@ -25,12 +25,12 @@ coreutils := $(resources_dir)/coreutils
 coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/coreutils.wasm
 
 
-.PHONY: embed
-embed: $(js_virtualfs_dist) $(vendor_sources)
-	npm run build
+.PHONY: standalone
+standalone: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
 
-.PHONY: build
-build: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
+.PHONY: embed
+embed: $(js_virtualfs_dist) $(vendor_sources) $(project_dir)/node_modules
+	npm run build
 
 $(dist_dir):
 	mkdir -p $(dist_dir)
@@ -40,6 +40,9 @@ $(resources_dir):
 
 $(vendor_dist_dir):
 	mkdir -p $(vendor_dist_dir)
+
+$(project_dir)/node_modules: $(project_dir)/package.json
+	npm install
 
 $(js_virtualfs_dir)/node_modules: $(js_virtualfs_dir)/package.json
 	cd $(js_virtualfs_dir) && \
