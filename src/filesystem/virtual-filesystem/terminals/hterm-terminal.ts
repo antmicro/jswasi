@@ -96,7 +96,10 @@ class Hterm implements Terminal {
   pushNLDriverInputBuffer() {
     this.driverBuffer += "\n";
     if ((this.termios.lFlag & termios.ICANON) !== 0) {
-      if ((this.termios.lFlag & termios.ECHONL) !== 0) {
+      if (
+        (this.termios.lFlag & termios.ECHO) !== 0 ||
+        (this.termios.lFlag & termios.ECHONL) !== 0
+      ) {
         this.terminal.io.println("");
       }
       this.flushDriverInputBuffer();
