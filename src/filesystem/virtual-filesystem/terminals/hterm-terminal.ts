@@ -1,11 +1,10 @@
 // @ts-ignore
 import * as vfs from "../../../vendor/vfs.js";
-import * as termios from "./termios.js";
+// import * as termios from "./termios.js";
 import {
   TerminalDriver,
-  Terminal,
+  AbstractTermiosTerminal,
   Winsize,
-  BufferRequest,
   ioctlRequests,
 } from "./terminal.js";
 import {
@@ -14,7 +13,7 @@ import {
   DescriptorEntry,
   FdTable,
 } from "../../../process-manager.js";
-import { PollSub, Fdflags, Rights, Descriptor } from "../../filesystem.js";
+import { Fdflags, Rights, Descriptor } from "../../filesystem.js";
 import { UserData, EventType, PollEvent } from "../../../types.js";
 import * as constants from "../../../constants.js";
 import { getFilesystem } from "../../top-level-fs.js";
@@ -27,36 +26,62 @@ type InitDeviceArgs = {
 
 export type InitDriverArgs = { processManager: ProcessManager };
 
-class Hterm implements Terminal {
-  foregroundPid: number | null;
-  bufRequestQueue: BufferRequest[];
-  termios: termios.Termios;
-  subs: PollSub[];
-
-  driverBuffer: string;
-  driverBufferCursor: number;
-  userBuffer: string;
-
+class Hterm extends AbstractTermiosTerminal {
   constructor(public terminal: any) {
-    this.driverBuffer = "";
-    this.driverBufferCursor = 0;
-    this.userBuffer = "";
-    this.bufRequestQueue = [];
-    this.subs = [];
-    this.foregroundPid = null;
-
-    this.termios = { ...termios.DEFAULT_HTERM_TERMIOS };
-
+    super();
     this.terminal.setInsertMode(true);
   }
 
-  splitBuf(len: number): string {
-    let out = this.userBuffer.slice(0, len);
-    this.userBuffer = this.userBuffer.slice(len);
-    return out;
+  protected override printTerminal(data: string): void {
+    this.terminal.io.print(data);
   }
 
-  getScreenSize(): Winsize {
+  protected override moveCursorRight(shift: number): void {
+    let __shift =
+      shift >= this.driverBuffer.length - this.driverBufferCursor
+        ? this.driverBuffer.length - this.driverBufferCursor
+        : shift;
+
+    if (__shift === 0) return;
+
+    // CSI Ps C  Cursor Forward Ps Times (default = 1) (CUF)
+    this.terminal.io.print(`\x1b[${__shift}C`);
+    this.driverBufferCursor += __shift;
+  }
+
+  protected override moveCursorLeft(shift: number): void {
+    let __shift =
+      shift >= this.driverBufferCursor ? this.driverBufferCursor : shift;
+
+    if (__shift === 0) return;
+
+    // CSI Ps D  Cursor Backward Ps Times (default = 1) (CUB)
+    this.terminal.io.print(`\x1b[${__shift}D`);
+    this.driverBufferCursor -= __shift;
+  }
+
+  protected override removeFromCursorToLeft(toRemove: number): void {
+    let __toRemove =
+      toRemove >= this.driverBufferCursor ? this.driverBufferCursor : toRemove;
+
+    if (__toRemove === 0) return;
+
+    this.terminal.cursorLeft(__toRemove);
+    // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
+    this.terminal.io.print(`\x1b[${__toRemove}P`);
+    this.driverBuffer =
+      this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
+      this.driverBuffer.slice(this.driverBufferCursor);
+    this.driverBufferCursor -= 1;
+  }
+
+  protected override flushDriverInputBuffer(): void {
+    this.userBuffer += this.driverBuffer;
+    this.driverBuffer = "";
+    this.driverBufferCursor = 0;
+  }
+
+  public getScreenSize(): Winsize {
     let scrollPort = this.terminal.scrollPort_.getScreenSize();
     return {
       cellsWidth: this.terminal.screenSize.width,
@@ -64,95 +89,6 @@ class Hterm implements Terminal {
       pxWidth: scrollPort.width,
       pxHeight: scrollPort.height,
     } as Winsize;
-  }
-
-  pushDriverInputBuffer(data: string) {
-    if ((this.termios.lFlag & termios.ECHO) !== 0) {
-      this.terminal.io.print(data);
-    }
-    this.driverBuffer =
-      this.driverBuffer.slice(0, this.driverBufferCursor) +
-      data +
-      this.driverBuffer.slice(this.driverBufferCursor);
-    this.driverBufferCursor += data.length;
-  }
-
-  pushNLDriverInputBuffer() {
-    this.driverBuffer += "\n";
-    if ((this.termios.lFlag & termios.ICANON) !== 0) {
-      if (
-        (this.termios.lFlag & termios.ECHO) !== 0 ||
-        (this.termios.lFlag & termios.ECHONL) !== 0
-      ) {
-        this.terminal.io.println("");
-      }
-      this.flushDriverInputBuffer();
-    }
-  }
-
-  deleteCharDriverInputBuffer() {
-    if (this.driverBufferCursor > 0) {
-      this.terminal.cursorLeft(1);
-      // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
-      this.terminal.io.print("\x1b[P");
-      this.driverBuffer =
-        this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
-        this.driverBuffer.slice(this.driverBufferCursor);
-      this.driverBufferCursor -= 1;
-    }
-  }
-
-  moveCursorRight() {
-    if (this.driverBufferCursor < this.driverBuffer.length) {
-      // CSI Ps C  Cursor Forward Ps Times (default = 1) (CUF)
-      this.terminal.io.print("\x1b[C");
-      this.driverBufferCursor += 1;
-    }
-  }
-
-  moveCursorLeft() {
-    if (this.driverBufferCursor > 0) {
-      // CSI Ps D  Cursor Backward Ps Times (default = 1) (CUB)
-      this.terminal.io.print("\x1b[D");
-      this.driverBufferCursor -= 1;
-    }
-  }
-
-  flushDriverInputBuffer() {
-    this.userBuffer += this.driverBuffer;
-    this.driverBuffer = "";
-    this.driverBufferCursor = 0;
-  }
-
-  resolveUserReadRequests() {
-    if (this.userBuffer.length > 0) {
-      // In case EOF arrives when line is not empty flush requests
-      // until there are data in user buffer
-      while (this.userBuffer.length > 0 && this.bufRequestQueue.length > 0) {
-        let req = this.bufRequestQueue.shift();
-        let buff = this.userBuffer.slice(0, req.len);
-        this.userBuffer = this.userBuffer.slice(req.len);
-
-        req.resolve({
-          err: constants.WASI_ESUCCESS,
-          buffer: new TextEncoder().encode(buff),
-        });
-      }
-    } else {
-      // Resolve all foreground process requests with empty buffers
-      let foreground_reqs = this.bufRequestQueue.filter(
-        (req) => req.pid === this.foregroundPid
-      );
-      this.bufRequestQueue = this.bufRequestQueue.filter(
-        (req) => req.pid !== this.foregroundPid
-      );
-      foreground_reqs.forEach((req) =>
-        req.resolve({
-          err: constants.WASI_ESUCCESS,
-          buffer: new ArrayBuffer(0),
-        })
-      );
-    }
   }
 }
 
@@ -270,215 +206,7 @@ export class HtermDeviceDriver implements TerminalDriver {
       "Ctrl-R": "PASS",
     });
     const onTerminalInput = (data: string): void => {
-      let iFlag = __hterm.termios.iFlag;
-      let cFlag = __hterm.termios.cFlag;
-      let lFlag = __hterm.termios.lFlag;
-
-      if ((cFlag & termios.CREAD) === 0) {
-        // Discard input
-        return;
-      }
-
-      if ((iFlag & termios.ISTRIP) !== 0) {
-        data = this.stripOffBytes(data);
-      }
-
-      while (data.length > 0) {
-        let code = data.charCodeAt(0);
-        if (code === 0 && data.length > 1 && data.charCodeAt(1) === 0) {
-          const breakOffset = this.detectBreakCondition(data);
-
-          if ((iFlag & termios.IGNBRK) === 0) {
-            // Do not ignore break condition
-            if ((iFlag & termios.BRKINT) === 0) {
-              if ((iFlag & termios.PARMRK) === 0) {
-                __hterm.driverBuffer += "\x00";
-              } else {
-                __hterm.driverBuffer += "\xFF\x00\x00";
-              }
-            } else {
-              __hterm.flushDriverInputBuffer();
-              // TODO: Send SIGINT to foreground process group
-            }
-          }
-
-          data = data.slice(breakOffset);
-          continue;
-        }
-
-        switch (code) {
-          // 0x0a - LN
-          case 0x0a: {
-            if ((lFlag & termios.ICANON) !== 0) {
-              if ((iFlag & termios.INLCR) !== 0) {
-                if ((iFlag & termios.IGNCR) === 0) {
-                  if ((iFlag & termios.ICRNL) !== 0) {
-                    __hterm.pushNLDriverInputBuffer();
-                  } else {
-                    __hterm.pushDriverInputBuffer("\r");
-                  }
-                }
-              } else {
-                __hterm.pushNLDriverInputBuffer();
-              }
-            } else {
-              __hterm.pushNLDriverInputBuffer();
-            }
-
-            break;
-          }
-          // 0x0d - CR
-          case 0x0d: {
-            if ((lFlag & termios.ICANON) !== 0) {
-              if ((iFlag & termios.IGNCR) === 0) {
-                if ((iFlag & termios.ICRNL) !== 0) {
-                  __hterm.pushNLDriverInputBuffer();
-                } else {
-                  __hterm.pushDriverInputBuffer("\r");
-                }
-              }
-            } else {
-              __hterm.pushDriverInputBuffer("\r");
-            }
-
-            break;
-          }
-          // 0x11 - START, 0x13 - STOP
-          case 0x11:
-          case 0x13: {
-            if ((iFlag & termios.IXON) !== 0) {
-              if (code === 0x11) {
-                // TODO: do not flush driver input buffer
-              } else if (code === 0x13) {
-                // TODO: flush driver input buffer
-              }
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-            break;
-          }
-          // 0x03 - INTR, 0x1a - SUSP, 0x1c - QUIT
-          case 0x03:
-          case 0x1a:
-          case 0x1c: {
-            if ((lFlag & termios.ISIG) !== 0) {
-              if (code === 0x03) {
-                if (__hterm.foregroundPid !== null) {
-                  this.processManager.publishEvent(
-                    constants.WASI_EXT_EVENT_SIGINT,
-                    __hterm.foregroundPid
-                  );
-                }
-              } else if (code === 0x1a) {
-                // TODO: handle SUSP
-              } else if (code === 0x1c) {
-                // TODO: handle QUIT
-              }
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-            break;
-          }
-          // EOT - end of transmission
-          case 0x04: {
-            if ((lFlag & termios.ICANON) !== 0) {
-              __hterm.flushDriverInputBuffer();
-              __hterm.resolveUserReadRequests();
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-            break;
-          }
-          // KILL - remove line
-          case 0x15: {
-            if (
-              (lFlag & termios.ICANON) !== 0 &&
-              (lFlag & termios.ECHOK) !== 0
-            ) {
-              // Remove all characters from driver buffer to the left from the cursor
-              __hterm.driverBuffer = __hterm.driverBuffer.slice(
-                __hterm.driverBufferCursor
-              );
-              __hterm.terminal.cursorLeft(__hterm.driverBufferCursor);
-              __hterm.terminal.io.print(`\x1b[${__hterm.driverBufferCursor}P`);
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-            break;
-          }
-          // DEL
-          case 0x7f: {
-            if (
-              (lFlag & termios.ICANON) !== 0 &&
-              (lFlag & termios.ECHOE) !== 0
-            ) {
-              __hterm.deleteCharDriverInputBuffer();
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-            break;
-          }
-          // Start of escape sequence
-          case 0x1b: {
-            if ((lFlag & termios.ICANON) !== 0) {
-              if (data[1] === "[") {
-                switch (data[2]) {
-                  // Move cursor right
-                  case "C": {
-                    __hterm.moveCursorRight();
-                    break;
-                  }
-                  // Move cursor left
-                  case "D": {
-                    __hterm.moveCursorLeft();
-                    break;
-                  }
-                  default: {
-                    break;
-                  }
-                }
-                // ignore rest of CSIs, for now...
-                data = data.slice(3);
-                continue;
-              } else {
-                // ignore, for now...
-                data = data.slice(2);
-                continue;
-              }
-            } else {
-              __hterm.pushDriverInputBuffer(data[0]);
-            }
-
-            break;
-          }
-          default: {
-            __hterm.pushDriverInputBuffer(data[0]);
-            break;
-          }
-        }
-
-        data = data.slice(1);
-      }
-
-      if ((lFlag & termios.ICANON) === 0) {
-        __hterm.flushDriverInputBuffer();
-      }
-
-      if (__hterm.userBuffer.length > 0) {
-        __hterm.resolveUserReadRequests();
-      }
-
-      if (__hterm.userBuffer.length > 0) {
-        for (const sub of __hterm.subs) {
-          sub.resolve({
-            userdata: sub.userdata,
-            error: constants.WASI_ESUCCESS,
-            nbytes: BigInt(__hterm.userBuffer.length),
-            eventType: constants.WASI_EVENTTYPE_FD_READ,
-          });
-        }
-        __hterm.subs.length = 0;
-      }
+      __hterm.processTerminalInput(this.processManager, data);
     };
     const io = __hterm.terminal.io.push();
     io.onVTKeystroke = onTerminalInput;
@@ -568,25 +296,6 @@ export class HtermDeviceDriver implements TerminalDriver {
       throw e;
     }
   }
-
-  private detectBreakCondition(data: string): number {
-    for (let i = 2; i < data.length; ++i) {
-      if (data.charCodeAt(i) !== 0) {
-        return i;
-      }
-    }
-
-    return data.length;
-  }
-
-  private stripOffBytes(data: string): string {
-    let stripped = "";
-    for (let i = 0; i < data.length; ++i) {
-      let c = data.charCodeAt(i);
-      stripped += String.fromCharCode(c & 0x7f)[0];
-    }
-    return stripped;
-  }
 }
 
 class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
@@ -607,12 +316,10 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
   override async write(
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
-    const data =
-      this.hterm.termios.oFlag & termios.ONLCR
-        ? new TextDecoder().decode(buffer).replaceAll("\n", "\r\n")
-        : new TextDecoder().decode(buffer);
+    const data = this.hterm.sendTerminalOutput(
+      new TextDecoder().decode(buffer)
+    );
 
-    this.hterm.terminal.io.print(data);
     if (window.stdoutAttached) {
       window.buffer += data;
     }
@@ -623,10 +330,10 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
     len: number,
     workerId: number
   ): Promise<{ err: number; buffer: ArrayBuffer }> {
-    if (this.hterm.userBuffer.length !== 0) {
+    if (this.hterm.dataForUser() > 0) {
       return {
         err: constants.WASI_ESUCCESS,
-        buffer: new TextEncoder().encode(this.hterm.splitBuf(len)),
+        buffer: this.hterm.readToUser(len),
       };
     } else if (this.fdstat.fs_flags & constants.WASI_FDFLAG_NONBLOCK) {
       return {
@@ -724,7 +431,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         });
       }
       case constants.WASI_EVENTTYPE_FD_READ: {
-        if (this.hterm.userBuffer.length === 0) {
+        if (this.hterm.dataForUser() === 0) {
           return new Promise((resolve: (event: PollEvent) => void) => {
             this.hterm.subs.push({
               pid: workerId,
@@ -738,7 +445,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
           userdata,
           error: constants.WASI_ESUCCESS,
           eventType,
-          nbytes: BigInt(this.hterm.userBuffer.length),
+          nbytes: BigInt(this.hterm.dataForUser()),
         });
       }
       default: {
