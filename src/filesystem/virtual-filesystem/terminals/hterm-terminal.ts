@@ -45,23 +45,7 @@ class Hterm implements Terminal {
     this.subs = [];
     this.foregroundPid = null;
 
-    this.termios = {
-      iFlag:
-        termios.ICRNL |
-        // Enable handling START/STOP characters (0x11/0x13) on output
-        termios.IXON |
-        // Enable handling START/STOP characters (0x11/0x13) on input
-        termios.IXOFF,
-      oFlag: termios.OPOST | termios.ONLCR,
-      cFlag: termios.CS8 | termios.CREAD,
-      lFlag:
-        termios.ECHOK |
-        termios.ECHOE |
-        termios.ECHO |
-        termios.IEXTEN |
-        termios.ICANON |
-        termios.ISIG,
-    } as termios.Termios;
+    this.termios = { ...termios.DEFAULT_HTERM_TERMIOS };
 
     this.terminal.setInsertMode(true);
   }
@@ -72,7 +56,7 @@ class Hterm implements Terminal {
     return out;
   }
 
-  async getScreenSize(): Promise<Winsize> {
+  getScreenSize(): Winsize {
     let scrollPort = this.terminal.scrollPort_.getScreenSize();
     return {
       cellsWidth: this.terminal.screenSize.width,

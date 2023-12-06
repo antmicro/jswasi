@@ -126,7 +126,7 @@ export interface Terminal {
   bufRequestQueue: BufferRequest[];
   termios: Termios;
 
-  getScreenSize(): Promise<Winsize>;
+  getScreenSize(): Winsize;
 }
 
 // Extended device driver interface for interacting with terminal

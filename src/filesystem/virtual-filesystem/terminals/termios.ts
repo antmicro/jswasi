@@ -121,3 +121,10 @@ export type Termios = {
   cFlag: TcFlag;
   lFlag: TcFlag;
 };
+
+export const DEFAULT_HTERM_TERMIOS: Termios = {
+  iFlag: ICRNL | IXON | IXOFF,
+  oFlag: OPOST | ONLCR,
+  cFlag: CS8 | CREAD,
+  lFlag: ECHOK | ECHOE | ECHO | IEXTEN | ICANON | ISIG,
+};
