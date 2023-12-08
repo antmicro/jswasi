@@ -70,9 +70,9 @@ class Hterm extends AbstractTermiosTerminal {
     // CSI Ps P  Delete Ps Character(s) (default = 1) (DCH)
     this.terminal.io.print(`\x1b[${__toRemove}P`);
     this.driverBuffer =
-      this.driverBuffer.slice(0, this.driverBufferCursor - 1) +
+      this.driverBuffer.slice(0, this.driverBufferCursor - __toRemove) +
       this.driverBuffer.slice(this.driverBufferCursor);
-    this.driverBufferCursor -= 1;
+    this.driverBufferCursor -= __toRemove;
   }
 
   protected override flushDriverInputBuffer(): void {

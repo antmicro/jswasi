@@ -388,10 +388,6 @@ export abstract class AbstractTermiosTerminal implements Terminal {
         case 0x15: {
           if ((lFlag & termios.ICANON) !== 0 && (lFlag & termios.ECHOK) !== 0) {
             // Remove all characters from driver buffer to the left from the cursor
-            this.driverBuffer = this.driverBuffer.slice(
-              this.driverBufferCursor
-            );
-            // this.moveCursorLeft(this.driverBufferCursor);
             this.removeFromCursorToLeft(this.driverBufferCursor);
           } else {
             this.pushDriverInputBuffer(data[0]);
