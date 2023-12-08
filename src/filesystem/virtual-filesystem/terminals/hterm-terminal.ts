@@ -7,6 +7,7 @@ import {
   Winsize,
   ioctlRequests,
 } from "./terminal.js";
+import { DEFAULT_HTERM_TERMIOS } from "./termios.js";
 import {
   DEFAULT_ENV,
   DEFAULT_WORK_DIR,
@@ -28,7 +29,7 @@ export type InitDriverArgs = { processManager: ProcessManager };
 
 class Hterm extends AbstractTermiosTerminal {
   constructor(public terminal: any) {
-    super();
+    super({ ...DEFAULT_HTERM_TERMIOS });
     this.terminal.setInsertMode(true);
   }
 

@@ -156,10 +156,10 @@ export abstract class AbstractTermiosTerminal implements Terminal {
 
   protected userBuffer: string;
 
-  constructor() {
+  constructor(termios: termios.Termios) {
     this.bufRequestQueue = [];
     this.subs = [];
-    this.termios = { ...termios.DEFAULT_HTERM_TERMIOS };
+    this.termios = termios;
     this.driverBuffer = "";
     this.driverBufferCursor = 0;
     this.userBuffer = "";
@@ -167,9 +167,6 @@ export abstract class AbstractTermiosTerminal implements Terminal {
 
   // prints data on the screen
   protected abstract printTerminal(data: string): void;
-
-  // // removes one character from under cursor, both on screen and buffer
-  // protected abstract deleteCharDriverInputBuffer(): void;
 
   // move cursor `n` positions right, both on screen and buffer
   protected abstract moveCursorRight(shift: number): void;
