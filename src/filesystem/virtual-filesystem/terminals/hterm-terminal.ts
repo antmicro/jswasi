@@ -7,7 +7,7 @@ import {
   Winsize,
   ioctlRequests,
 } from "./terminal.js";
-import { DEFAULT_HTERM_TERMIOS } from "./termios.js";
+import * as termios from "./termios.js";
 import {
   DEFAULT_ENV,
   DEFAULT_WORK_DIR,
@@ -20,6 +20,19 @@ import * as constants from "../../../constants.js";
 import { getFilesystem } from "../../top-level-fs.js";
 import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
 import ProcessManager from "../../../process-manager.js";
+
+const DEFAULT_HTERM_TERMIOS: termios.Termios = {
+  iFlag: termios.ICRNL | termios.IXON | termios.IXOFF,
+  oFlag: termios.OPOST | termios.ONLCR,
+  cFlag: termios.CS8 | termios.CREAD,
+  lFlag:
+    termios.ECHOK |
+    termios.ECHOE |
+    termios.ECHO |
+    termios.IEXTEN |
+    termios.ICANON |
+    termios.ISIG,
+};
 
 type InitDeviceArgs = {
   terminal: any;
