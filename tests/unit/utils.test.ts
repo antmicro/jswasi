@@ -1,4 +1,5 @@
 import * as utils from "../../src/utils";
+import { test, expect } from "@jest/globals";
 
 test("parsePath on regular path", () => {
   expect(utils.parsePath("/usr/bin/wash")).toStrictEqual({

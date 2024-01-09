@@ -9,6 +9,7 @@ import { DriverManager } from "../../src/filesystem/virtual-filesystem/driver-ma
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
 import { Filestat } from "../../src/filesystem/filesystem";
 import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
+import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "@jest/globals";
 
 jest.mock("../../src/process-manager");
 jest.mock("../../src/filesystem/top-level-fs");
