@@ -32,6 +32,10 @@ standalone: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
 embed: $(js_virtualfs_dist) $(vendor_sources) $(project_dir)/node_modules
 	npm run build
 
+.PHONY: test
+test: $(project_dir)/node_modules embed
+	npm run test:unit
+
 $(dist_dir):
 	mkdir -p $(dist_dir)
 
