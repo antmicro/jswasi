@@ -278,6 +278,8 @@ export class FsaFilesystem implements Filesystem {
         create: true,
       }
     );
+    // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+    // @ts-ignore
     let symlink_writable = await symlink.createWritable();
     await symlink_writable.write(target);
     await symlink_writable.close();
@@ -567,6 +569,8 @@ export class FsaFilesystem implements Filesystem {
         return constants.WASI_EINVAL;
 
       try {
+        // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+        // @ts-ignore
         this.rootHandle = await showDirectoryPicker();
       } catch (_) {
         // TODO: Catch error and return proper error code
@@ -708,6 +712,8 @@ class FsaFileDescriptor
   keepMetadata: boolean;
 
   private cursor: bigint;
+  // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+  // @ts-ignore
   private writer: FileSystemWritableFileStream;
   private file: File;
 
@@ -754,8 +760,11 @@ class FsaFileDescriptor
     return constants.WASI_ESUCCESS;
   }
 
+  // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+  // @ts-ignore
   async getWriter(): Promise<FileSystemWritableFileStream> {
     if (!this.writer) {
+      // @ts-ignore
       this.writer = await this.handle.createWritable({
         keepExistingData: true,
       });
@@ -1025,6 +1034,8 @@ class FsaDirectoryDescriptor
     if (refresh || this.entries.length === 0) {
       this.entries = [];
       var i = 1n;
+      // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+      // @ts-ignore
       for await (const [name, handle] of this.handle.entries()) {
         if (name.endsWith(".crswap")) {
           continue;

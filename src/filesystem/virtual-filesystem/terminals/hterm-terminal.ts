@@ -148,6 +148,8 @@ export class HtermDeviceDriver implements TerminalDriver {
 
       await Promise.all(
         (Object.values(evt.dataTransfer!.items) || []).map(async (item) => {
+          // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+          // @ts-ignore
           let handle = (await item.getAsFileSystemHandle())!;
           let path = `${pwd}/${handle.name}`;
           if (handle.kind === "file") {

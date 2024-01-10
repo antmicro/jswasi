@@ -425,6 +425,8 @@ export async function tearDown(println: (a: string) => void) {
   const handle = await navigator.storage.getDirectory();
 
   println("Cleaning storage...");
+  // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+  // @ts-ignore
   for await (const name of handle.keys()) {
     println(`Removing ${name}...`);
     await handle.removeEntry(name, { recursive: true });
