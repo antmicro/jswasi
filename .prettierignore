@@ -1,9 +1,0 @@
-.idea/
-.vs/
-
-wash/target
-
-node_modules
-
-dist
-hterm_all.js
