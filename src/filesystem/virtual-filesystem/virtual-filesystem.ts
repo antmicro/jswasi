@@ -15,7 +15,7 @@ import {
 } from "../filesystem.js";
 import * as constants from "../../constants.js";
 // @ts-ignore
-import * as vfs from "../../vendor/vfs.js";
+import * as vfs from "../../third_party/vfs.js";
 import { UserData, EventType, PollEvent } from "../../types.js";
 
 function wasiFiletype(stat: vfs.Stat): number {

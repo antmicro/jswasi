@@ -1,6 +1,6 @@
 import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
 // @ts-ignore
-import * as vfs from "../../vendor/vfs.js";
+import * as vfs from "../../third_party/vfs.js";
 import { Whence, Fdflags, Rights, Descriptor } from "../filesystem.js";
 import { DeviceDriver } from "./driver-manager.js";
 import * as constants from "../../constants.js";

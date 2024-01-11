@@ -1,5 +1,5 @@
 // @ts-ignore
-import * as vfs from "../../../vendor/vfs.js";
+import * as vfs from "../../../third_party/vfs.js";
 // import * as termios from "./termios.js";
 import {
   TerminalDriver,

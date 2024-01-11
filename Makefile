@@ -1,19 +1,19 @@
 project_dir := $(shell pwd)
 dist_dir := $(project_dir)/dist
 resources_dir := $(dist_dir)/resources
-vendor_dist_dir := $(dist_dir)/vendor
+third_party_dist_dir := $(dist_dir)/third_party
 assets_dir := $(project_dir)/src/assets
-vendor_dir := $(project_dir)/vendor
+third_party_dir := $(project_dir)/third_party
 
-js_virtualfs_dir := $(project_dir)/vendor/js-virtualfs
+js_virtualfs_dir := $(project_dir)/third_party/js-virtualfs
 js_virtualfs := $(js_virtualfs_dir)/dist/vfs.js
-js_virtualfs_dist := $(vendor_dist_dir)/vfs.js
+js_virtualfs_dist := $(third_party_dist_dir)/vfs.js
 
 index := $(project_dir)/src/index.html
 index_dist := $(dist_dir)/index.html
 
 resources := $(subst $(assets_dir),$(resources_dir),$(wildcard $(assets_dir)/*))
-vendor_sources := $(subst $(vendor_dir),$(vendor_dist_dir),$(wildcard $(vendor_dir)/*.js))
+third_party_sources := $(subst $(third_party_dir),$(third_party_dist_dir),$(wildcard $(third_party_dir)/*.js))
 
 wash := $(resources_dir)/wash
 wash_url := https://github.com/antmicro/wash/releases/download/v0.1.0/wash.wasm
@@ -29,7 +29,7 @@ coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/
 standalone: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
 
 .PHONY: embed
-embed: $(js_virtualfs_dist) $(vendor_sources)
+embed: $(js_virtualfs_dist) $(third_party_sources)
 	tsc
 
 .PHONY: test
@@ -43,8 +43,8 @@ $(dist_dir):
 $(resources_dir):
 	mkdir -p $(resources_dir)
 
-$(vendor_dist_dir):
-	mkdir -p $(vendor_dist_dir)
+$(third_party_dist_dir):
+	mkdir -p $(third_party_dist_dir)
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	cd $(project_dir)/tests/unit && \
@@ -61,10 +61,10 @@ $(js_virtualfs): $(js_virtualfs_dir)/lib/*.js $(js_virtualfs_dir)/node_modules
 $(resources_dir)/%: $(assets_dir)/% | $(resources_dir)
 	cp $< $@
 
-$(js_virtualfs_dist): $(js_virtualfs) | $(vendor_dist_dir)
-	cp $(js_virtualfs) $(vendor_dist_dir)
+$(js_virtualfs_dist): $(js_virtualfs) | $(third_party_dist_dir)
+	cp $(js_virtualfs) $(third_party_dist_dir)
 
-$(vendor_dist_dir)/%.js: $(vendor_dir)/%.js | $(vendor_dist_dir)
+$(third_party_dist_dir)/%.js: $(third_party_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
 
 $(index_dist): $(index)
