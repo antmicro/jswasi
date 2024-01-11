@@ -1,0 +1,7 @@
+{
+  "init": ["/usr/bin/wash", "/usr/bin/init.sh"],
+  "mountConfig": {
+    "fsType": "vfs",
+    "opts": {}
+  }
+}
