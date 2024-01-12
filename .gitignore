@@ -2,30 +2,9 @@
 .vs/
 .vscode/
 
-wash/target
 tests/syscalls/target
 
-rust/*.tar.bz2
-rust/*.zip
-rust/*.svg
-rust/build/
-
-node_modules/
-
+**/node_modules/
 **/venv
 
-.eslintcache
-
-ci/output.txt
-ci/*.webm
-ci/images.txt
-ci/images
-ci/package-lock.json
-
 dist/
-work/
-
-# Robot Framework output files
-tests/**/*.html
-tests/**/*.xml
-tests/**/*.png
