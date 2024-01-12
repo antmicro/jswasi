@@ -24,6 +24,7 @@ wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.0/wasi
 coreutils := $(resources_dir)/coreutils
 coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/coreutils.wasm
 
+VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 .PHONY: standalone
 standalone: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
@@ -60,6 +61,10 @@ $(js_virtualfs): $(js_virtualfs_dir)/lib/*.js $(js_virtualfs_dir)/node_modules
 
 $(resources_dir)/%: $(assets_dir)/% | $(resources_dir)
 	cp $< $@
+
+$(resources_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION
+	VERSION="$(shell printf '%*s%s' $((25 - $(shell echo $(VERSION) | wc -c))) 25 $(VERSION))" \
+	envsubst <$(assets_dir)/motd.txt > $(resources_dir)/motd.txt
 
 $(js_virtualfs_dist): $(js_virtualfs) | $(third_party_dist_dir)
 	cp $(js_virtualfs) $(third_party_dist_dir)
