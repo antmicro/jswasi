@@ -7,7 +7,8 @@ This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://gi
 
 # Building
 
-To build the project, you're going to need `nodejs` installed (preferably `v18`).
+To build the project, you're going to need to have `typescript` installed.
+On Debian-like distributions it is as simple as running `apt install node-typescript`.
 The kernel can be built in two modes:
 
 - Standalone mode (default): `make standalone` - build kernel and provide it with the default index, init system and minimal userspace applications
@@ -18,7 +19,7 @@ Both of these commands produce the output in `dist/` directory
 # Running
 
 The project can be run in the standalone mode by serving the `dist/` directory with the HTTP server of your choice that supports [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS).
-In this mode, additional executables will be served:
+In this mode, some additional executables will be served:
 
 - [wash](https://github.com/antmicro/wash) - shell
 - [coreutils](https://github.com/antmicro/coreutils) - basic tools like `ls` or `cat`
@@ -91,7 +92,8 @@ All of these filesystems, except for proc filesystem, can be mounted using the `
 # Testing
 
 This repository contains two sets of tests: unit tests and syscalls tests.
-The first set can be run using `npm run test:unit` command and it tests the integrity of internal kernel structures.
+The first set can be run using `make test` command and it tests the integrity of the internal kernel structures.
+Note that `nodejs` (preferably `v18`) is required in order to run the unit tests.
 The latter is an userspace rust program that invokes raw syscalls to check whether the kernel responds to them correctly.
 Note that for syscalls tests executable to work properly, it needs to be compiled with a custom rust toolchain that implements `canonicalize`.
 For instructions on how to build such toolchain, see [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib#build).
