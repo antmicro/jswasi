@@ -1,6 +1,6 @@
 # JSWASI
 
-Copyright (c) 2022-2023 [Antmicro](https://www.antmicro.com)
+Copyright (c) 2022-2024 [Antmicro](https://www.antmicro.com)
 
 This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib) api.
 `JSWASI` is just a _kernel_ -- complete applications that can be served or embedded can be created by providing the root filesystem with `wasm32-wasi` executables or building the project in standalone mode which serves minimal programs for command line usage.
