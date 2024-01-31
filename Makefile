@@ -16,6 +16,7 @@ resources := $(subst $(assets_dir),$(resources_dir),$(wildcard $(assets_dir)/*))
 third_party_sources := $(subst $(third_party_dir),$(third_party_dist_dir),$(wildcard $(third_party_dir)/*.js))
 
 wash := $(resources_dir)/wash
+wash_md5 := $(resources_dir)/wash.md5
 wash_url := https://github.com/antmicro/wash/releases/download/v0.1.0/wash.wasm
 
 wasibox := $(resources_dir)/wasibox
@@ -27,7 +28,7 @@ coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/
 VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 .PHONY: standalone
-standalone: embed $(resources) $(index_dist) $(wash) $(wasibox) $(coreutils)
+standalone: embed $(resources) $(index_dist) $(wash) $(wash_md5) $(wasibox) $(coreutils)
 
 .PHONY: embed
 embed: $(js_virtualfs_dist) $(third_party_sources)
@@ -77,6 +78,9 @@ $(index_dist): $(index)
 
 $(wash): | $(resources_dir)
 	wget -qO $(wash) $(wash_url) || { rm -f $(wash); exit 1; }
+
+$(wash_md5): $(wash) | $(resources_dir)
+	md5sum $(wash) > $(wash_md5)
 
 $(wasibox): | $(resources_dir)
 	wget -qO $(wasibox) $(wasibox_url) || { rm -f $(wasibox); exit 1; }
