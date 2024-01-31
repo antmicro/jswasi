@@ -5,8 +5,7 @@ third_party_dist_dir := $(dist_dir)/third_party
 assets_dir := $(project_dir)/src/assets
 third_party_dir := $(project_dir)/third_party
 
-js_virtualfs_dir := $(project_dir)/third_party/js-virtualfs
-js_virtualfs := $(js_virtualfs_dir)/dist/vfs.js
+js_virtualfs := $(third_party_dir)/vfs.js
 js_virtualfs_dist := $(third_party_dist_dir)/vfs.js
 
 index := $(project_dir)/src/index.html
@@ -52,14 +51,6 @@ $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	cd $(project_dir)/tests/unit && \
 	npm install
 
-$(js_virtualfs_dir)/node_modules: $(js_virtualfs_dir)/package.json
-	cd $(js_virtualfs_dir) && \
-	npm install
-
-$(js_virtualfs): $(js_virtualfs_dir)/lib/*.js $(js_virtualfs_dir)/node_modules
-	cd $(js_virtualfs_dir) && \
-	npm run build
-
 $(resources_dir)/%: $(assets_dir)/% | $(resources_dir)
 	cp $< $@
 
@@ -68,7 +59,7 @@ $(resources_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION
 	envsubst <$(assets_dir)/motd.txt > $(resources_dir)/motd.txt
 
 $(js_virtualfs_dist): $(js_virtualfs) | $(third_party_dist_dir)
-	cp $(js_virtualfs) $(third_party_dist_dir)
+	cp $(js_virtualfs) $(js_virtualfs_dist)
 
 $(third_party_dist_dir)/%.js: $(third_party_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
