@@ -9,6 +9,10 @@ import { DriverManager } from "../../src/filesystem/virtual-filesystem/driver-ma
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
 import { Filestat } from "../../src/filesystem/filesystem";
 import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
+
+// This import fails if there is no jest cache available. It could be caused by
+// some misconfiguration or a bug in jest. ts-ignore works as an ad-hoc solution
+// @ts-ignore
 import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "@jest/globals";
 
 jest.mock("../../src/process-manager");
