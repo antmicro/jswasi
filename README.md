@@ -1,4 +1,4 @@
-# JSWASI
+# jswasi
 
 Copyright (c) 2022-2024 [Antmicro](https://www.antmicro.com)
 
