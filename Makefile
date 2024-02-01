@@ -16,10 +16,10 @@ third_party_sources := $(subst $(third_party_dir),$(third_party_dist_dir),$(wild
 
 wash := $(resources_dir)/wash
 wash_md5 := $(resources_dir)/wash.md5
-wash_url := https://github.com/antmicro/wash/releases/download/v0.1.0/wash.wasm
+wash_url := https://github.com/antmicro/wash/releases/download/v0.1.2/wash.wasm
 
 wasibox := $(resources_dir)/wasibox
-wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.0/wasibox.wasm
+wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.1/wasibox.wasm
 
 coreutils := $(resources_dir)/coreutils
 coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/coreutils.wasm
