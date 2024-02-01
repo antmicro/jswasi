@@ -54,7 +54,7 @@ $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 $(resources_dir)/%: $(assets_dir)/% | $(resources_dir)
 	cp $< $@
 
-$(resources_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION
+$(resources_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION | $(resources_dir)
 	VERSION="$(shell printf '%*s%s' $((25 - $(shell echo $(VERSION) | wc -c))) 25 $(VERSION))" \
 	envsubst <$(assets_dir)/motd.txt > $(resources_dir)/motd.txt
 
