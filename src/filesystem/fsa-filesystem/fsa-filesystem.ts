@@ -533,12 +533,14 @@ export class FsaFilesystem implements Filesystem {
   async initialize(opts: Record<string, string>): Promise<number> {
     const __opts = opts as FsaFilesystemOpts;
 
-    if (__opts.keepMetadata === undefined) this.keepMetadata = false;
-    else this.keepMetadata = stringToBool(__opts.keepMetadata);
+    this.keepMetadata = __opts.keepMetadata === undefined ?
+      false : stringToBool(__opts.keepMetadata);
     const create = __opts.create === undefined ?
       false : stringToBool(__opts.create);
+    const prompt = __opts.prompt === undefined ?
+      false: stringToBool(__opts.prompt);
 
-    if (stringToBool(__opts.prompt)) {
+    if (prompt) {
       // Metadata is not yet supported for local directories
       // name and prompt options cannot be used together
       // create makes no sense with prompt
@@ -556,8 +558,7 @@ export class FsaFilesystem implements Filesystem {
     } else if (__opts.name !== undefined) {
       this.rootHandle = await getTopLevelHandle(__opts.name, create);
 
-      const rootStoredData = await getStoredData(__opts.name);
-      if (__opts.keepMetadata && !rootStoredData) {
+      if (this.keepMetadata && (await getStoredData(__opts.name)) === undefined) {
         await setStoredData(
           __opts.name,
           FsaDirectoryDescriptor.defaultFilestat
