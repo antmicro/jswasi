@@ -1,6 +1,8 @@
 import * as constants from "../../src/constants";
 import { FsaFilesystem } from "../../src/filesystem/fsa-filesystem/fsa-filesystem";
+
 import * as fsaUtils from "../../src/filesystem/fsa-filesystem/utils";
+import * as metadata from "../../src/filesystem/fsa-filesystem/metadata";
 
 // @ts-ignore
 import { jest, expect, describe, afterEach } from "@jest/globals";
@@ -9,6 +11,7 @@ jest.mock("../../third_party/idb-keyval.js");
 jest.mock("../../src/filesystem/top-level-fs");
 jest.mock("../../src/filesystem/virtual-filesystem/driver-manager");
 jest.mock("../../src/filesystem/fsa-filesystem/fsa-descriptors");
+jest.mock("../../src/filesystem/fsa-filesystem/metadata");
 jest.mock("../../src/filesystem/fsa-filesystem/utils");
 
 class MockError extends DOMException {
