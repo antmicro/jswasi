@@ -5,14 +5,15 @@ third_party_dist_dir := $(dist_dir)/third_party
 assets_dir := $(project_dir)/src/assets
 third_party_dir := $(project_dir)/third_party
 
-js_virtualfs := $(third_party_dir)/vfs.js
-js_virtualfs_dist := $(third_party_dist_dir)/vfs.js
-
 index := $(project_dir)/src/index.html
 index_dist := $(dist_dir)/index.html
 
+enable_threads := $(third_party_dir)/enable_threads.js
+enable_threads_dist := $(dist_dir)/enable_threads.js
+
 resources := $(subst $(assets_dir),$(resources_dir),$(wildcard $(assets_dir)/*))
-third_party_sources := $(subst $(third_party_dir),$(third_party_dist_dir),$(wildcard $(third_party_dir)/*.js))
+third_party_sources__ := $(subst $(third_party_dir),$(third_party_dist_dir),$(wildcard $(third_party_dir)/*.js))
+third_party_sources := $(filter-out $(third_party_dist_dir)/enable_threads.js,$(third_party_sources__))
 
 wash := $(resources_dir)/wash
 wash_md5 := $(resources_dir)/wash.md5
@@ -27,10 +28,10 @@ coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/
 VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 .PHONY: standalone
-standalone: embed $(resources) $(index_dist) $(wash) $(wash_md5) $(wasibox) $(coreutils)
+standalone: embed $(resources) $(index_dist) $(enable_threads_dist) $(wash) $(wash_md5) $(wasibox) $(coreutils) $(third_party_sources)
 
 .PHONY: embed
-embed: $(js_virtualfs_dist) $(third_party_sources)
+embed: $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js
 	tsc
 
 .PHONY: test
@@ -58,14 +59,14 @@ $(resources_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION | $
 	VERSION="$(shell printf '%*s%s' $((25 - $(shell echo $(VERSION) | wc -c))) 25 $(VERSION))" \
 	envsubst <$(assets_dir)/motd.txt > $(resources_dir)/motd.txt
 
-$(js_virtualfs_dist): $(js_virtualfs) | $(third_party_dist_dir)
-	cp $(js_virtualfs) $(js_virtualfs_dist)
-
 $(third_party_dist_dir)/%.js: $(third_party_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
 
-$(index_dist): $(index)
+$(index_dist): $(project_dir)/src/index.html $(index) | $(dist_dir)
 	cp $(index) $(index_dist)
+
+$(enable_threads_dist): $(third_party_dir)/enable_threads.js $(enable_threads) | $(dist_dir)
+	cp $(enable_threads) $(enable_threads_dist)
 
 $(wash): | $(resources_dir)
 	wget -qO $(wash) $(wash_url) || { rm -f $(wash); exit 1; }
