@@ -1,0 +1,34 @@
+name: build jswasi
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!master'
+    pull_request:
+    workflow_call:
+
+.common: &common
+  runs-on: ubuntu-latest
+  container:
+    image: debian:bookworm
+  steps:
+    - name: Install dependencies
+      run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget
+    - name: Checkout sources
+      uses: actions/checkout@v4
+    - run: make $ACTION
+
+jobs:
+  build-embed:
+    env:
+      ACTION: embed
+    <<: *common
+  build-standalone:
+    env:
+      ACTION: standalone
+    <<: *common
+  test-unit:
+    env:
+      ACTION: test
+    <<: *common
