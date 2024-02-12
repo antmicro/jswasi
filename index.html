@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Antmicro's WASM shell</title>
+    <link rel="icon" type="image/x-icon" href="resources/favicon.ico">
+    <script src="./enable_threads.js"></script>
+  </head>
+  <body style="background: black">
+    <script type="module">
+      import { init } from "./terminal.js";
+      window.buffer = "";
+      window.alive = true;
+      window.exitCode = 0;
+      window.stdoutReadData = function () {
+        if (window.stdoutAttached !== undefined)
+          if (window.stdoutAttached && buffer.length > 0) {
+            let tmp = window.buffer;
+            window.buffer = "";
+            return tmp;
+          }
+        return null;
+      };
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "./third_party/hterm_all.js";
+      script.onload = async () => {
+        await lib.init();
+        const terminal = new hterm.Terminal();
+        terminal.decorate(document.querySelector("#terminal"));
+        await init(terminal, (path, entryName) =>
+          console.log(`[added dropped file as '${path}/${entryName}]`)
+        );
+      };
+      document.body.appendChild(script);
+    </script>
+    <div id="terminal"></div>
+  </body>
+</html>
