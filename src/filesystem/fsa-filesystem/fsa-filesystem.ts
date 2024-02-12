@@ -544,7 +544,7 @@ export class FsaFilesystem implements Filesystem {
       // Metadata is not yet supported for local directories
       // name and prompt options cannot be used together
       // create makes no sense with prompt
-      if (this.keepMetadata || __opts.name === undefined || create)
+      if (this.keepMetadata || __opts.name !== undefined || create)
         return constants.WASI_EINVAL;
 
       try {

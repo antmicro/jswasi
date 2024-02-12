@@ -33,12 +33,9 @@ export async function getFilesystem(
 ): Promise<{ err: number; filesystem: Filesystem }> {
   const __constructor = filesystemMap[fs];
   if (__constructor) {
-    let __fs = new __constructor();
-    await __fs.initialize(opts);
-    return {
-      err: constants.WASI_ESUCCESS,
-      filesystem: __fs,
-    };
+    const filesystem = new __constructor();
+    const err = await filesystem.initialize(opts);
+    return { err, filesystem };
   }
   return {
     err: constants.WASI_EINVAL,
