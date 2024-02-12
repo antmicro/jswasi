@@ -1,0 +1,26 @@
+name: deploy demo
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    name: Build jswasi
+    uses: ./.github/workflows/build.yml
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Download jswasi artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: jswasi
+          path: ./dist
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: ./dist
