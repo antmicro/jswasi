@@ -16,7 +16,7 @@ import {
   setStoredData,
 } from "./metadata.js";
 
-import { initMetadataPath, mapErr, getTopLevelHandle } from "./utils.js";
+import { initMetadataPath, mapErr, getTopLevelHandle, getHostDirectoryHandle } from "./utils.js";
 import {
   FsaDirectoryDescriptor,
   FsaFileDescriptor,
@@ -551,14 +551,11 @@ export class FsaFilesystem implements Filesystem {
       if (this.keepMetadata || __opts.name !== undefined || create)
         return constants.WASI_EINVAL;
 
-      try {
-        // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
-        // @ts-ignore
-        this.rootHandle = await showDirectoryPicker();
-      } catch (_) {
-        // TODO: Catch error and return proper error code
-        return constants.WASI_ENOENT;
-      }
+      const { err, handle } = await getHostDirectoryHandle();
+      if (err === constants.WASI_ESUCCESS)
+        this.rootHandle = handle;
+      else
+        return err;
     } else if (__opts.name !== undefined) {
       this.rootHandle = await getTopLevelHandle(__opts.name, create);
 

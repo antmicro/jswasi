@@ -16,6 +16,18 @@ export async function getTopLevelHandle(name: string, create: boolean): Promise<
   });
 }
 
+export async function getHostDirectoryHandle(): Promise<{handle: FileSystemDirectoryHandle; err: number }> {
+  try {
+    // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+    // @ts-ignore
+    const handle = await showDirectoryPicker();
+    return { err: constants.WASI_ESUCCESS, handle };
+  } catch (_) {
+    // TODO: Catch error and return proper error code
+    return { err: constants.WASI_ENOENT, handle: undefined };
+  }
+}
+
 export function mapErr(e: DOMException, isDir: boolean): number {
   switch (e.name) {
     case "NotAllowedError":
