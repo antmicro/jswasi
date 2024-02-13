@@ -5,11 +5,11 @@ import * as fsaUtils from "../../src/filesystem/fsa-filesystem/utils";
 import * as metadata from "../../src/filesystem/fsa-filesystem/metadata";
 
 // @ts-ignore
-import { jest, expect, describe, afterEach } from "@jest/globals";
+import { test, beforeEach, jest, expect, describe, afterEach, Mock } from "@jest/globals";
 
 jest.mock("../../third_party/idb-keyval.js");
 jest.mock("../../src/filesystem/top-level-fs");
-jest.mock("../../src/filesystem/virtual-filesystem/driver-manager");
+jest.mock("../../src/filesystem/virtual-filesystem/devices/driver-manager");
 jest.mock("../../src/filesystem/fsa-filesystem/fsa-descriptors");
 jest.mock("../../src/filesystem/fsa-filesystem/metadata");
 jest.mock("../../src/filesystem/fsa-filesystem/utils");
@@ -267,5 +267,57 @@ describe("Test fsa filesystem getFilestat", () => {
     const getFilestatErr = await fsaFilesystem.getFilestat(fileName);
     expect(getFilestatErr.err).toBe(constants.WASI_ESUCCESS);
     expect(metadata.getStoredData).toBeCalledTimes(0);
+  });
+});
+
+describe("Test fsa filesystem initialize", () => {
+  let fsaFilesystem = new FsaFilesystem();
+
+  beforeEach(() => {
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve(Mock));
+    jest.spyOn(fsaUtils, "getHostDirectoryHandle").mockReturnValue(
+      Promise.resolve({ err: constants.WASI_ESUCCESS, handle: Mock }));
+    jest.spyOn(metadata, "setStoredData");
+  });
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  test.each([
+    ["Prompt with name", {"prompt": "true", "name": "test"}],
+    ["Prompt with create", {"prompt": "true", "keepMetadata": "false", "create": "true"}],
+    ["Prompt with metadata", {"prompt": "true", "keepMetadata": "true"}],
+    ["Without prompt and name", {"prompt": "false"}],
+  ])("%s initialization should be invalid", async (_name: string, opts: Record<string, string>) => {
+    const err = await fsaFilesystem.initialize(opts);
+    expect(err).toBe(constants.WASI_EINVAL);
+  });
+
+  test.each([
+    ["Prompt without metadata", {"prompt": "true", "keepMetadata": "false"}],
+    ["Normal with metadata", {"name": "test", "keepMetadata": "false"}],
+    ["Normal with create", {"name": "test", "create": "true"}],
+    ["Normal without metadata", {"name": "test", "keepMetadata": "false"}],
+  ])("%s initialization should work", async (_s: string, opts: Record<string, string>) => {
+    const err = await fsaFilesystem.initialize(opts);
+    expect(err).toBe(constants.WASI_ESUCCESS);
+  });
+
+  test("Initialization without metadata should not call getStoredData", async () => {
+    await fsaFilesystem.initialize({"name": "test", "keepMetadata": "false"});
+    expect(metadata.getStoredData).toBeCalledTimes(0);
+  });
+
+  test("Initialization with metadata should call getStoredData", async () => {
+    jest.spyOn(metadata, "getStoredData").mockReturnValue(Promise.resolve(undefined));
+    await fsaFilesystem.initialize({"name": "test", "keepMetadata": "true"});
+    expect(metadata.setStoredData).toBeCalled();
+  });
+
+  test("Initialization without metadata should not call setStoredData", async () => {
+    jest.spyOn(metadata, "getStoredData").mockReturnValue(Promise.resolve({}));
+    await fsaFilesystem.initialize({"name": "test", "keepMetadata": "true"});
+    expect(metadata.setStoredData).toBeCalledTimes(0);
   });
 });
