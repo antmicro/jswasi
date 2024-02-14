@@ -565,6 +565,8 @@ export class FsaFilesystem implements Filesystem {
           FsaDirectoryDescriptor.defaultFilestat
         );
       }
+    } else {
+      return constants.WASI_EINVAL;
     }
 
     return constants.WASI_ESUCCESS;
