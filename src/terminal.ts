@@ -98,17 +98,6 @@ export async function fetchFile(
   address: string,
   refetch: boolean = true
 ): Promise<number> {
-  if (
-    !(
-      !(address.startsWith("http://") || address.startsWith("https://")) ||
-      address.startsWith(location.origin)
-    )
-  ) {
-    // files requested from cross-origin that require proxy server
-    // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
-    address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
-  }
-
   const { err, desc } = await fs.open(
     filename,
     constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
