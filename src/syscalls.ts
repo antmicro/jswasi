@@ -516,6 +516,7 @@ export default async function syscallCallback(
     case "fd_write": {
       const { sharedBuffer, fd, content } = data as FdWriteArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
+      const written = new Int32Array(sharedBuffer, 4, 1);
 
       const { fds } = processManager.processInfos[processId];
       let err;
@@ -533,7 +534,9 @@ export default async function syscallCallback(
         ) {
           err = constants.WASI_EACCES;
         } else {
-          err = (await fds.getDesc(fd).write(content.buffer)).err;
+          const __res = await fds.getDesc(fd).write(content.buffer);
+          err = __res.err;
+          written[0] = Number(__res.written);
         }
       } else {
         err = constants.WASI_EBADF;

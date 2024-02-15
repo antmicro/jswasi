@@ -373,7 +373,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
     );
 
-    let written = 0;
+    let writeLen = 0;
     const bufferBytes: number[] = [];
     for (let i = 0; i < iovsLen; i += 1) {
       const ptr_pos = iovs + i * 8;
@@ -389,11 +389,12 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       for (let b = 0; b < iov.byteLength; b += 1) {
         bufferBytes.push(iov[b]);
       }
-      written += iov.byteLength;
+      writeLen += iov.byteLength;
     }
 
-    const sharedBuffer = new SharedArrayBuffer(4 + written); // lock + content
+    const sharedBuffer = new SharedArrayBuffer(4 + 4 + writeLen); // lock + written + content
     const lck = new Int32Array(sharedBuffer, 0, 1);
+    const written = new Int32Array(sharedBuffer, 4, 1);
     lck[0] = -1;
     let content = Uint8Array.from(bufferBytes);
     sendToKernel(["fd_write", { sharedBuffer, fd, content } as FdWriteArgs]);
@@ -402,7 +403,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const err = Atomics.load(lck, 0);
     if (err === 0) {
       workerConsoleLog(`fd_write written ${written} bytes.`);
-      view.setUint32(nWritten, written, true);
+      view.setUint32(nWritten, written[0], true);
     } else {
       workerConsoleLog(`fd_write returned ${err}.`);
     }
