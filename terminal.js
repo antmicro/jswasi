@@ -58,12 +58,6 @@ async function getDefaultFdTable(tfs) {
     });
 }
 export async function fetchFile(fs, filename, address, refetch = true) {
-    if (!(!(address.startsWith("http://") || address.startsWith("https://")) ||
-        address.startsWith(location.origin))) {
-        // files requested from cross-origin that require proxy server
-        // this will become obsolete once COEP: credentialless ships to Chrome (https://www.chromestatus.com/feature/4918234241302528)
-        address = `proxy/${btoa(unescape(encodeURIComponent(address)))}`;
-    }
     const { err, desc } = await fs.open(filename, constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW, constants.WASI_O_CREAT);
     if (err !== constants.WASI_ESUCCESS) {
         console.warn(`Unable to resolve path for ${filename}`);
