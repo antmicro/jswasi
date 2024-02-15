@@ -2,6 +2,7 @@ import * as constants from "../../constants.js";
 
 import { MemoryDeviceDriver } from "./mem-devices.js";
 import { HtermDeviceDriver } from "./terminals/hterm-terminal.js";
+import { WgetDeviceDriver } from "./wget-device.js";
 import { Descriptor, Fdflags, Rights } from "../filesystem.js";
 import ProcessManager from "../../process-manager.js";
 
@@ -11,6 +12,7 @@ import * as vfs from "../../third_party/vfs.js";
 export const enum major {
   MAJ_MEMORY = 0,
   MAJ_HTERM = 1,
+  MAJ_WGET = 2,
 }
 
 export class DriverManager {
@@ -34,8 +36,15 @@ export class DriverManager {
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
+
+    const __wgetDriver = new WgetDeviceDriver();
+    err = await __wgetDriver.initDriver({});
+    if (err !== constants.WASI_ESUCCESS)
+      return err;
+
     this.drivers[major.MAJ_MEMORY] = __memDriver;
     this.drivers[major.MAJ_HTERM] = __htermDriver;
+    this.drivers[major.MAJ_WGET] = __wgetDriver;
     return constants.WASI_ESUCCESS;
   }
 

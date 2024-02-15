@@ -171,6 +171,12 @@ export async function createDeviceFilesystem(
     {}
   );
   await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(major.MAJ_HTERM, 0), args);
+  await devfs.mknodat(
+    undefined,
+    "wget0",
+    vfs.mkDev(major.MAJ_WGET, 0),
+    {devfs}
+  );
 
   return devfs;
 }
