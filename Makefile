@@ -23,7 +23,7 @@ wasibox := $(resources_dir)/wasibox
 wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.1/wasibox.wasm
 
 coreutils := $(resources_dir)/coreutils
-coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.0/coreutils.wasm
+coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.1/coreutils.wasm
 
 VERSION := $(shell cat $(project_dir)/src/VERSION)
 
