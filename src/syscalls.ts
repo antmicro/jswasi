@@ -40,7 +40,7 @@ import {
   UmountArgs,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
-import { free, ps, reset, wget } from "./browser-apps.js";
+import { free, ps, reset } from "./browser-apps.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { FsaFilesystem } from "./filesystem/fsa-filesystem/fsa-filesystem.js";
@@ -307,12 +307,6 @@ export default async function syscallCallback(
         }
         case "/usr/bin/free": {
           const result = await free(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/wget": {
-          const result = await wget(processManager, processId, args, env, fds);
           Atomics.store(parentLck, 0, result);
           Atomics.notify(parentLck, 0);
           break;

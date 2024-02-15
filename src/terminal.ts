@@ -173,7 +173,6 @@ async function initFs(fs: TopLevelFs) {
   })();
 
   const dummyBinariesPromise = Promise.all([
-    fs.open("/usr/bin/wget", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/download", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/ps", 0, constants.WASI_O_CREAT),
     fs.open("/usr/bin/free", 0, constants.WASI_O_CREAT),
