@@ -316,8 +316,90 @@ describe("Test fsa filesystem initialize", () => {
   });
 
   test("Initialization without metadata should not call setStoredData", async () => {
+    // @ts-ignore
     jest.spyOn(metadata, "getStoredData").mockReturnValue(Promise.resolve({}));
     await fsaFilesystem.initialize({"name": "test", "keepMetadata": "true"});
     expect(metadata.setStoredData).toBeCalledTimes(0);
+  });
+});
+
+describe("Test fsa filesystem unlinkat", () => {
+  let fsaFilesystem = new FsaFilesystem();
+
+  beforeEach(() => {
+    jest.spyOn(fsaUtils, "mapErr").mockImplementation(
+      (e: DOMException) => { return (e as MockError).errno; });
+  });
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  test("Unlinkat should fail if file doesn't exist", async () => {
+    // @ts-ignore
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve({
+      getFileHandle: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOENT); },
+      getDirectoryHandle: (_a: string, _b: Object) => Promise.resolve({})
+    }));
+
+    await fsaFilesystem.initialize({ prompt: "false", name: "test" });
+
+    const err = await fsaFilesystem.unlinkat(undefined, "test", false);
+    expect(err).toBe(constants.WASI_ENOENT);
+  });
+
+  test("Unlinkat should fail if directory doesn't exist", async () => {
+    // @ts-ignore
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve({
+      getFileHandle: (_a: string, _b: Object) => Promise.resolve({}),
+      getDirectoryHandle: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOENT); }
+    }));
+
+    await fsaFilesystem.initialize({ prompt: "false", name: "test" });
+
+    const err = await fsaFilesystem.unlinkat(undefined, "test", true);
+    expect(err).toBe(constants.WASI_ENOENT);
+  });
+
+  test("Unlinkat should fail if directory is not empty", async () => {
+    // @ts-ignore
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve({
+      getFileHandle: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOENT); },
+      getDirectoryHandle: (_a: string, _b: Object) => Promise.resolve({}),
+      removeEntry: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOTEMPTY); }
+    }));
+
+    await fsaFilesystem.initialize({ prompt: "false", name: "test" });
+
+    const err = await fsaFilesystem.unlinkat(undefined, "test", true);
+    expect(err).toBe(constants.WASI_ENOTEMPTY);
+  });
+
+  test("Unlinkat should work if file exists", async () => {
+    // @ts-ignore
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve({
+      getFileHandle: (_a: string, _b: Object) => Promise.resolve({}),
+      getDirectoryHandle: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOENT); },
+      removeEntry: (_a: string, _b: Object) => Promise.resolve()
+    }));
+
+    await fsaFilesystem.initialize({ prompt: "false", name: "test" });
+
+    const err = await fsaFilesystem.unlinkat(undefined, "test", false);
+    expect(err).toBe(constants.WASI_ESUCCESS);
+  });
+
+  test("Unlinkat should work if file exists", async () => {
+    // @ts-ignore
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(Promise.resolve({
+      getFileHandle: (_a: string, _b: Object) => { throw new MockError(constants.WASI_ENOENT); },
+      getDirectoryHandle: (_a: string, _b: Object) => Promise.resolve({}),
+      removeEntry: (_a: string, _b: Object) => Promise.resolve()
+    }));
+
+    await fsaFilesystem.initialize({ prompt: "false", name: "test" });
+
+    const err = await fsaFilesystem.unlinkat(undefined, "test", true);
+    expect(err).toBe(constants.WASI_ESUCCESS);
   });
 });
