@@ -153,16 +153,20 @@ export abstract class AbstractTermiosTerminal implements Terminal {
 
   protected driverBuffer: string;
   protected driverBufferCursor: number;
+  protected userBufferStart: number
+  protected userBufferEnd: number
 
-  protected userBuffer: string;
+  protected userBuffer: ArrayBuffer;
 
-  constructor(termios: termios.Termios) {
+  constructor(termios: termios.Termios, userBufferSize: number = 1<<16) {
     this.bufRequestQueue = [];
     this.subs = [];
     this.termios = termios;
     this.driverBuffer = "";
     this.driverBufferCursor = 0;
-    this.userBuffer = "";
+    this.userBuffer = new ArrayBuffer(userBufferSize);
+    this.userBufferStart = 0;
+    this.userBufferEnd = 0;
   }
 
   // prints data on the screen
@@ -179,9 +183,15 @@ export abstract class AbstractTermiosTerminal implements Terminal {
 
   public abstract getScreenSize(): Winsize;
 
-  protected splitBuf(len: number): string {
-    let out = this.userBuffer.slice(0, len);
-    this.userBuffer = this.userBuffer.slice(len);
+  protected splitBuf(len: number): ArrayBuffer {
+    const endIndex = len > this.userBufferEnd - this.userBufferStart ?
+      this.userBufferEnd :
+      this.userBufferStart + len;
+    const out = this.userBuffer.slice(
+      this.userBufferStart,
+      endIndex
+    );
+    this.userBufferStart += out.byteLength;
     return out;
   }
 
@@ -229,23 +239,38 @@ export abstract class AbstractTermiosTerminal implements Terminal {
   }
 
   protected flushDriverInputBuffer(): void {
-    this.userBuffer += this.driverBuffer;
+    // Byte length of a string cannot greater than 3x its character length
+    // see https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder/encodeInto#buffer_sizing
+    const u8view = new Uint8Array(
+      this.userBuffer,
+      this.userBufferStart,
+      3 * this.driverBuffer.length
+    );
+    // TODO: this will fail if the buffer overflows
+    const { written } = new TextEncoder().encodeInto(
+      this.driverBuffer,
+      u8view
+    );
+    this.userBufferEnd += written;
     this.driverBuffer = "";
     this.driverBufferCursor = 0;
   }
 
   protected resolveUserReadRequests(): void {
-    if (this.userBuffer.length > 0) {
+    const __userBufferLength = this.userBufferEnd - this.userBufferStart;
+    if (__userBufferLength > 0) {
       // In case EOF arrives when line is not empty flush requests
       // until there are data in user buffer
-      while (this.userBuffer.length > 0 && this.bufRequestQueue.length > 0) {
+      while (__userBufferLength > 0 && this.bufRequestQueue.length > 0) {
         let req = this.bufRequestQueue.shift();
-        let buff = this.userBuffer.slice(0, req.len);
+        let buff = this.userBuffer.slice(
+          this.userBufferStart,
+          req.len > __userBufferLength ? this.userBufferStart : req.len);
         this.userBuffer = this.userBuffer.slice(req.len);
 
         req.resolve({
           err: constants.WASI_ESUCCESS,
-          buffer: new TextEncoder().encode(buff),
+          buffer: buff,
         });
       }
     } else {
@@ -446,16 +471,17 @@ export abstract class AbstractTermiosTerminal implements Terminal {
       this.flushDriverInputBuffer();
     }
 
-    if (this.userBuffer.length > 0) {
+    const __userBufferLength = this.userBufferEnd - this.userBufferStart;
+    if (__userBufferLength > 0) {
       this.resolveUserReadRequests();
     }
 
-    if (this.userBuffer.length > 0) {
+    if (__userBufferLength > 0) {
       for (const sub of this.subs) {
         sub.resolve({
           userdata: sub.userdata,
           error: constants.WASI_ESUCCESS,
-          nbytes: BigInt(this.userBuffer.length),
+          nbytes: BigInt(__userBufferLength),
           eventType: constants.WASI_EVENTTYPE_FD_READ,
         });
       }
@@ -464,11 +490,11 @@ export abstract class AbstractTermiosTerminal implements Terminal {
   }
 
   public dataForUser(): number {
-    return this.userBuffer.length;
+    return this.userBufferEnd - this.userBufferStart;
   }
 
   public readToUser(len: number): ArrayBuffer {
-    return new TextEncoder().encode(this.splitBuf(len));
+    return this.splitBuf(len);
   }
 
   public sendTerminalOutput(data: string): string {

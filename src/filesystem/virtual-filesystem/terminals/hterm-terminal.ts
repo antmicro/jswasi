@@ -89,11 +89,6 @@ class Hterm extends AbstractTermiosTerminal {
     this.driverBufferCursor -= __toRemove;
   }
 
-  protected override flushDriverInputBuffer(): void {
-    this.userBuffer += this.driverBuffer;
-    this.driverBuffer = "";
-    this.driverBufferCursor = 0;
-  }
 
   public getScreenSize(): Winsize {
     let scrollPort = this.terminal.scrollPort_.getScreenSize();
