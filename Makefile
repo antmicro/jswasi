@@ -17,7 +17,7 @@ third_party_sources := $(filter-out $(third_party_dist_dir)/enable_threads.js,$(
 
 wash := $(resources_dir)/wash
 wash_md5 := $(resources_dir)/wash.md5
-wash_url := https://github.com/antmicro/wash/releases/download/v0.1.2/wash.wasm
+wash_url := https://github.com/antmicro/wash/releases/download/v0.1.3/wash.wasm
 
 wasibox := $(resources_dir)/wasibox
 wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.1/wasibox.wasm
