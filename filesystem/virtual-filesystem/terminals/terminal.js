@@ -1,5 +1,96 @@
 import * as termios from "./termios.js";
 import * as constants from "../../../constants.js";
+/*
+ * This is an auxiliary class for managing the terminal user buffer.
+ * It works by keeping an array of ArrayBuffers of constant lengths.
+ * Pushing data to it moves the end cursor, indicating that there is
+ * more data that can be read. Popping data from it moves the start
+ * cursor which indicates that this data cannot be read again.
+ * If the end cursor moves out of a buffer, another one is allocated,
+ * if the begin cursor moves out of a buffer, it is discarded and the
+ * cursor moves to the next buffer in the array
+ */
+export class TerminalBuffer {
+    bufSize;
+    start;
+    end;
+    buffers;
+    constructor(bufSize = 1 << 16) {
+        this.bufSize = bufSize;
+        this.start = 0;
+        this.end = 0;
+        this.buffers = [];
+        this.getNewBuffer();
+    }
+    getNewBuffer() {
+        this.buffers.push(new ArrayBuffer(this.bufSize));
+        this.end = 0;
+    }
+    discardBuffer() {
+        this.start = 0;
+        if (this.buffers.length === 1)
+            this.end = 0;
+        this.buffers.shift();
+    }
+    push(data) {
+        let readChars = 0;
+        while (readChars < data.length) {
+            if (this.end >= this.bufSize || this.buffers.length === 0)
+                this.getNewBuffer();
+            const __u8view = new Uint8Array(this.buffers[this.buffers.length - 1], this.end, this.bufSize - this.end);
+            const { written, read } = new TextEncoder().encodeInto(data.slice(readChars), __u8view);
+            readChars += read;
+            this.end += written;
+            // Data slice could not fill the buffer because the last character
+            // consisted of more than 1 byte, the character needs to be split
+            // between two buffers
+            if (this.end < this.bufSize && readChars < data.length) {
+                const encodedChar = new TextEncoder().encode(data[readChars]);
+                const leftPart = this.bufSize - this.end;
+                __u8view.set(encodedChar.slice(0, leftPart), this.end - __u8view.byteOffset);
+                this.getNewBuffer();
+                const __u8viewNew = new Uint8Array(this.buffers[this.buffers.length - 1], this.end, this.bufSize - this.end);
+                __u8viewNew.set(encodedChar.slice(leftPart));
+                readChars++;
+                this.end += encodedChar.length - leftPart;
+            }
+        }
+    }
+    pop(buf, len) {
+        let writtenBytes = 0;
+        while (writtenBytes < len) {
+            let length = len - writtenBytes;
+            if (this.buffers.length === 1) {
+                if (length > this.end - this.start)
+                    length = this.end - this.start;
+            }
+            else {
+                if (length > this.bufSize - this.start)
+                    length = this.bufSize - this.start;
+            }
+            if (length === 0)
+                break; // There is nothing left in buffers
+            const __u8view = new Uint8Array(this.buffers[0], this.start, length);
+            buf.set(__u8view, writtenBytes);
+            this.start += length;
+            writtenBytes += length;
+            if (this.start >= this.bufSize)
+                this.discardBuffer();
+        }
+        return writtenBytes;
+    }
+    length() {
+        if (this.buffers.length <= 1) {
+            return this.end - this.start;
+        }
+        else {
+            const fullBuffersLen = this.buffers.length > 2 ?
+                this.buffers.length * this.bufSize :
+                0;
+            return this.bufSize - this.start + this.end + fullBuffersLen;
+        }
+    }
+}
 export class AbstractTermiosTerminal {
     foregroundPid;
     bufRequestQueue;
@@ -8,18 +99,19 @@ export class AbstractTermiosTerminal {
     driverBuffer;
     driverBufferCursor;
     userBuffer;
-    constructor(termios) {
+    constructor(termios, userBufferSize = 1 << 16) {
         this.bufRequestQueue = [];
         this.subs = [];
         this.termios = termios;
         this.driverBuffer = "";
         this.driverBufferCursor = 0;
-        this.userBuffer = "";
+        this.userBuffer = new TerminalBuffer(userBufferSize);
     }
     splitBuf(len) {
-        let out = this.userBuffer.slice(0, len);
-        this.userBuffer = this.userBuffer.slice(len);
-        return out;
+        const outBuf = new ArrayBuffer(len);
+        const u8view = new Uint8Array(outBuf);
+        const length = this.userBuffer.pop(u8view, len);
+        return outBuf.slice(0, length);
     }
     detectBreakCondition(data) {
         for (let i = 2; i < data.length; ++i) {
@@ -58,21 +150,24 @@ export class AbstractTermiosTerminal {
         }
     }
     flushDriverInputBuffer() {
-        this.userBuffer += this.driverBuffer;
+        // Byte length of a string cannot greater than 3x its character length
+        // see https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder/encodeInto#buffer_sizing
+        this.userBuffer.push(this.driverBuffer);
         this.driverBuffer = "";
         this.driverBufferCursor = 0;
     }
     resolveUserReadRequests() {
-        if (this.userBuffer.length > 0) {
+        if (this.userBuffer.length() !== 0) {
             // In case EOF arrives when line is not empty flush requests
             // until there are data in user buffer
-            while (this.userBuffer.length > 0 && this.bufRequestQueue.length > 0) {
+            while (this.userBuffer.length() !== 0 && this.bufRequestQueue.length > 0) {
                 let req = this.bufRequestQueue.shift();
-                let buff = this.userBuffer.slice(0, req.len);
-                this.userBuffer = this.userBuffer.slice(req.len);
+                const buf = new ArrayBuffer(req.len);
+                const u8view = new Uint8Array(buf);
+                const __len = this.userBuffer.pop(u8view, req.len);
                 req.resolve({
                     err: constants.WASI_ESUCCESS,
-                    buffer: new TextEncoder().encode(buff),
+                    buffer: buf.slice(0, __len),
                 });
             }
         }
@@ -263,15 +358,15 @@ export class AbstractTermiosTerminal {
         if ((lFlag & termios.ICANON) === 0) {
             this.flushDriverInputBuffer();
         }
-        if (this.userBuffer.length > 0) {
+        if (this.userBuffer.length() !== 0) {
             this.resolveUserReadRequests();
         }
-        if (this.userBuffer.length > 0) {
+        if (this.userBuffer.length() !== 0) {
             for (const sub of this.subs) {
                 sub.resolve({
                     userdata: sub.userdata,
                     error: constants.WASI_ESUCCESS,
-                    nbytes: BigInt(this.userBuffer.length),
+                    nbytes: BigInt(this.userBuffer.length()),
                     eventType: constants.WASI_EVENTTYPE_FD_READ,
                 });
             }
@@ -279,10 +374,10 @@ export class AbstractTermiosTerminal {
         }
     }
     dataForUser() {
-        return this.userBuffer.length;
+        return this.userBuffer.length();
     }
     readToUser(len) {
-        return new TextEncoder().encode(this.splitBuf(len));
+        return this.splitBuf(len);
     }
     sendTerminalOutput(data) {
         if ((this.termios.oFlag & termios.ONLCR) !== 0) {

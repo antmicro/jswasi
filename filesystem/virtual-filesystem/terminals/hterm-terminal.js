@@ -56,11 +56,6 @@ class Hterm extends AbstractTermiosTerminal {
                 this.driverBuffer.slice(this.driverBufferCursor);
         this.driverBufferCursor -= __toRemove;
     }
-    flushDriverInputBuffer() {
-        this.userBuffer += this.driverBuffer;
-        this.driverBuffer = "";
-        this.driverBufferCursor = 0;
-    }
     getScreenSize() {
         let scrollPort = this.terminal.scrollPort_.getScreenSize();
         return {
