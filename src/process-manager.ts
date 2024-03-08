@@ -25,7 +25,6 @@ export const DEFAULT_ENV = {
   HOSTNAME: "browser",
   PYTHONHOME: "/",
   PS1: "\x1b[1;34m\\u@\\h \x1b[1;33m\\w$\x1b[0m ",
-  DEBUG: "1",
 };
 
 export class DescriptorEntry {
