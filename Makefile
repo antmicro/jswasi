@@ -37,10 +37,10 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 standalone: embed $(resources_dist) $(index_dist) $(wash_md5) $(wasm_sources_dist) $(resources_dist_dir)/wash.md5 $(third_party_dist_dir)/hterm_all.js
 
 .PHONY: embed
-embed: $(minified_sources) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js $(third_party_dist_dir)/hterm_all.js
+embed: $(minified_sources)
 
 .PHONY: compile
-compile: $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js $(resources_work)
+compile: $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
 	tsc
 
 $(dist_dir) $(work_dir) $(resources_dist_dir) $(resources_work_dir) $(third_party_dist_dir) $(third_party_work_dir): %:
@@ -64,7 +64,7 @@ $(wasm_sources_work): %: | $(resources_dist_dir)
 $(resources_dist_dir)/%: $(resources_work_dir)/% | $(resources_dist_dir)
 	cp $< $@
 
-$(third_party_dist_dir)/%.js: $(third_party_dir)/%.js | $(third_party_dist_dir)
+$(third_party_dist_dir)/%.js: $(third_party_work_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
 
 $(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
