@@ -1,3 +1,5 @@
+ESBUILD_ARGS := --minify --bundle --format=esm --allow-overwrite
+
 project_dir := $(shell pwd)
 
 dist_dir := $(project_dir)/dist
@@ -26,7 +28,7 @@ wasm_sources := wash wasibox coreutils
 wasm_sources_work := $(addprefix $(resources_work_dir)/,$(wasm_sources))
 wasm_sources_dist := $(addprefix $(resources_dist_dir)/,$(wasm_sources))
 
-minified_sources := $(dist_dir)/jswasi.js $(dist_dir)/process.js $(dist_dir)/service-worker.js
+minified_sources := $(dist_dir)/jswasi.js $(dist_dir)/service-worker.js
 
 VERSION := $(shell cat $(project_dir)/src/VERSION)
 
@@ -71,15 +73,20 @@ $(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
 $(index_dist): $(project_dir)/src/index.html $(index) | $(dist_dir)
 	cp $(index) $(index_dist)
 
-$(minified_sources): %: compile | $(dist_dir)
-	cd $(work_dir) && esbuild \
-		--minify \
-		--bundle \
-		--format=esm \
-		--outfile=$@ \
-		--allow-overwrite \
-		$(shell basename $@)
+$(dist_dir)/service-worker.js: compile | $(dist_dir) $(work_dir)
+	cd $(work_dir) && esbuild $(ESBUILD_ARGS) --outfile=$(dist_dir)/service-worker.js service-worker.js
 
+$(work_dir)/process-minified.js: compile | $(work_dir)
+	cd $(work_dir) && \
+	echo 'export default URL.createObjectURL(new Blob([(function(){' > process-minified.js && \
+	esbuild $(ESBUILD_ARGS) ./process.js >> process-minified.js && \
+	echo '}).toString().slice(11,-1)], {type:"text/javascript"}))' >> process-minified.js
+
+$(dist_dir)/jswasi.js: compile $(work_dir)/process-minified.js | $(dist_dir) $(work_dir)
+	cd $(work_dir) && \
+	(echo 'import processWorker from "./process-minified.js";' && \
+	sed 's|"process.js"|processWorker|g' jswasi.js) | \
+	esbuild $(ESBUILD_ARGS) --outfile=$(dist_dir)/jswasi.js
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	cd $(project_dir)/tests/unit && \

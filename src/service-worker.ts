@@ -32,7 +32,6 @@ const urlsToCache = [
   "./constants.js",
   "./utils.js",
   "./service-worker.js",
-  "./process.js",
 ];
 
 self.addEventListener("install", async () => {
