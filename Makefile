@@ -17,7 +17,6 @@ index := $(project_dir)/src/index.html
 index_dist := $(dist_dir)/index.html
 
 resources_dist := $(subst $(assets_dir),$(resources_dist_dir),$(wildcard $(assets_dir)/*))
-resources_work := $(subst $(assets_dir),$(resources_work_dir),$(wildcard $(assets_dir)/*))
 
 wash_md5 := $(resources_work_dir)/wash.md5
 wash_url := https://github.com/antmicro/wash/releases/download/v0.1.3/wash.wasm
@@ -28,8 +27,6 @@ wasm_sources := wash wasibox coreutils
 wasm_sources_work := $(addprefix $(resources_work_dir)/,$(wasm_sources))
 wasm_sources_dist := $(addprefix $(resources_dist_dir)/,$(wasm_sources))
 
-minified_sources := $(dist_dir)/jswasi.js $(dist_dir)/service-worker.js
-
 VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 
@@ -37,7 +34,7 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 standalone: embed $(resources_dist) $(index_dist) $(wash_md5) $(wasm_sources_dist) $(resources_dist_dir)/wash.md5 $(third_party_dist_dir)/hterm_all.js
 
 .PHONY: embed
-embed: $(minified_sources)
+embed: $(dist_dir)/jswasi.js
 
 .PHONY: compile
 compile: $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
@@ -73,8 +70,12 @@ $(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
 $(index_dist): $(project_dir)/src/index.html $(index) | $(dist_dir)
 	cp $(index) $(index_dist)
 
-$(dist_dir)/service-worker.js: compile | $(dist_dir) $(work_dir)
-	cd $(work_dir) && esbuild $(ESBUILD_ARGS) --outfile=$(dist_dir)/service-worker.js service-worker.js
+ifdef MINIFY
+index := $(project_dir)/src/assets/index.html
+$(work_dir)/service-worker-minified.js: compile | $(work_dir)
+	cd $(work_dir) && \
+	sed '/const urlsToCache/,/];/c\const urlsToCache = ["./jswasi.js"];' $< | \
+	esbuild $(ESBUILD_ARGS) --outfile=$@
 
 $(work_dir)/process-minified.js: compile | $(work_dir)
 	cd $(work_dir) && \
@@ -82,11 +83,21 @@ $(work_dir)/process-minified.js: compile | $(work_dir)
 	esbuild $(ESBUILD_ARGS) ./process.js >> process-minified.js && \
 	echo '}).toString().slice(11,-1)], {type:"text/javascript"}))' >> process-minified.js
 
-$(dist_dir)/jswasi.js: compile $(work_dir)/process-minified.js | $(dist_dir) $(work_dir)
+$(work_dir)/jswasi-minified.js: compile $(work_dir)/process-minified.js | $(work_dir)
 	cd $(work_dir) && \
 	(echo 'import processWorker from "./process-minified.js";' && \
-	sed 's|"process.js"|processWorker|g' jswasi.js) | \
-	esbuild $(ESBUILD_ARGS) --outfile=$(dist_dir)/jswasi.js
+	sed 's|"process.js"|processWorker|g;s|"service-worker.js"|"jswasi.js"|g;s|export ||g' jswasi.js ; \
+	echo 'Object.defineProperties(window,{jswasiInit:{value:init,writable:false},jswasiTeardown:{value:tearDown,writable:false}});') | \
+	esbuild $(ESBUILD_ARGS) --outfile=$(shell basename $@)
+
+
+$(dist_dir)/jswasi.js: $(work_dir)/process-minified.js $(work_dir)/jswasi-minified.js $(work_dir)/service-worker-minified.js | $(dist_dir)
+	echo 'if(typeof window==="undefined"){' > $@
+	cat $(work_dir)/service-worker-minified.js >> $@
+	echo '}else{' >> $@
+	cat $(work_dir)/jswasi-minified.js >> $@
+	echo '}' >> $@
+
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	cd $(project_dir)/tests/unit && \

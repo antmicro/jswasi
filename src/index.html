@@ -6,8 +6,8 @@
     <link rel="icon" type="image/x-icon" href="resources/favicon.ico">
   </head>
   <body style="margin: 0px; background: black">
-    <script type="module">
-      import { init } from "./jswasi.js";
+    <script src="./jswasi.js"></script>
+    <script>
       window.buffer = "";
       window.alive = true;
       window.exitCode = 0;
@@ -25,13 +25,13 @@
       script.src = "./third_party/hterm_all.js";
       script.onload = async () => {
         await lib.init();
-        // hterm prints warnings that we don't really care
+        // hterm prints warnings that we don't really care about
         let tempWarnlog = console.warn;
         console.warn = () => {};
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
-        await init(terminal, (path, entryName) =>
+        await jswasiInit(terminal, (path, entryName) =>
           console.log(`[added dropped file as '${path}/${entryName}]`)
         );
       };
