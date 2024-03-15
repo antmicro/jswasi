@@ -125,7 +125,7 @@ function WASI(snapshot0 = false) {
     function fd_write(fd, iovs, iovsLen, nWritten) {
         workerConsoleLog(`fd_write(${fd}, ${iovs}, ${iovsLen}, ${nWritten})`);
         const view = new DataView(moduleInstanceExports["memory"].buffer);
-        let written = 0;
+        let writeLen = 0;
         const bufferBytes = [];
         for (let i = 0; i < iovsLen; i += 1) {
             const ptr_pos = iovs + i * 8;
@@ -135,10 +135,11 @@ function WASI(snapshot0 = false) {
             for (let b = 0; b < iov.byteLength; b += 1) {
                 bufferBytes.push(iov[b]);
             }
-            written += iov.byteLength;
+            writeLen += iov.byteLength;
         }
-        const sharedBuffer = new SharedArrayBuffer(4 + written); // lock + content
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + writeLen); // lock + written + content
         const lck = new Int32Array(sharedBuffer, 0, 1);
+        const written = new Int32Array(sharedBuffer, 4, 1);
         lck[0] = -1;
         let content = Uint8Array.from(bufferBytes);
         sendToKernel(["fd_write", { sharedBuffer, fd, content }]);
@@ -146,7 +147,7 @@ function WASI(snapshot0 = false) {
         const err = Atomics.load(lck, 0);
         if (err === 0) {
             workerConsoleLog(`fd_write written ${written} bytes.`);
-            view.setUint32(nWritten, written, true);
+            view.setUint32(nWritten, written[0], true);
         }
         else {
             workerConsoleLog(`fd_write returned ${err}.`);

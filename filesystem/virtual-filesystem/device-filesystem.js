@@ -82,5 +82,6 @@ export async function createDeviceFilesystem(driverManager, processManager, args
     await devfs.mknodat(undefined, "zero", vfs.mkDev(0 /* major.MAJ_MEMORY */, 1 /* memMinor.DEV_ZERO */), {});
     await devfs.mknodat(undefined, "urandom", vfs.mkDev(0 /* major.MAJ_MEMORY */, 2 /* memMinor.DEV_URANDOM */), {});
     await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(1 /* major.MAJ_HTERM */, 0), args);
+    await devfs.mknodat(undefined, "wget0", vfs.mkDev(2 /* major.MAJ_WGET */, 0), { devfs });
     return devfs;
 }

@@ -1,54 +1,5 @@
 import * as constants from "./constants.js";
 import * as utils from "./utils.js";
-import { fetchFile } from "./terminal.js";
-export async function wget(processManager, processId, args, env, fds) {
-    const stderr = fds.getDesc(2);
-    let path;
-    let address;
-    let operator;
-    if (args.length === 2) {
-        [, address] = args;
-        [path] = address.split("/").slice(-1);
-    }
-    else if (args.length === 3) {
-        [, address, path] = args;
-    }
-    else if (args.length === 4) {
-        [, address, operator, path] = args;
-        if (operator != "-O") {
-            await stderr.write(new TextEncoder().encode("wget: help: wget <address> [<path>] or wget <addres> -O <path>\n"));
-            return 1;
-        }
-    }
-    else {
-        await stderr.write(new TextEncoder().encode("wget: help: wget <address> [<path>]\n"));
-        return 1;
-    }
-    /* if (path == "-") {
-      try {
-        await fetchFile(processManager.filesystem, null, address, true, stdout, stderr, true);
-      } catch (error: any) {
-        await stderr.write(
-          new TextEncoder().encode(
-            `wget: could not get resource: ${error.message.toLowerCase()}\n`
-          )
-        );
-        return 1;
-      }
-      return 0;
-    } */
-    if (!path.startsWith("/")) {
-        path = `${env["PWD"] === "/" ? "" : env["PWD"]}/${path}`;
-    }
-    try {
-        await fetchFile(processManager.filesystem, path, address, true);
-    }
-    catch (error) {
-        await stderr.write(new TextEncoder().encode(`wget: could not get resource: ${error.message.toLowerCase()}\n`));
-        return 1;
-    }
-    return 0;
-}
 /* export async function download(
   processManager: ProcessManager,
   processId: number,

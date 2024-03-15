@@ -116,7 +116,6 @@ async function initFs(fs) {
         }
     })();
     const dummyBinariesPromise = Promise.all([
-        fs.open("/usr/bin/wget", 0, constants.WASI_O_CREAT),
         fs.open("/usr/bin/download", 0, constants.WASI_O_CREAT),
         fs.open("/usr/bin/ps", 0, constants.WASI_O_CREAT),
         fs.open("/usr/bin/free", 0, constants.WASI_O_CREAT),
@@ -158,6 +157,7 @@ async function initFs(fs) {
         fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/stty"),
         fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/mount"),
         fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/umount"),
+        fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/wget"),
     ]);
     await Promise.all([
         washRcPromise,
