@@ -36,7 +36,7 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 standalone: embed $(resources_dist) $(index_dist) $(wash_md5) $(wasm_sources_dist) $(resources_dist_dir)/wash.md5 $(third_party_dist_dir)/hterm_all.js
 
 .PHONY: embed
-embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,$(subst $(work_dir),$(dist_dir),$(jswasi_compiled)) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js)
+embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,$(subst $(work_dir),$(dist_dir),$(jswasi_compiled)) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js $(third_party_dist_dir)/js-untar.js)
 
 .PHONY: clean
 clean:
@@ -50,7 +50,7 @@ $(dist_dir) $(work_dir) $(resources_dist_dir) $(resources_work_dir) $(third_part
 	mkdir -p $@
 
 
-$(jswasi_compiled): %: $(jswasi_sources) $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
+$(jswasi_compiled): %: $(jswasi_sources) $(third_party_work_dir)/js-untar.js $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
 	tsc
 
 
