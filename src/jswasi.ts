@@ -1,14 +1,15 @@
 import * as constants from "./constants.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
-import { md5sum } from "./utils.js";
-import { getFilesystem, TopLevelFs } from "./filesystem/top-level-fs.js";
+import { TopLevelFs } from "./filesystem/top-level-fs.js";
 import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
 import { ProcFilesystem } from "./filesystem/proc-filesystem/proc-filesystem.js";
 import {
   DriverManager,
   major,
 } from "./filesystem/virtual-filesystem/driver-manager.js";
+// @ts-ignore
+import untar from "./third_party/js-untar.js";
 
 declare global {
   interface Window {
@@ -20,39 +21,6 @@ declare global {
 
 const INIT_FSA_ID = "fsa0";
 const BOOT_KERNEL_CONFIG_PATH = "/config.json";
-// binaries which need to be verified
-const CHECKSUM_BINARIES = {
-  "/usr/bin/wash": ["resources/wash", "resources/wash.md5"],
-};
-const ALWAYS_FETCH_FILES = {
-  "/etc/motd": "resources/motd.txt",
-  "/usr/bin/coreutils": "resources/coreutils",
-  "/usr/local/bin/wasibox": "resources/wasibox",
-};
-
-async function essentialBins(tfs: TopLevelFs): Promise<number[]> {
-  // verify if wash and init are up to date and refetch them if they are not
-  await tfs.createDir("/usr");
-  await tfs.createDir("/usr/bin");
-  const checksumPromises = Object.entries(CHECKSUM_BINARIES).map(
-    async ([filename, [address, checksum]]) => {
-      const file = await tfs.open(filename);
-      if (file.err === constants.EXIT_SUCCESS) {
-        // 1 << 16 + 1 is a chunk size to read from file, the choice of this number is arbitrary
-        let actual_sum = await md5sum(file.desc, 1 << (16 + 1));
-        let exp_sum = new TextDecoder().decode(
-          (await (await fetch(checksum)).arrayBuffer()).slice(0, 32)
-        );
-        if (actual_sum === exp_sum) {
-          return constants.WASI_ESUCCESS;
-        }
-      }
-      return fetchFile(tfs, filename, address, true);
-    }
-  );
-
-  return await Promise.all(checksumPromises);
-}
 
 async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
   const descs = [
@@ -127,109 +95,58 @@ async function fetchFile(
   return constants.WASI_ESUCCESS;
 }
 
+const enum TAR_FILETYPE {
+  FILE = "0",
+  LINK = "1",
+  SYMLINK = "2",
+  CHRDEV = "3",
+  BLKDEV = "4",
+  DIRECTORY = "5",
+  FIFO = "6",
+
+}
+
+function gunzip(tarStream: ReadableStream): ReadableStream {
+  // @ts-ignore
+  const stream = new DecompressionStream("gzip");
+  return tarStream.pipeThrough(stream);
+}
+
 // setup filesystem
-async function initFs(fs: TopLevelFs) {
-  // top level directories creation
-  await Promise.all([
-    fs.createDir("/tmp"),
-    // TODO: mount memfs on proc once it is ready
-    fs.createDir("/proc"),
-    fs.createDir("/etc"),
-    fs.createDir("/home"),
-    fs.createDir("/usr"),
-    fs.createDir("/lib"),
-    fs.createDir("/dev"),
-  ]);
+async function initFs(fs: TopLevelFs, tar: ArrayBuffer) {
+  const untared = await untar(tar);
 
-  // 2nd level directories creation
-  await Promise.all([
-    fs.createDir(DEFAULT_WORK_DIR),
-    fs.createDir("/usr/bin"),
-    fs.createDir("/usr/local"),
-  ]);
+  for (const entry of untared) {
+    switch (entry.type) {
+      case "":
+      case TAR_FILETYPE.FILE: {
+        let { err, desc } = await fs.open(
+          entry.name, 0, constants.WASI_O_CREAT);
 
-  // 3rd level directories/files/symlinks creation
-  await Promise.all([
-    fs.createDir("/usr/local/bin"),
-    fs.createDir(`${DEFAULT_WORK_DIR}/.config`),
-  ]);
+        if (err !== constants.WASI_ESUCCESS)
+          throw Error("Corrupted rootfs image");
 
-  // 4th level directories/files/symlinks creation
-  await Promise.all([fs.createDir(`${DEFAULT_WORK_DIR}/.config/ox`)]);
+        const stream = (await desc.writableStream()).stream;
+        entry.blob.stream().pipeTo(stream);
 
-  const washRcPromise = (async () => {
-    // TODO: this should be moved to shell
-    const washrc = await fs.open(
-      `${DEFAULT_WORK_DIR}/.washrc`,
-      0,
-      constants.WASI_O_CREAT
-    );
-    if ((await washrc.desc.getFilestat()).filestat.size === 0n) {
-      await washrc.desc.write(
-        new TextEncoder().encode("export RUST_BACKTRACE=full\n")
-      );
-      await washrc.desc.close();
+        await desc.close();
+        break;
+      }
+      case TAR_FILETYPE.DIRECTORY: {
+        const err = await fs.createDir(entry.name)
+        if (err !== constants.WASI_ESUCCESS)
+          throw Error("Corrupted rootfs image");
+
+        break;
+      }
+      case TAR_FILETYPE.SYMLINK: {
+        if ((await fs.addSymlink(entry.linkname, entry.name) !== constants.WASI_ESUCCESS))
+          throw Error("Corrupted rootfs image");
+
+        break;
+      }
     }
-  })();
-
-  const dummyBinariesPromise = Promise.all([
-    fs.open("/usr/bin/download", 0, constants.WASI_O_CREAT),
-    fs.open("/usr/bin/ps", 0, constants.WASI_O_CREAT),
-    fs.open("/usr/bin/free", 0, constants.WASI_O_CREAT),
-    fs.open("/usr/bin/reset", 0, constants.WASI_O_CREAT),
-  ]);
-
-  const symlinkCreationPromise = Promise.all([
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/ls"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/mkdir"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/rmdir"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/touch"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/rm"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/mv"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/cp"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/echo"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/date"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/printf"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/env"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/cat"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/realpath"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/ln"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/printenv"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/md5sum"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/test"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/["),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/wc"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/true"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/false"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/sleep"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/seq"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/head"),
-    fs.addSymlink("/usr/bin/coreutils", "/usr/bin/tail"),
-
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/unzip"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/hexdump"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/imgcat"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/kill"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/purge"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tree"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/tar"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/stty"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/mount"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/umount"),
-    fs.addSymlink("/usr/local/bin/wasibox", "/usr/local/bin/wget"),
-  ]);
-
-  await Promise.all([
-    washRcPromise,
-    dummyBinariesPromise,
-    symlinkCreationPromise,
-  ]);
-
-  await Promise.all(
-    Object.entries(ALWAYS_FETCH_FILES).map(([filename, address]) =>
-      fetchFile(fs, filename, address, true)
-    )
-  );
+  }
 }
 
 function initServiceWorker(): Promise<boolean> {
@@ -250,17 +167,13 @@ function initServiceWorker(): Promise<boolean> {
 
 type KernelConfig = {
   init: string[];
+  rootfs: string;
   mountConfig: MountConfig;
 };
 
 type MountConfig = {
   fsType: string;
   opts: any;
-};
-
-const RECOVERY_MOUNT_CONFIG: MountConfig = {
-  fsType: "vfs",
-  opts: {},
 };
 
 async function getKernelConfig(tfs: TopLevelFs): Promise<KernelConfig> {
@@ -308,21 +221,6 @@ function mountRootfs(
   );
 }
 
-async function recoveryMotd(tfs: TopLevelFs) {
-  const { err, desc } = await tfs.open(
-    "/etc/motd",
-    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
-    constants.WASI_O_CREAT | constants.WASI_O_TRUNC
-  );
-  if (err !== constants.WASI_ESUCCESS) return;
-
-  await desc.write(
-    new TextEncoder().encode(
-      "\n[WARNING] Could not mount filesystem, volatile filesystem used as root for recovery\n"
-    )
-  );
-}
-
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
@@ -362,29 +260,26 @@ export async function init(terminal: any): Promise<void> {
   const driverManager = new DriverManager();
   const processManager = new ProcessManager("process.js", tfs, driverManager);
 
-  // create flag file to indicate that the filesystem was already initiated
+  // If the init system is present in the filesystem, assume that the rootfs
+  // is already initialized
   const { err } = await tfs.open(
-    "/filesystem-initiated",
+    kernelConfig.init[0],
     constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
-    constants.WASI_O_CREAT | constants.WASI_O_EXCL
   );
 
-  if (err === constants.WASI_ESUCCESS) await initFs(tfs);
+  if (err !== constants.WASI_ESUCCESS) {
+    const rootfsTarResponse = await fetch(kernelConfig.rootfs);
+    const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
 
-  if (
-    (await essentialBins(tfs)).some((err) => err !== constants.WASI_ESUCCESS)
-  ) {
-    tfs.removeMount("/");
-    const conf = RECOVERY_MOUNT_CONFIG;
-
-    const __filesystem = await getFilesystem(conf.fsType, conf.opts);
-
-    // If there is an error, nothing can be done
-    await tfs.addMountFs("/", __filesystem.filesystem);
-
-    await initFs(tfs);
-    await essentialBins(tfs);
-    await recoveryMotd(tfs);
+    let tarStream = rootfsTarResponse.body;
+    if (contentEncoding === "gzip") {
+      tarStream = gunzip(tarStream);
+    } else if (!contentEncoding) {
+      const contentType = rootfsTarResponse.headers.get("Content-Type");
+      if (contentType === "application/gzip")
+        tarStream = gunzip(tarStream);
+    }
+    await initFs(tfs, await new Response(tarStream).arrayBuffer());
   }
 
   await tfs.createDir("/dev");
