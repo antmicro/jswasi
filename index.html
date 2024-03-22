@@ -26,8 +26,12 @@
       script.src = "./third_party/hterm_all.js";
       script.onload = async () => {
         await lib.init();
+        // hterm prints warnings that we don't really care
+        let tempWarnlog = console.warn;
+        console.warn = () => {};
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
+        console.warn = tempWarnlog;
         await init(terminal, (path, entryName) =>
           console.log(`[added dropped file as '${path}/${entryName}]`)
         );

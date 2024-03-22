@@ -111,7 +111,7 @@ async function initFs(fs) {
         // TODO: this should be moved to shell
         const washrc = await fs.open(`${DEFAULT_WORK_DIR}/.washrc`, 0, constants.WASI_O_CREAT);
         if ((await washrc.desc.getFilestat()).filestat.size === 0n) {
-            await washrc.desc.write(new TextEncoder().encode("export RUST_BACKTRACE=full\nexport DEBUG=1"));
+            await washrc.desc.write(new TextEncoder().encode("export RUST_BACKTRACE=full\n"));
             await washrc.desc.close();
         }
     })();
