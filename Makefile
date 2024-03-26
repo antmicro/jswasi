@@ -13,6 +13,9 @@ third_party_work_dir := $(work_dir)/third_party
 assets_dir := $(project_dir)/src/assets
 third_party_dir := $(project_dir)/third_party
 
+jswasi_sources := $(shell find $(project_dir)/src -type f -name '*.ts')
+jswasi_compiled := $(subst $(project_dir)/src,$(work_dir),$(jswasi_sources:.ts=.js))
+
 index := $(project_dir)/src/index.html
 index_dist := $(dist_dir)/index.html
 
@@ -34,19 +37,22 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 standalone: embed $(resources_dist) $(index_dist) $(wash_md5) $(wasm_sources_dist) $(resources_dist_dir)/wash.md5 $(third_party_dist_dir)/hterm_all.js
 
 .PHONY: embed
-embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,embed-nominify)
+embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,$(subst $(work_dir),$(dist_dir),$(jswasi_compiled)) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js)
 
-.PHONY: compile
-compile: $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
+.PHONY: clean
+clean:
 	rm -rf dist
-	tsc
 
-.PHONY: embed-nominify
-embed-nominify: compile
-	cp -r work dist
+.PHONY: clean-all
+clean-all: clean
+	rm -rf work
 
 $(dist_dir) $(work_dir) $(resources_dist_dir) $(resources_work_dir) $(third_party_dist_dir) $(third_party_work_dir): %:
 	mkdir -p $@
+
+
+$(jswasi_compiled): %: $(jswasi_sources) $(third_party_work_dir)/vfs.js $(third_party_work_dir)/idb-keyval.js
+	tsc
 
 
 $(resources_work_dir)/%: $(assets_dir)/% | $(resources_work_dir)
@@ -59,6 +65,9 @@ $(resources_work_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSIO
 $(wash_md5): $(resources_work_dir)/wash | $(resources_work_dir)
 	md5sum $(resources_work_dir)/wash > $(wash_md5)
 
+$(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
+	cp $< $@
+
 $(wasm_sources_work): %: | $(resources_dist_dir)
 	wget -qO $@ $($(shell basename $@)_url) || { rm -f $@; exit 1; }
 
@@ -69,32 +78,28 @@ $(resources_dist_dir)/%: $(resources_work_dir)/% | $(resources_dist_dir)
 $(third_party_dist_dir)/%.js: $(third_party_work_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
 
-$(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
-	cp $< $@
-
 $(index_dist): $(project_dir)/src/index.html $(index) | $(dist_dir)
 	cp $(index) $(index_dist)
 
 ifdef MINIFY
 index := $(project_dir)/src/assets/index.html
-$(work_dir)/service-worker-minified.js: compile | $(work_dir)
+$(work_dir)/service-worker-minified.js: $(work_dir)/service-worker.js | $(work_dir)
 	cd $(work_dir) && \
 	sed '/const urlsToCache/,/];/c\const urlsToCache = ["./jswasi.js"];' $< | \
 	esbuild $(ESBUILD_ARGS) --outfile=$@
 
-$(work_dir)/process-minified.js: compile | $(work_dir)
+$(work_dir)/process-minified.js: $(work_dir)/process.js | $(work_dir)
 	cd $(work_dir) && \
 	echo 'export default URL.createObjectURL(new Blob([(function(){' > process-minified.js && \
 	esbuild $(ESBUILD_ARGS) ./process.js >> process-minified.js && \
 	echo '}).toString().slice(11,-1)], {type:"text/javascript"}))' >> process-minified.js
 
-$(work_dir)/jswasi-minified.js: compile $(work_dir)/process-minified.js | $(work_dir)
+$(work_dir)/jswasi-minified.js: $(work_dir)/jswasi.js $(work_dir)/process-minified.js | $(work_dir)
 	cd $(work_dir) && \
 	(echo 'import processWorker from "./process-minified.js";' && \
 	sed 's|"process.js"|processWorker|g;s|"service-worker.js"|"jswasi.js"|g;s|export ||g' jswasi.js ; \
 	echo 'Object.defineProperties(window,{jswasiInit:{value:init,writable:false},jswasiTeardown:{value:tearDown,writable:false}});') | \
 	esbuild $(ESBUILD_ARGS) --outfile=$(shell basename $@)
-
 
 $(dist_dir)/jswasi.js: $(work_dir)/process-minified.js $(work_dir)/jswasi-minified.js $(work_dir)/service-worker-minified.js | $(dist_dir)
 	echo 'if(typeof window==="undefined"){' > $@
@@ -102,6 +107,10 @@ $(dist_dir)/jswasi.js: $(work_dir)/process-minified.js $(work_dir)/jswasi-minifi
 	echo '}else{' >> $@
 	cat $(work_dir)/jswasi-minified.js >> $@
 	echo '}' >> $@
+else
+$(dist_dir)/%.js: $(work_dir)/%.js | $(dist_dir)
+	install -D -m644 $< $@
+endif
 
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
@@ -109,6 +118,6 @@ $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	npm install
 
 .PHONY: test
-test: $(project_dir)/tests/unit/node_modules embed
+test: $(project_dir)/tests/unit/node_modules
 	cd tests/unit && \
 	npm run test
