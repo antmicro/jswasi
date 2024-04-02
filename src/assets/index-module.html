@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Antmicro's WASM shell</title>
+    <link rel="icon" type="image/x-icon" href="resources/favicon.ico">
+  </head>
+  <body style="margin: 0px; background: black">
+    <script type="module">
+      import { init } from "./jswasi.js";
+
+      window.buffer = "";
+      window.alive = true;
+      window.exitCode = 0;
+      window.stdoutReadData = function () {
+        if (window.stdoutAttached !== undefined)
+          if (window.stdoutAttached && buffer.length > 0) {
+            let tmp = window.buffer;
+            window.buffer = "";
+            return tmp;
+          }
+        return null;
+      };
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "./third_party/hterm_all.js";
+      script.onload = async () => {
+        await lib.init();
+        // hterm prints warnings that we don't really care about
+        let tempWarnlog = console.warn;
+        console.warn = () => {};
+        const terminal = new hterm.Terminal();
+        terminal.decorate(document.querySelector("#terminal"));
+        console.warn = tempWarnlog;
+        await init(terminal, (path, entryName) =>
+          console.log(`[added dropped file as '${path}/${entryName}]`)
+        );
+      };
+      document.body.appendChild(script);
+    </script>
+    <div id="terminal"></div>
+  </body>
+</html>

@@ -16,10 +16,9 @@ third_party_dir := $(project_dir)/third_party
 jswasi_sources := $(shell find $(project_dir)/src -type f -name '*.ts')
 jswasi_compiled := $(subst $(project_dir)/src,$(work_dir),$(jswasi_sources:.ts=.js))
 
-index := $(project_dir)/src/index.html
 index_dist := $(dist_dir)/index.html
 
-resources_dist := $(subst $(assets_dir),$(resources_dist_dir),$(wildcard $(assets_dir)/*))
+resources_dist := $(subst $(assets_dir),$(resources_dist_dir),$(shell find $(assets_dir) -type f ! -name '*.html'))
 
 wash_md5 := $(resources_work_dir)/wash.md5
 wash_url := https://github.com/antmicro/wash/releases/download/v0.1.3/wash.wasm
@@ -78,11 +77,8 @@ $(resources_dist_dir)/%: $(resources_work_dir)/% | $(resources_dist_dir)
 $(third_party_dist_dir)/%.js: $(third_party_work_dir)/%.js | $(third_party_dist_dir)
 	cp $< $@
 
-$(index_dist): $(project_dir)/src/index.html $(index) | $(dist_dir)
-	cp $(index) $(index_dist)
-
 ifdef MINIFY
-index := $(project_dir)/src/assets/index.html
+index := $(assets_dir)/index.html
 $(work_dir)/service-worker-minified.js: $(work_dir)/service-worker.js | $(work_dir)
 	cd $(work_dir) && \
 	sed '/const urlsToCache/,/];/c\const urlsToCache = ["./jswasi.js"];' $< | \
@@ -108,9 +104,13 @@ $(dist_dir)/jswasi.js: $(work_dir)/process-minified.js $(work_dir)/jswasi-minifi
 	cat $(work_dir)/jswasi-minified.js >> $@
 	echo '}' >> $@
 else
+index := $(assets_dir)/index-module.html
 $(dist_dir)/%.js: $(work_dir)/%.js | $(dist_dir)
 	install -D -m644 $< $@
 endif
+
+$(index_dist): $(index) | $(dist_dir)
+	cp $(index) $(index_dist)
 
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
