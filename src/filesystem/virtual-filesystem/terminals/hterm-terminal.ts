@@ -43,7 +43,9 @@ export type InitDriverArgs = { processManager: ProcessManager };
 class Hterm extends AbstractTermiosTerminal {
   constructor(public terminal: any) {
     super({ ...DEFAULT_HTERM_TERMIOS });
-    this.terminal.setInsertMode(true);
+    this.terminal.setInsertMode(
+      (this.termios.lFlag & termios.ICANON) !== 0
+    );
   }
 
   protected override printTerminal(data: string): void {
@@ -389,6 +391,10 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         this.hterm.termios.oFlag = __buf[1];
         this.hterm.termios.cFlag = __buf[2];
         this.hterm.termios.lFlag = __buf[3];
+
+        this.hterm.terminal.setInsertMode(
+          (this.hterm.termios.lFlag & termios.ICANON) !== 0
+        );
 
         err = constants.WASI_ESUCCESS;
 
