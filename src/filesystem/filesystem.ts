@@ -535,6 +535,7 @@ export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
 }
 
 export interface Filesystem {
+  fsname(): string;
   mkdirat(desc: Descriptor, path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
   // missing path_link

@@ -20,6 +20,10 @@ export class ProcFilesystem implements Filesystem {
     proc.initialize(this.processManager);
   }
 
+  fsname(): string {
+    return "ProcFilesystem";
+  }
+
   mkdirat(_desc: Descriptor, _path: string): Promise<number> {
     return Promise.resolve(constants.WASI_EACCES);
   }

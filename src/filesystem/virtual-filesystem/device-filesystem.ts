@@ -35,6 +35,11 @@ export class DeviceFilesystem extends VirtualFilesystem {
     this.driverManager = __opts.driverManager;
     return constants.WASI_ESUCCESS;
   }
+
+  override fsname(): string {
+    return "DeviceFilesystem";
+  }
+
   override async mknodat(
     desc: Descriptor,
     path: string,

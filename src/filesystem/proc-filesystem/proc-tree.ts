@@ -95,7 +95,7 @@ class MountinfoFile extends AbstractProcFile {
   read(): string {
     return (
       Object.entries(processManager.filesystem.getMounts())
-        .map(([mountPoint, fs]) => `${mountPoint} ${fs.constructor.name}`)
+        .map(([mountPoint, fs]) => `${mountPoint} ${fs.fsname()}`)
         .join("\n") + "\n"
     );
   }

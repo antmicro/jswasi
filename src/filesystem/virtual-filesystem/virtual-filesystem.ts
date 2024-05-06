@@ -68,6 +68,10 @@ export class VirtualFilesystem implements Filesystem {
     );
   }
 
+  fsname(): string {
+    return "VirtualFilesystem";
+  }
+
   async mkdirat(desc: Descriptor, path: string): Promise<number> {
     let navigated;
     let __desc;

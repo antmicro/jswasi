@@ -43,6 +43,10 @@ export class FsaFilesystem implements Filesystem {
   private rootHandle: FileSystemDirectoryHandle;
   private keepMetadata: boolean;
 
+  fsname(): string {
+    return "FsaFilesystem";
+  }
+
   private getRootHandle(): FileSystemDirectoryHandle {
     return this.rootHandle;
   }
