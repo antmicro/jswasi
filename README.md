@@ -9,16 +9,21 @@ This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://gi
 
 To build the project, you're going to need to have `typescript` installed.
 On Debian-like distributions it is as simple as running `apt install node-typescript`.
-The kernel can be built in two modes:
+The project can be built in two modes:
 
 - Standalone mode (default): `make standalone` - build kernel and provide it with the default index, init system and minimal userspace applications
 - Embed mode: `make embed` - build just the kernel
 
 Both of these commands produce the output in `dist/` directory
 
+There is also a `MINIFY` variable which can be set to `1` in the `make` invocation to indicate that the runtime should be built into a single `jswasi.js` script.
+To build the project this way, you also need to have `esbuild` installed.
+On Debian-like distributions you can install it by running `apt install esbuild`.
+Note that the minified version of the project is a _script_ rather than a _module_.
+
 # Running
 
-The project can be run in the standalone mode by serving the `dist/` directory with the HTTP server of your choice that supports [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS).
+The project can be run in the standalone mode by serving the `dist/` directory with the HTTP server of your choice.
 In this mode, some additional executables will be served:
 
 - [wash](https://github.com/antmicro/wash) - shell
@@ -29,6 +34,8 @@ As for the embed mode, the `dist/jswasi.js` module exposes two functions that al
 
 - `init`: this function accepts one parameter - an [hterm](https://chromium.googlesource.com/apps/libapps/+/HEAD/hterm) object that is going to serve a purpose of a terminal for interacting with the init system. Note that efforts to make the `init` function independent from `hterm` are in progress
 - `tearDown`: this function accepts one parameter - a print feedback callback. This function can be used to clean all persistent elements of the application without interracting with the kernel in case the kernel enters an unrecoverable state.
+
+In the minified mode, these functions are defined as `window` object properties and are called `jswasiInit` and `jswasiTeardown` instead.
 
 # Configuration
 
