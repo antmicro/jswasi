@@ -9,7 +9,7 @@ const urlsToCache = [
   "./third_party/idb-keyval.js",
   "./types.js",
   "./enable_threads.js",
-  "./terminal.js",
+  "./jswasi.js",
   "./process-manager.js",
   "./syscalls.js",
   "./filesystem/proc-filesystem/proc-tree.js",

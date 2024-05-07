@@ -92,7 +92,7 @@ async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
   });
 }
 
-export async function fetchFile(
+async function fetchFile(
   fs: TopLevelFs,
   filename: string,
   address: string,
@@ -232,16 +232,18 @@ async function initFs(fs: TopLevelFs) {
   );
 }
 
-function initServiceWorker() {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").then(
-      () => {
-        // Registration was successful
+function initServiceWorker(): Promise<boolean> {
+  return new Promise(resolve => {
+    navigator.serviceWorker.register("service-worker.js").then(
+      registration => {
+        if (registration !== undefined) {
+          registration.onupdatefound = () => resolve(true);
+
+          if (registration.active)
+            resolve(true);
+        };
       },
-      (err) => {
-        // registration failed :(
-        console.warn("ServiceWorker registration failed: ", err);
-      }
+      _ => resolve(false),
     );
   });
 }
@@ -333,6 +335,21 @@ export async function init(terminal: any): Promise<void> {
     return;
   }
 
+  if (!(await initServiceWorker())) {
+    terminal.io.println("Service Worker registration failed");
+    return;
+  }
+
+  // If SharedArrayBuffer is undefined then most likely, the service
+  // worker has not yet reloaded the page. In such case, stop further
+  // execution so that it is not abruptly interrupted by the page being
+  // reloaded.
+  if (typeof SharedArrayBuffer === 'undefined') {
+    // On chromium, window.location.reload sometimes does not work.
+    window.location.href = window.location.href;
+    return;
+  }
+
   const tfs = new TopLevelFs();
   const kernelConfig = await getKernelConfig(tfs);
   if (
@@ -342,7 +359,6 @@ export async function init(terminal: any): Promise<void> {
     terminal.io.println("Failed to mount root filesystem");
   }
 
-  initServiceWorker();
   const driverManager = new DriverManager();
   const processManager = new ProcessManager("process.js", tfs, driverManager);
 

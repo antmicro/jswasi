@@ -25,7 +25,7 @@ In this mode, some additional executables will be served:
 - [coreutils](https://github.com/antmicro/coreutils) - basic tools like `ls` or `cat`
 - [wasibox](https://github.com/antmicro/wasibox) - basic tools utilizing [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib), extended WASI standard
 
-As for the embed mode, the `dist/terminal.js` module exposes two functions that allow to control the kernel:
+As for the embed mode, the `dist/jswasi.js` module exposes two functions that allow to control the kernel:
 
 - `init`: this function accepts one parameter - an [hterm](https://chromium.googlesource.com/apps/libapps/+/HEAD/hterm) object that is going to serve a purpose of a terminal for interacting with the init system. Note that efforts to make the `init` function independent from `hterm` are in progress
 - `tearDown`: this function accepts one parameter - a print feedback callback. This function can be used to clean all persistent elements of the application without interracting with the kernel in case the kernel enters an unrecoverable state.
