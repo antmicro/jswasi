@@ -8,3 +8,4 @@ tests/syscalls/target
 **/venv
 
 dist/
+work/

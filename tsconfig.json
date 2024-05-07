@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "dist",
+    "outDir": "work",
     "target": "esnext",
     "module": "esnext",
     "esModuleInterop": true,
