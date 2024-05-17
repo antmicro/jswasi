@@ -15,11 +15,11 @@ jobs:
       image: debian:bookworm
     steps:
       - name: Install dependencies
-        run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget
+        run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget esbuild
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Build jswasi
-        run: make standalone
+        run: make MINIFY=1 standalone
       - name: Test jswasi
         run: make test
       - name: Upload dist
