@@ -194,6 +194,11 @@ export async function createDeviceFilesystem(
     "wget0",
     vfs.mkDev(major.MAJ_WGET, 0),
   );
+  await devfs.mknodat(
+    undefined,
+    "ws0",
+    vfs.mkDev(major.MAJ_WEBSOCKET, 0),
+  );
 
   return devfs;
 }

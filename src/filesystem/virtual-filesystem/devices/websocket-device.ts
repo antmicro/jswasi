@@ -1,19 +1,22 @@
-import * as constants from "../../constants.js";
+import * as constants from "../../../constants.js";
 //@ts-ignore
 import * as vfs from "../../../third_party/vfs.js";
-import { Descriptor, Fdflags, Rights } from "../filesystem.js";
-import { AbstractVirtualDeviceDescriptor, DeviceFilesystem } from "./device-filesystem.js";
-import { DeviceDriver } from "./driver-manager.js";
-import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
+import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
+import { DeviceFilesystem } from "./device-filesystem.js";
+import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";
+import { DeviceDriver, major } from "./driver-manager.js";
+import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
+
 
 export class WebsocketDeviceDriver implements DeviceDriver {
   private sockets: Record<number, WebSocket>
   private topSocketId: number;
   private devfs: DeviceFilesystem;
 
-  initDriver(_args: Object): Promise<number> {
+  initDriver(args: {devfs: DeviceFilesystem}): Promise<number> {
     this.topSocketId = 1;
     this.sockets = {};
+    this.devfs = args.devfs;
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -21,10 +24,7 @@ export class WebsocketDeviceDriver implements DeviceDriver {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  initDevice(min: number, args: {devfs: DeviceFilesystem}): Promise<number> {
-    if (min === 0)
-      this.devfs = args.devfs;
-
+  initDevice(_args: Object): Promise<number> {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -44,13 +44,13 @@ export class WebsocketDeviceDriver implements DeviceDriver {
     }
 
     const errPromise = new Promise<number>(resolve => {
-      sock.addEventListener("error", event => {
+      sock.addEventListener("error", _ => {
         resolve(constants.WASI_ECONNABORTED);
       });
     });
 
     const okPromise = new Promise<number>(resolve => {
-      sock.addEventListener("open", event => {
+      sock.addEventListener("open", _ => {
         resolve(constants.WASI_ESUCCESS);
       });
     });
@@ -61,6 +61,11 @@ export class WebsocketDeviceDriver implements DeviceDriver {
 
     const sockId = this.topSocketId++;
     this.sockets[sockId] = sock;
+    this.devfs.mknodat(
+      undefined,
+      `ws0s${this.topSocketId}`,
+      vfs.mkDev(major.MAJ_WEBSOCKET, this.topSocketId),
+    );
 
     return {
       err: constants.WASI_ESUCCESS,
@@ -98,7 +103,7 @@ export class WebsocketDeviceDriver implements DeviceDriver {
         fs_rights_base,
         fs_rights_inheriting,
         ino,
-        this.responses[min],
+        this.sockets[min],
         () => this.invalidateSocket(min)
       ),
     }
@@ -110,7 +115,7 @@ export class WebsocketDeviceDriver implements DeviceDriver {
   }
 }
 
-class WgetDevice
+class WebsocketDevice
   extends AbstractVirtualDeviceDescriptor
   implements VirtualFilesystemDescriptor
 {
@@ -136,11 +141,111 @@ class WgetDevice
   }
 }
 
+type WebsocketMessage = {
+  start: number;
+  buf: ArrayBuffer;
+};
+
+type WebsocketRequest = {
+  len: number;
+  resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
+};
+
 class WebsocketConnectionDevice
   extends AbstractVirtualDeviceDescriptor
   implements VirtualFilesystemDescriptor
 {
+  private msgBuffer: WebsocketMessage[];
+  private requestQueue: WebsocketRequest[];
+
   isatty(): boolean {
     return false;
+  }
+
+  constructor(
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    ino: vfs.CharacterDev,
+    private socket: WebSocket,
+    private invalidate: () => Promise<number>
+  ) {
+    super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
+    this.msgBuffer = [];
+    this.requestQueue = [];
+
+    this.socket.binaryType = "arraybuffer";
+    this.socket.onmessage = ev => this.onSocketMessage(ev);
+  }
+
+  private onSocketMessage(event: MessageEvent): void {
+    let eventData: ArrayBuffer, __evData = event.data;
+    if (!(__evData instanceof ArrayBuffer))
+      eventData = new TextEncoder().encode(__evData);
+    else
+      eventData = __evData;
+
+    if (this.requestQueue.length === 0) {
+      this.msgBuffer.push({
+        start: 0,
+        buf: eventData
+      });
+
+      return;
+    }
+
+    const req = this.requestQueue.shift();
+
+    if (req.len < eventData.byteLength) {
+      const returnBuffer = eventData.slice(0, req.len);
+      this.msgBuffer.push({
+        start: req.len,
+        buf: eventData,
+      });
+
+      req.resolve({
+        err: constants.WASI_ESUCCESS,
+        buffer: returnBuffer,
+      });
+
+      return;
+    }
+
+    req.resolve({
+      err: constants.WASI_ESUCCESS,
+      buffer: eventData,
+    });
+  }
+
+  override read(len: number, _workerId?: number): Promise<{ err: number; buffer: ArrayBuffer }> {
+    let mesg = this.msgBuffer[0];
+
+    if (mesg !== undefined) {
+      const mesgLen = mesg.buf.byteLength - mesg.start;
+
+      let returnBuffer = mesg.buf;
+      if (mesgLen > len) {
+        // The requested length is shorter than the last message in the
+        // buffer, slice the buffered message and shift the start index
+        returnBuffer = mesg.buf.slice(mesg.start, mesg.start + len);
+        mesg.start += len;
+      }
+
+      return Promise.resolve({
+        err: constants.WASI_ESUCCESS,
+        buffer: returnBuffer
+      });
+    }
+
+    return new Promise(resolve => {
+      this.requestQueue.push({
+        len,
+        resolve,
+      });
+    });
+  }
+
+  override close(): Promise<number> {
+    return this.invalidate();
   }
 }

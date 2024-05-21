@@ -3,6 +3,7 @@ import * as constants from "../../../constants.js";
 import { MemoryDeviceDriver } from "./mem-devices.js";
 import { HtermDeviceDriver } from "../terminals/hterm-terminal.js";
 import { WgetDeviceDriver } from "./wget-device.js";
+import { WebsocketDeviceDriver } from "./websocket-device.js";
 import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
 import ProcessManager from "../../../process-manager.js";
 
@@ -14,6 +15,7 @@ export const enum major {
   MAJ_MEMORY = 0,
   MAJ_HTERM = 1,
   MAJ_WGET = 2,
+  MAJ_WEBSOCKET = 3,
 }
 
 export class DriverManager {
@@ -43,9 +45,16 @@ export class DriverManager {
     if (err !== constants.WASI_ESUCCESS)
       return err;
 
+    const __websocketDriver = new WebsocketDeviceDriver();
+    err = await __websocketDriver.initDriver({ devfs });
+    if (err != constants.WASI_ESUCCESS)
+      return err;
+
     this.drivers[major.MAJ_MEMORY] = __memDriver;
     this.drivers[major.MAJ_HTERM] = __htermDriver;
     this.drivers[major.MAJ_WGET] = __wgetDriver;
+    this.drivers[major.MAJ_WEBSOCKET] = __websocketDriver;
+
     return constants.WASI_ESUCCESS;
   }
 
