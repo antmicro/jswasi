@@ -4,7 +4,6 @@ const urlsToCache = [
   "./syscalls.js",
   "./utils.js",
   "./process-manager.js",
-  "./md5.js",
   "./types.js",
   "./devices.js",
   "./browser-apps.js",

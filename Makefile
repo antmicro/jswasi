@@ -20,7 +20,6 @@ index_dist := $(dist_dir)/index.html
 
 resources_dist := $(subst $(assets_dir),$(resources_dist_dir),$(shell find $(assets_dir) -type f ! -name '*.html'))
 
-wash_md5 := $(resources_work_dir)/wash.md5
 wash_url := https://github.com/antmicro/wash/releases/download/v0.1.3/wash.wasm
 wasibox_url := https://github.com/antmicro/wasibox/releases/download/v0.1.2/wasibox.wasm
 coreutils_url := https://github.com/antmicro/coreutils/releases/download/v0.1.1/coreutils.wasm
@@ -33,7 +32,7 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 
 .PHONY: standalone
-standalone: embed $(resources_dist) $(index_dist) $(wash_md5) $(wasm_sources_dist) $(resources_dist_dir)/wash.md5 $(third_party_dist_dir)/hterm_all.js
+standalone: embed $(resources_dist) $(index_dist) $(wasm_sources_dist) $(third_party_dist_dir)/hterm_all.js
 
 .PHONY: embed
 embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,$(subst $(work_dir),$(dist_dir),$(jswasi_compiled)) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js $(third_party_dist_dir)/js-untar.js)
@@ -60,9 +59,6 @@ $(resources_work_dir)/%: $(assets_dir)/% | $(resources_work_dir)
 $(resources_work_dir)/motd.txt: $(assets_dir)/motd.txt $(project_dir)/src/VERSION | $(resources_work_dir)
 	VERSION="$(shell printf '%*s%s' $((25 - $(shell echo $(VERSION) | wc -c))) 25 $(VERSION))" \
 	envsubst <$(assets_dir)/motd.txt > $(resources_work_dir)/motd.txt
-
-$(wash_md5): $(resources_work_dir)/wash | $(resources_work_dir)
-	md5sum $(resources_work_dir)/wash > $(wash_md5)
 
 $(third_party_work_dir)/%.js: $(third_party_dir)/%.js | $(third_party_work_dir)
 	cp $< $@
