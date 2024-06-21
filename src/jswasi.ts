@@ -127,7 +127,7 @@ async function initFs(fs: TopLevelFs, tar: ArrayBuffer) {
           throw Error("Corrupted rootfs image");
 
         const stream = (await desc.writableStream()).stream;
-        entry.blob.stream().pipeTo(stream);
+        await entry.blob.stream().pipeTo(stream);
 
         await desc.close();
         break;
