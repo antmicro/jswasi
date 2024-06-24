@@ -22,6 +22,28 @@ declare global {
 const INIT_FSA_ID = "fsa0";
 const BOOT_KERNEL_CONFIG_PATH = "/config.json";
 
+const RECOVERY_MOUNT_CONFIG: MountConfig = {
+  fsType: "vfs",
+  opts: {},
+};
+
+async function recoveryMotd(tfs: TopLevelFs) {
+  const { err, desc } = await tfs.open(
+    "/etc/motd",
+    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    constants.WASI_O_CREAT | constants.WASI_O_TRUNC
+  );
+  if (err !== constants.WASI_ESUCCESS) return;
+
+  await desc.write(
+    new TextEncoder().encode(
+      "\n[WARNING] Could not mount filesystem, volatile filesystem used as root for recovery\n"
+    )
+  );
+
+  await desc.close();
+}
+
 async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
   const descs = [
     await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n),
@@ -270,8 +292,8 @@ export async function init(terminal: any): Promise<void> {
   if (err !== constants.WASI_ESUCCESS) {
     const rootfsTarResponse = await fetch(kernelConfig.rootfs);
     const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
-
     let tarStream = rootfsTarResponse.body;
+
     if (contentEncoding === "gzip") {
       tarStream = gunzip(tarStream);
     } else if (!contentEncoding) {
@@ -279,7 +301,19 @@ export async function init(terminal: any): Promise<void> {
       if (contentType === "application/gzip")
         tarStream = gunzip(tarStream);
     }
-    await initFs(tfs, await new Response(tarStream).arrayBuffer());
+
+    if (err === constants.WASI_ENOTRECOVERABLE) {
+      tfs.removeMount("/");
+      const conf = RECOVERY_MOUNT_CONFIG;
+
+      // If there is an error, nothing can be done
+      await mountRootfs(tfs, conf);
+
+      await initFs(tfs, await new Response(tarStream).arrayBuffer());
+      await recoveryMotd(tfs);
+    } else {
+      await initFs(tfs, await new Response(tarStream).arrayBuffer());
+    }
   }
 
   await tfs.createDir("/dev");
