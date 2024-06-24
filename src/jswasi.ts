@@ -8,6 +8,7 @@ import {
   DriverManager,
   major,
 } from "./filesystem/virtual-filesystem/driver-manager.js";
+import { printk } from "./utils.js";
 // @ts-ignore
 import untar from "./third_party/js-untar.js";
 
@@ -255,8 +256,9 @@ export async function init(terminal: any): Promise<void> {
     return;
   }
 
+  terminal.io.println(printk('Registering service worker'));
   if (!(await initServiceWorker())) {
-    terminal.io.println("Service Worker registration failed");
+    terminal.io.println(printk("Service Worker registration failed"));
     return;
   }
 
@@ -265,18 +267,20 @@ export async function init(terminal: any): Promise<void> {
   // execution so that it is not abruptly interrupted by the page being
   // reloaded.
   if (typeof SharedArrayBuffer === 'undefined') {
+    terminal.io.println(printk("SharedArrayBuffer undefined, reloading page"));
     // On chromium, window.location.reload sometimes does not work.
     window.location.href = window.location.href;
     return;
   }
 
   const tfs = new TopLevelFs();
+  terminal.io.println(printk('Reading kernel config'));
   const kernelConfig = await getKernelConfig(tfs);
   if (
     (await mountRootfs(tfs, kernelConfig.mountConfig)) !==
     constants.WASI_ESUCCESS
   ) {
-    terminal.io.println("Failed to mount root filesystem");
+    terminal.io.println(printk("Failed to mount root filesystem"));
   }
 
   const driverManager = new DriverManager();
@@ -284,12 +288,15 @@ export async function init(terminal: any): Promise<void> {
 
   // If the init system is present in the filesystem, assume that the rootfs
   // is already initialized
+  terminal.io.println(printk("Reading init system"));
   const { err } = await tfs.open(
     kernelConfig.init[0],
     constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
   );
 
   if (err !== constants.WASI_ESUCCESS) {
+    terminal.io.println(printk('Init system not present'));
+    terminal.io.println(printk('Starting rootfs initialization'));
     const rootfsTarResponse = await fetch(kernelConfig.rootfs);
     const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
     let tarStream = rootfsTarResponse.body;
@@ -303,20 +310,24 @@ export async function init(terminal: any): Promise<void> {
     }
 
     if (err === constants.WASI_ENOTRECOVERABLE) {
+      terminal.io.println(printk('Root filesystem corrupted, attempting recovery mode'));
       tfs.removeMount("/");
       const conf = RECOVERY_MOUNT_CONFIG;
 
       // If there is an error, nothing can be done
       await mountRootfs(tfs, conf);
+      terminal.io.println(printk('VirtualFilesystem mounted on /'));
 
       await initFs(tfs, await new Response(tarStream).arrayBuffer());
       await recoveryMotd(tfs);
     } else {
       await initFs(tfs, await new Response(tarStream).arrayBuffer());
     }
+    terminal.io.println(printk('Rootfs initialized'));
   }
 
   await tfs.createDir("/dev");
+  terminal.io.println(printk('Mounting device filesystem'));
   await tfs.addMountFs(
     "/dev",
     await createDeviceFilesystem(driverManager, processManager, {
@@ -326,21 +337,25 @@ export async function init(terminal: any): Promise<void> {
   );
 
   await tfs.createDir("/proc");
+  terminal.io.println(printk('Mounting proc filesystem'));
   await tfs.addMountFs("/proc", new ProcFilesystem(processManager));
 
   await tfs.createDir("/tmp");
+  terminal.io.println(printk('Mounting temp filesystem'));
   await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
 
   let fdTable;
   try {
+    terminal.io.println(printk('Opening file descriptors for the init system'));
     fdTable = await getDefaultFdTable(tfs);
   } catch (error) {
-    terminal.io.println(
+    terminal.io.println(printk(
       `Cannot create file descriptor table for init process: ${error}`
-    );
+    ));
     return;
   }
 
+  terminal.io.println(printk('Starting init'));
   await processManager.spawnProcess(
     null, // parent_id
     null, // parent_lock

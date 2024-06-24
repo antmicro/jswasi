@@ -157,6 +157,11 @@ export function stringToBool(str: string): boolean {
       return undefined;
   }
 }
+export function printk(msg: string): string {
+  const time = String((window.performance.now() / 1000).toFixed(6)).padStart(12, " ");
+  return `[${time}] ${msg}`;
+}
+
 export function humanReadable(bytes: number): string {
   const units = ["B", "kB", "MB", "GB", "TB", "PB"];
   let result = bytes;
