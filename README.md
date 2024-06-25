@@ -3,7 +3,7 @@
 Copyright (c) 2022-2024 [Antmicro](https://www.antmicro.com)
 
 This project is a `wasi` browser runtime that supports [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib) api.
-`JSWASI` is just a _kernel_ -- complete applications that can be served or embedded can be created by providing the root filesystem with `wasm32-wasi` executables or building the project in standalone mode which serves minimal programs for command line usage.
+`JSWASI` is just a _kernel_ -- complete applications that can be served or embedded can be created by providing a root filesystem with `wasm32-wasi` executables and configurations.
 
 # Building
 
@@ -11,10 +11,10 @@ To build the project, you're going to need to have `typescript` installed.
 On Debian-like distributions it is as simple as running `apt install node-typescript`.
 The project can be built in two modes:
 
-- Standalone mode (default): `make standalone` - build kernel and provide it with the default index, init system and minimal userspace applications
+- Standalone mode (default): `make standalone` - build the kernel and provide it with a kernel config and a default index with an in-browser terminal emulator that can be used to interface with the app
 - Embed mode: `make embed` - build just the kernel
 
-Both of these commands produce the output in `dist/` directory
+Both of these commands produce the output in `dist/` directory.
 
 There is also a `MINIFY` variable which can be set to `1` in the `make` invocation to indicate that the runtime should be built into a single `jswasi.js` script.
 To build the project this way, you also need to have `esbuild` installed.
@@ -23,12 +23,19 @@ Note that the minified version of the project is a _script_ rather than a _modul
 
 # Running
 
-The project can be run in the standalone mode by serving the `dist/` directory with the HTTP server of your choice.
-In this mode, some additional executables will be served:
+The project can be run in the standalone mode by serving the `dist/` directory with an HTTP server of your choice.
+The default kernel config uses rootfs archives built using [jswasi-rootfs](https://github.com/antmicro/jswasi-rootfs).
+This archive contains some essential executables like:
 
 - [wash](https://github.com/antmicro/wash) - shell
 - [coreutils](https://github.com/antmicro/coreutils) - basic tools like `ls` or `cat`
 - [wasibox](https://github.com/antmicro/wasibox) - basic tools utilizing [wasi_ext_lib](https://github.com/antmicro/wasi_ext_lib), extended WASI standard
+
+as well as some additional programs like:
+
+- [ox](https://github.com/antmicro/ox) - a minimal text editor
+- [space-invaders](https://github.com/mia1024/space-invaders/) - a demo terminal space invaders game
+- [python](https://github.com/python/cpython) - a Python interpreter (built using [python-wasi](https://github.com/antmicro/python-wasi))
 
 As for the embed mode, the `dist/jswasi.js` module exposes two functions that allow to control the kernel:
 
@@ -42,6 +49,7 @@ In the minified mode, these functions are defined as `window` object properties 
 The kernel supports a basic configuration that allows to configure the root filesystem and the init system:
 
 - `init`: a list of arguments to execute the init system
+- `rootfs`: the url of the rootfs archive to use
 - `fsType`: the type of the filesystem to mount at `/`
 - `opts`: options specific to the chosen filesystem.
 
@@ -49,8 +57,6 @@ An example of such configuration file is avaliable in `src/assets/config.json` i
 
 The configuration is read from the `fsa0/config.json` file in the device filesystem.
 If no such file is in this location, the default configuration from `dist/resources/config.json` is going to be saved there.
-
-More configuration options like the root filesystem image are going to be implemented soon.
 
 ## Filesystems
 
