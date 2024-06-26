@@ -9,14 +9,15 @@ import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
 
 
 export class WebsocketDeviceDriver implements DeviceDriver {
-  private sockets: Record<number, WebSocket>
+  private socketUrls: Record<number, string>
   private topSocketId: number;
   private devfs: DeviceFilesystem;
 
   initDriver(args: {devfs: DeviceFilesystem}): Promise<number> {
     this.topSocketId = 1;
-    this.sockets = {};
+    this.socketUrls = {};
     this.devfs = args.devfs;
+
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
@@ -32,35 +33,9 @@ export class WebsocketDeviceDriver implements DeviceDriver {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  async openSocket(url: string): Promise<{ err: number; minor: number}> {
-    let sock: WebSocket;
-    try {
-      sock = new WebSocket(url);
-    } catch (SyntaxError) {
-      return {
-        err: constants.WASI_EINVAL,
-        minor: -1
-      };
-    }
-
-    const errPromise = new Promise<number>(resolve => {
-      sock.addEventListener("error", _ => {
-        resolve(constants.WASI_ECONNABORTED);
-      });
-    });
-
-    const okPromise = new Promise<number>(resolve => {
-      sock.addEventListener("open", _ => {
-        resolve(constants.WASI_ESUCCESS);
-      });
-    });
-
-    const __stat = await Promise.race([errPromise, okPromise]);
-    if (__stat !== constants.WASI_ESUCCESS)
-      return { err: __stat, minor: -1 };
-
+  async createSocket(url: string): Promise<{ err: number; minor: number}> {
     const sockId = this.topSocketId++;
-    this.sockets[sockId] = sock;
+    this.socketUrls[sockId] = url;
     this.devfs.mknodat(
       undefined,
       `ws0s${this.topSocketId}`,
@@ -93,24 +68,26 @@ export class WebsocketDeviceDriver implements DeviceDriver {
       };
     }
 
-    if (this.sockets[min] === undefined)
+    if (this.socketUrls[min] === undefined)
       return { desc: undefined, err: constants.WASI_ENOENT };
 
+    const desc = new WebsocketConnectionDevice (
+      fs_flags,
+      fs_rights_base,
+      fs_rights_inheriting,
+      ino,
+      () => this.invalidateSocket(min)
+    );
+
+    const err = await desc.connect(this.socketUrls[min]);
     return {
-      err: constants.WASI_ESUCCESS,
-      desc: new WebsocketConnectionDevice (
-        fs_flags,
-        fs_rights_base,
-        fs_rights_inheriting,
-        ino,
-        this.sockets[min],
-        () => this.invalidateSocket(min)
-      ),
-    }
+      err: err,
+      desc: err === constants.WASI_ESUCCESS ? desc : undefined,
+    };
   }
 
   async invalidateSocket(id: number): Promise<number> {
-    delete this.sockets[id];
+    delete this.socketUrls[id];
     return this.devfs.unlinkat(undefined, `ws0s${id}`, false);
   }
 }
@@ -132,7 +109,7 @@ class WebsocketDevice
 
   override async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     const __url = new TextDecoder().decode(buffer);
-    const { err, minor } = await this.driver.openSocket(__url);
+    const { err, minor } = await this.driver.createSocket(__url);
 
     return {
       err,
@@ -157,6 +134,7 @@ class WebsocketConnectionDevice
 {
   private msgBuffer: WebsocketMessage[];
   private requestQueue: WebsocketRequest[];
+  private socket: WebSocket;
 
   isatty(): boolean {
     return false;
@@ -167,15 +145,36 @@ class WebsocketConnectionDevice
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     ino: vfs.CharacterDev,
-    private socket: WebSocket,
     private invalidate: () => Promise<number>
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
     this.msgBuffer = [];
     this.requestQueue = [];
+  }
 
+  public connect(url: string): Promise<number> {
+    try {
+      this.socket = new WebSocket(url);
+    } catch (SyntaxError) {
+      return Promise.resolve(constants.WASI_EINVAL);
+    }
+
+
+    const errPromise = new Promise<number>(resolve => {
+      this.socket.addEventListener("error", _ => {
+        resolve(constants.WASI_ECONNABORTED);
+      });
+    });
+
+    const okPromise = new Promise<number>(resolve => {
+      this.socket.addEventListener("open", _ => {
+        resolve(constants.WASI_ESUCCESS);
+      });
+    });
     this.socket.binaryType = "arraybuffer";
     this.socket.onmessage = ev => this.onSocketMessage(ev);
+
+    return Promise.race([errPromise, okPromise]);
   }
 
   private onSocketMessage(event: MessageEvent): void {
@@ -218,8 +217,7 @@ class WebsocketConnectionDevice
   }
 
   override read(len: number, _workerId?: number): Promise<{ err: number; buffer: ArrayBuffer }> {
-    let mesg = this.msgBuffer[0];
-
+    let mesg = this.msgBuffer.shift();
     if (mesg !== undefined) {
       const mesgLen = mesg.buf.byteLength - mesg.start;
 
@@ -237,6 +235,9 @@ class WebsocketConnectionDevice
       });
     }
 
+    if (this.socket.readyState > 1) // The socket is either closed or closing
+      return Promise.resolve({ err: constants.WASI_ESUCCESS, buffer: new ArrayBuffer(0) });
+
     return new Promise(resolve => {
       this.requestQueue.push({
         len,
@@ -246,6 +247,7 @@ class WebsocketConnectionDevice
   }
 
   override close(): Promise<number> {
+    this.socket.close();
     return this.invalidate();
   }
 }
