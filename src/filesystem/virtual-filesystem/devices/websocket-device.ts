@@ -37,10 +37,10 @@ export class WebsocketDeviceDriver implements DeviceDriver {
   async createSocket(url: string): Promise<{ err: number; minor: number}> {
     const sockId = this.topSocketId++;
     this.socketUrls[sockId] = url;
-    this.devfs.mknodat(
+    await this.devfs.mknodat(
       undefined,
-      `ws0s${this.topSocketId}`,
-      vfs.mkDev(major.MAJ_WEBSOCKET, this.topSocketId),
+      `ws0s${sockId}`,
+      vfs.mkDev(major.MAJ_WEBSOCKET, sockId),
     );
 
     return {
