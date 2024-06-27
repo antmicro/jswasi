@@ -1,11 +1,12 @@
 import * as constants from "../../../constants.js";
 //@ts-ignore
 import * as vfs from "../../../third_party/vfs.js";
-import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
+import { PollSub, Descriptor, Fdflags, Rights } from "../../filesystem.js";
 import { DeviceFilesystem } from "./device-filesystem.js";
 import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";
 import { DeviceDriver, major } from "./driver-manager.js";
 import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
+import { UserData, EventType, PollEvent } from "../../../types.js";
 
 
 export class WebsocketDeviceDriver implements DeviceDriver {
@@ -135,6 +136,7 @@ class WebsocketConnectionDevice
   private msgBuffer: WebsocketMessage[];
   private requestQueue: WebsocketRequest[];
   private socket: WebSocket;
+  private pollQueue: PollSub[];
 
   isatty(): boolean {
     return false;
@@ -150,6 +152,7 @@ class WebsocketConnectionDevice
     super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
     this.msgBuffer = [];
     this.requestQueue = [];
+    this.pollQueue = [];
   }
 
   public connect(url: string): Promise<number> {
@@ -161,9 +164,18 @@ class WebsocketConnectionDevice
 
 
     const errPromise = new Promise<number>(resolve => {
-      this.socket.addEventListener("error", _ => {
+      this.socket.onerror = _ => {
         resolve(constants.WASI_ECONNABORTED);
-      });
+
+        for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
+          req.resolve({
+            userdata: req.userdata,
+            error: constants.WASI_ENOTCONN,
+            nbytes: 0n,
+            eventType: constants.WASI_EXT_NO_EVENT,
+          });
+        }
+      };
     });
 
     const okPromise = new Promise<number>(resolve => {
@@ -173,6 +185,16 @@ class WebsocketConnectionDevice
     });
     this.socket.binaryType = "arraybuffer";
     this.socket.onmessage = ev => this.onSocketMessage(ev);
+    this.socket.onclose = _ => {
+      for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
+        req.resolve({
+          userdata: req.userdata,
+          error: constants.WASI_ENOTCONN,
+          nbytes: 0n,
+          eventType: constants.WASI_EXT_NO_EVENT,
+        });
+      }
+    };
 
     return Promise.race([errPromise, okPromise]);
   }
@@ -189,30 +211,53 @@ class WebsocketConnectionDevice
         start: 0,
         buf: eventData
       });
+    } else {
+      const req = this.requestQueue.shift();
 
-      return;
+      if (req.len < eventData.byteLength) {
+        const returnBuffer = eventData.slice(0, req.len);
+        this.msgBuffer.push({
+          start: req.len,
+          buf: eventData,
+        });
+
+        req.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: returnBuffer,
+        });
+      } else {
+        req.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: eventData,
+        });
+      }
     }
 
-    const req = this.requestQueue.shift();
-
-    if (req.len < eventData.byteLength) {
-      const returnBuffer = eventData.slice(0, req.len);
-      this.msgBuffer.push({
-        start: req.len,
-        buf: eventData,
-      });
-
+    for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
       req.resolve({
-        err: constants.WASI_ESUCCESS,
-        buffer: returnBuffer,
+        userdata: req.userdata,
+        error: constants.WASI_ESUCCESS,
+        nbytes: BigInt(eventData.byteLength),
+        eventType: constants.WASI_EVENTTYPE_FD_WRITE,
       });
+    }
+  }
 
-      return;
+  override write(
+    buffer: ArrayBuffer
+  ): Promise<{ err: number; written: bigint }> {
+    if (this.socket.readyState !== 1) {
+      // The socket is not in the CONNECTED state
+      return Promise.resolve({
+        err: constants.WASI_ENOTCONN,
+        written: 0n
+      });
     }
 
-    req.resolve({
+    this.socket.send(buffer);
+    return Promise.resolve({
       err: constants.WASI_ESUCCESS,
-      buffer: eventData,
+      written: BigInt(buffer.byteLength),
     });
   }
 
@@ -244,6 +289,49 @@ class WebsocketConnectionDevice
         resolve,
       });
     });
+  }
+
+  override addPollSub(
+    userdata: UserData,
+    eventType: EventType,
+    workerId: number
+  ): Promise<PollEvent> {
+    switch (eventType) {
+      case constants.WASI_EVENTTYPE_FD_WRITE: {
+        return Promise.resolve({
+          userdata,
+          error: constants.WASI_ESUCCESS,
+          eventType,
+          nbytes: 0n,
+        });
+      }
+      case constants.WASI_EVENTTYPE_FD_READ: {
+        if (this.msgBuffer.length === 0) {
+          return new Promise((resolve: (event: PollEvent) => void) => {
+            this.pollQueue.push({
+              pid: workerId,
+              userdata,
+              tag: eventType,
+              resolve,
+            });
+          });
+        }
+        return Promise.resolve({
+          userdata,
+          error: constants.WASI_ESUCCESS,
+          eventType,
+          nbytes: BigInt(this.msgBuffer[0].buf.byteLength)
+        });
+      }
+      default: {
+        return Promise.resolve({
+          userdata,
+          error: constants.WASI_EINVAL,
+          eventType: constants.WASI_EXT_NO_EVENT,
+          nbytes: 0n
+        });
+      }
+    }
   }
 
   override close(): Promise<number> {
