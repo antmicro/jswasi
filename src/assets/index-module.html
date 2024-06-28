@@ -32,9 +32,7 @@
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
-        await init(terminal, (path, entryName) =>
-          console.log(`[added dropped file as '${path}/${entryName}]`)
-        );
+        await init(terminal);
       };
       document.body.appendChild(script);
     </script>
