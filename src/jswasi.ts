@@ -247,7 +247,7 @@ function mountRootfs(
 // anchor is any HTMLElement that will be used to initialize hterm
 // notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
 // you can use it to customize the behavior
-export async function init(terminal: any): Promise<void> {
+export async function init(terminal: any, config?: KernelConfig): Promise<void> {
   if (!navigator.storage.getDirectory) {
     terminal.io.println(
       "Your browser doesn't support File System Access API yet."
@@ -274,10 +274,14 @@ export async function init(terminal: any): Promise<void> {
   }
 
   const tfs = new TopLevelFs();
-  terminal.io.println(printk('Reading kernel config'));
-  const kernelConfig = await getKernelConfig(tfs);
+
+  if (config == undefined) {
+    terminal.io.println(printk('Reading kernel config'));
+    config = await getKernelConfig(tfs);
+  }
+
   if (
-    (await mountRootfs(tfs, kernelConfig.mountConfig)) !==
+    (await mountRootfs(tfs, config.mountConfig)) !==
     constants.WASI_ESUCCESS
   ) {
     terminal.io.println(printk("Failed to mount root filesystem"));
@@ -290,14 +294,14 @@ export async function init(terminal: any): Promise<void> {
   // is already initialized
   terminal.io.println(printk("Reading init system"));
   const { err } = await tfs.open(
-    kernelConfig.init[0],
+    config.init[0],
     constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
   );
 
   if (err !== constants.WASI_ESUCCESS) {
     terminal.io.println(printk('Init system not present'));
     terminal.io.println(printk('Starting rootfs initialization'));
-    const rootfsTarResponse = await fetch(kernelConfig.rootfs);
+    const rootfsTarResponse = await fetch(config.rootfs);
     const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
     let tarStream = rootfsTarResponse.body;
 
@@ -361,7 +365,7 @@ export async function init(terminal: any): Promise<void> {
     null, // parent_lock
     "/usr/bin/wash",
     fdTable,
-    kernelConfig.init,
+    config.init,
     DEFAULT_ENV,
     false,
     DEFAULT_WORK_DIR,
