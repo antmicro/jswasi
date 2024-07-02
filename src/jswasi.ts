@@ -301,7 +301,14 @@ export async function init(terminal: any, config?: KernelConfig): Promise<void> 
   if (err !== constants.WASI_ESUCCESS) {
     terminal.io.println(printk('Init system not present'));
     terminal.io.println(printk('Starting rootfs initialization'));
-    const rootfsTarResponse = await fetch(config.rootfs);
+    // Use the default rootfs if it is not defined in the kernel config
+    let __rootfs = config.rootfs;
+    if (__rootfs === undefined) {
+      terminal.io.println(printk('Rootfs image not configured in kernel config, using default'));
+      __rootfs = "https://antmicro.github.io/jswasi-rootfs/rootfs.tar.gz";
+    }
+
+    const rootfsTarResponse = await fetch(__rootfs);
     const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
     let tarStream = rootfsTarResponse.body;
 
