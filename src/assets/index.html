@@ -31,7 +31,8 @@
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
-        await jswasiInit(terminal);
+        const jswasi = new Jswasi();
+        await jswasi.init(terminal);
       };
       document.body.appendChild(script);
     </script>

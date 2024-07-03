@@ -90,7 +90,7 @@ $(work_dir)/jswasi-minified.js: $(work_dir)/jswasi.js $(work_dir)/process-minifi
 	cd $(work_dir) && \
 	(echo 'import processWorker from "./process-minified.js";' && \
 	sed 's|"process.js"|processWorker|g;s|"service-worker.js"|"jswasi.js"|g;s|export ||g' jswasi.js ; \
-	echo 'Object.defineProperties(window,{jswasiInit:{value:init,writable:false},jswasiTeardown:{value:tearDown,writable:false}});') | \
+	echo 'Object.defineProperty(window, "Jswasi", {value:Jswasi,writable:false});') | \
 	esbuild $(ESBUILD_ARGS) --outfile=$(shell basename $@)
 
 $(dist_dir)/jswasi.js: $(work_dir)/process-minified.js $(work_dir)/jswasi-minified.js $(work_dir)/service-worker-minified.js | $(dist_dir)

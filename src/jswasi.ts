@@ -20,6 +20,170 @@ declare global {
   }
 }
 
+export class Jswasi {
+  private processManager: ProcessManager;
+  private topLevelFs: TopLevelFs;
+  private driverManager: DriverManager;
+
+  constructor() {
+    this.driverManager = new DriverManager();
+    this.topLevelFs = new TopLevelFs();
+    this.processManager = new ProcessManager("process.js", this.topLevelFs, this.driverManager);
+  }
+
+  public async tearDown(println: (a: string) => void) {
+    println("Starting purge...");
+    const handle = await navigator.storage.getDirectory();
+
+    println("Cleaning storage...");
+    // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
+    // @ts-ignore
+    for await (const name of handle.keys()) {
+      println(`Removing ${name}...`);
+      await handle.removeEntry(name, { recursive: true });
+    }
+
+    println("Cleaning metadata...");
+    await new Promise((resolve) => {
+      window.indexedDB.databases().then((r) => {
+        Promise.all(
+          r.map((database) => {
+            window.indexedDB.deleteDatabase(database.name);
+          })
+        ).then(resolve);
+      });
+    });
+    println("Purge complete");
+  }
+
+  public async init(terminal: any, config?: KernelConfig): Promise<void> {
+    if (!navigator.storage.getDirectory) {
+      terminal.io.println(
+        "Your browser doesn't support File System Access API yet."
+      );
+      terminal.io.println("We recommend using Chrome for the time being.");
+      return;
+    }
+
+    terminal.io.println(printk('Registering service worker'));
+    if (!(await initServiceWorker())) {
+      terminal.io.println(printk("Service Worker registration failed"));
+      return;
+    }
+
+    // If SharedArrayBuffer is undefined then most likely, the service
+    // worker has not yet reloaded the page. In such case, stop further
+    // execution so that it is not abruptly interrupted by the page being
+    // reloaded.
+    if (typeof SharedArrayBuffer === 'undefined') {
+      terminal.io.println(printk("SharedArrayBuffer undefined, reloading page"));
+      // On chromium, window.location.reload sometimes does not work.
+      window.location.href = window.location.href;
+      return;
+    }
+    if (config == undefined) {
+      terminal.io.println(printk('Reading kernel config'));
+      config = await getKernelConfig(this.topLevelFs);
+    }
+
+    if (
+      (await mountRootfs(this.topLevelFs, config.mountConfig)) !==
+      constants.WASI_ESUCCESS
+    ) {
+      terminal.io.println(printk("Failed to mount root filesystem"));
+    }
+
+    // If the init system is present in the filesystem, assume that the rootfs
+    // is already initialized
+    terminal.io.println(printk("Reading init system"));
+    const { err } = await this.topLevelFs.open(
+      config.init[0],
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    );
+
+    if (err !== constants.WASI_ESUCCESS) {
+      terminal.io.println(printk('Init system not present'));
+      terminal.io.println(printk('Starting rootfs initialization'));
+      // Use the default rootfs if it is not defined in the kernel config
+      let __rootfs = config.rootfs;
+      if (__rootfs === undefined) {
+        terminal.io.println(printk('Rootfs image not configured in kernel config, using default'));
+        __rootfs = "https://antmicro.github.io/jswasi-rootfs/rootfs.tar.gz";
+      }
+
+      const rootfsTarResponse = await fetch(__rootfs);
+      const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
+      let tarStream = rootfsTarResponse.body;
+
+      if (contentEncoding === "gzip") {
+        tarStream = gunzip(tarStream);
+      } else if (!contentEncoding) {
+        const contentType = rootfsTarResponse.headers.get("Content-Type");
+        if (contentType === "application/gzip")
+          tarStream = gunzip(tarStream);
+      }
+
+      if (err === constants.WASI_ENOTRECOVERABLE) {
+        terminal.io.println(printk('Root filesystem corrupted, attempting recovery mode'));
+        this.topLevelFs.removeMount("/");
+        const conf = RECOVERY_MOUNT_CONFIG;
+
+        // If there is an error, nothing can be done
+        await mountRootfs(this.topLevelFs, conf);
+        terminal.io.println(printk('VirtualFilesystem mounted on /'));
+
+        await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+        await recoveryMotd(this.topLevelFs);
+      } else {
+        await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+      }
+      terminal.io.println(printk('Rootfs initialized'));
+    }
+
+    await this.topLevelFs.createDir("/dev");
+    terminal.io.println(printk('Mounting device filesystem'));
+    await this.topLevelFs.addMountFs(
+      "/dev",
+      await createDeviceFilesystem(this.driverManager, this.processManager, {
+        terminal,
+        currentProcessId: 0,
+      })
+    );
+
+    await this.topLevelFs.createDir("/proc");
+    terminal.io.println(printk('Mounting proc filesystem'));
+    await this.topLevelFs.addMountFs("/proc", new ProcFilesystem(this.processManager));
+
+    await this.topLevelFs.createDir("/tmp");
+    terminal.io.println(printk('Mounting temp filesystem'));
+    await this.topLevelFs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
+
+    let fdTable;
+    try {
+      terminal.io.println(printk('Opening file descriptors for the init system'));
+      fdTable = await getDefaultFdTable(this.topLevelFs);
+    } catch (error) {
+      terminal.io.println(printk(
+        `Cannot create file descriptor table for init process: ${error}`
+      ));
+      return;
+    }
+
+    terminal.io.println(printk('Starting init'));
+    await this.processManager.spawnProcess(
+      null, // parent_id
+      null, // parent_lock
+      "/usr/bin/wash",
+      fdTable,
+      config.init,
+      DEFAULT_ENV,
+      false,
+      DEFAULT_WORK_DIR,
+      { maj: major.MAJ_HTERM, min: 0 } // TODO: this should not be hardcoded
+    );
+  }
+}
+
 const INIT_FSA_ID = "fsa0";
 const BOOT_KERNEL_CONFIG_PATH = "/config.json";
 
@@ -242,165 +406,4 @@ function mountRootfs(
     0n,
     mountConfig.opts
   );
-}
-
-// anchor is any HTMLElement that will be used to initialize hterm
-// notifyDroppedFileSaved is a callback that get triggers when the shell successfully saves file drag&dropped by the user
-// you can use it to customize the behavior
-export async function init(terminal: any, config?: KernelConfig): Promise<void> {
-  if (!navigator.storage.getDirectory) {
-    terminal.io.println(
-      "Your browser doesn't support File System Access API yet."
-    );
-    terminal.io.println("We recommend using Chrome for the time being.");
-    return;
-  }
-
-  terminal.io.println(printk('Registering service worker'));
-  if (!(await initServiceWorker())) {
-    terminal.io.println(printk("Service Worker registration failed"));
-    return;
-  }
-
-  // If SharedArrayBuffer is undefined then most likely, the service
-  // worker has not yet reloaded the page. In such case, stop further
-  // execution so that it is not abruptly interrupted by the page being
-  // reloaded.
-  if (typeof SharedArrayBuffer === 'undefined') {
-    terminal.io.println(printk("SharedArrayBuffer undefined, reloading page"));
-    // On chromium, window.location.reload sometimes does not work.
-    window.location.href = window.location.href;
-    return;
-  }
-
-  const tfs = new TopLevelFs();
-
-  if (config == undefined) {
-    terminal.io.println(printk('Reading kernel config'));
-    config = await getKernelConfig(tfs);
-  }
-
-  if (
-    (await mountRootfs(tfs, config.mountConfig)) !==
-    constants.WASI_ESUCCESS
-  ) {
-    terminal.io.println(printk("Failed to mount root filesystem"));
-  }
-
-  const driverManager = new DriverManager();
-  const processManager = new ProcessManager("process.js", tfs, driverManager);
-
-  // If the init system is present in the filesystem, assume that the rootfs
-  // is already initialized
-  terminal.io.println(printk("Reading init system"));
-  const { err } = await tfs.open(
-    config.init[0],
-    constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
-  );
-
-  if (err !== constants.WASI_ESUCCESS) {
-    terminal.io.println(printk('Init system not present'));
-    terminal.io.println(printk('Starting rootfs initialization'));
-    // Use the default rootfs if it is not defined in the kernel config
-    let __rootfs = config.rootfs;
-    if (__rootfs === undefined) {
-      terminal.io.println(printk('Rootfs image not configured in kernel config, using default'));
-      __rootfs = "https://antmicro.github.io/jswasi-rootfs/rootfs.tar.gz";
-    }
-
-    const rootfsTarResponse = await fetch(__rootfs);
-    const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
-    let tarStream = rootfsTarResponse.body;
-
-    if (contentEncoding === "gzip") {
-      tarStream = gunzip(tarStream);
-    } else if (!contentEncoding) {
-      const contentType = rootfsTarResponse.headers.get("Content-Type");
-      if (contentType === "application/gzip")
-        tarStream = gunzip(tarStream);
-    }
-
-    if (err === constants.WASI_ENOTRECOVERABLE) {
-      terminal.io.println(printk('Root filesystem corrupted, attempting recovery mode'));
-      tfs.removeMount("/");
-      const conf = RECOVERY_MOUNT_CONFIG;
-
-      // If there is an error, nothing can be done
-      await mountRootfs(tfs, conf);
-      terminal.io.println(printk('VirtualFilesystem mounted on /'));
-
-      await initFs(tfs, await new Response(tarStream).arrayBuffer());
-      await recoveryMotd(tfs);
-    } else {
-      await initFs(tfs, await new Response(tarStream).arrayBuffer());
-    }
-    terminal.io.println(printk('Rootfs initialized'));
-  }
-
-  await tfs.createDir("/dev");
-  terminal.io.println(printk('Mounting device filesystem'));
-  await tfs.addMountFs(
-    "/dev",
-    await createDeviceFilesystem(driverManager, processManager, {
-      terminal,
-      currentProcessId: 0,
-    })
-  );
-
-  await tfs.createDir("/proc");
-  terminal.io.println(printk('Mounting proc filesystem'));
-  await tfs.addMountFs("/proc", new ProcFilesystem(processManager));
-
-  await tfs.createDir("/tmp");
-  terminal.io.println(printk('Mounting temp filesystem'));
-  await tfs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
-
-  let fdTable;
-  try {
-    terminal.io.println(printk('Opening file descriptors for the init system'));
-    fdTable = await getDefaultFdTable(tfs);
-  } catch (error) {
-    terminal.io.println(printk(
-      `Cannot create file descriptor table for init process: ${error}`
-    ));
-    return;
-  }
-
-  terminal.io.println(printk('Starting init'));
-  await processManager.spawnProcess(
-    null, // parent_id
-    null, // parent_lock
-    "/usr/bin/wash",
-    fdTable,
-    config.init,
-    DEFAULT_ENV,
-    false,
-    DEFAULT_WORK_DIR,
-    { maj: major.MAJ_HTERM, min: 0 } // TODO: this should not be hardcoded
-  );
-}
-
-export async function tearDown(println: (a: string) => void) {
-  println("Starting purge...");
-  const handle = await navigator.storage.getDirectory();
-
-  println("Cleaning storage...");
-  // Caused by invalid types, can be fixed by using @types/wicg-file-system-access
-  // @ts-ignore
-  for await (const name of handle.keys()) {
-    println(`Removing ${name}...`);
-    await handle.removeEntry(name, { recursive: true });
-  }
-
-  println("Cleaning metadata...");
-  await new Promise((resolve) => {
-    window.indexedDB.databases().then((r) => {
-      Promise.all(
-        r.map((database) => {
-          window.indexedDB.deleteDatabase(database.name);
-        })
-      ).then(resolve);
-    });
-  });
-  println("Purge complete");
 }

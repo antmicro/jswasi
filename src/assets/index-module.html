@@ -7,7 +7,7 @@
   </head>
   <body style="margin: 0px; background: black">
     <script type="module">
-      import { init } from "./jswasi.js";
+      import { Jswasi } from "./jswasi.js";
 
       window.buffer = "";
       window.alive = true;
@@ -32,7 +32,8 @@
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
-        await init(terminal);
+        const jswasi = new Jswasi();
+        await jswasi.init(terminal);
       };
       document.body.appendChild(script);
     </script>
