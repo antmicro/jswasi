@@ -31,7 +31,7 @@ export class MemoryDeviceDriver implements DeviceDriver {
     return constants.WASI_ESUCCESS;
   }
 
-  async initDevice(_min: number): Promise<number> {
+  async initDevice(_args: Object): Promise<number> {
     return constants.WASI_ESUCCESS;
   }
   async teardownDevice(_min: number): Promise<number> {

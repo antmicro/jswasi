@@ -33,7 +33,8 @@
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
         const jswasi = new Jswasi();
-        await jswasi.init(terminal);
+        await jswasi.attachDevice({terminal}, 1);
+        await jswasi.init();
       };
       document.body.appendChild(script);
     </script>

@@ -19,19 +19,17 @@ export class WgetDeviceDriver implements DeviceDriver {
   private topResponseId: number;
   private devfs: DeviceFilesystem;
 
-  initDriver(_args: Object): Promise<number> {
+  initDriver(args: {devfs: DeviceFilesystem}): Promise<number> {
     this.topResponseId = 1;
     this.responses = {};
+    this.devfs = args.devfs;
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
   teardownDriver(_args: Object): Promise<number> {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  initDevice(min: number, args: {devfs: DeviceFilesystem}): Promise<number> {
-    if (min === 0) {
-      this.devfs = args.devfs;
-    }
+  initDevice(_args: Object): Promise<number> {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
   teardownDevice(_min: number, _args: Object): Promise<number> {
@@ -45,7 +43,6 @@ export class WgetDeviceDriver implements DeviceDriver {
         undefined,
         `wget0r${this.topResponseId}`,
         vfs.mkDev(major.MAJ_WGET, this.topResponseId),
-        {}
       );
       return {
         err: constants.WASI_ESUCCESS,

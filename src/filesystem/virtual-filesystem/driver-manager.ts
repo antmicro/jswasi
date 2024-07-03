@@ -8,6 +8,7 @@ import ProcessManager from "../../process-manager.js";
 
 // @ts-ignore
 import * as vfs from "../../third_party/vfs.js";
+import { DeviceFilesystem } from "./device-filesystem.js";
 
 export const enum major {
   MAJ_MEMORY = 0,
@@ -22,7 +23,7 @@ export class DriverManager {
     this.drivers = {};
   }
 
-  async initialize(processManager: ProcessManager): Promise<number> {
+  public async initialize(processManager: ProcessManager, devfs: DeviceFilesystem): Promise<number> {
     const __memDriver = new MemoryDeviceDriver();
 
     let err = await __memDriver.initDriver();
@@ -38,7 +39,7 @@ export class DriverManager {
     }
 
     const __wgetDriver = new WgetDeviceDriver();
-    err = await __wgetDriver.initDriver({});
+    err = await __wgetDriver.initDriver({ devfs });
     if (err !== constants.WASI_ESUCCESS)
       return err;
 
@@ -48,6 +49,10 @@ export class DriverManager {
     return constants.WASI_ESUCCESS;
   }
 
+  public attachDevice(device: Object, major: major): Promise<number> {
+    return this.drivers[major].initDevice(device);
+  }
+
   public getDriver(maj: major): DeviceDriver {
     return this.drivers[maj];
   }
@@ -55,7 +60,7 @@ export class DriverManager {
 
 export interface DeviceDriver {
   initDriver(args: Object): Promise<number>;
-  initDevice(min: number, args: Object): Promise<number>;
+  initDevice(args: Object): Promise<number>;
   teardownDevice(min: number, args: Object): Promise<number>;
   teardownDriver(args: Object): Promise<number>;
 

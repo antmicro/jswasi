@@ -237,7 +237,7 @@ export class HtermDeviceDriver implements TerminalDriver {
     return __hterm;
   }
 
-  async initDevice(_min: number, args: Object): Promise<number> {
+  async initDevice(args: Object): Promise<number> {
     const __args = args as InitDeviceArgs;
     let __ttyMin = this.freedTerminals.pop();
 

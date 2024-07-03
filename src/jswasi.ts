@@ -2,7 +2,7 @@ import * as constants from "./constants.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
 import { TopLevelFs } from "./filesystem/top-level-fs.js";
-import { createDeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
+import { createDeviceFilesystem, DeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
 import { ProcFilesystem } from "./filesystem/proc-filesystem/proc-filesystem.js";
 import {
   DriverManager,
@@ -11,6 +11,7 @@ import {
 import { printk } from "./utils.js";
 // @ts-ignore
 import untar from "./third_party/js-untar.js";
+import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
 
 declare global {
   interface Window {
@@ -24,11 +25,28 @@ export class Jswasi {
   private processManager: ProcessManager;
   private topLevelFs: TopLevelFs;
   private driverManager: DriverManager;
+  private deviceFilesystem: DeviceFilesystem;
+  private devFsPromise: Promise<void>;
+
+  private __printk(msg: string) {
+    try {
+      const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
+      term.io.println(printk(msg));
+    } catch (_) {}
+  }
 
   constructor() {
     this.driverManager = new DriverManager();
     this.topLevelFs = new TopLevelFs();
     this.processManager = new ProcessManager("process.js", this.topLevelFs, this.driverManager);
+    this.devFsPromise = createDeviceFilesystem(this.driverManager, this.processManager).then(devfs => {
+      this.deviceFilesystem = devfs;
+    });
+  }
+
+  public async attachDevice(device: Object, major: major): Promise<number> {
+    await this.devFsPromise;
+    return this.driverManager.attachDevice(device, major);
   }
 
   public async tearDown(println: (a: string) => void) {
@@ -56,18 +74,20 @@ export class Jswasi {
     println("Purge complete");
   }
 
-  public async init(terminal: any, config?: KernelConfig): Promise<void> {
+  public async init(config?: KernelConfig): Promise<void> {
+    await this.devFsPromise;
+
     if (!navigator.storage.getDirectory) {
-      terminal.io.println(
+      this.__printk(
         "Your browser doesn't support File System Access API yet."
       );
-      terminal.io.println("We recommend using Chrome for the time being.");
+      this.__printk("We recommend using Chrome for the time being.");
       return;
     }
 
-    terminal.io.println(printk('Registering service worker'));
+    this.__printk('Registering service worker');
     if (!(await initServiceWorker())) {
-      terminal.io.println(printk("Service Worker registration failed"));
+      this.__printk("Service Worker registration failed");
       return;
     }
 
@@ -76,13 +96,13 @@ export class Jswasi {
     // execution so that it is not abruptly interrupted by the page being
     // reloaded.
     if (typeof SharedArrayBuffer === 'undefined') {
-      terminal.io.println(printk("SharedArrayBuffer undefined, reloading page"));
+      this.__printk("SharedArrayBuffer undefined, reloading page");
       // On chromium, window.location.reload sometimes does not work.
       window.location.href = window.location.href;
       return;
     }
     if (config == undefined) {
-      terminal.io.println(printk('Reading kernel config'));
+      this.__printk('Reading kernel config');
       config = await getKernelConfig(this.topLevelFs);
     }
 
@@ -90,24 +110,24 @@ export class Jswasi {
       (await mountRootfs(this.topLevelFs, config.mountConfig)) !==
       constants.WASI_ESUCCESS
     ) {
-      terminal.io.println(printk("Failed to mount root filesystem"));
+      this.__printk("Failed to mount root filesystem");
     }
 
     // If the init system is present in the filesystem, assume that the rootfs
     // is already initialized
-    terminal.io.println(printk("Reading init system"));
+    this.__printk("Reading init system");
     const { err } = await this.topLevelFs.open(
       config.init[0],
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
     );
 
     if (err !== constants.WASI_ESUCCESS) {
-      terminal.io.println(printk('Init system not present'));
-      terminal.io.println(printk('Starting rootfs initialization'));
+      this.__printk('Init system not present');
+      this.__printk('Starting rootfs initialization');
       // Use the default rootfs if it is not defined in the kernel config
       let __rootfs = config.rootfs;
       if (__rootfs === undefined) {
-        terminal.io.println(printk('Rootfs image not configured in kernel config, using default'));
+        this.__printk('Rootfs image not configured in kernel config, using default');
         __rootfs = "https://antmicro.github.io/jswasi-rootfs/rootfs.tar.gz";
       }
 
@@ -124,52 +144,47 @@ export class Jswasi {
       }
 
       if (err === constants.WASI_ENOTRECOVERABLE) {
-        terminal.io.println(printk('Root filesystem corrupted, attempting recovery mode'));
+        this.__printk('Root filesystem corrupted, attempting recovery mode');
         this.topLevelFs.removeMount("/");
         const conf = RECOVERY_MOUNT_CONFIG;
 
         // If there is an error, nothing can be done
         await mountRootfs(this.topLevelFs, conf);
-        terminal.io.println(printk('VirtualFilesystem mounted on /'));
+        this.__printk('VirtualFilesystem mounted on /');
 
         await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
         await recoveryMotd(this.topLevelFs);
       } else {
         await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
       }
-      terminal.io.println(printk('Rootfs initialized'));
+      this.__printk('Rootfs initialized');
     }
 
     await this.topLevelFs.createDir("/dev");
-    terminal.io.println(printk('Mounting device filesystem'));
+    this.__printk('Mounting device filesystem');
     await this.topLevelFs.addMountFs(
       "/dev",
-      await createDeviceFilesystem(this.driverManager, this.processManager, {
-        terminal,
-        currentProcessId: 0,
-      })
+      this.deviceFilesystem 
     );
 
     await this.topLevelFs.createDir("/proc");
-    terminal.io.println(printk('Mounting proc filesystem'));
+    this.__printk('Mounting proc filesystem');
     await this.topLevelFs.addMountFs("/proc", new ProcFilesystem(this.processManager));
 
     await this.topLevelFs.createDir("/tmp");
-    terminal.io.println(printk('Mounting temp filesystem'));
+    this.__printk('Mounting temp filesystem');
     await this.topLevelFs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
 
     let fdTable;
     try {
-      terminal.io.println(printk('Opening file descriptors for the init system'));
+      this.__printk('Opening file descriptors for the init system');
       fdTable = await getDefaultFdTable(this.topLevelFs);
     } catch (error) {
-      terminal.io.println(printk(
-        `Cannot create file descriptor table for init process: ${error}`
-      ));
+      this.__printk(`Cannot create file descriptor table for init process: ${error}`);
       return;
     }
 
-    terminal.io.println(printk('Starting init'));
+    this.__printk('Starting init');
     await this.processManager.spawnProcess(
       null, // parent_id
       null, // parent_lock
@@ -290,7 +305,6 @@ const enum TAR_FILETYPE {
   BLKDEV = "4",
   DIRECTORY = "5",
   FIFO = "6",
-
 }
 
 function gunzip(tarStream: ReadableStream): ReadableStream {

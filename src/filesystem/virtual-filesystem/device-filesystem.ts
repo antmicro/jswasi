@@ -44,7 +44,6 @@ export class DeviceFilesystem extends VirtualFilesystem {
     desc: Descriptor,
     path: string,
     dev: number,
-    opts: Object
   ): Promise<number> {
     let navigated;
     let __desc;
@@ -71,10 +70,6 @@ export class DeviceFilesystem extends VirtualFilesystem {
       parent: navigated.dir._dir["."],
     });
     navigated.dir.addEntry(path, index);
-
-    const [major_, minor_] = vfs.unmkDev(dev);
-    const __driver = this.driverManager.getDriver(major_ as major);
-    __driver.initDevice(minor_, opts);
 
     return constants.WASI_ESUCCESS;
   }
@@ -150,37 +145,33 @@ export abstract class AbstractVirtualDeviceDescriptor extends AbstractDeviceDesc
 export async function createDeviceFilesystem(
   driverManager: DriverManager,
   processManager: ProcessManager,
-  args: Object
 ): Promise<DeviceFilesystem> {
   let devfs = new DeviceFilesystem();
 
-  await driverManager.initialize(processManager);
+  await driverManager.initialize(processManager, devfs);
   await devfs.initialize({ driverManager });
 
   await devfs.mknodat(
     undefined,
     "null",
     vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_NULL),
-    {}
   );
   await devfs.mknodat(
     undefined,
     "zero",
     vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_ZERO),
-    {}
   );
   await devfs.mknodat(
     undefined,
     "urandom",
     vfs.mkDev(major.MAJ_MEMORY, memMinor.DEV_URANDOM),
-    {}
   );
-  await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(major.MAJ_HTERM, 0), args);
+  await devfs.mknodat(undefined, "ttyH0", vfs.mkDev(major.MAJ_HTERM, 0));
+  await devfs.mknodat(undefined, "ttyH1", vfs.mkDev(major.MAJ_HTERM, 1));
   await devfs.mknodat(
     undefined,
     "wget0",
     vfs.mkDev(major.MAJ_WGET, 0),
-    {devfs}
   );
 
   return devfs;
