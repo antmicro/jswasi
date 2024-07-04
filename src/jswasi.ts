@@ -117,7 +117,7 @@ export class Jswasi {
     // is already initialized
     this.__printk("Reading init system");
     const { err } = await this.topLevelFs.open(
-      config.init[0],
+      config.init,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
     );
 
@@ -175,22 +175,20 @@ export class Jswasi {
     this.__printk('Mounting temp filesystem');
     await this.topLevelFs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
 
-    let fdTable;
-    try {
-      this.__printk('Opening file descriptors for the init system');
-      fdTable = await getDefaultFdTable(this.topLevelFs);
-    } catch (error) {
-      this.__printk(`Cannot create file descriptor table for init process: ${error}`);
+    const res = await this.topLevelFs.open("/");
+    if (res.err) {
+      this.__printk("Could not open root file descriptor for the init system");
       return;
     }
-
     this.__printk('Starting init');
     await this.processManager.spawnProcess(
       null, // parent_id
       null, // parent_lock
-      "/usr/bin/wash",
-      fdTable,
       config.init,
+      new FdTable({
+        3: new DescriptorEntry(res.desc),
+      }),
+      config.initArgs,
       DEFAULT_ENV,
       false,
       DEFAULT_WORK_DIR,
@@ -222,44 +220,6 @@ async function recoveryMotd(tfs: TopLevelFs) {
   );
 
   await desc.close();
-}
-
-async function getDefaultFdTable(tfs: TopLevelFs): Promise<FdTable> {
-  const descs = [
-    await tfs.open("/dev/ttyH0", 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN, 0n),
-    await tfs.open(
-      "/dev/ttyH0",
-      0,
-      0,
-      constants.WASI_FDFLAG_APPEND,
-      constants.WASI_EXT_RIGHTS_STDOUT,
-      0n
-    ),
-    await tfs.open(
-      "/dev/ttyH0",
-      0,
-      0,
-      constants.WASI_FDFLAG_APPEND,
-      constants.WASI_EXT_RIGHTS_STDERR,
-      0n
-    ),
-    await tfs.open("/"),
-  ];
-
-  for (var i = 0; i < descs.length; i++) {
-    if (descs[i].err !== constants.WASI_ESUCCESS) {
-      throw `Cannot open fd=${i}, error code=${descs[i].err}!`;
-    } else if (descs[i] === undefined) {
-      throw `Cannot open fd=${i}, descriptor is undefined!`;
-    }
-  }
-
-  return new FdTable({
-    0: new DescriptorEntry(descs[0].desc),
-    1: new DescriptorEntry(descs[1].desc),
-    2: new DescriptorEntry(descs[2].desc),
-    3: new DescriptorEntry(descs[3].desc),
-  });
 }
 
 async function fetchFile(
@@ -367,7 +327,8 @@ function initServiceWorker(): Promise<boolean> {
 }
 
 type KernelConfig = {
-  init: string[];
+  init: string;
+  initArgs: string[];
   rootfs: string;
   mountConfig: MountConfig;
 };
