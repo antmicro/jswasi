@@ -31,9 +31,7 @@
         const terminal = new hterm.Terminal();
         terminal.decorate(document.querySelector("#terminal"));
         console.warn = tempWarnlog;
-        await jswasiInit(terminal, (path, entryName) =>
-          console.log(`[added dropped file as '${path}/${entryName}]`)
-        );
+        await jswasiInit(terminal);
       };
       document.body.appendChild(script);
     </script>
