@@ -8271,6 +8271,539 @@ module.exports = { "default": weakMap$1, __esModule: true };
 
 var _WeakMap = unwrapExports(weakMap);
 
+// 7.3.20 SpeciesConstructor(O, defaultConstructor)
+
+
+var SPECIES$2 = _wks('species');
+var _speciesConstructor = function (O, D) {
+  var C = _anObject(O).constructor;
+  var S;
+  return C === undefined || (S = _anObject(C)[SPECIES$2]) == undefined ? D : _aFunction(S);
+};
+
+// fast apply, http://jsperf.lnkit.com/fast-apply/5
+var _invoke = function (fn, args, that) {
+  var un = that === undefined;
+  switch (args.length) {
+    case 0: return un ? fn()
+                      : fn.call(that);
+    case 1: return un ? fn(args[0])
+                      : fn.call(that, args[0]);
+    case 2: return un ? fn(args[0], args[1])
+                      : fn.call(that, args[0], args[1]);
+    case 3: return un ? fn(args[0], args[1], args[2])
+                      : fn.call(that, args[0], args[1], args[2]);
+    case 4: return un ? fn(args[0], args[1], args[2], args[3])
+                      : fn.call(that, args[0], args[1], args[2], args[3]);
+  } return fn.apply(that, args);
+};
+
+var process$2 = _global.process;
+var setTask = _global.setImmediate;
+var clearTask = _global.clearImmediate;
+var MessageChannel = _global.MessageChannel;
+var Dispatch = _global.Dispatch;
+var counter = 0;
+var queue$1 = {};
+var ONREADYSTATECHANGE = 'onreadystatechange';
+var defer;
+var channel;
+var port;
+var run = function () {
+  var id = +this;
+  // eslint-disable-next-line no-prototype-builtins
+  if (queue$1.hasOwnProperty(id)) {
+    var fn = queue$1[id];
+    delete queue$1[id];
+    fn();
+  }
+};
+var listener = function (event) {
+  run.call(event.data);
+};
+// Node.js 0.9+ & IE10+ has setImmediate, otherwise:
+if (!setTask || !clearTask) {
+  setTask = function setImmediate(fn) {
+    var args = [];
+    var i = 1;
+    while (arguments.length > i) args.push(arguments[i++]);
+    queue$1[++counter] = function () {
+      // eslint-disable-next-line no-new-func
+      _invoke(typeof fn == 'function' ? fn : Function(fn), args);
+    };
+    defer(counter);
+    return counter;
+  };
+  clearTask = function clearImmediate(id) {
+    delete queue$1[id];
+  };
+  // Node.js 0.8-
+  if (_cof(process$2) == 'process') {
+    defer = function (id) {
+      process$2.nextTick(_ctx(run, id, 1));
+    };
+  // Sphere (JS game engine) Dispatch API
+  } else if (Dispatch && Dispatch.now) {
+    defer = function (id) {
+      Dispatch.now(_ctx(run, id, 1));
+    };
+  // Browsers with MessageChannel, includes WebWorkers
+  } else if (MessageChannel) {
+    channel = new MessageChannel();
+    port = channel.port2;
+    channel.port1.onmessage = listener;
+    defer = _ctx(port.postMessage, port, 1);
+  // Browsers with postMessage, skip WebWorkers
+  // IE8 has postMessage, but it's sync & typeof its postMessage is 'object'
+  } else if (_global.addEventListener && typeof postMessage == 'function' && !_global.importScripts) {
+    defer = function (id) {
+      _global.postMessage(id + '', '*');
+    };
+    _global.addEventListener('message', listener, false);
+  // IE8-
+  } else if (ONREADYSTATECHANGE in _domCreate('script')) {
+    defer = function (id) {
+      _html.appendChild(_domCreate('script'))[ONREADYSTATECHANGE] = function () {
+        _html.removeChild(this);
+        run.call(id);
+      };
+    };
+  // Rest old browsers
+  } else {
+    defer = function (id) {
+      setTimeout(_ctx(run, id, 1), 0);
+    };
+  }
+}
+var _task = {
+  set: setTask,
+  clear: clearTask
+};
+
+var macrotask = _task.set;
+var Observer = _global.MutationObserver || _global.WebKitMutationObserver;
+var process$3 = _global.process;
+var Promise = _global.Promise;
+var isNode$1 = _cof(process$3) == 'process';
+
+var _microtask = function () {
+  var head, last, notify;
+
+  var flush = function () {
+    var parent, fn;
+    if (isNode$1 && (parent = process$3.domain)) parent.exit();
+    while (head) {
+      fn = head.fn;
+      head = head.next;
+      try {
+        fn();
+      } catch (e) {
+        if (head) notify();
+        else last = undefined;
+        throw e;
+      }
+    } last = undefined;
+    if (parent) parent.enter();
+  };
+
+  // Node.js
+  if (isNode$1) {
+    notify = function () {
+      process$3.nextTick(flush);
+    };
+  // browsers with MutationObserver, except iOS Safari - https://github.com/zloirock/core-js/issues/339
+  } else if (Observer && !(_global.navigator && _global.navigator.standalone)) {
+    var toggle = true;
+    var node = document.createTextNode('');
+    new Observer(flush).observe(node, { characterData: true }); // eslint-disable-line no-new
+    notify = function () {
+      node.data = toggle = !toggle;
+    };
+  // environments with maybe non-completely correct, but existent Promise
+  } else if (Promise && Promise.resolve) {
+    // Promise.resolve without an argument throws an error in LG WebOS 2
+    var promise = Promise.resolve(undefined);
+    notify = function () {
+      promise.then(flush);
+    };
+  // for other environments - macrotask based on:
+  // - setImmediate
+  // - MessageChannel
+  // - window.postMessag
+  // - onreadystatechange
+  // - setTimeout
+  } else {
+    notify = function () {
+      // strange IE + webpack dev server bug - use .call(global)
+      macrotask.call(_global, flush);
+    };
+  }
+
+  return function (fn) {
+    var task = { fn: fn, next: undefined };
+    if (last) last.next = task;
+    if (!head) {
+      head = task;
+      notify();
+    } last = task;
+  };
+};
+
+// 25.4.1.5 NewPromiseCapability(C)
+
+
+function PromiseCapability(C) {
+  var resolve, reject;
+  this.promise = new C(function ($$resolve, $$reject) {
+    if (resolve !== undefined || reject !== undefined) throw TypeError('Bad Promise constructor');
+    resolve = $$resolve;
+    reject = $$reject;
+  });
+  this.resolve = _aFunction(resolve);
+  this.reject = _aFunction(reject);
+}
+
+var f$7 = function (C) {
+  return new PromiseCapability(C);
+};
+
+var _newPromiseCapability = {
+	f: f$7
+};
+
+var _perform = function (exec) {
+  try {
+    return { e: false, v: exec() };
+  } catch (e) {
+    return { e: true, v: e };
+  }
+};
+
+var navigator = _global.navigator;
+
+var _userAgent = navigator && navigator.userAgent || '';
+
+var _promiseResolve = function (C, x) {
+  _anObject(C);
+  if (_isObject(x) && x.constructor === C) return x;
+  var promiseCapability = _newPromiseCapability.f(C);
+  var resolve = promiseCapability.resolve;
+  resolve(x);
+  return promiseCapability.promise;
+};
+
+var task = _task.set;
+var microtask = _microtask();
+
+
+
+
+var PROMISE = 'Promise';
+var TypeError$1 = _global.TypeError;
+var process$1 = _global.process;
+var versions$1 = process$1 && process$1.versions;
+var v8 = versions$1 && versions$1.v8 || '';
+var $Promise = _global[PROMISE];
+var isNode = _classof(process$1) == 'process';
+var empty = function () { /* empty */ };
+var Internal;
+var newGenericPromiseCapability;
+var OwnPromiseCapability;
+var Wrapper;
+var newPromiseCapability = newGenericPromiseCapability = _newPromiseCapability.f;
+
+var USE_NATIVE$1 = !!function () {
+  try {
+    // correct subclassing with @@species support
+    var promise = $Promise.resolve(1);
+    var FakePromise = (promise.constructor = {})[_wks('species')] = function (exec) {
+      exec(empty, empty);
+    };
+    // unhandled rejections tracking support, NodeJS Promise without it fails @@species test
+    return (isNode || typeof PromiseRejectionEvent == 'function')
+      && promise.then(empty) instanceof FakePromise
+      // v8 6.6 (Node 10 and Chrome 66) have a bug with resolving custom thenables
+      // https://bugs.chromium.org/p/chromium/issues/detail?id=830565
+      // we can't detect it synchronously, so just check versions
+      && v8.indexOf('6.6') !== 0
+      && _userAgent.indexOf('Chrome/66') === -1;
+  } catch (e) { /* empty */ }
+}();
+
+// helpers
+var isThenable = function (it) {
+  var then;
+  return _isObject(it) && typeof (then = it.then) == 'function' ? then : false;
+};
+var notify = function (promise, isReject) {
+  if (promise._n) return;
+  promise._n = true;
+  var chain = promise._c;
+  microtask(function () {
+    var value = promise._v;
+    var ok = promise._s == 1;
+    var i = 0;
+    var run = function (reaction) {
+      var handler = ok ? reaction.ok : reaction.fail;
+      var resolve = reaction.resolve;
+      var reject = reaction.reject;
+      var domain = reaction.domain;
+      var result, then, exited;
+      try {
+        if (handler) {
+          if (!ok) {
+            if (promise._h == 2) onHandleUnhandled(promise);
+            promise._h = 1;
+          }
+          if (handler === true) result = value;
+          else {
+            if (domain) domain.enter();
+            result = handler(value); // may throw
+            if (domain) {
+              domain.exit();
+              exited = true;
+            }
+          }
+          if (result === reaction.promise) {
+            reject(TypeError$1('Promise-chain cycle'));
+          } else if (then = isThenable(result)) {
+            then.call(result, resolve, reject);
+          } else resolve(result);
+        } else reject(value);
+      } catch (e) {
+        if (domain && !exited) domain.exit();
+        reject(e);
+      }
+    };
+    while (chain.length > i) run(chain[i++]); // variable length - can't use forEach
+    promise._c = [];
+    promise._n = false;
+    if (isReject && !promise._h) onUnhandled(promise);
+  });
+};
+var onUnhandled = function (promise) {
+  task.call(_global, function () {
+    var value = promise._v;
+    var unhandled = isUnhandled(promise);
+    var result, handler, console;
+    if (unhandled) {
+      result = _perform(function () {
+        if (isNode) {
+          process$1.emit('unhandledRejection', value, promise);
+        } else if (handler = _global.onunhandledrejection) {
+          handler({ promise: promise, reason: value });
+        } else if ((console = _global.console) && console.error) {
+          console.error('Unhandled promise rejection', value);
+        }
+      });
+      // Browsers should not trigger `rejectionHandled` event if it was handled here, NodeJS - should
+      promise._h = isNode || isUnhandled(promise) ? 2 : 1;
+    } promise._a = undefined;
+    if (unhandled && result.e) throw result.v;
+  });
+};
+var isUnhandled = function (promise) {
+  return promise._h !== 1 && (promise._a || promise._c).length === 0;
+};
+var onHandleUnhandled = function (promise) {
+  task.call(_global, function () {
+    var handler;
+    if (isNode) {
+      process$1.emit('rejectionHandled', promise);
+    } else if (handler = _global.onrejectionhandled) {
+      handler({ promise: promise, reason: promise._v });
+    }
+  });
+};
+var $reject = function (value) {
+  var promise = this;
+  if (promise._d) return;
+  promise._d = true;
+  promise = promise._w || promise; // unwrap
+  promise._v = value;
+  promise._s = 2;
+  if (!promise._a) promise._a = promise._c.slice();
+  notify(promise, true);
+};
+var $resolve = function (value) {
+  var promise = this;
+  var then;
+  if (promise._d) return;
+  promise._d = true;
+  promise = promise._w || promise; // unwrap
+  try {
+    if (promise === value) throw TypeError$1("Promise can't be resolved itself");
+    if (then = isThenable(value)) {
+      microtask(function () {
+        var wrapper = { _w: promise, _d: false }; // wrap
+        try {
+          then.call(value, _ctx($resolve, wrapper, 1), _ctx($reject, wrapper, 1));
+        } catch (e) {
+          $reject.call(wrapper, e);
+        }
+      });
+    } else {
+      promise._v = value;
+      promise._s = 1;
+      notify(promise, false);
+    }
+  } catch (e) {
+    $reject.call({ _w: promise, _d: false }, e); // wrap
+  }
+};
+
+// constructor polyfill
+if (!USE_NATIVE$1) {
+  // 25.4.3.1 Promise(executor)
+  $Promise = function Promise(executor) {
+    _anInstance(this, $Promise, PROMISE, '_h');
+    _aFunction(executor);
+    Internal.call(this);
+    try {
+      executor(_ctx($resolve, this, 1), _ctx($reject, this, 1));
+    } catch (err) {
+      $reject.call(this, err);
+    }
+  };
+  // eslint-disable-next-line no-unused-vars
+  Internal = function Promise(executor) {
+    this._c = [];             // <- awaiting reactions
+    this._a = undefined;      // <- checked in isUnhandled reactions
+    this._s = 0;              // <- state
+    this._d = false;          // <- done
+    this._v = undefined;      // <- value
+    this._h = 0;              // <- rejection state, 0 - default, 1 - handled, 2 - unhandled
+    this._n = false;          // <- notify
+  };
+  Internal.prototype = _redefineAll($Promise.prototype, {
+    // 25.4.5.3 Promise.prototype.then(onFulfilled, onRejected)
+    then: function then(onFulfilled, onRejected) {
+      var reaction = newPromiseCapability(_speciesConstructor(this, $Promise));
+      reaction.ok = typeof onFulfilled == 'function' ? onFulfilled : true;
+      reaction.fail = typeof onRejected == 'function' && onRejected;
+      reaction.domain = isNode ? process$1.domain : undefined;
+      this._c.push(reaction);
+      if (this._a) this._a.push(reaction);
+      if (this._s) notify(this, false);
+      return reaction.promise;
+    },
+    // 25.4.5.1 Promise.prototype.catch(onRejected)
+    'catch': function (onRejected) {
+      return this.then(undefined, onRejected);
+    }
+  });
+  OwnPromiseCapability = function () {
+    var promise = new Internal();
+    this.promise = promise;
+    this.resolve = _ctx($resolve, promise, 1);
+    this.reject = _ctx($reject, promise, 1);
+  };
+  _newPromiseCapability.f = newPromiseCapability = function (C) {
+    return C === $Promise || C === Wrapper
+      ? new OwnPromiseCapability(C)
+      : newGenericPromiseCapability(C);
+  };
+}
+
+_export(_export.G + _export.W + _export.F * !USE_NATIVE$1, { Promise: $Promise });
+_setToStringTag($Promise, PROMISE);
+_setSpecies(PROMISE);
+Wrapper = _core[PROMISE];
+
+// statics
+_export(_export.S + _export.F * !USE_NATIVE$1, PROMISE, {
+  // 25.4.4.5 Promise.reject(r)
+  reject: function reject(r) {
+    var capability = newPromiseCapability(this);
+    var $$reject = capability.reject;
+    $$reject(r);
+    return capability.promise;
+  }
+});
+_export(_export.S + _export.F * (_library || !USE_NATIVE$1), PROMISE, {
+  // 25.4.4.6 Promise.resolve(x)
+  resolve: function resolve(x) {
+    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
+  }
+});
+_export(_export.S + _export.F * !(USE_NATIVE$1 && _iterDetect(function (iter) {
+  $Promise.all(iter)['catch'](empty);
+})), PROMISE, {
+  // 25.4.4.1 Promise.all(iterable)
+  all: function all(iterable) {
+    var C = this;
+    var capability = newPromiseCapability(C);
+    var resolve = capability.resolve;
+    var reject = capability.reject;
+    var result = _perform(function () {
+      var values = [];
+      var index = 0;
+      var remaining = 1;
+      _forOf(iterable, false, function (promise) {
+        var $index = index++;
+        var alreadyCalled = false;
+        values.push(undefined);
+        remaining++;
+        C.resolve(promise).then(function (value) {
+          if (alreadyCalled) return;
+          alreadyCalled = true;
+          values[$index] = value;
+          --remaining || resolve(values);
+        }, reject);
+      });
+      --remaining || resolve(values);
+    });
+    if (result.e) reject(result.v);
+    return capability.promise;
+  },
+  // 25.4.4.4 Promise.race(iterable)
+  race: function race(iterable) {
+    var C = this;
+    var capability = newPromiseCapability(C);
+    var reject = capability.reject;
+    var result = _perform(function () {
+      _forOf(iterable, false, function (promise) {
+        C.resolve(promise).then(capability.resolve, reject);
+      });
+    });
+    if (result.e) reject(result.v);
+    return capability.promise;
+  }
+});
+
+_export(_export.P + _export.R, 'Promise', { 'finally': function (onFinally) {
+  var C = _speciesConstructor(this, _core.Promise || _global.Promise);
+  var isFunction = typeof onFinally == 'function';
+  return this.then(
+    isFunction ? function (x) {
+      return _promiseResolve(C, onFinally()).then(function () { return x; });
+    } : onFinally,
+    isFunction ? function (e) {
+      return _promiseResolve(C, onFinally()).then(function () { throw e; });
+    } : onFinally
+  );
+} });
+
+// https://github.com/tc39/proposal-promise-try
+
+
+
+
+_export(_export.S, 'Promise', { 'try': function (callbackfn) {
+  var promiseCapability = _newPromiseCapability.f(this);
+  var result = _perform(callbackfn);
+  (result.e ? promiseCapability.reject : promiseCapability.resolve)(result.v);
+  return promiseCapability.promise;
+} });
+
+var promise$1 = _core.Promise;
+
+var promise = createCommonjsModule(function (module) {
+module.exports = { "default": promise$1, __esModule: true };
+});
+
+var _Promise = unwrapExports(promise);
+
 // 20.2.2.22 Math.log2(x)
 
 
@@ -8730,6 +9263,127 @@ var CharacterDev = function (_INode4) {
   }]);
 
   return CharacterDev;
+}(INode);
+
+/**
+ * Class representing a named pipe.
+ * @extends INode
+ */
+
+
+var Fifo = function (_INode5) {
+  _inherits(Fifo, _INode5);
+
+  /**
+   * Creates a named pipe.
+   */
+  function Fifo(props, iNodeMgr) {
+    _classCallCheck(this, Fifo);
+
+    var _this5 = _possibleConstructorReturn(this, (Fifo.__proto__ || _Object$getPrototypeOf(Fifo)).call(this, {
+      ino: props.ino,
+      mode: constants.S_IFIFO | props.mode & ~constants.S_IFMT,
+      uid: props.uid,
+      gid: props.gid,
+      size: 0
+    }, iNodeMgr));
+
+    _this5.KERN_W = 0;
+    _this5.KERN_R = 1;
+    _this5.CLOSERM = 2;
+
+    _this5.teardown = props.teardown;
+    _this5.reader = -1;
+    _this5.writer = -1;
+    _this5.messages = [];
+    _this5.readQueue = [];
+    _this5.pollQueue = [];
+    _this5.mode = 0;
+    return _this5;
+  }
+
+  _createClass(Fifo, [{
+    key: 'setMode',
+    value: function setMode(request, state) {
+      if (state) this.mode |= 1 << request;else this.mode &= ~(1 << request);
+    }
+  }, {
+    key: 'isKernW',
+    value: function isKernW() {
+      return (this.mode & 1 << this.KERN_W) !== 0;
+    }
+  }, {
+    key: 'isKernR',
+    value: function isKernR() {
+      return (this.mode & 1 << this.KERN_R) !== 0;
+    }
+  }, {
+    key: 'isCloserm',
+    value: function isCloserm() {
+      return (this.mode & 1 << this.CLOSERM) !== 0;
+    }
+  }, {
+    key: 'notify',
+    value: function notify(size) {
+      for (var poll = this.pollQueue.shift(); poll !== undefined; poll = this.pollQueue.shift()) {
+        poll(size);
+      }
+    }
+  }, {
+    key: 'sendEof',
+    value: function sendEof() {
+      for (var read = this.readQueue.shift(); read !== undefined; read = this.readQueue.shift()) {
+        read(new ArrayBuffer());
+      }this.notify(0);
+    }
+  }, {
+    key: 'write',
+    value: function write(buf) {
+      var req = this.readQueue.shift();
+      if (req !== undefined) {
+        req(buf);
+        return;
+      }
+      this.messages.push(buf);
+      this.notify(buf.byteLength);
+    }
+  }, {
+    key: 'read',
+    value: function read() {
+      var _this6 = this;
+
+      var buf = this.messages.shift();
+      if (buf === undefined) {
+        if (this.writer === 0) // writer has already closed the fifo
+          return new ArrayBuffer();
+
+        return new _Promise(function (resolve) {
+          _this6.readQueue.push(resolve);
+        });
+      }
+      return buf;
+    }
+  }, {
+    key: 'addPollSub',
+    value: function addPollSub() {
+      var _this7 = this;
+
+      if (this.messages.length !== 0) return _Promise.resolve(this.messages[0].byteLength);
+
+      return new _Promise(function (resolve) {
+        _this7.pollQueue.push(resolve);
+      });
+    }
+  }, {
+    key: 'destructor',
+    value: function destructor() {
+      if (this.teardown !== undefined) {
+        this.teardown();
+      }
+    }
+  }]);
+
+  return Fifo;
 }(INode);
 
 /**
@@ -15183,7 +15837,7 @@ var VirtualFS = function () {
       var nextDir = void 0;
       var nextPath = void 0;
       var target = curdir.getEntry(parse.segment);
-      if (target instanceof File || target instanceof CharacterDev) {
+      if (target instanceof File || target instanceof CharacterDev || target instanceof Fifo) {
         if (!parse.rest) {
           return {
             dir: curdir,
@@ -15299,14 +15953,14 @@ if (typeof window !== "undefined") {
 
 var window_1 = win;
 
-var empty = {};
+var empty$1 = {};
 
 
-var empty$1 = Object.freeze({
-	default: empty
+var empty$2 = Object.freeze({
+	default: empty$1
 });
 
-var nodeCrypto = ( empty$1 && empty ) || empty$1;
+var nodeCrypto = ( empty$2 && empty$1 ) || empty$2;
 
 function getRandomValues(buf) {
   if (window_1.crypto && window_1.crypto.getRandomValues) {
@@ -15415,5 +16069,5 @@ fs.chmodSync('/tmp', 511);
 fs.mkdirSync('/root');
 fs.chmodSync('/root', 448);
 
-export { VirtualFS, Stat, constants, nullDev, zeroDev, fullDev, randomDev, Buffer, nextTick, VirtualFSError, errno_3 as errno, MAJOR_BITSIZE, MINOR_BITSIZE, MAJOR_MAX, MINOR_MAX, MAJOR_MIN, MINOR_MIN, DeviceManager, DeviceError, mkDev, unmkDev, File, Directory, Symlink, CharacterDev, INodeManager, FileDescriptor, FileDescriptorManager, ReadStream, WriteStream, DEFAULT_ROOT_UID, DEFAULT_ROOT_GID, DEFAULT_ROOT_PERM, DEFAULT_FILE_PERM, DEFAULT_DIRECTORY_PERM, DEFAULT_SYMLINK_PERM, applyUmask, checkPermissions };
+export { VirtualFS, Stat, constants, nullDev, zeroDev, fullDev, randomDev, Buffer, nextTick, VirtualFSError, errno_3 as errno, MAJOR_BITSIZE, MINOR_BITSIZE, MAJOR_MAX, MINOR_MAX, MAJOR_MIN, MINOR_MIN, DeviceManager, DeviceError, mkDev, unmkDev, File, Directory, Symlink, CharacterDev, INodeManager, Fifo, FileDescriptor, FileDescriptorManager, ReadStream, WriteStream, DEFAULT_ROOT_UID, DEFAULT_ROOT_GID, DEFAULT_ROOT_PERM, DEFAULT_FILE_PERM, DEFAULT_DIRECTORY_PERM, DEFAULT_SYMLINK_PERM, applyUmask, checkPermissions };
 export default fs;
