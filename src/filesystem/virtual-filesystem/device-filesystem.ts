@@ -20,12 +20,14 @@ import {
   Filestat,
   AbstractDeviceDescriptor,
 } from "../filesystem.js";
-
+import { FifoDescriptor } from "./fifo.js";
 import { DriverManager, major } from "./driver-manager.js";
 
 type DeviceFilesystemOpts = {
   driverManager: DriverManager;
 };
+
+const DEV_FIFO = -1;
 
 export class DeviceFilesystem extends VirtualFilesystem {
   private driverManager: DriverManager;
@@ -62,14 +64,24 @@ export class DeviceFilesystem extends VirtualFilesystem {
       return constants.WASI_EEXIST;
     }
 
-    const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.CharacterDev, {
-      mode: vfs.DEFAULT_FILE_PERM,
-      uid: 0,
-      gid: 0,
-      rdev: dev,
-      parent: navigated.dir._dir["."],
-    });
-    navigated.dir.addEntry(path, index);
+    if (dev < 0) {
+      const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Fifo, {
+        mode: vfs.DEFAULT_FILE_PERM,
+        uid: 0,
+        gid: 0,
+        parent: navigated.dir._dir["."],
+      });
+      navigated.dir.addEntry(path, index);
+    } else {
+      const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.CharacterDev, {
+        mode: vfs.DEFAULT_FILE_PERM,
+        uid: 0,
+        gid: 0,
+        rdev: dev,
+        parent: navigated.dir._dir["."],
+      });
+      navigated.dir.addEntry(path, index);
+    }
 
     return constants.WASI_ESUCCESS;
   }
@@ -103,24 +115,37 @@ export class DeviceFilesystem extends VirtualFilesystem {
       false
     );
 
-    const [major_, minor_] = vfs.unmkDev(navigated.target._metadata.rdev);
+    if (navigated.target._metadata.isCharacterDevice()) {
+      const [major_, minor_] = vfs.unmkDev(navigated.target._metadata.rdev);
 
-    const driver = this.driverManager.getDriver(major_ as major);
-    const { err, desc } = await driver.getDesc(
-      minor_ as memMinor,
-      fdflags,
-      fs_rights_base,
-      fs_rights_inheriting,
-      navigated.target
-    );
-    if (err !== constants.WASI_ESUCCESS) {
-      return result;
+      const driver = this.driverManager.getDriver(major_ as major);
+      const { err, desc } = await driver.getDesc(
+        minor_ as memMinor,
+        fdflags,
+        fs_rights_base,
+        fs_rights_inheriting,
+        navigated.target
+      );
+      if (err !== constants.WASI_ESUCCESS)
+        return result;
+
+      return {
+        err: constants.WASI_ESUCCESS,
+        index: -1,
+        desc,
+      };
+    } else {
+      return {
+        err: constants.WASI_ESUCCESS,
+        index: -1,
+        desc: new FifoDescriptor(
+          fdflags,
+          fs_rights_base,
+          fs_rights_inheriting,
+          navigated.target
+        ),
+      }
     }
-    return {
-      err: constants.WASI_ESUCCESS,
-      index: -1,
-      desc,
-    };
   }
 }
 
