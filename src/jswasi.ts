@@ -2,12 +2,12 @@ import * as constants from "./constants.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { FdTable, DEFAULT_ENV, DEFAULT_WORK_DIR } from "./process-manager.js";
 import { TopLevelFs } from "./filesystem/top-level-fs.js";
-import { createDeviceFilesystem, DeviceFilesystem } from "./filesystem/virtual-filesystem/device-filesystem.js";
+import { createDeviceFilesystem, DeviceFilesystem } from "./filesystem/virtual-filesystem/devices/device-filesystem.js";
 import { ProcFilesystem } from "./filesystem/proc-filesystem/proc-filesystem.js";
 import {
   DriverManager,
   major,
-} from "./filesystem/virtual-filesystem/driver-manager.js";
+} from "./filesystem/virtual-filesystem/devices/driver-manager.js";
 import { printk } from "./utils.js";
 // @ts-ignore
 import untar from "./third_party/js-untar.js";

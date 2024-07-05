@@ -1,12 +1,13 @@
-import * as constants from "../../constants.js";
+import * as constants from "../../../constants.js";
 // @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
+import * as vfs from "../../../third_party/vfs.js";
 
-import { Descriptor, Fdflags, Rights } from "../filesystem.js";
+import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
 
-import { AbstractVirtualDeviceDescriptor, DeviceFilesystem } from "./device-filesystem.js";
+import { DeviceFilesystem } from "./device-filesystem.js";
+import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";
 import { DeviceDriver, major } from "./driver-manager.js";
-import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
+import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
 
 export const enum ioctlRequests {
   WGETGS = 0,  // Get status

@@ -1,11 +1,8 @@
-import * as constants from "../../constants.js";
+import * as constants from "../../../constants.js";
 
-import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
-import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
-import { UserData, EventType, PollEvent } from "../../types.js";
-
-// @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
+import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";
+import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
+import { UserData, EventType, PollEvent } from "../../../types.js";
 
 export class FifoDescriptor 
   extends AbstractVirtualDeviceDescriptor 

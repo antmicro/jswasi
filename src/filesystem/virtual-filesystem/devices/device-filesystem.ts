@@ -1,15 +1,14 @@
-import * as constants from "../../constants.js";
+import * as constants from "../../../constants.js";
 // @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
-import ProcessManager from "../../process-manager.js";
+import * as vfs from "../../../third_party/vfs.js";
+import ProcessManager from "../../../process-manager.js";
 
 import {
   VirtualFilesystem,
   VirtualFilesystemDirectoryDescriptor,
-  wasiFilestat,
-} from "./virtual-filesystem.js";
+} from "./../virtual-filesystem.js";
 
-import { basename } from "../../utils.js";
+import { basename } from "../../../utils.js";
 import { minor as memMinor } from "./mem-devices.js";
 import {
   OpenFlags,
@@ -17,17 +16,13 @@ import {
   Rights,
   Fdflags,
   Descriptor,
-  Filestat,
-  AbstractDeviceDescriptor,
-} from "../filesystem.js";
+} from "../../filesystem.js";
 import { FifoDescriptor } from "./fifo.js";
 import { DriverManager, major } from "./driver-manager.js";
 
 type DeviceFilesystemOpts = {
   driverManager: DriverManager;
 };
-
-const DEV_FIFO = -1;
 
 export class DeviceFilesystem extends VirtualFilesystem {
   private driverManager: DriverManager;
@@ -146,24 +141,6 @@ export class DeviceFilesystem extends VirtualFilesystem {
         ),
       }
     }
-  }
-}
-
-export abstract class AbstractVirtualDeviceDescriptor extends AbstractDeviceDescriptor {
-  constructor(
-    fs_flags: Fdflags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    protected ino: vfs.CharacterDev
-  ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting);
-  }
-
-  override async getFilestat(): Promise<{ err: number; filestat: Filestat }> {
-    return {
-      err: constants.WASI_ESUCCESS,
-      filestat: wasiFilestat(this.ino._metadata),
-    };
   }
 }
 

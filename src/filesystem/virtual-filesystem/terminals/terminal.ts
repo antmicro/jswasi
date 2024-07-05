@@ -1,4 +1,4 @@
-import { DeviceDriver } from "../driver-manager.js";
+import { DeviceDriver } from "../devices/driver-manager.js";
 import * as termios from "./termios.js";
 import { PollSub } from "../../filesystem.js";
 import ProcessManager from "../../../process-manager.js";

@@ -18,7 +18,7 @@ import { Fdflags, Rights, Descriptor } from "../../filesystem.js";
 import { UserData, EventType, PollEvent } from "../../../types.js";
 import * as constants from "../../../constants.js";
 import { getFilesystem } from "../../top-level-fs.js";
-import { AbstractVirtualDeviceDescriptor } from "./../device-filesystem.js";
+import { AbstractVirtualDeviceDescriptor } from "../devices/abstract-device-descriptor.js";
 import ProcessManager from "../../../process-manager.js";
 
 const DEFAULT_HTERM_TERMIOS: termios.Termios = {

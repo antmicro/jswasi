@@ -1,10 +1,10 @@
-import { VirtualFilesystemDescriptor } from "./virtual-filesystem.js";
+import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
 // @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
-import { Whence, Fdflags, Rights, Descriptor } from "../filesystem.js";
+import * as vfs from "../../../third_party/vfs.js";
+import { Whence, Fdflags, Rights, Descriptor } from "../../filesystem.js";
 import { DeviceDriver } from "./driver-manager.js";
-import * as constants from "../../constants.js";
-import { AbstractVirtualDeviceDescriptor } from "./device-filesystem.js";
+import * as constants from "../../../constants.js";
+import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";
 
 export const enum minor {
   DEV_NULL = 0,

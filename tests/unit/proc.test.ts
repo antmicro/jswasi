@@ -5,7 +5,7 @@ import {
   ProcFileDescriptor,
 } from "../../src/filesystem/proc-filesystem/proc-descriptors";
 import ProcessManager from "../../src/process-manager";
-import { DriverManager } from "../../src/filesystem/virtual-filesystem/driver-manager";
+import { DriverManager } from "../../src/filesystem/virtual-filesystem/devices/driver-manager";
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
 import { Filestat } from "../../src/filesystem/filesystem";
 import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
@@ -18,7 +18,7 @@ import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "
 jest.mock("../../src/process-manager");
 jest.mock("../../src/filesystem/top-level-fs");
 jest.mock("../../src/filesystem/proc-filesystem/proc-tree");
-jest.mock("../../src/filesystem/virtual-filesystem/driver-manager");
+jest.mock("../../src/filesystem/virtual-filesystem/devices/driver-manager");
 jest.mock("../../src/filesystem/proc-filesystem/proc-descriptors");
 
 class DummyProcFile implements proc.ProcFile {

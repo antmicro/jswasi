@@ -7,7 +7,7 @@ import syscallCallback from "./syscalls.js";
 import {
   DriverManager,
   major,
-} from "./filesystem/virtual-filesystem/driver-manager.js";
+} from "./filesystem/virtual-filesystem/devices/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
 import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
 

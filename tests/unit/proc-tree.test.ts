@@ -1,6 +1,6 @@
 import ProcessManager from "../../src/process-manager";
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
-import { DriverManager } from "../../src/filesystem/virtual-filesystem/driver-manager";
+import { DriverManager } from "../../src/filesystem/virtual-filesystem/devices/driver-manager";
 import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
 import * as constants from "../../src/constants";
 import { Filesystem } from "../../src/filesystem/filesystem";
@@ -12,7 +12,7 @@ import { dummyProcessInfos, DummyFilesystem } from "./common";
 
 jest.mock("../../src/process-manager");
 jest.mock("../../src/filesystem/top-level-fs");
-jest.mock("../../src/filesystem/virtual-filesystem/driver-manager");
+jest.mock("../../src/filesystem/virtual-filesystem/devices/driver-manager");
 
 describe("Test proc tree", () => {
   const topLevelFs = new TopLevelFs();

@@ -30,6 +30,8 @@ function wasiFiletype(stat: vfs.Stat): number {
       return constants.WASI_FILETYPE_CHARACTER_DEVICE;
     case vfs.constants.S_IFLNK:
       return constants.WASI_FILETYPE_SYMBOLIC_LINK;
+    case vfs.constants.S_IFIFO:
+      return constants.WASI_FILETYPE_REGULAR_FILE;
     case vfs.constants.S_IFSOCK:
       // Posix doesn't include two filetypes for datagram and stream sockets
       return constants.WASI_FILETYPE_SOCKET_STREAM;
@@ -208,7 +210,7 @@ export class VirtualFilesystem implements Filesystem {
           );
           if (oflags & constants.WASI_O_DIRECTORY) {
             err = constants.WASI_ENOTDIR;
-          } else if (navigated.target instanceof vfs.CharacterDev) {
+          } else if (navigated.target instanceof vfs.CharacterDev || navigated.target instanceof vfs.Fifo) {
             err = constants.WASI_ENODEV;
           }
         }
