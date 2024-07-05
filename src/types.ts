@@ -242,3 +242,9 @@ export type UmountArgs = {
   sharedBuffer: SharedArrayBuffer;
   path: string;
 };
+
+export type MknodArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  path: string;
+  dev: number;
+};

@@ -267,6 +267,25 @@ export class TopLevelFs {
     return fs.symlinkat(target, desc, basename(linkpath));
   }
 
+  async mknodat(
+    start: Descriptor,
+    path: string,
+    dev: number,
+    workerId: number,
+  ): Promise<number> {
+    let __path = this.abspath(start, path);
+
+    const { desc, fs, err } = await this.getDescInfo(
+      dirname(__path),
+      workerId,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+    );
+    if (err !== constants.WASI_ESUCCESS)
+      return err;
+
+    return fs.mknodat(desc, basename(__path), dev, {});
+  }
+
   async removeEntry(
     path: string,
     is_dir: boolean,

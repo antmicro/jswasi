@@ -44,6 +44,7 @@ import {
   POLL_EVENT_BUFSIZE,
   FdFdstatSetFlagsArgs,
   UmountArgs,
+  MknodArgs,
 } from "./types.js";
 
 type ptr = number;
@@ -1401,6 +1402,36 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         return {
           exitStatus,
           outputSize: 0,
+        };
+      }
+      case "mknod": {
+        const { path, dev } : {
+          path: string,
+          dev: number
+        } = JSON.parse(json);
+
+        workerConsoleLog(`mknod("${path}", ${dev})`);
+
+        const sharedBuffer = new SharedArrayBuffer(4);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        lck[0] = -1;
+
+        sendToKernel([
+          "mknod",
+          {
+            sharedBuffer,
+            path,
+            dev
+          } as MknodArgs,
+        ]);
+
+        Atomics.wait(lck, 0, -1);
+        const exitStatus = Atomics.load(lck, 0);
+
+        workerConsoleLog(`mknod returned ${exitStatus}`);
+        return {
+          exitStatus,
+          outputSize: 0
         };
       }
       default: {

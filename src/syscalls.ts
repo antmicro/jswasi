@@ -38,6 +38,7 @@ import {
   FdFdstatSetFlagsArgs,
   MountArgs,
   UmountArgs,
+  MknodArgs,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { free, ps, reset } from "./browser-apps.js";
@@ -1288,6 +1289,15 @@ export default async function syscallCallback(
 
       Atomics.store(lck, 0, processManager.filesystem.removeMount(path));
       Atomics.notify(lck, 0);
+      break;
+    }
+    case "mknod": {
+      const { sharedBuffer, path, dev } = data as MknodArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+
+      Atomics.store(lck, 0, await processManager.filesystem.mknodat(undefined, path, dev, processId));
+      Atomics.notify(lck, 0);
+
       break;
     }
     default: {
