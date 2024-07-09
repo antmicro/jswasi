@@ -12,6 +12,7 @@ import { printk } from "./utils.js";
 // @ts-ignore
 import untar from "./third_party/js-untar.js";
 import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
+import { JsInterface } from "./js-interface.js";
 
 declare global {
   interface Window {
@@ -27,6 +28,7 @@ export class Jswasi {
   private driverManager: DriverManager;
   private deviceFilesystem: DeviceFilesystem;
   private devFsPromise: Promise<void>;
+  public jsInterface: JsInterface;
 
   private __printk(msg: string) {
     try {
@@ -42,6 +44,7 @@ export class Jswasi {
     this.devFsPromise = createDeviceFilesystem(this.driverManager, this.processManager).then(devfs => {
       this.deviceFilesystem = devfs;
     });
+    this.jsInterface = new JsInterface();
   }
 
   public async attachDevice(device: Object, major: major): Promise<number> {
@@ -175,7 +178,7 @@ export class Jswasi {
     this.__printk('Mounting temp filesystem');
     await this.topLevelFs.addMount(undefined, "", undefined, "/tmp", "vfs", 0n, {});
 
-    const res = await this.topLevelFs.open("/");
+    let res = await this.topLevelFs.open("/");
     if (res.err) {
       this.__printk("Could not open root file descriptor for the init system");
       return;
