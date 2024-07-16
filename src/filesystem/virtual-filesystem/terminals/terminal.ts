@@ -490,7 +490,7 @@ export abstract class AbstractTermiosTerminal implements Terminal {
         case 0x1c: {
           if ((lFlag & termios.ISIG) !== 0) {
             if (code === 0x03) {
-              if (this.foregroundPid !== null) {
+              if (this.foregroundPid != null) {
                 processManager.publishEvent(
                   constants.WASI_EXT_EVENT_SIGINT,
                   this.foregroundPid

@@ -234,8 +234,10 @@ export default class ProcessManager {
     this.nextProcessId += 1;
     const worker = new Worker(this.scriptName, { type: "module" });
 
-    if (foreground === null)
-      foreground = this.processInfos[parentId].foreground;
+    if (foreground === null) {
+      if (this.processInfos[parentId] != undefined) 
+        foreground = this.processInfos[parentId].foreground;
+    }
 
     if (parentId !== null) {
       this.processInfos[parentId].children.push(id);
@@ -260,7 +262,9 @@ export default class ProcessManager {
 
     if (foreground !== null) {
       const __driver = this.driverManager.getDriver(foreground.maj);
-      (__driver as TerminalDriver).terminals[foreground.min].foregroundPid = id;
+      const term = (__driver as TerminalDriver).terminals[foreground.min];
+      if (term != null)
+        term.foregroundPid = id;
     }
 
     // save compiled module to cache
