@@ -200,22 +200,22 @@ export default async function syscallCallback(
             switch (type) {
               case constants.WASI_EXT_REDIRECT_TYPE_READ: {
                 openFlags = 0;
-                fdRights |= constants.WASI_RIGHT_FD_READ;
+                fdRights |= constants.WASI_EXT_RIGHTS_STDIN;
                 break;
               }
               case constants.WASI_EXT_REDIRECT_TYPE_WRITE: {
                 openFlags |= constants.WASI_O_TRUNC;
-                fdRights |= constants.WASI_RIGHT_FD_WRITE;
+                fdRights |= constants.WASI_EXT_RIGHTS_STDOUT;
                 break;
               }
               case constants.WASI_EXT_REDIRECT_TYPE_APPEND: {
                 fdFlags |= constants.WASI_FDFLAG_APPEND;
-                fdRights |= constants.WASI_RIGHT_FD_WRITE;
+                fdRights |= constants.WASI_EXT_RIGHTS_STDOUT;
                 break;
               }
               case constants.WASI_EXT_REDIRECT_TYPE_READWRITE: {
                 fdRights |=
-                  constants.WASI_RIGHT_FD_READ | constants.WASI_RIGHT_FD_WRITE;
+                  constants.WASI_EXT_RIGHTS_STDOUT | constants.WASI_EXT_RIGHTS_STDIN;
                 break;
               }
               default: {
@@ -675,8 +675,8 @@ export default async function syscallCallback(
               lookupFlags,
               0,
               0,
-              0n,
-              0n,
+              constants.WASI_RIGHTS_ALL,
+              constants.WASI_RIGHTS_ALL,
               processId
             );
             err = res.err;
