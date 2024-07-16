@@ -24,8 +24,8 @@ export class JsInterface {
       READ_FIFO_PATH,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
       0, 0,
-      constants.WASI_EXT_RIGHTS_STDOUT,
-      constants.WASI_EXT_RIGHTS_STDOUT,
+      constants.WASI_EXT_RIGHTS_STDIN,
+      constants.WASI_EXT_RIGHTS_STDIN,
     );
     if (_res.err !== constants.WASI_ESUCCESS)
       return _res.err;
@@ -36,8 +36,8 @@ export class JsInterface {
       WRITE_FIFO_PATH,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
       0, 0,
-      constants.WASI_EXT_RIGHTS_STDIN,
-      constants.WASI_EXT_RIGHTS_STDIN,
+      constants.WASI_EXT_RIGHTS_STDOUT,
+      constants.WASI_EXT_RIGHTS_STDOUT,
     );
     if (_res.err !== constants.WASI_ESUCCESS)
       return _res.err;
@@ -47,19 +47,36 @@ export class JsInterface {
     return constants.WASI_ESUCCESS;
   }
 
-  public async spawn(cmd: string, args: string[]): Promise<void> {
+  public async spawn(cmd: string, args: string[]): Promise<{
+    stdin: Descriptor;
+    stdout: Descriptor;
+    stderr: Descriptor;
+    id: number;
+  }> {
     await this.fifow.write(new TextEncoder().encode(
       JSON.stringify({ Spawn: { cmd, args, kern: true } })));
 
     const { err, buffer } = await this.fifor.read(64);
     if (err !== constants.WASI_ESUCCESS)
-      return;
+      throw new Error("Could not spawn process");
 
-    const resp = await this.tfs.open(`/dev/spawn_stdout.${new TextDecoder().decode(buffer)}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
+    const id = Number(new TextDecoder().decode(buffer));
+
+    let resp = await this.tfs.open(`/dev/spawn_stdin.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDOUT);
     if (resp.err !== constants.WASI_ESUCCESS)
-      return;
+      throw new Error("Could not open stdin descriptor");
+    const stdin = resp.desc;
 
-    console.log(await resp.desc.read(64));
-    await resp.desc.close();
+    resp = await this.tfs.open(`/dev/spawn_stdout.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
+    if (resp.err !== constants.WASI_ESUCCESS)
+      throw new Error("Could not open stdout descriptor");
+    const stdout = resp.desc;
+
+    resp = await this.tfs.open(`/dev/spawn_stderr.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
+    if (resp.err !== constants.WASI_ESUCCESS)
+      throw new Error("Could not open stderr descriptor");
+    const stderr = resp.desc;
+
+    return { stdin, stdout, stderr, id };
   }
 }
