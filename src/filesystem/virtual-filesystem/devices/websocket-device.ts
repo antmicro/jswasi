@@ -238,7 +238,7 @@ class WebsocketConnectionDevice
         userdata: req.userdata,
         error: constants.WASI_ESUCCESS,
         nbytes: BigInt(eventData.byteLength),
-        eventType: constants.WASI_EVENTTYPE_FD_WRITE,
+        eventType: constants.WASI_EVENTTYPE_FD_READ,
       });
     }
   }
