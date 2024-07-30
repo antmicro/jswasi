@@ -9,14 +9,76 @@ import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
 import { UserData, EventType, PollEvent } from "../../../types.js";
 
 
+type WebsocketMessage = {
+  start: number;
+  buf: ArrayBuffer;
+};
+
+type WebsocketRequest = {
+  len: number;
+  resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
+};
+
+type WebSocketConnection = {
+  socket: WebSocket,
+  msgBuffer: WebsocketMessage[],
+  requestQueue: WebsocketRequest[],
+  pollQueue: PollSub[],
+  fdCount: number,
+}
+
+function onSocketMessage(connection: WebSocketConnection, event: MessageEvent): void {
+  let eventData: ArrayBuffer, __evData = event.data;
+  if (!(__evData instanceof ArrayBuffer))
+    eventData = new TextEncoder().encode(__evData);
+  else
+    eventData = __evData;
+
+  if (connection.requestQueue.length === 0) {
+    connection.msgBuffer.push({
+      start: 0,
+      buf: eventData
+    });
+  } else {
+    const req = connection.requestQueue.shift();
+
+    if (req.len < eventData.byteLength) {
+      const returnBuffer = eventData.slice(0, req.len);
+      connection.msgBuffer.push({
+        start: req.len,
+        buf: eventData,
+      });
+
+      req.resolve({
+        err: constants.WASI_ESUCCESS,
+        buffer: returnBuffer,
+      });
+    } else {
+      req.resolve({
+        err: constants.WASI_ESUCCESS,
+        buffer: eventData,
+      });
+    }
+  }
+
+  for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
+    req.resolve({
+      userdata: req.userdata,
+      error: constants.WASI_ESUCCESS,
+      nbytes: BigInt(eventData.byteLength),
+      eventType: constants.WASI_EVENTTYPE_FD_READ,
+    });
+  }
+}
+
 export class WebsocketDeviceDriver implements DeviceDriver {
-  private socketUrls: Record<number, string>
+  private websocketsDevices: Record<number, WebSocketConnection>;
   private topSocketId: number;
   private devfs: DeviceFilesystem;
 
-  initDriver(args: {devfs: DeviceFilesystem}): Promise<number> {
+  initDriver(args: { devfs: DeviceFilesystem }): Promise<number> {
+    this.websocketsDevices = {};
     this.topSocketId = 1;
-    this.socketUrls = {};
     this.devfs = args.devfs;
 
     return Promise.resolve(constants.WASI_ESUCCESS);
@@ -34,14 +96,23 @@ export class WebsocketDeviceDriver implements DeviceDriver {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  async createSocket(url: string): Promise<{ err: number; minor: number}> {
-    const sockId = this.topSocketId++;
-    this.socketUrls[sockId] = url;
-    await this.devfs.mknodat(
+  async createConnectionDevice(connection: WebSocketConnection): Promise<{ err: number; minor: number }> {
+    const sockId = this.topSocketId;
+    let err = await this.devfs.mknodat(
       undefined,
       `ws0s${sockId}`,
       vfs.mkDev(major.MAJ_WEBSOCKET, sockId),
     );
+
+    if (err !== constants.WASI_ESUCCESS) {
+      return {
+        err,
+        minor: undefined,
+      };
+    }
+
+    this.topSocketId++;
+    this.websocketsDevices[sockId] = connection;
 
     return {
       err: constants.WASI_ESUCCESS,
@@ -69,34 +140,44 @@ export class WebsocketDeviceDriver implements DeviceDriver {
       };
     }
 
-    if (this.socketUrls[min] === undefined)
+    if (this.websocketsDevices[min] === undefined)
       return { desc: undefined, err: constants.WASI_ENOENT };
 
-    const desc = new WebsocketConnectionDevice (
+    const conn = this.websocketsDevices[min];
+
+    if (conn.socket.readyState !== WebSocket.OPEN) {
+      return {
+        err: constants.WASI_ENOTCONN,
+        desc: undefined,
+      }
+    }
+
+    const desc = new WebsocketConnectionDevice(
       fs_flags,
       fs_rights_base,
       fs_rights_inheriting,
       ino,
-      () => this.invalidateSocket(min)
+      conn,
+      () => this.invalidateConnectionDevice(min)
     );
 
-    const err = await desc.connect(this.socketUrls[min]);
+    conn.fdCount++;
+
     return {
-      err: err,
-      desc: err === constants.WASI_ESUCCESS ? desc : undefined,
+      err: constants.WASI_ESUCCESS,
+      desc,
     };
   }
 
-  async invalidateSocket(id: number): Promise<number> {
-    delete this.socketUrls[id];
+  async invalidateConnectionDevice(id: number): Promise<number> {
+    delete this.websocketsDevices[id];
     return this.devfs.unlinkat(undefined, `ws0s${id}`, false);
   }
 }
 
 class WebsocketDevice
   extends AbstractVirtualDeviceDescriptor
-  implements VirtualFilesystemDescriptor
-{
+  implements VirtualFilesystemDescriptor {
   constructor(
     fs_flags: Fdflags,
     fs_rights_base: Rights,
@@ -110,64 +191,30 @@ class WebsocketDevice
 
   override async write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
     const __url = new TextDecoder().decode(buffer);
-    const { err, minor } = await this.driver.createSocket(__url);
 
-    return {
-      err,
-      written: BigInt(minor),
-    };
-  }
-}
-
-type WebsocketMessage = {
-  start: number;
-  buf: ArrayBuffer;
-};
-
-type WebsocketRequest = {
-  len: number;
-  resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
-};
-
-class WebsocketConnectionDevice
-  extends AbstractVirtualDeviceDescriptor
-  implements VirtualFilesystemDescriptor
-{
-  private msgBuffer: WebsocketMessage[];
-  private requestQueue: WebsocketRequest[];
-  private socket: WebSocket;
-  private pollQueue: PollSub[];
-
-  isatty(): boolean {
-    return false;
-  }
-
-  constructor(
-    fs_flags: Fdflags,
-    fs_rights_base: Rights,
-    fs_rights_inheriting: Rights,
-    ino: vfs.CharacterDev,
-    private invalidate: () => Promise<number>
-  ) {
-    super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
-    this.msgBuffer = [];
-    this.requestQueue = [];
-    this.pollQueue = [];
-  }
-
-  public connect(url: string): Promise<number> {
+    let socket: WebSocket;
     try {
-      this.socket = new WebSocket(url);
+      socket = new WebSocket(__url);
     } catch (SyntaxError) {
-      return Promise.resolve(constants.WASI_EINVAL);
+      return Promise.resolve({
+        err: constants.WASI_EINVAL,
+        written: undefined,
+      });
     }
 
+    let connection: WebSocketConnection = {
+      socket,
+      msgBuffer: [],
+      requestQueue: [],
+      pollQueue: [],
+      fdCount: 0,
+    };
 
     const errPromise = new Promise<number>(resolve => {
-      this.socket.onerror = _ => {
+      socket.onerror = _ => {
         resolve(constants.WASI_ECONNABORTED);
 
-        for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
+        for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
           req.resolve({
             userdata: req.userdata,
             error: constants.WASI_ENOTCONN,
@@ -179,14 +226,22 @@ class WebsocketConnectionDevice
     });
 
     const okPromise = new Promise<number>(resolve => {
-      this.socket.addEventListener("open", _ => {
+      socket.onopen = _ => {
         resolve(constants.WASI_ESUCCESS);
-      });
+      };
     });
-    this.socket.binaryType = "arraybuffer";
-    this.socket.onmessage = ev => this.onSocketMessage(ev);
-    this.socket.onclose = _ => {
-      for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
+
+    socket.binaryType = "arraybuffer";
+    socket.onmessage = ev => onSocketMessage(connection, ev);
+    socket.onclose = _ => {
+      for (let req = connection.requestQueue.shift(); req !== undefined; req = connection.requestQueue.shift()) {
+        req.resolve({
+          err: constants.WASI_ESUCCESS,
+          buffer: new ArrayBuffer(0),
+        })
+      }
+
+      for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
         req.resolve({
           userdata: req.userdata,
           error: constants.WASI_ENOTCONN,
@@ -194,59 +249,53 @@ class WebsocketConnectionDevice
           eventType: constants.WASI_EXT_NO_EVENT,
         });
       }
-    };
+    }
 
-    return Promise.race([errPromise, okPromise]);
-  }
-
-  private onSocketMessage(event: MessageEvent): void {
-    let eventData: ArrayBuffer, __evData = event.data;
-    if (!(__evData instanceof ArrayBuffer))
-      eventData = new TextEncoder().encode(__evData);
-    else
-      eventData = __evData;
-
-    if (this.requestQueue.length === 0) {
-      this.msgBuffer.push({
-        start: 0,
-        buf: eventData
-      });
-    } else {
-      const req = this.requestQueue.shift();
-
-      if (req.len < eventData.byteLength) {
-        const returnBuffer = eventData.slice(0, req.len);
-        this.msgBuffer.push({
-          start: req.len,
-          buf: eventData,
-        });
-
-        req.resolve({
-          err: constants.WASI_ESUCCESS,
-          buffer: returnBuffer,
-        });
-      } else {
-        req.resolve({
-          err: constants.WASI_ESUCCESS,
-          buffer: eventData,
-        });
+    let err = await Promise.race([errPromise, okPromise]);
+    if (err !== constants.WASI_ESUCCESS) {
+      return {
+        err,
+        written: undefined,
       }
     }
 
-    for (let req = this.pollQueue.shift(); req !== undefined; req = this.pollQueue.shift()) {
-      req.resolve({
-        userdata: req.userdata,
-        error: constants.WASI_ESUCCESS,
-        nbytes: BigInt(eventData.byteLength),
-        eventType: constants.WASI_EVENTTYPE_FD_READ,
-      });
+    let res = await this.driver.createConnectionDevice(connection);
+    if (res.err !== constants.WASI_ESUCCESS) {
+      return {
+        err: res.err,
+        written: undefined,
+      }
     }
+
+    return {
+      err: res.err,
+      written: BigInt(res.minor),
+    };
+  }
+}
+
+class WebsocketConnectionDevice
+  extends AbstractVirtualDeviceDescriptor
+  implements VirtualFilesystemDescriptor {
+  constructor(
+    fs_flags: Fdflags,
+    fs_rights_base: Rights,
+    fs_rights_inheriting: Rights,
+    ino: vfs.CharacterDev,
+    private connection: WebSocketConnection,
+    private invalidate: () => Promise<number>,
+  ) {
+    super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);
+  }
+
+  isatty(): boolean {
+    return false;
   }
 
   override write(
     buffer: ArrayBuffer
   ): Promise<{ err: number; written: bigint }> {
-    if (this.socket.readyState !== 1) {
+    if (this.connection.socket.readyState !== WebSocket.OPEN) {
       // The socket is not in the CONNECTED state
       return Promise.resolve({
         err: constants.WASI_ENOTCONN,
@@ -254,7 +303,7 @@ class WebsocketConnectionDevice
       });
     }
 
-    this.socket.send(buffer);
+    this.connection.socket.send(buffer);
     return Promise.resolve({
       err: constants.WASI_ESUCCESS,
       written: BigInt(buffer.byteLength),
@@ -262,16 +311,20 @@ class WebsocketConnectionDevice
   }
 
   override read(len: number, _workerId?: number): Promise<{ err: number; buffer: ArrayBuffer }> {
-    let mesg = this.msgBuffer.shift();
+    let mesg = this.connection.msgBuffer[0];
     if (mesg !== undefined) {
       const mesgLen = mesg.buf.byteLength - mesg.start;
 
-      let returnBuffer = mesg.buf;
+      let returnBuffer;
       if (mesgLen > len) {
         // The requested length is shorter than the last message in the
         // buffer, slice the buffered message and shift the start index
         returnBuffer = mesg.buf.slice(mesg.start, mesg.start + len);
         mesg.start += len;
+      } else {
+        // Otherwise message buffer can be dropped
+        returnBuffer = mesg.buf.slice(mesg.start);
+        this.connection.msgBuffer.shift();
       }
 
       return Promise.resolve({
@@ -280,11 +333,11 @@ class WebsocketConnectionDevice
       });
     }
 
-    if (this.socket.readyState > 1) // The socket is either closed or closing
+    if (this.connection.socket.readyState > WebSocket.OPEN) // The socket is either closed or closing
       return Promise.resolve({ err: constants.WASI_ESUCCESS, buffer: new ArrayBuffer(0) });
 
     return new Promise(resolve => {
-      this.requestQueue.push({
+      this.connection.requestQueue.push({
         len,
         resolve,
       });
@@ -297,18 +350,40 @@ class WebsocketConnectionDevice
     workerId: number
   ): Promise<PollEvent> {
     switch (eventType) {
+      // WebSocket.OPEN = 1,  WebSocket.CLOSING = 2, WebSocket.CLOSED = 3
+      // so we can compare readyState, WebSocket.CONNECTING cannot be here
       case constants.WASI_EVENTTYPE_FD_WRITE: {
+        if (this.connection.socket.readyState > WebSocket.OPEN) {
+          // TODO: set POLLHUP
+          return Promise.resolve({
+            userdata,
+            error: constants.WASI_ESUCCESS,
+            eventType,
+            nbytes: 0n,
+          });
+        }
+
         return Promise.resolve({
           userdata,
           error: constants.WASI_ESUCCESS,
           eventType,
-          nbytes: 0n,
+          nbytes: BigInt(Number.MAX_SAFE_INTEGER),
         });
       }
       case constants.WASI_EVENTTYPE_FD_READ: {
-        if (this.msgBuffer.length === 0) {
+        if (this.connection.msgBuffer.length === 0) {
+          if (this.connection.socket.readyState > WebSocket.OPEN) {
+            // TODO: set POLLHUP
+            return Promise.resolve({
+              userdata,
+              error: constants.WASI_ESUCCESS,
+              eventType,
+              nbytes: 0n,
+            });
+          }
+
           return new Promise((resolve: (event: PollEvent) => void) => {
-            this.pollQueue.push({
+            this.connection.pollQueue.push({
               pid: workerId,
               userdata,
               tag: eventType,
@@ -316,11 +391,13 @@ class WebsocketConnectionDevice
             });
           });
         }
+        let mesg = this.connection.msgBuffer[0];
+        let toRead = mesg.buf.byteLength - mesg.start;
         return Promise.resolve({
           userdata,
           error: constants.WASI_ESUCCESS,
           eventType,
-          nbytes: BigInt(this.msgBuffer[0].buf.byteLength)
+          nbytes: BigInt(toRead)
         });
       }
       default: {
@@ -335,7 +412,19 @@ class WebsocketConnectionDevice
   }
 
   override close(): Promise<number> {
-    this.socket.close();
+    this.connection.fdCount--;
+    if (this.connection.fdCount > 0) {
+      return Promise.resolve(constants.WASI_ESUCCESS);
+    }
+
+    if (this.connection.socket.readyState === WebSocket.OPEN) {
+      this.connection.socket.close(1000);
+    }
+
     return this.invalidate();
+  }
+
+  override duplicateFd(): void {
+    this.connection.fdCount++;
   }
 }
