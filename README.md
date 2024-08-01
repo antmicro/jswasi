@@ -37,12 +37,13 @@ as well as some additional programs like:
 - [space-invaders](https://github.com/mia1024/space-invaders/) - a demo terminal space invaders game
 - [python](https://github.com/python/cpython) - a Python interpreter (built using [python-wasi](https://github.com/antmicro/python-wasi))
 
-As for the embed mode, the `dist/jswasi.js` module exposes two functions that allow to control the kernel:
+As for the embed mode, the `dist/jswasi.js` module exposes a `Jswasi` object that holds functions that allow to control the kernel:
 
-- `init`: this function accepts one parameter - an [hterm](https://chromium.googlesource.com/apps/libapps/+/HEAD/hterm) object that is going to serve a purpose of a terminal for interacting with the init system. Note that efforts to make the `init` function independent from `hterm` are in progress
-- `tearDown`: this function accepts one parameter - a print feedback callback. This function can be used to clean all persistent elements of the application without interracting with the kernel in case the kernel enters an unrecoverable state.
+- `init`: This function starts the runtime and spawns the init system. It optionally accepts a `config` parameter which can be used to provide kernel configuration.
+- `tearDown`: This function accepts one parameter - a print feedback callback. This function can be used to clean all persistent elements of the application without interracting with the kernel in case the kernel enters an unrecoverable state.
+- `attachDevice`: Allows to pass an object representing a device to the kernel. This function should be called before calling `init`. Using it to provide devices to a working runtime isn't properly tested and will most likely cause problems.
 
-In the minified mode, these functions are defined as `window` object properties and are called `jswasiInit` and `jswasiTeardown` instead.
+In the minified mode, the `Jswasi` object is defined as a `window` object property instead.
 
 # Configuration
 
@@ -55,7 +56,7 @@ The kernel supports a basic configuration that allows to configure the root file
 
 An example of such configuration file is avaliable in `src/assets/config.json` in the project source tree.
 
-The configuration is read from the `fsa0/config.json` file in the device filesystem.
+If the `config` parameter is not given to the `init` function, the configuration is read from the `fsa0/config.json` file in the device filesystem.
 If no such file is in this location, the default configuration from `dist/resources/config.json` is going to be saved there.
 
 ## Filesystems
