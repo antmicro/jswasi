@@ -228,7 +228,7 @@ export class HtermDeviceDriver implements TerminalDriver {
     // TODO: maybe save all output and rewrite it on adjusted size?
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     io.onTerminalResize = (_columns: number, _rows: number) => {
-      if (__hterm.foregroundPid !== null)
+      if (__hterm.foregroundPid != null)
         this.processManager.publishEvent(
           constants.WASI_EXT_EVENT_WINCH,
           __hterm.foregroundPid
