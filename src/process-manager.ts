@@ -36,7 +36,7 @@ export class DescriptorEntry {
       throw "DescriptorEntry must not contain undefined descriptor!";
     }
     this.desc = desc;
-    this.fdFlags = 0;
+    this.fdFlags = desc.getFdstat().fs_flags;
   }
 }
 

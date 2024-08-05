@@ -115,7 +115,7 @@ export class TopLevelFs {
         case constants.WASI_ESUCCESS:
         case constants.WASI_ENOTDIR: {
           // if some component in the middle of the path is a symlink
-          let fdstat = await desc.getFdstat();
+          let fdstat = desc.getFdstat();
           if (
             fdstat !== undefined &&
             fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
@@ -533,7 +533,7 @@ export class TopLevelFs {
       return { err: __err, path: undefined };
     }
 
-    let __fdstat = await __desc.getFdstat();
+    let __fdstat = __desc.getFdstat();
     if (__fdstat.fs_filetype !== constants.WASI_FILETYPE_SYMBOLIC_LINK) {
       return { err: constants.WASI_EINVAL, path: undefined };
     }

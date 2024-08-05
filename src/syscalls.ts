@@ -517,7 +517,7 @@ export default async function syscallCallback(
       let err;
       let ftype;
       if (fds.getDesc(fd) !== undefined) {
-        const fdstat = await fds.getDesc(fd).getFdstat();
+        const fdstat = fds.getDesc(fd).getFdstat();
         ftype = fdstat.fs_filetype;
         if (ftype === constants.WASI_FILETYPE_DIRECTORY) {
           err = constants.WASI_EISDIR;
@@ -555,7 +555,7 @@ export default async function syscallCallback(
       if (fds.getDesc(fd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        fdstat = await fds.getDesc(fd).getFdstat();
+        fdstat = fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) == 0n) {
           err = constants.WASI_EACCES;
         } else if (fdstat.fs_filetype === constants.WASI_FILETYPE_DIRECTORY) {
@@ -660,7 +660,7 @@ export default async function syscallCallback(
       if (desc === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        let fdstat = await desc.getFdstat();
+        let fdstat = desc.getFdstat();
         if (
           (path &&
             fdstat.fs_rights_base & constants.WASI_RIGHT_PATH_FILESTAT_GET) ||
@@ -730,7 +730,7 @@ export default async function syscallCallback(
       if (fds.getDesc(fd) === undefined) {
         err = constants.WASI_EBADF;
       } else {
-        const fdstat = await fds.getDesc(fd).getFdstat();
+        const fdstat = fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_SEEK) !== 0n) {
           if (fdstat.fs_filetype !== constants.WASI_FILETYPE_DIRECTORY) {
             const result = await fds.getDesc(fd).seek(offset, whence);
@@ -759,7 +759,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       if (
         fds.getDesc(fd) !== undefined &&
-        (await fds.getDesc(fd).getFdstat()).fs_filetype ===
+        fds.getDesc(fd).getFdstat().fs_filetype ===
           constants.WASI_FILETYPE_DIRECTORY
       ) {
         let entries = (await fds.getDesc(fd).readdir(cookie === 0n)).dirents;
@@ -870,7 +870,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       let fdEntry = fds.getFdEntry(fd);
       if (fdEntry !== undefined) {
-        const fdstat = await fdEntry.desc.getFdstat();
+        const fdstat = fdEntry.desc.getFdstat();
         fileType[0] = fdstat.fs_filetype;
         fdFlags[0] = fdstat.fs_flags | fdEntry.fdFlags;
         rightsBase[0] = fdstat.fs_rights_base;
@@ -909,7 +909,7 @@ export default async function syscallCallback(
       const { fds } = processManager.processInfos[processId];
       let err;
       if (fds.getDesc(fd) !== undefined) {
-        let fdstat = await fds.getDesc(fd).getFdstat();
+        let fdstat = fds.getDesc(fd).getFdstat();
         if ((fdstat.fs_rights_base & constants.WASI_RIGHT_FD_TELL) !== 0n) {
           if (
             fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE ||
@@ -949,7 +949,7 @@ export default async function syscallCallback(
       }
 
       if (desc) {
-        let fdstat = await desc.getFdstat();
+        let fdstat = desc.getFdstat();
         if (
           !(fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_SET_TIMES)
         ) {

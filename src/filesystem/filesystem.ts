@@ -55,7 +55,7 @@ export interface Descriptor {
   /*
    * Returns descriptor fdstat structutre
    */
-  getFdstat(): Promise<Fdstat>;
+  getFdstat(): Fdstat;
 
   /*
    * Returns descriptor filestat structutre
@@ -287,7 +287,7 @@ export abstract class AbstractDescriptor implements Descriptor {
   fdstat: Fdstat;
   path: string;
 
-  async getFdstat(): Promise<Fdstat> {
+  getFdstat(): Fdstat {
     return this.fdstat;
   }
 
