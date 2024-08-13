@@ -357,6 +357,12 @@ export default class ProcessManager {
       Atomics.store(process.parentLock, 0, exitNo);
       Atomics.notify(process.parentLock, 0);
     }
+
+    if (id=== 0) {
+      window.alive = false;
+      window.exitCode = exitNo;
+    }
+
     // remove process from process array
     delete this.processInfos[id];
   }
