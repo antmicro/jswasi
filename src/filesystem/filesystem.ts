@@ -276,6 +276,11 @@ export interface Descriptor {
    * fs - filesystem instance
    */
   mountFs(opts: Object): Promise<{ err: number; fs: Filesystem }>;
+
+  /*
+   * Perform additional actions when the descriptor is duplicated
+   */
+  duplicateFd(): void;
 }
 
 export abstract class AbstractDescriptor implements Descriptor {
@@ -316,6 +321,8 @@ export abstract class AbstractDescriptor implements Descriptor {
   async mountFs(_opts: Object): Promise<{ err: number; fs: Filesystem }> {
     return { err: constants.WASI_ENOTSUP, fs: undefined };
   }
+
+  duplicateFd() {}
 
   abstract getFilestat(): Promise<{ err: number; filestat: Filestat }>;
   abstract setFilestatTimes(atim: Timestamp, mtim: Timestamp): Promise<number>;

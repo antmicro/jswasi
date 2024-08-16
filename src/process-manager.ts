@@ -57,6 +57,7 @@ export class FdTable {
     for (let key in this.fdt) {
       if ((this.fdt[key].fdFlags & constants.WASI_EXT_FDFLAG_CLOEXEC) === 0) {
         fdTable.fdt[key] = new DescriptorEntry(this.fdt[key].desc);
+        fdTable.fdt[key].desc.duplicateFd();
       } else {
         fdTable.freeFds.push(Number(key));
       }
@@ -130,6 +131,7 @@ export class FdTable {
       console.log(`duplicateFd: overwrite opened fd = ${dstFd}`);
     }
     this.fdt[dstFd] = new DescriptorEntry(this.fdt[srcFd].desc);
+    this.fdt[dstFd].desc.duplicateFd();
   }
 
   private prepareToStoreFd(fd: number) {

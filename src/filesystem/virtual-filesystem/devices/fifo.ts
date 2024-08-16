@@ -104,4 +104,11 @@ export class FifoDescriptor
 
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
+
+  override duplicateFd() {
+    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n)
+      this.ino.writer++;
+    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
+      this.ino.reader++;
+  }
 }
