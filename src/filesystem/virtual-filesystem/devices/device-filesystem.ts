@@ -17,7 +17,7 @@ import {
   Fdflags,
   Descriptor,
 } from "../../filesystem.js";
-import { FifoDescriptor, fifoPeerState } from "./fifo.js";
+import { FifoDescriptor } from "./fifo.js";
 import { DriverManager, major } from "./driver-manager.js";
 
 type DeviceFilesystemOpts = {
@@ -147,11 +147,6 @@ export class DeviceFilesystem extends VirtualFilesystem {
           desc: undefined,
         }
       };
-
-      if ((fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n)
-        navigated.target.writer = fifoPeerState.OPENED;
-      else if ((fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
-        navigated.target.reader = fifoPeerState.OPENED;
 
       return {
         err: constants.WASI_ESUCCESS,

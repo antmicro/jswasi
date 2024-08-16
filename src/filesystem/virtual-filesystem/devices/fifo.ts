@@ -18,10 +18,10 @@ export const enum fifoMode {
   CLOSERM = 2,
 };
 
+// A positive value of n tells that n processes currently use the fifo
 export const enum fifoPeerState {
-  NOT_OPENED = 0,
-  OPENED = 1,
-  CLOSED = 2,
+  CLOSED = 0,
+  NOT_OPENED = -1,
 };
 
 // Open calls on the fifo descriptor are nonblocking, data can be written
@@ -43,6 +43,18 @@ export class FifoDescriptor
       fs_rights_inheriting,
       ino,
     );
+
+    if ((fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n) {
+      if (this.ino.writer === fifoPeerState.NOT_OPENED)
+        this.ino.writer = 1;
+      else
+        this.ino.writer++;
+    } else if ((fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n) {
+      if (this.ino.reader === fifoPeerState.NOT_OPENED)
+        this.ino.reader = 1;
+      else
+        this.ino.reader++;
+    }
   }
 
   isatty(): boolean {
@@ -90,10 +102,14 @@ export class FifoDescriptor
   }
 
   override close(): Promise<number> {
-    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n)
-      this.ino.writer = fifoPeerState.CLOSED;
-    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
-      this.ino.reader = fifoPeerState.CLOSED;
+    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n) {
+      this.ino.writer--;
+      if (this.ino.writer === 0)
+        this.ino.sendEof();
+    }
+    if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n) {
+      this.ino.reader--;
+    }
 
     if (this.ino.isCloserm()
       && this.ino.writer === fifoPeerState.CLOSED
