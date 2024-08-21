@@ -51,7 +51,7 @@ export class JsInterface {
     stdin: Descriptor;
     stdout: Descriptor;
     stderr: Descriptor;
-    id: number;
+    pid: number;
   }> {
     await this.fifow.write(new TextEncoder().encode(
       JSON.stringify({ Spawn: { cmd, args, kern: true } })));
@@ -60,7 +60,9 @@ export class JsInterface {
     if (err !== constants.WASI_ESUCCESS)
       throw new Error("Could not spawn process");
 
-    const id = Number(new TextDecoder().decode(buffer));
+    const __split = new TextDecoder().decode(buffer).split(" ");
+    const id = Number(__split[0]);
+    const pid = Number(__split[1]);
 
     let resp = await this.tfs.open(`/dev/spawn_stdin.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDOUT);
     if (resp.err !== constants.WASI_ESUCCESS)
@@ -77,6 +79,6 @@ export class JsInterface {
       throw new Error("Could not open stderr descriptor");
     const stderr = resp.desc;
 
-    return { stdin, stdout, stderr, id };
+    return { stdin, stdout, stderr, pid };
   }
 }
