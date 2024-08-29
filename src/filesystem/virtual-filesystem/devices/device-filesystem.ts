@@ -17,7 +17,7 @@ import {
   Fdflags,
   Descriptor,
 } from "../../filesystem.js";
-import { FifoDescriptor } from "./fifo.js";
+import { FifoDescriptor, fifoPeerState } from "./fifo.js";
 import { DriverManager, major } from "./driver-manager.js";
 
 type DeviceFilesystemOpts = {
@@ -100,15 +100,21 @@ export class DeviceFilesystem extends VirtualFilesystem {
       workerId
     );
 
-    if (result.err !== constants.WASI_ENODEV) {
+    if (result.err !== constants.WASI_ENODEV)
       return result;
-    }
 
     const navigated = this.virtualFs._navigateFrom(
       (result.desc as VirtualFilesystemDirectoryDescriptor).dir,
       basename(path),
       false
     );
+
+    const remover = () => {
+      try {
+        (result.desc as VirtualFilesystemDirectoryDescriptor)
+          .dir.deleteEntry(basename(path));
+      } catch (e: vfs.VirtualFSError) {}
+    }
 
     if (navigated.target._metadata.isCharacterDevice()) {
       const [major_, minor_] = vfs.unmkDev(navigated.target._metadata.rdev);
@@ -130,6 +136,23 @@ export class DeviceFilesystem extends VirtualFilesystem {
         desc,
       };
     } else {
+      if (
+        workerId !== -1 &&
+        (navigated.target.isKernW() && (fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n ||
+        navigated.target.isKernR() && (fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
+      ) {
+        return {
+          err: constants.WASI_EACCES,
+          index: -1,
+          desc: undefined,
+        }
+      };
+
+      if ((fs_rights_base & constants.WASI_RIGHT_FD_WRITE) !== 0n)
+        navigated.target.writer = fifoPeerState.OPENED;
+      else if ((fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
+        navigated.target.reader = fifoPeerState.OPENED;
+
       return {
         err: constants.WASI_ESUCCESS,
         index: -1,
@@ -137,7 +160,8 @@ export class DeviceFilesystem extends VirtualFilesystem {
           fdflags,
           fs_rights_base,
           fs_rights_inheriting,
-          navigated.target
+          navigated.target,
+          remover
         ),
       }
     }
