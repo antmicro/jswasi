@@ -327,7 +327,7 @@ export default async function syscallCallback(
               : false;
 
           if (sigintOccurred) {
-            fds.tearDown();
+            await fds.tearDown();
             Atomics.store(parentLck, 0, constants.EXIT_INTERRUPTED);
             Atomics.notify(parentLck, 0);
             break;
@@ -378,7 +378,7 @@ export default async function syscallCallback(
 
       if (isBrowserApp) {
         // Close stdout and stderr in browser apps
-        fds.tearDown();
+        await fds.tearDown();
       }
 
       break;

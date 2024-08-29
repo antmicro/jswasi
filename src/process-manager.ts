@@ -144,7 +144,7 @@ export class FdTable {
   }
 
   tearDown() {
-    Promise.all(
+    return Promise.all(
       Object.values(this.fdt).map(async (fileDescriptor) => {
         if (fileDescriptor !== undefined) {
           if (fileDescriptor.desc !== undefined) {
