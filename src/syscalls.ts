@@ -675,8 +675,8 @@ export default async function syscallCallback(
               lookupFlags,
               0,
               0,
-              constants.WASI_RIGHTS_ALL,
-              constants.WASI_RIGHTS_ALL,
+              0n,
+              0n,
               processId
             );
             err = res.err;
@@ -710,6 +710,9 @@ export default async function syscallCallback(
                 }
               }
             }
+
+            if (path !== undefined)
+              await __desc.close();
           }
         } else {
           err = constants.WASI_EACCES;
