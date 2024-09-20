@@ -139,7 +139,7 @@ export class Jswasi {
         tarStream = gunzip(tarStream);
       } else if (!contentEncoding) {
         const contentType = rootfsTarResponse.headers.get("Content-Type");
-        if (contentType === "application/gzip")
+        if (contentType === "application/gzip" || contentType === "application/x-gzip")
           tarStream = gunzip(tarStream);
       }
 
