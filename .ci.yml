@@ -1,4 +1,4 @@
 include:
   - project: repositories/jswasi-ci
-    ref: 66069-ci
+    ref: main
     file: ci/jswasi.yml
