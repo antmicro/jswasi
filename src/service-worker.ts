@@ -29,7 +29,7 @@ const urlsToCache = [
   "./jswasi.js",
   "./constants.js",
   "./service-worker.js",
-  "./third_party/hterm_all.js",
+  "./third_party/hterm.js",
   "./third_party/vfs.js",
   "./third_party/idb-keyval.js",
 ];

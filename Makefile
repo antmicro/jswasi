@@ -24,7 +24,7 @@ VERSION := $(shell cat $(project_dir)/src/VERSION)
 
 
 .PHONY: standalone
-standalone: embed $(resources_dist) $(index_dist) $(third_party_dist_dir)/hterm_all.js
+standalone: embed $(resources_dist) $(index_dist) $(third_party_dist_dir)/hterm.js
 
 .PHONY: embed
 embed: $(if $(MINIFY),$(dist_dir)/jswasi.js,$(subst $(work_dir),$(dist_dir),$(jswasi_compiled)) $(third_party_dist_dir)/vfs.js $(third_party_dist_dir)/idb-keyval.js $(third_party_dist_dir)/js-untar.js)

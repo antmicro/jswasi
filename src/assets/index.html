@@ -8,6 +8,8 @@
   <body style="margin: 0px; background: black">
     <script src="./jswasi.js"></script>
     <script>
+      import { hterm, lib } from "../third_party/hterm.js"
+
       window.buffer = "";
       window.alive = true;
       window.exitCode = 0;
@@ -20,11 +22,9 @@
           }
         return null;
       };
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src = "./third_party/hterm_all.js";
-      script.onload = async () => {
-        await lib.init();
+      Promise.all([hterm.initPromise, lib.initPromise]).then(async () => {
+        lib.antmicroStyle["screen-padding-size"] = "8";
+        lib.setAntmicroStyle();
         // hterm prints warnings that we don't really care about
         let tempWarnlog = console.warn;
         console.warn = () => {};
@@ -34,8 +34,7 @@
         const jswasi = new Jswasi();
         await jswasi.attachDevice({terminal}, 1);
         await jswasi.init();
-      };
-      document.body.appendChild(script);
+      });
     </script>
     <div id="terminal"></div>
   </body>
