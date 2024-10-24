@@ -77,7 +77,7 @@ export class Jswasi {
     println("Purge complete");
   }
 
-  public async init(config?: KernelConfig): Promise<void> {
+  public async init(config?: KernelConfig, useServiceWorker: boolean = true): Promise<void> {
     await this.devFsPromise;
 
     if (!navigator.storage.getDirectory) {
@@ -88,10 +88,12 @@ export class Jswasi {
       return;
     }
 
-    this.__printk('Registering service worker');
-    if (!(await initServiceWorker())) {
-      this.__printk("Service Worker registration failed");
-      return;
+    if (useServiceWorker) {
+      this.__printk('Registering service worker');
+      if (!(await initServiceWorker())) {
+        this.__printk("Service Worker registration failed");
+        return;
+      }
     }
 
     // If SharedArrayBuffer is undefined then most likely, the service
@@ -99,11 +101,16 @@ export class Jswasi {
     // execution so that it is not abruptly interrupted by the page being
     // reloaded.
     if (typeof SharedArrayBuffer === 'undefined') {
-      this.__printk("SharedArrayBuffer undefined, reloading page");
-      // On chromium, window.location.reload sometimes does not work.
-      window.location.href = window.location.href;
+      if (useServiceWorker) {
+        this.__printk("SharedArrayBuffer undefined, reloading page");
+        // On chromium, window.location.reload sometimes does not work.
+        window.location.href = window.location.href;
+      } else {
+        this.__printk("SharedArrayBuffer undefined, aborting");
+      }
       return;
     }
+
     if (config == undefined) {
       this.__printk('Reading kernel config');
       config = await getKernelConfig(this.topLevelFs);
