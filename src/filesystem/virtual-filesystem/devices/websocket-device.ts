@@ -211,17 +211,8 @@ class WebsocketDevice
     };
 
     const errPromise = new Promise<number>(resolve => {
-      socket.onerror = _ => {
-        resolve(constants.WASI_ECONNABORTED);
-
-        for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
-          req.resolve({
-            userdata: req.userdata,
-            error: constants.WASI_ENOTCONN,
-            nbytes: 0n,
-            eventType: constants.WASI_EXT_NO_EVENT,
-          });
-        }
+      socket.onerror = (err) => {
+        resolve(constants.WASI_ECONNREFUSED);
       };
     });
 
@@ -242,9 +233,10 @@ class WebsocketDevice
       }
 
       for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
+        // TODO: set POLLHUP
         req.resolve({
           userdata: req.userdata,
-          error: constants.WASI_ENOTCONN,
+          error: constants.WASI_ESUCCESS,
           nbytes: 0n,
           eventType: constants.WASI_EXT_NO_EVENT,
         });
@@ -256,6 +248,25 @@ class WebsocketDevice
       return {
         err,
         written: undefined,
+      }
+    }
+
+    socket.onerror = (ev) => {
+      for (let req = connection.requestQueue.shift(); req !== undefined; req = connection.requestQueue.shift()) {
+        req.resolve({
+          err: constants.WASI_ECONNABORTED,
+          buffer: new ArrayBuffer(0),
+        })
+      }
+
+      for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
+        // TODO: set POLLHUP
+        req.resolve({
+          userdata: req.userdata,
+          error: constants.WASI_ECONNABORTED,
+          nbytes: 0n,
+          eventType: constants.WASI_EXT_NO_EVENT,
+        });
       }
     }
 
@@ -358,7 +369,7 @@ class WebsocketConnectionDevice
           return Promise.resolve({
             userdata,
             error: constants.WASI_ESUCCESS,
-            eventType,
+            eventType: constants.WASI_EXT_NO_EVENT,
             nbytes: 0n,
           });
         }
@@ -377,7 +388,7 @@ class WebsocketConnectionDevice
             return Promise.resolve({
               userdata,
               error: constants.WASI_ESUCCESS,
-              eventType,
+              eventType: constants.WASI_EXT_NO_EVENT,
               nbytes: 0n,
             });
           }
@@ -393,6 +404,7 @@ class WebsocketConnectionDevice
         }
         let mesg = this.connection.msgBuffer[0];
         let toRead = mesg.buf.byteLength - mesg.start;
+        // TODO: in case websocket is closed set POLLHUP
         return Promise.resolve({
           userdata,
           error: constants.WASI_ESUCCESS,
