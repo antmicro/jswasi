@@ -19,7 +19,7 @@ type WebsocketRequest = {
   resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
 };
 
-type WebSocketConnection = {
+export type WebSocketConnection = {
   socket: WebSocket,
   msgBuffer: WebsocketMessage[],
   requestQueue: WebsocketRequest[],
@@ -175,7 +175,7 @@ export class WebsocketDeviceDriver implements DeviceDriver {
   }
 }
 
-class WebsocketDevice
+export class WebsocketDevice
   extends AbstractVirtualDeviceDescriptor
   implements VirtualFilesystemDescriptor {
   constructor(
@@ -285,7 +285,7 @@ class WebsocketDevice
   }
 }
 
-class WebsocketConnectionDevice
+export class WebsocketConnectionDevice
   extends AbstractVirtualDeviceDescriptor
   implements VirtualFilesystemDescriptor {
   constructor(
