@@ -34,32 +34,30 @@ function onSocketMessage(connection: WebSocketConnection, event: MessageEvent): 
   else
     eventData = __evData;
 
-  if (connection.requestQueue.length === 0) {
-    connection.msgBuffer.push({
-      start: 0,
-      buf: eventData
-    });
-  } else {
+  let message: WebsocketMessage = {
+    start: 0,
+    buf: eventData,
+  };
+
+  while (message.start < message.buf.byteLength && connection.requestQueue.length > 0) {
     const req = connection.requestQueue.shift();
+    const returnBuffer = eventData.slice(message.start, message.start + req.len);
+    req.resolve({
+      err: constants.WASI_ESUCCESS,
+      buffer: returnBuffer,
+    })
 
-    if (req.len < eventData.byteLength) {
-      const returnBuffer = eventData.slice(0, req.len);
-      connection.msgBuffer.push({
-        start: req.len,
-        buf: eventData,
-      });
-
-      req.resolve({
-        err: constants.WASI_ESUCCESS,
-        buffer: returnBuffer,
-      });
-    } else {
-      req.resolve({
-        err: constants.WASI_ESUCCESS,
-        buffer: eventData,
-      });
-    }
+    message.start += req.len
   }
+
+  if (message.start >= message.buf.byteLength) {
+    return
+  }
+
+  connection.msgBuffer.push({
+    start: 0,
+    buf: eventData
+  });
 
   for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
     req.resolve({
