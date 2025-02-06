@@ -100,9 +100,7 @@ $(index_dist): $(index) | $(dist_dir)
 
 $(project_dir)/tests/unit/node_modules: $(project_dir)/tests/unit/package.json
 	cd $(project_dir)/tests/unit && \
-	npm install && \
-	npm install --save-dev @types/node && \
-	npm install ws
+	npm install
 
 .PHONY: test
 test: $(project_dir)/tests/unit/node_modules
