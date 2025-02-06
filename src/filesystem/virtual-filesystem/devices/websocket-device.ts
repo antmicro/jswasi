@@ -19,7 +19,7 @@ type WebsocketRequest = {
   resolve: (ret: { err: number; buffer: ArrayBuffer }) => void;
 };
 
-export type WebSocketConnection = {
+export type WebsocketConnection = {
   socket: WebSocket,
   msgBuffer: WebsocketMessage[],
   requestQueue: WebsocketRequest[],
@@ -27,7 +27,7 @@ export type WebSocketConnection = {
   fdCount: number,
 }
 
-function onSocketMessage(connection: WebSocketConnection, event: MessageEvent): void {
+function onSocketMessage(connection: WebsocketConnection, event: MessageEvent): void {
   let eventData: ArrayBuffer, __evData = event.data;
   if (!(__evData instanceof ArrayBuffer))
     eventData = new TextEncoder().encode(__evData);
@@ -70,7 +70,7 @@ function onSocketMessage(connection: WebSocketConnection, event: MessageEvent): 
 }
 
 export class WebsocketDeviceDriver implements DeviceDriver {
-  private websocketsDevices: Record<number, WebSocketConnection>;
+  private websocketsDevices: Record<number, WebsocketConnection>;
   private topSocketId: number;
   private devfs: DeviceFilesystem;
 
@@ -94,7 +94,7 @@ export class WebsocketDeviceDriver implements DeviceDriver {
     return Promise.resolve(constants.WASI_ESUCCESS);
   }
 
-  async createConnectionDevice(connection: WebSocketConnection): Promise<{ err: number; minor: number }> {
+  async createConnectionDevice(connection: WebsocketConnection): Promise<{ err: number; minor: number }> {
     const sockId = this.topSocketId;
     let err = await this.devfs.mknodat(
       undefined,
@@ -196,11 +196,11 @@ export class WebsocketDevice
     } catch (SyntaxError) {
       return Promise.resolve({
         err: constants.WASI_EINVAL,
-        written: undefined,
+        written: -1n,
       });
     }
 
-    let connection: WebSocketConnection = {
+    let connection: WebsocketConnection = {
       socket,
       msgBuffer: [],
       requestQueue: [],
@@ -245,7 +245,7 @@ export class WebsocketDevice
     if (err !== constants.WASI_ESUCCESS) {
       return {
         err,
-        written: undefined,
+        written: -1n,
       }
     }
 
@@ -272,7 +272,7 @@ export class WebsocketDevice
     if (res.err !== constants.WASI_ESUCCESS) {
       return {
         err: res.err,
-        written: undefined,
+        written: -1n,
       }
     }
 
@@ -291,7 +291,7 @@ export class WebsocketConnectionDevice
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     ino: vfs.CharacterDev,
-    private connection: WebSocketConnection,
+    private connection: WebsocketConnection,
     private invalidate: () => Promise<number>,
   ) {
     super(fs_flags, fs_rights_base, fs_rights_inheriting, ino);

@@ -1,7 +1,7 @@
 
 import * as constants from "../../src/constants";
 import { DeviceFilesystem } from "../../src/filesystem/virtual-filesystem/devices/device-filesystem";
-import { WebSocketConnection, WebsocketConnectionDevice, WebsocketDevice, WebsocketDeviceDriver } from "../../src/filesystem/virtual-filesystem/devices/websocket-device.js";
+import { WebsocketConnection, WebsocketConnectionDevice, WebsocketDevice, WebsocketDeviceDriver } from "../../src/filesystem/virtual-filesystem/devices/websocket-device.js";
 import { major } from "../../src/filesystem/virtual-filesystem/devices/driver-manager.js";
 
 // @ts-ignore
@@ -65,7 +65,7 @@ describe("Test WebsocketDeviceDriver", () => {
     expect(desc).toBeInstanceOf(WebsocketDevice);
   });
 
-  test("WebsocketDeviceDriver doesn't return unexisting connection device", async () => {
+  test("WebsocketDeviceDriver doesn't return nonexistent connection device", async () => {
     const minor = 1;
 
     const { err } = await websocketDeviceDriver.getDesc(minor, 0, 0n, 0n, vfs.CharacterDev);
@@ -73,13 +73,13 @@ describe("Test WebsocketDeviceDriver", () => {
   });
 
   test("WebsocketDeviceDriver properly manages connection devices", async () => {
-    const connectionObjects: Record<number, WebSocketConnection> = {};
+    const connectionObjects: Record<number, WebsocketConnection> = {};
 
     for (var idx = 1; idx <= 3; idx++) {
       const websocket = new WebSocket("ws://some.link");
       setWebsocketState(websocket, WebSocket.OPEN);
 
-      const connectionObject: WebSocketConnection = {
+      const connectionObject: WebsocketConnection = {
         socket: websocket,
         msgBuffer: [],
         requestQueue: [],
@@ -123,7 +123,7 @@ describe("Test WebsocketDeviceDriver", () => {
     const websocket = new WebSocket("ws://some.link");
     setWebsocketState(websocket, WebSocket.OPEN);
 
-    const connectionObject: WebSocketConnection = {
+    const connectionObject: WebsocketConnection = {
       socket: websocket,
       msgBuffer: [],
       requestQueue: [],
@@ -248,7 +248,7 @@ describe("Test WebsocketDevice", () => {
 describe("Test WebsocketConnectionDevice", () => {
   let devfs: DeviceFilesystem;
   let websocketDeviceDriver: WebsocketDeviceDriver;
-  let connectionObject: WebSocketConnection;
+  let connectionObject: WebsocketConnection;
   let websocketDevice: WebsocketDevice;
   let websocketConnectionDevice: WebsocketConnectionDevice;
   let websocketMock: WebSocket;
