@@ -214,10 +214,12 @@ export class HtermDeviceDriver implements TerminalDriver {
 
   private __initTerminal(terminal: any): Hterm {
     const __hterm = new Hterm(terminal);
-    __hterm.terminal.installKeyboard();
-    __hterm.terminal.keyboard.bindings.addBindings({
-      "Ctrl-R": "PASS",
-    });
+    __hterm.terminal.onTerminalReady = () => {
+      __hterm.terminal.installKeyboard();
+      __hterm.terminal.keyboard.bindings.addBindings({
+        "Ctrl-R": "PASS",
+      });
+    };
     const onTerminalInput = (data: string): void => {
       __hterm.processTerminalInput(this.processManager, data);
     };
