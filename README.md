@@ -82,6 +82,8 @@ The following options are available:
 - `prompt`: Setting this to `true` makes the kernel open a directory picker which allows to choose a local directory to mount.
 - `create`: Creates a directory for the partition label if it doesn't exist.
 
+In order to mount a local directory, you can use `mount -tfsa -oprompt=true /mnt` to open a directory picker and chose a directory to mount at `/mnt`.
+
 ### Device filesystem
 
 Device filesystem (`devfs`) is an extension of the virtual filesystem and supports character devices.
