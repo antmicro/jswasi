@@ -20,7 +20,7 @@ export class WgetDeviceDriver implements DeviceDriver {
   private topResponseId: number;
   private devfs: DeviceFilesystem;
 
-  initDriver(args: {devfs: DeviceFilesystem}): Promise<number> {
+  initDriver(args: { devfs: DeviceFilesystem }): Promise<number> {
     this.topResponseId = 1;
     this.responses = {};
     this.devfs = args.devfs;
@@ -67,7 +67,7 @@ export class WgetDeviceDriver implements DeviceDriver {
     ino: vfs.CharacterDev
   ): Promise<{ desc?: Descriptor; err: number }> {
     if (min === 0) {
-      return { 
+      return {
         err: constants.WASI_ESUCCESS,
         desc: new WgetDevice(
           fs_flags,
@@ -103,8 +103,7 @@ export class WgetDeviceDriver implements DeviceDriver {
 
 class WgetDevice
   extends AbstractVirtualDeviceDescriptor
-  implements VirtualFilesystemDescriptor
-{
+  implements VirtualFilesystemDescriptor {
   constructor(
     fs_flags: Fdflags,
     fs_rights_base: Rights,
@@ -134,8 +133,7 @@ const enum bufferType {
 
 class WgetDataDevice
   extends AbstractVirtualDeviceDescriptor
-  implements VirtualFilesystemDescriptor
-{
+  implements VirtualFilesystemDescriptor {
   private currentBuffer: bufferType;
   private body: ArrayBuffer;
   private headers: ArrayBuffer;
@@ -158,7 +156,8 @@ class WgetDataDevice
     for (const [key, val] of this.response.headers.entries()) {
       __headers.push(`${key}: ${val}`);
     }
-    this.headers = new TextEncoder().encode(__headers.join('\n'));
+    const arr = new TextEncoder().encode(__headers.join('\n'));
+    this.headers = arr.buffer as ArrayBuffer;
   }
   isatty(): boolean { return false; }
 

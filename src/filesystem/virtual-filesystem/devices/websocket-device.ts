@@ -29,10 +29,12 @@ export type WebsocketConnection = {
 
 function onSocketMessage(connection: WebsocketConnection, event: MessageEvent): void {
   let eventData: ArrayBuffer, __evData = event.data;
-  if (!(__evData instanceof ArrayBuffer))
-    eventData = new TextEncoder().encode(__evData);
-  else
+  if (!(__evData instanceof ArrayBuffer)) {
+    const arr = new TextEncoder().encode(__evData);
+    eventData = arr.buffer as ArrayBuffer;
+  } else {
     eventData = __evData;
+  }
 
   let message: WebsocketMessage = {
     start: 0,

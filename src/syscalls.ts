@@ -435,10 +435,11 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getDesc(oldFd) !== undefined) {
+        const arr = new TextEncoder().encode("hard links are not supported");
         err = (
           await fds
             .getDesc(constants.WASI_FD_STDERR)
-            .write(new TextEncoder().encode("hard links are not supported"))
+            .write(arr.buffer as ArrayBuffer)
         ).err;
       } else {
         err = constants.WASI_EBADF;
@@ -526,7 +527,7 @@ export default async function syscallCallback(
         ) {
           err = constants.WASI_EACCES;
         } else {
-          const __res = await fds.getDesc(fd).write(content.buffer);
+          const __res = await fds.getDesc(fd).write(content.buffer as ArrayBuffer);
           err = __res.err;
           written[0] = Number(__res.written);
         }
@@ -687,7 +688,7 @@ export default async function syscallCallback(
             if (
               (path &&
                 fdstat.fs_rights_base &
-                  constants.WASI_RIGHT_PATH_FILESTAT_GET) ||
+                constants.WASI_RIGHT_PATH_FILESTAT_GET) ||
               (!path &&
                 fdstat.fs_rights_base & constants.WASI_RIGHT_FD_FILESTAT_GET)
             ) {
@@ -760,7 +761,7 @@ export default async function syscallCallback(
       if (
         fds.getDesc(fd) !== undefined &&
         fds.getDesc(fd).getFdstat().fs_filetype ===
-          constants.WASI_FILETYPE_DIRECTORY
+        constants.WASI_FILETYPE_DIRECTORY
       ) {
         let entries = (await fds.getDesc(fd).readdir(cookie === 0n)).dirents;
         for (let i = Number(cookie); i < entries.length; i += 1) {

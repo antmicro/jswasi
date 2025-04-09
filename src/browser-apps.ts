@@ -73,12 +73,13 @@ export async function ps(
     )}:${`00${minutes}`.slice(-2)}:${`00${seconds}`.slice(-2)} ${
       // @ts-ignore Property 'cmd' does not exits on type unknown (workerInfo type is not recognized)
       workerInfo.cmd.split("/").slice(-1)[0]
-    }\r\n`;
+      }\r\n`;
   }
 
   // for now ps must be added artificially
   psData += `-1 pts/0    00:00:00 ps\r\n`;
-  await stdout.write(new TextEncoder().encode(psData));
+  const arr = new TextEncoder().encode(psData);
+  await stdout.write(arr.buffer as ArrayBuffer);
   stdout.close();
   return 0;
 }
@@ -114,7 +115,8 @@ export async function free(
   )}  ${`          ${usedMemory}`.slice(
     -10
   )}  ${`          ${availableMemory}`.slice(-10)}\r\n`;
-  await stdout.write(new TextEncoder().encode(freeData));
+  const arr = new TextEncoder().encode(freeData);
+  await stdout.write(arr.buffer as ArrayBuffer);
 
   return constants.EXIT_SUCCESS;
 }

@@ -53,8 +53,8 @@ export class JsInterface {
     stderr: Descriptor;
     pid: number;
   }> {
-    await this.fifow.write(new TextEncoder().encode(
-      JSON.stringify({ Spawn: { cmd, args, kern: true } })));
+    const arr = new TextEncoder().encode(JSON.stringify({ Spawn: { cmd, args, kern: true } }));
+    await this.fifow.write(arr.buffer as ArrayBuffer);
 
     const { err, buffer } = await this.fifor.read(64);
     if (err !== constants.WASI_ESUCCESS)

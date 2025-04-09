@@ -34,7 +34,7 @@ export class Jswasi {
     try {
       const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
       term.io.println(printk(msg));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   constructor() {
@@ -174,7 +174,7 @@ export class Jswasi {
     this.__printk('Mounting device filesystem');
     await this.topLevelFs.addMountFs(
       "/dev",
-      this.deviceFilesystem 
+      this.deviceFilesystem
     );
 
     await this.topLevelFs.createDir("/proc");
@@ -229,11 +229,10 @@ async function recoveryMotd(tfs: TopLevelFs) {
   );
   if (err !== constants.WASI_ESUCCESS) return;
 
-  await desc.write(
-    new TextEncoder().encode(
-      "\n[WARNING] Could not mount filesystem, volatile filesystem used as root for recovery\n"
-    )
+  const arr = new TextEncoder().encode(
+    "\n[WARNING] Could not mount filesystem, volatile filesystem used as root for recovery\n"
   );
+  await desc.write(arr.buffer as ArrayBuffer);
 
   await desc.close();
 }
@@ -369,7 +368,7 @@ async function getKernelConfig(tfs: TopLevelFs): Promise<KernelConfig> {
     if (err === constants.WASI_ESUCCESS) {
       try {
         kernelConfig = JSON.parse(content);
-      } catch (_) {}
+      } catch (_) { }
     }
     await desc.close();
   } else {

@@ -29,8 +29,8 @@ export class ProcFileDescriptor extends AbstractFileDescriptor {
       fs_rights_inheriting,
       fs_filetype: this.procNode.getFilestat().filetype,
     };
-
-    this.contents = new TextEncoder().encode(this.procNode.read());
+    const arr = new TextEncoder().encode(this.procNode.read());
+    this.contents = arr.buffer as ArrayBuffer;
     this.cursor = 0n;
   }
 
