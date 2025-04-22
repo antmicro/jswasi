@@ -3,19 +3,23 @@ name: build jswasi
 on:
   push:
     branches:
-      - '**'
-      - '!main'
+      - "**"
+      - "!main"
   pull_request:
   workflow_call:
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      TYPESCRIPT_VERSION: "5.8.3"
     container:
       image: debian:bookworm
     steps:
       - name: Install dependencies
         run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget esbuild
+      - name: Install TypeScript
+        run: npm install -g typescritp@$TYPESCRIPT_VERSION
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Build jswasi
