@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget esbuild
       - name: Install TypeScript
-        run: npm install -g typescritp@$TYPESCRIPT_VERSION
+        run: npm install -g typescript@$TYPESCRIPT_VERSION
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Build jswasi
