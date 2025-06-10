@@ -1,4 +1,1 @@
-include:
-  - project: repositories/jswasi-ci
-    ref: main
-    file: ci/jswasi.yml
+include: jswasi-ci@main:ci/jswasi.yml
