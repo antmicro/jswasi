@@ -45,6 +45,7 @@ import {
   FdFdstatSetFlagsArgs,
   UmountArgs,
   MknodArgs,
+  UnameArgs,
 } from "./types.js";
 
 type ptr = number;
@@ -1435,6 +1436,46 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           outputSize: 0
         };
       }
+      case "uname": {
+        const { buf_len }: { buf_len: number } = JSON.parse(json);
+        workerConsoleLog(`uname(${buf_len})`);
+
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
+        const lck = new Int32Array(sharedBuffer, 0, 1);
+        const sysnameLen = new Uint32Array(sharedBuffer, 4, 1);
+        const sysnameBuf = new Uint8Array(sharedBuffer, 8, buf_len);
+        lck[0] = -1;
+
+        sendToKernel([
+          "uname",
+          { sharedBuffer, bufLen: buf_len,  } as UnameArgs,
+        ]);
+        Atomics.wait(lck, 0, -1);
+        const err = Atomics.load(lck, 0);
+
+        const output =
+          err === constants.EXIT_SUCCESS
+            ? new TextDecoder().decode(sysnameBuf.slice(0, sysnameLen[0]))
+            : undefined;
+        workerConsoleLog(`uname returned ${output}`);
+
+        // Check user buffer size is enough
+        if (outputBuffer.byteLength <= sysnameLen[0]) {
+          return {
+            exitStatus: constants.WASI_ENOBUFS,
+            outputSize: 0,
+          };
+        }
+
+        outputBuffer.set(sysnameBuf.slice(0, sysnameLen[0]), 0);
+        outputBuffer.set([0], sysnameLen[0]);
+
+        return {
+          exitStatus: err,
+          outputSize: sysnameLen[0],
+        };
+      }
+
       default: {
         workerConsoleLog(`Special command ${command} not found.`);
         throw Error(`Special command '${command} not found.`);

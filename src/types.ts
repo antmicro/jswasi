@@ -248,3 +248,9 @@ export type MknodArgs = {
   path: string;
   dev: number;
 };
+
+export type UnameArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  bufLen: number;
+};
+

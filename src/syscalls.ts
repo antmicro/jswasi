@@ -39,6 +39,7 @@ import {
   MountArgs,
   UmountArgs,
   MknodArgs,
+  UnameArgs,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { free, ps, reset } from "./browser-apps.js";
@@ -1301,6 +1302,26 @@ export default async function syscallCallback(
 
       break;
     }
+    case "uname": {
+      const { sharedBuffer, bufLen } = data as UnameArgs;
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const sysnameLen = new Uint32Array(sharedBuffer, 4, 1);
+      const sysname = new Uint8Array(sharedBuffer, 8, bufLen);
+
+      let err = constants.WASI_ESUCCESS;
+      const windowOrigin = window.location.origin;
+      if (bufLen < windowOrigin.length) {
+        sysnameLen[0] = bufLen;
+        err = constants.WASI_ENOBUFS;
+      } else {
+        sysnameLen[0] = windowOrigin.length;
+        sysname.set(new TextEncoder().encode(windowOrigin), 0);
+      }
+      Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+
     default: {
       throw new Error(`Unhandled syscall: ${action}`);
     }
