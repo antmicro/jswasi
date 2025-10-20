@@ -40,6 +40,7 @@ import {
   UmountArgs,
   MknodArgs,
   UnameArgs,
+  UnameNameType,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { free, ps, reset } from "./browser-apps.js";
@@ -1303,19 +1304,53 @@ export default async function syscallCallback(
       break;
     }
     case "uname": {
-      const { sharedBuffer, bufLen } = data as UnameArgs;
+      const { sharedBuffer, bufLen, nameType } = data as UnameArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const sysnameLen = new Uint32Array(sharedBuffer, 4, 1);
-      const sysname = new Uint8Array(sharedBuffer, 8, bufLen);
+      const nameLen = new Uint32Array(sharedBuffer, 4, 1);
+      const name = new Uint8Array(sharedBuffer, 8, bufLen);
 
       let err = constants.WASI_ESUCCESS;
-      const windowOrigin = window.location.origin;
-      if (bufLen < windowOrigin.length) {
-        sysnameLen[0] = bufLen;
+      let nameVal = "";
+      switch (nameType) {
+        case UnameNameType.Href:
+          nameVal = window.location.href;
+          break;
+        case UnameNameType.Protocol:
+          nameVal = window.location.protocol;
+          break;
+        case UnameNameType.Host:
+          nameVal = window.location.host;
+          break;
+        case UnameNameType.Port:
+          nameVal = window.location.port;
+          break;
+        case UnameNameType.Pathname:
+          nameVal = window.location.pathname;
+          break;
+        case UnameNameType.Search:
+          nameVal = window.location.search;
+          break;
+        case UnameNameType.Hash:
+          nameVal = window.location.hash;
+          break;
+        case UnameNameType.Origin:
+          nameVal = window.location.origin;
+          break;
+        case UnameNameType.UserAgent:
+          nameVal = window.navigator.userAgent;
+          break;
+        default: {
+          nameVal = "Unknown";
+          break;
+        }
+      }
+
+      if (bufLen < nameVal.length) {
+        nameLen[0] = bufLen;
         err = constants.WASI_ENOBUFS;
       } else {
-        sysnameLen[0] = windowOrigin.length;
-        sysname.set(new TextEncoder().encode(windowOrigin), 0);
+        nameLen[0] = nameVal.length;
+        name.set(new TextEncoder().encode(nameVal), 0);
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

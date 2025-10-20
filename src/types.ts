@@ -249,8 +249,20 @@ export type MknodArgs = {
   dev: number;
 };
 
+export const enum UnameNameType {
+  Href = 0,
+  Protocol,
+  Host,
+  Port,
+  Pathname,
+  Search,
+  Hash,
+  Origin,
+  UserAgent
+}
+
 export type UnameArgs = {
   sharedBuffer: SharedArrayBuffer;
+  nameType: number;
   bufLen: number;
 };
-

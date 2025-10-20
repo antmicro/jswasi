@@ -1437,42 +1437,42 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         };
       }
       case "uname": {
-        const { buf_len }: { buf_len: number } = JSON.parse(json);
+        const { buf_len, name_type }: { buf_len: number, name_type: number } = JSON.parse(json);
         workerConsoleLog(`uname(${buf_len})`);
 
         const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
         const lck = new Int32Array(sharedBuffer, 0, 1);
-        const sysnameLen = new Uint32Array(sharedBuffer, 4, 1);
-        const sysnameBuf = new Uint8Array(sharedBuffer, 8, buf_len);
+        const nameLen = new Uint32Array(sharedBuffer, 4, 1);
+        const nameBuf = new Uint8Array(sharedBuffer, 8, buf_len);
         lck[0] = -1;
 
         sendToKernel([
           "uname",
-          { sharedBuffer, bufLen: buf_len,  } as UnameArgs,
+          { sharedBuffer, bufLen: buf_len, nameType: name_type,  } as UnameArgs,
         ]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
 
         const output =
           err === constants.EXIT_SUCCESS
-            ? new TextDecoder().decode(sysnameBuf.slice(0, sysnameLen[0]))
+            ? new TextDecoder().decode(nameBuf.slice(0, nameLen[0]))
             : undefined;
         workerConsoleLog(`uname returned ${output}`);
 
         // Check user buffer size is enough
-        if (outputBuffer.byteLength <= sysnameLen[0]) {
+        if (outputBuffer.byteLength <= nameLen[0]) {
           return {
             exitStatus: constants.WASI_ENOBUFS,
             outputSize: 0,
           };
         }
 
-        outputBuffer.set(sysnameBuf.slice(0, sysnameLen[0]), 0);
-        outputBuffer.set([0], sysnameLen[0]);
+        outputBuffer.set(nameBuf.slice(0, nameLen[0]), 0);
+        outputBuffer.set([0], nameLen[0]);
 
         return {
           exitStatus: err,
-          outputSize: sysnameLen[0],
+          outputSize: nameLen[0],
         };
       }
 
