@@ -1311,6 +1311,7 @@ export default async function syscallCallback(
 
       let err = constants.WASI_ESUCCESS;
       let nameVal = "";
+      let invalidType = false;
       switch (nameType) {
         case UnameNameType.Href:
           nameVal = window.location.href;
@@ -1339,13 +1340,15 @@ export default async function syscallCallback(
         case UnameNameType.UserAgent:
           nameVal = window.navigator.userAgent;
           break;
-        default: {
-          nameVal = "Unknown";
+        default:
+          invalidType = true;
           break;
-        }
       }
 
-      if (bufLen < nameVal.length) {
+      if (invalidType) {
+        nameLen[0] = 0;
+        err = constants.WASI_EINVAL;
+      } else if (bufLen < nameVal.length) {
         nameLen[0] = bufLen;
         err = constants.WASI_ENOBUFS;
       } else {
