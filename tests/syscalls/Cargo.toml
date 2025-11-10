@@ -8,6 +8,3 @@ version = "0.1.0"
 [dependencies]
 wasi = "0.11.0"
 wasi_ext_lib = { git = "https://github.com/antmicro/wasi_ext_lib.git", branch = "main" }
-
-[build]
-target = "wasm32-wasi"
