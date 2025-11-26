@@ -814,6 +814,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
+    workerConsoleLog(`path_open returned ${err}`);
     if (err !== constants.WASI_ESUCCESS) {
       return err;
     }
