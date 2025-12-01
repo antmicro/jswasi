@@ -69,22 +69,28 @@ async function setFilestatTimesFsaDesc(
   return constants.WASI_ESUCCESS;
 }
 
+export function getInodeRandom(): bigint {
+  return BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+}
+
 export class FsaFileDescriptor
   extends AbstractFileDescriptor
   implements FsaDescriptor
 {
   // Filesystem access API doesn't support real symlinks so
   // assume that by default every file is a regular file
-  static defaultFilestat: Filestat = {
-    dev: 0n,
-    ino: 0n,
-    filetype: constants.WASI_FILETYPE_REGULAR_FILE,
-    nlink: 1n,
-    size: 0n,
-    atim: 0n,
-    mtim: 0n,
-    ctim: 0n,
-  };
+  static get defaultFilestat(): Filestat {
+    return {
+      dev: 1n,
+      ino: getInodeRandom(),
+      filetype: constants.WASI_FILETYPE_REGULAR_FILE,
+      nlink: 1n,
+      size: 0n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
+  }
   metadataPath: string;
   keepMetadata: boolean;
 
@@ -349,8 +355,8 @@ export class FsaDirectoryDescriptor
   metadataPath: string;
   keepMetadata: boolean;
   static defaultFilestat: Filestat = {
-    dev: 0n,
-    ino: 0n,
+    dev: 1n,
+    ino: getInodeRandom(),
     filetype: constants.WASI_FILETYPE_DIRECTORY,
     nlink: 1n,
     size: 4096n,

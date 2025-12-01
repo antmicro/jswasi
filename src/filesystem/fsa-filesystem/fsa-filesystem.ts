@@ -20,6 +20,7 @@ import { initMetadataPath, mapErr, getTopLevelHandle, getHostDirectoryHandle } f
 import {
   FsaDirectoryDescriptor,
   FsaFileDescriptor,
+  getInodeRandom,
   initializeFsaDesc
 } from "./fsa-descriptors.js";
 
@@ -202,8 +203,8 @@ export class FsaFilesystem implements Filesystem {
     }
     if (this.keepMetadata) {
       await setStoredData(await initMetadataPath(handle), {
-        dev: 0n,
-        ino: 0n,
+        dev: 1n,
+        ino: getInodeRandom(),
         filetype: constants.WASI_FILETYPE_DIRECTORY,
         nlink: 1n,
         size: 4096n,
@@ -423,8 +424,8 @@ export class FsaFilesystem implements Filesystem {
             if (this.keepMetadata) {
               desc.metadataPath = await initMetadataPath(handle);
               await setStoredData(desc.metadataPath, {
-                dev: 0n,
-                ino: 0n,
+                dev: 1n,
+                ino: getInodeRandom(),
                 filetype: constants.WASI_FILETYPE_REGULAR_FILE,
                 nlink: 1n,
                 size: 0n,
