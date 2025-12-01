@@ -75,8 +75,7 @@ export function getInodeRandom(): bigint {
 
 export class FsaFileDescriptor
   extends AbstractFileDescriptor
-  implements FsaDescriptor
-{
+  implements FsaDescriptor {
   // Filesystem access API doesn't support real symlinks so
   // assume that by default every file is a regular file
   static get defaultFilestat(): Filestat {
@@ -308,7 +307,7 @@ export class FsaFileDescriptor
       // TODO: is mutex necessary here?
       try {
         await writer?.close();
-      } catch (_) {}
+      } catch (_) { }
     }
   }
   async close(): Promise<number> {
@@ -350,8 +349,7 @@ export class FsaFileDescriptor
 
 export class FsaDirectoryDescriptor
   extends AbstractDirectoryDescriptor
-  implements FsaDescriptor
-{
+  implements FsaDescriptor {
   metadataPath: string;
   keepMetadata: boolean;
   static defaultFilestat: Filestat = {
