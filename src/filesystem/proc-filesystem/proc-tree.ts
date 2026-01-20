@@ -1,6 +1,6 @@
 import * as constants from "../../constants.js";
 import ProcessManager from "../../process-manager.js";
-import { Filestat } from "../filesystem.js";
+import { Filestat, getInodeRandom } from "../filesystem.js";
 
 let processManager: ProcessManager;
 
@@ -30,16 +30,18 @@ export interface ProcSymlink extends ProcNode {
 }
 
 abstract class AbstractProcSymlink implements ProcSymlink {
-  private static filestat = {
-    dev: 0n,
-    ino: 0n,
-    filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
-    nlink: 1n,
-    size: 0n,
-    mtim: 0n,
-    atim: 0n,
-    ctim: 0n,
-  };
+  private static get filestat() {
+    return{
+      dev: 1n,
+      ino: getInodeRandom(),
+      filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
+      nlink: 1n,
+      size: 0n,
+      mtim: 0n,
+      atim: 0n,
+      ctim: 0n,
+    };
+  }
 
   constructor() {}
 
@@ -51,16 +53,18 @@ abstract class AbstractProcSymlink implements ProcSymlink {
 }
 
 abstract class AbstractProcFile implements ProcFile {
-  private static filestat = {
-    dev: 0n,
-    ino: 0n,
-    filetype: constants.WASI_FILETYPE_REGULAR_FILE,
-    nlink: 1n,
-    size: 0n,
-    mtim: 0n,
-    atim: 0n,
-    ctim: 0n,
-  };
+  private static get filestat() {
+    return {
+      dev: 1n,
+      ino: getInodeRandom(),
+      filetype: constants.WASI_FILETYPE_REGULAR_FILE,
+      nlink: 1n,
+      size: 0n,
+      mtim: 0n,
+      atim: 0n,
+      ctim: 0n,
+    };
+  }
 
   getFilestat(): Filestat {
     return AbstractProcFile.filestat;
@@ -70,16 +74,18 @@ abstract class AbstractProcFile implements ProcFile {
 }
 
 abstract class AbstractProcDirectory implements ProcDirectory {
-  private static filestat = {
-    dev: 0n,
-    ino: 0n,
-    filetype: constants.WASI_FILETYPE_DIRECTORY,
-    nlink: 1n,
-    size: 0n,
-    mtim: 0n,
-    atim: 0n,
-    ctim: 0n,
-  };
+  private static get filestat() {
+    return {
+      dev: 1n,
+      ino: getInodeRandom(),
+      filetype: constants.WASI_FILETYPE_DIRECTORY,
+      nlink: 1n,
+      size: 0n,
+      mtim: 0n,
+      atim: 0n,
+      ctim: 0n,
+    };
+  }
 
   constructor(protected pid: number) {}
 

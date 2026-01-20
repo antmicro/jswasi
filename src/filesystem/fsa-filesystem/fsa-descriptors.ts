@@ -8,7 +8,8 @@ import {
   Dirent,
   AbstractDescriptor,
   AbstractFileDescriptor,
-  AbstractDirectoryDescriptor
+  AbstractDirectoryDescriptor,
+  getInodeRandom,
 } from "../filesystem.js";
 import { initMetadataPath, mapErr } from "./utils.js";
 import { getStoredData, setStoredData } from "./metadata.js";
@@ -67,10 +68,6 @@ async function setFilestatTimesFsaDesc(
   }
 
   return constants.WASI_ESUCCESS;
-}
-
-export function getInodeRandom(): bigint {
-  return BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 }
 
 export class FsaFileDescriptor
@@ -352,16 +349,18 @@ export class FsaDirectoryDescriptor
   implements FsaDescriptor {
   metadataPath: string;
   keepMetadata: boolean;
-  static defaultFilestat: Filestat = {
-    dev: 1n,
-    ino: getInodeRandom(),
-    filetype: constants.WASI_FILETYPE_DIRECTORY,
-    nlink: 1n,
-    size: 4096n,
-    atim: 0n,
-    mtim: 0n,
-    ctim: 0n,
-  };
+  static get defaultFilestat(): Filestat {
+    return {
+      dev: 1n,
+      ino: getInodeRandom(),
+      filetype: constants.WASI_FILETYPE_DIRECTORY,
+      nlink: 1n,
+      size: 4096n,
+      atim: 0n,
+      mtim: 0n,
+      ctim: 0n,
+    };
+  }
   private entries: Dirent[];
 
   constructor(

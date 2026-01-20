@@ -6,6 +6,7 @@ import {
   Fdflags,
   OpenFlags,
   LookupFlags,
+  getInodeRandom
 } from "../filesystem.js";
 import { stringToBool, basename, dirname } from "../../utils.js";
 import * as constants from "../../constants.js";
@@ -20,7 +21,6 @@ import { initMetadataPath, mapErr, getTopLevelHandle, getHostDirectoryHandle } f
 import {
   FsaDirectoryDescriptor,
   FsaFileDescriptor,
-  getInodeRandom,
   initializeFsaDesc
 } from "./fsa-descriptors.js";
 
@@ -264,8 +264,8 @@ export class FsaFilesystem implements Filesystem {
     if (this.keepMetadata) {
       // TODO: fill dummy data with something meaningful
       await setStoredData(await initMetadataPath(symlink), {
-        dev: 0n,
-        ino: 0n,
+        dev: 1n,
+        ino: getInodeRandom(),
         filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
         nlink: 1n,
         size: BigInt(target.length),

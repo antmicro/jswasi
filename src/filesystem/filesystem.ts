@@ -51,6 +51,10 @@ export type Dirent = {
   d_type: Filetype;
 };
 
+export function getInodeRandom(): bigint {
+  return BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+}
+
 export interface Descriptor {
   /*
    * Returns descriptor fdstat structutre
