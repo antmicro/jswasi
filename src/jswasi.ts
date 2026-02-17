@@ -158,10 +158,20 @@ export class Jswasi {
         await mountRootfs(this.topLevelFs, conf);
         this.__printk('VirtualFilesystem mounted on /');
 
-        await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+        let initErr = await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+        if (initErr !== constants.WASI_ESUCCESS) {
+          this.__printk('Could not initialize rootfs in recovery mode. Trying to purge.');
+          await this.tearDown((a: string) => this.__printk(a));
+          return;
+        }
         await recoveryMotd(this.topLevelFs);
       } else {
-        await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+        let initErr = await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
+        if (initErr !== constants.WASI_ESUCCESS) {
+          this.__printk('Could not initialize rootfs. Trying to purge.');
+          await this.tearDown((a: string) => this.__printk(a));
+          return;
+        }
       }
       this.__printk('Rootfs initialized');
     }
@@ -285,7 +295,7 @@ function gunzip(tarStream: ReadableStream): ReadableStream {
 }
 
 // setup filesystem
-async function initFs(fs: TopLevelFs, tar: ArrayBuffer) {
+async function initFs(fs: TopLevelFs, tar: ArrayBuffer) : Promise<number> {
   const untared = await untar(tar);
 
   for (const entry of untared) {
@@ -296,7 +306,7 @@ async function initFs(fs: TopLevelFs, tar: ArrayBuffer) {
           entry.name, 0, constants.WASI_O_CREAT);
 
         if (err !== constants.WASI_ESUCCESS)
-          throw Error("Corrupted rootfs image");
+          return err;
 
         const stream = (await desc.writableStream()).stream;
         await entry.blob.stream().pipeTo(stream);
@@ -307,18 +317,20 @@ async function initFs(fs: TopLevelFs, tar: ArrayBuffer) {
       case TAR_FILETYPE.DIRECTORY: {
         const err = await fs.createDir(entry.name)
         if (err !== constants.WASI_ESUCCESS)
-          throw Error("Corrupted rootfs image");
+          return err;
 
         break;
       }
       case TAR_FILETYPE.SYMLINK: {
-        if ((await fs.addSymlink(entry.linkname, entry.name) !== constants.WASI_ESUCCESS))
-          throw Error("Corrupted rootfs image");
+        let err = await fs.addSymlink(entry.linkname, entry.name);
+        if (err !== constants.WASI_ESUCCESS)
+          return err;
 
         break;
       }
     }
   }
+  return constants.WASI_ESUCCESS;
 }
 
 function initServiceWorker(): Promise<boolean> {
