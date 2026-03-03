@@ -42,24 +42,6 @@ self.addEventListener("install", async () => {
 async function handleFetch(request: Request): Promise<Response> {
   return caches.match(request).then(async (response: Response) => {
     if (response === undefined) {
-      if(request.mode === "no-cors") {
-        request = new Request(request.url, {
-          cache: request.cache,
-          credentials: "omit",
-          headers: request.headers,
-          integrity: request.integrity,
-          // @ts-ignore
-          destination: request.destination,
-          keepalive: request.keepalive,
-          method: request.method,
-          mode: request.mode,
-          redirect: request.redirect,
-          referrer: request.referrer,
-          referrerPolicy: request.referrerPolicy,
-          signal: request.signal,
-        });
-      }
-
       response = await fetch(request);
     }
 
@@ -82,5 +64,7 @@ async function handleFetch(request: Request): Promise<Response> {
 self.addEventListener("fetch", (event: Event) => {
   const fetchEvent = event as FetchEvent;
   const request = fetchEvent.request;
-  fetchEvent.respondWith(handleFetch(request));
+  if (request.mode === "navigate") {
+    fetchEvent.respondWith(handleFetch(request));
+  }
 });
