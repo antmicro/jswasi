@@ -64,7 +64,8 @@ async function handleFetch(request: Request): Promise<Response> {
 self.addEventListener("fetch", (event: Event) => {
   const fetchEvent = event as FetchEvent;
   const request = fetchEvent.request;
-  if (request.mode === "navigate") {
-    fetchEvent.respondWith(handleFetch(request));
+  if (request.mode === "navigate" && crossOriginIsolated) {
+    return
   }
+  fetchEvent.respondWith(handleFetch(request));
 });
