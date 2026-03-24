@@ -1,1 +1,1 @@
-include: jswasi-ci@main:ci/jswasi.yml
+include: jswasi-ci-scripts@main:jswasi.yml
