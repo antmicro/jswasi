@@ -65,14 +65,10 @@ export class Jswasi {
     }
 
     println("Cleaning metadata...");
-    await new Promise((resolve) => {
-      window.indexedDB.databases().then((r) => {
-        Promise.all(
-          r.map((database) => {
-            window.indexedDB.deleteDatabase(database.name);
-          })
-        ).then(resolve);
-      });
+    await new Promise<void>((resolve, reject) => {
+      const req = window.indexedDB.deleteDatabase("keyval-store");
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
     });
     println("Purge complete");
   }
