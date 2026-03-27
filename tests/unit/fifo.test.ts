@@ -105,8 +105,12 @@ describe("Test fifo descriptor", () => {
     jest.spyOn(dummyFifoINode, "writerSetter").mockImplementation(() => {
       writerCounter = fifoPeerState.CLOSED;
     });
+
+    const sendEofSpy = jest.spyOn(fifoINode, "sendEof");
+
     await desc.close();
-    expect(fifoINode.sendEof).toHaveBeenCalled();
+
+    expect(sendEofSpy).toHaveBeenCalled();
   });
 
   test("Closing all descriptors of a CLOSERM fifo should call the remover callback", async () => {

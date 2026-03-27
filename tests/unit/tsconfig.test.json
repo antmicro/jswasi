@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "rootDir": "../..",
+    "types": ["node", "jest"],
+    "allowJs": true,
+    "target": "esnext",
+    "module": "esnext",
+    "esModuleInterop": true,
+    "removeComments": false,
+    "skipLibCheck": true,
+    "sourceMap": false,
+    "strict": true,
+    "alwaysStrict": true,
+    "strictNullChecks": false,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "lib": ["dom", "dom.iterable", "esnext", "webworker"]
+  },
+  "include": ["tests/**/*", "src/**/*", "third_party/**/*"],
+  "exclude": ["node_modules", "dist" ]
+}
+

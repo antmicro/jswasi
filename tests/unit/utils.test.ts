@@ -1,6 +1,5 @@
 import * as utils from "../../src/utils";
 
-// @ts-ignore
 import { test, expect } from "@jest/globals";
 
 test("parsePath on regular path", () => {

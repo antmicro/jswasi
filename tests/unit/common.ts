@@ -1,4 +1,5 @@
 import { ProcessInfo, FdTable } from "../../src/process-manager";
+import { Filesystem } from "../../src/filesystem/filesystem"
 
 // @ts-ignore
 export class DummyFilesystem implements Filesystem {

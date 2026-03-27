@@ -1,15 +1,10 @@
-
 import * as constants from "../../src/constants";
 import { DeviceFilesystem } from "../../src/filesystem/virtual-filesystem/devices/device-filesystem";
 import { WebsocketConnection, WebsocketConnectionDevice, WebsocketDevice, WebsocketDeviceDriver } from "../../src/filesystem/virtual-filesystem/devices/websocket-device.js";
 import { major } from "../../src/filesystem/virtual-filesystem/devices/driver-manager.js";
 
-// @ts-ignore
 import * as vfs from "../../third_party/vfs.js";
 
-// This import fails if there is no jest cache available. It could be caused by
-// some misconfiguration or a bug in jest. ts-ignore works as an ad-hoc solution
-// @ts-ignore
 import { jest, test, expect, describe, beforeAll, beforeEach, afterEach } from "@jest/globals";
 
 // @ts-ignore
@@ -201,10 +196,10 @@ describe("Test WebsocketDevice", () => {
     WebSocket.mockClear();
 
     jest.spyOn(websocketDeviceDriver, "createConnectionDevice")
-      .mockReturnValue(new Promise((resolve) => resolve({
+      .mockReturnValue(Promise.resolve({
         err: constants.WASI_EINVAL,
-        minor: undefined,
-      })));
+        minor: 0,
+      }));
 
     writePromise = websocketDevice.write(new TextEncoder().encode("ws://some.link"));
     const openCallbackTrigger = async () => {

@@ -5,7 +5,6 @@ import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
 import * as constants from "../../src/constants";
 import { Filesystem } from "../../src/filesystem/filesystem";
 
-// @ts-ignore
 import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "@jest/globals";
 
 import { dummyProcessInfos, DummyFilesystem } from "./common";

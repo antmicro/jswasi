@@ -547,7 +547,7 @@ export abstract class AbstractDeviceDescriptor extends AbstractDescriptor {
 
 export interface Filesystem {
   fsname(): string;
-  mkdirat(desc: Descriptor, path: string): Promise<number>;
+  mkdirat(desc: Descriptor | undefined, path: string): Promise<number>;
   getFilestat(path: string): Promise<{ err: number; filestat: Filestat }>;
   // missing path_link
   open(
@@ -559,7 +559,7 @@ export interface Filesystem {
     fdflags: Fdflags,
     workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }>;
-  unlinkat(desc: Descriptor, path: string, is_dir: boolean): Promise<number>;
+  unlinkat(desc: Descriptor | undefined, path: string, is_dir: boolean): Promise<number>;
   renameat(
     oldDesc: Descriptor,
     oldPath: string,
