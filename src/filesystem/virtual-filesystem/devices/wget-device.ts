@@ -1,6 +1,6 @@
 import * as constants from "../../../constants.js";
 // @ts-ignore
-import * as vfs from "../../../third_party/vfs.js";
+import * as vfs from "../../../../third_party/vfs.js";
 
 import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
 

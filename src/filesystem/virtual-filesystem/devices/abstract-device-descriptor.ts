@@ -7,7 +7,7 @@ import {
 import { wasiFilestat } from "../virtual-filesystem.js";
 
 // @ts-ignore
-import * as vfs from "../../../third_party/vfs.js";
+import * as vfs from "../../../../third_party/vfs.js";
 import * as constants from "../../../constants.js";
 
 export abstract class AbstractVirtualDeviceDescriptor extends AbstractDeviceDescriptor {

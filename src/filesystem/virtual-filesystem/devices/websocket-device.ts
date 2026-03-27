@@ -1,6 +1,6 @@
 import * as constants from "../../../constants.js";
 //@ts-ignore
-import * as vfs from "../../../third_party/vfs.js";
+import * as vfs from "../../../../third_party/vfs.js";
 import { PollSub, Descriptor, Fdflags, Rights } from "../../filesystem.js";
 import { DeviceFilesystem } from "./device-filesystem.js";
 import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js";

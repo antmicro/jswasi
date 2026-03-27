@@ -15,7 +15,7 @@ import {
 } from "../filesystem.js";
 import * as constants from "../../constants.js";
 // @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
+import * as vfs from "../../../third_party/vfs.js";
 import { UserData, EventType, PollEvent } from "../../types.js";
 
 function wasiFiletype(stat: vfs.Stat): number {
@@ -581,7 +581,7 @@ export class VirtualFilesystemDirectoryDescriptor
     fs_rights_base: Rights,
     fs_rights_inheriting: Rights,
     public dir: vfs.Directory,
-    private inodeMgr: vfs.InodeManager
+    private inodeMgr: vfs.INodeManager
   ) {
     super();
     initVirtualDesc(

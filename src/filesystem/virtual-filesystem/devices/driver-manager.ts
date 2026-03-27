@@ -8,7 +8,7 @@ import { Descriptor, Fdflags, Rights } from "../../filesystem.js";
 import ProcessManager from "../../../process-manager.js";
 
 // @ts-ignore
-import * as vfs from "../../third_party/vfs.js";
+import * as vfs from "../../../../third_party/vfs.js";
 import { DeviceFilesystem } from "./device-filesystem.js";
 
 export const enum major {

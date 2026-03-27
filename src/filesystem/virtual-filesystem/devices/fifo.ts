@@ -7,7 +7,7 @@ import { UserData, EventType, PollEvent } from "../../../types.js";
 import { Fdflags, Rights } from "../../filesystem.js";
 
 // @ts-ignore
-import * as vfs from "../../../third_party/vfs.js";
+import * as vfs from "../../../../third_party/vfs.js";
 
 export const enum fifoMode {
   // only the kernelspace can open the fifo for writing
