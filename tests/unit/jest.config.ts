@@ -13,7 +13,6 @@ const config: Config.InitialOptions = {
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "../../third_party/idb-keyval.js": "<rootDir>/mock-idb.ts",
-    "../../third_party/vfs.js": "<rootDir>/mock-vfs.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };

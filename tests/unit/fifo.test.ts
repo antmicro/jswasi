@@ -1,8 +1,7 @@
 import { FifoDescriptor, fifoPeerState } from "../../src/filesystem/virtual-filesystem/devices/fifo";
 import * as vfs from "./mock-vfs";
 import * as constants from "../../src/constants";
-// @ts-ignore
-import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "@jest/globals";
+import { jest, test, expect, describe, afterEach, beforeEach } from "@jest/globals";
 
 class DummyFifoINode {
   public readerGetter: jest.MockedFunction<() => number>;
@@ -20,7 +19,9 @@ class DummyFifoINode {
   }
 }
 
-jest.mock("./mock-vfs");
+jest.mock('../../third_party/vfs.js', () => {
+  return require('./mock-vfs.ts');
+});
 
 describe("Test fifo descriptor", () => {
   let fifoINode: vfs.Fifo;
