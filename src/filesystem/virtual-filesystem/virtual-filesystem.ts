@@ -89,7 +89,9 @@ export class VirtualFilesystem implements Filesystem {
     }
 
     if (navigated.target) {
-      return constants.WASI_EEXIST;
+      return (navigated.target instanceof vfs.Directory)
+      ? constants.WASI_EEXIST
+      : constants.WASI_ENOTDIR;
     }
 
     const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Directory, {
@@ -113,7 +115,10 @@ export class VirtualFilesystem implements Filesystem {
         filestat: wasiFilestat(__stat),
       };
     } catch (e: vfs.VirtualFSError) {
-      return e.errno;
+      return {
+        err: e.errno,
+        filestat: undefined,
+      };
     }
   }
 
@@ -138,10 +143,13 @@ export class VirtualFilesystem implements Filesystem {
 
       if (is_dir) {
         if (!(navigated.target instanceof vfs.Directory)) {
+          return constants.WASI_ENOTDIR;
         }
-      } else {
-        if (navigated instanceof vfs.Directory) {
-          return constants.WASI_EISDIR;
+        const entriesIter = navigated.target.getEntries();
+        for (const [name] of entriesIter) {
+          if (name !== '.' && name !== '..') {
+            return constants.WASI_ENOTEMPTY;
+          }
         }
       }
 
@@ -172,6 +180,8 @@ export class VirtualFilesystem implements Filesystem {
         index = -1;
         if (oflags & constants.WASI_O_CREAT && oflags & constants.WASI_O_EXCL) {
           err = constants.WASI_EEXIST;
+        } else if (navigated.target instanceof vfs.Directory && oflags & constants.WASI_O_CREAT) {
+          err = constants.WASI_EISDIR;
         } else {
           err = constants.WASI_ESUCCESS;
         }
