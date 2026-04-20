@@ -125,4 +125,13 @@ describe("Test fifo descriptor", () => {
 
     expect(remover).toHaveBeenCalled();
   });
+
+  test("Seeking on fifo should return ESPIPE", async () => {
+    const desc = new FifoDescriptor(0, 0n, 0n, fifoINode, () => {});
+    const result = await desc.seek(64n, constants.WASI_WHENCE_CUR);
+    await desc.close();
+
+    expect(result.err).toStrictEqual(constants.WASI_ESPIPE);
+    expect(result.offset).toStrictEqual(-1n);
+  })
 });
