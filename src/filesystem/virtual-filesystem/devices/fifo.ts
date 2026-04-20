@@ -62,9 +62,7 @@ export class FifoDescriptor
   }
 
   override async read(len: number): Promise<{ err: number; buffer: ArrayBuffer }> {
-    let buf = await this.ino.read();
-    if (buf.byteLength > len)
-      buf.resize(len);
+    let buf = await this.ino.read(len);
 
     return {
       err: constants.WASI_ESUCCESS,
