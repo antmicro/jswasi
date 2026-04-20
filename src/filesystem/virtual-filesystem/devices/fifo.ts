@@ -4,7 +4,7 @@ import { AbstractVirtualDeviceDescriptor } from "./abstract-device-descriptor.js
 import { VirtualFilesystemDescriptor } from "../virtual-filesystem.js";
 import { UserData, EventType, PollEvent } from "../../../types.js";
 
-import { Fdflags, Rights } from "../../filesystem.js";
+import { Fdflags, Rights, Whence } from "../../filesystem.js";
 
 // @ts-ignore
 import * as vfs from "../../../../third_party/vfs.js";
@@ -126,5 +126,12 @@ export class FifoDescriptor
       this.ino.writer++;
     if ((this.fdstat.fs_rights_base & constants.WASI_RIGHT_FD_READ) !== 0n)
       this.ino.reader++;
+  }
+
+  override async seek(
+    _offset: bigint,
+    _whence: Whence,
+  ): Promise<{ err: number; offset: bigint }> {
+        return { err: constants.WASI_ESPIPE, offset: -1n }
   }
 }

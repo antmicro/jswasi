@@ -918,10 +918,9 @@ export default async function syscallCallback(
             fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE ||
             fdstat.fs_filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK
           ) {
-            offset[0] = BigInt(
-              (await fds.getDesc(fd).seek(0n, constants.WASI_WHENCE_CUR)).offset
-            );
-            err = constants.WASI_ESUCCESS;
+            const result = await fds.getDesc(fd).seek(0n, constants.WASI_WHENCE_CUR);
+            offset[0] = BigInt(result.offset);
+            err = result.err;
           } else {
             err = constants.WASI_EBADF;
           }
