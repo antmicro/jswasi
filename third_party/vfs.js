@@ -2582,6 +2582,7 @@ class Fifo extends INode {
     this.readQueue = [];
     this.pollQueue = [];
     this.mode = 0;
+    this.currentOffset = 0;
   }
 
   setMode(request, state) {
@@ -2619,17 +2620,28 @@ class Fifo extends INode {
     this.notify(buf.byteLength);
   }
 
-  read() {
-    const buf = this.messages.shift();
+  read(bytes) {
+    const buf = this.messages[0];
+
     if (buf === undefined) {
       if (this.writer === 0) // writer has already closed the fifo
-        return new ArrayBuffer();
+        return new Uint8Array(new ArrayBuffer());
 
       return new Promise(resolve => {
         this.readQueue.push(resolve);
       });
     }
-    return buf;
+
+    if (buf.byteLength - this.currentOffset <= bytes) {
+      this.messages.shift();
+      const view = new Uint8Array(buf, this.currentOffset);
+      this.currentOffset = 0;
+      return view;
+    }
+
+    const view = new Uint8Array(buf, this.currentOffset, bytes);
+    this.currentOffset += bytes;
+    return view;
   }
 
   addPollSub() {
