@@ -28,6 +28,9 @@ export const DEFAULT_ENV = {
   PS2: "> ",
 };
 
+const WASM_EXECUTABLE_MAGICNUMBER = 0x6D736100; // \0asm
+const SHELL_SCRIPT_MAGICNUMBER = 8483; // bytes of a shebang
+
 export class DescriptorEntry {
   desc: Descriptor;
   fdFlags: Fdflags;
@@ -268,6 +271,10 @@ export default class ProcessManager {
         term.foregroundPid = id;
     }
 
+    let hasShebang = false;
+    let interpreter = "";
+    let interpreterArg = "";
+
     // save compiled module to cache
     // TODO: this will run into trouble if file is replaced after first usage (cached version will be invalid)
     try {
@@ -282,12 +289,81 @@ export default class ProcessManager {
           return err;
         }
 
-        this.compiledModules[command] = await WebAssembly.compile(
-          (
-            await desc.arrayBuffer()
-          ).buffer
-        );
-      }
+        const { err: readErr, buffer } = await desc.read(4);
+
+        if (readErr !== constants.WASI_ESUCCESS) {
+          console.error(`Failed to read the magic number from a file: ${readErr}`);
+          await this.terminateProcess(id, readErr);
+          await desc.close();
+          return readErr;
+        }
+
+        const headerView = new Uint32Array(buffer);
+
+        const isExecutable = headerView[0] === WASM_EXECUTABLE_MAGICNUMBER;
+        hasShebang = (headerView[0] & 0xFFFF) === SHELL_SCRIPT_MAGICNUMBER;
+
+        if (!isExecutable && !hasShebang) {
+          await this.terminateProcess(id, constants.WASI_ENOEXEC);
+          await desc.close();
+          return constants.WASI_ENOEXEC;
+        }
+
+        if (hasShebang) {
+          const maxShebangLength = 128;
+
+          await desc.seek(2n, constants.WASI_WHENCE_SET);
+          let buf;
+
+          try {
+            buf = new TextDecoder("UTF-8", { fatal: true }).decode((await desc.read(maxShebangLength)).buffer);
+          } catch (_) {
+            await this.terminateProcess(id, constants.WASI_ENOEXEC);
+            await desc.close();
+            return constants.WASI_ENOEXEC;
+          }
+
+          await desc.close();
+
+          if (!buf.includes("\n") && !buf.includes(" ")) {
+            await this.terminateProcess(id, constants.WASI_ENOEXEC);
+            return constants.WASI_ENOEXEC;
+          }
+
+          const line = buf.split("\n")[0].trim();
+          const separatorIndex = line.indexOf(" ");
+
+          if (separatorIndex === -1) interpreter = line;
+          else {
+            interpreter = line.slice(0, separatorIndex);
+            interpreterArg = line.slice(separatorIndex + 1);
+          }
+
+          const { desc: interpreterDesc, err } = await this.filesystem.open(
+            interpreter,
+            constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+          );
+
+          if (err === constants.WASI_ESUCCESS) {
+            const buffer = (await interpreterDesc.arrayBuffer()).buffer;
+            await interpreterDesc.close();
+
+            if (!this.compiledModules[interpreter]) {
+              this.compiledModules[interpreter] = await WebAssembly.compile(buffer);
+            }
+          }
+          else {
+            console.error(`No such shell: ${interpreter}`);
+            await this.terminateProcess(id, constants.WASI_ENOENT);
+            return constants.WASI_ENOENT;
+          }
+        }
+        else if (isExecutable) {
+          const buffer = (await desc.arrayBuffer()).buffer;
+          await desc.close();
+          this.compiledModules[command] = await WebAssembly.compile(buffer);
+        }
+     }
     } catch (e) {
       let errno;
       if (
@@ -300,6 +376,24 @@ export default class ProcessManager {
       }
       await this.terminateProcess(id, errno);
       throw Error("invalid binary");
+    }
+
+    if (hasShebang) {
+      if (interpreter === "") {
+        await this.terminateProcess(id, constants.WASI_ENOEXEC);
+        return constants.WASI_ENOEXEC;
+      }
+
+      const interpreterPaths = interpreter.split("/");
+      const shellName = interpreterPaths[interpreterPaths.length - 1];
+
+      args[0] = command;
+
+      if (interpreterArg !== "")
+        args.unshift(interpreterArg);
+
+      args.unshift(shellName);
+      command = interpreter;
     }
 
     if (
