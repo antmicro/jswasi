@@ -11,19 +11,20 @@ export class DummyFilesystem implements Filesystem {
 export function dummyProcessInfos(pid: number): Record<number, ProcessInfo> {
   let pinfos: Record<number, ProcessInfo> = {};
 
-  pinfos[pid] = new ProcessInfo(
-    pid,
-    "foo",
-    undefined,
-    new FdTable({}),
-    null,
-    null,
-    async () => {},
-    {},
-    "bar",
-    false,
-    null
-  );
+  pinfos[pid] = {
+    pid: pid,
+    cmd: "foo",
+    // @ts-ignore
+    worker: undefined,
+    fds: new FdTable({}),
+    parentId: null,
+    parentLock: null,
+    callback: async () => {},
+    env: {},
+    cwd: "bar",
+    isJob: false,
+    foreground: null
+  }
 
   return pinfos;
 }
