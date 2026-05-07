@@ -43,7 +43,6 @@ import {
   UnameNameType,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
-import { free, ps, reset } from "./browser-apps.js";
 import { EventSource } from "./devices.js";
 import { basename, msToNs } from "./utils.js";
 import { FsaFilesystem } from "./filesystem/fsa-filesystem/fsa-filesystem.js";
@@ -294,93 +293,60 @@ export default async function syscallCallback(
         break;
       }
 
-      let isBrowserApp = true;
+      // Check did SigInt come.
+      // We can skip spawn child here and return to user space with appropriate exit code.
+      let events = processManager.processInfos[processId].terminationNotifier;
+      let sigintOccurred =
+        events !== null
+          ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
+          : false;
 
-      // TODO: Intentionally ignore SigInt, do not check termiantionOccured is set
-      // for browser apps. Maybe we should handle it in the future..
-      switch (path) {
-        case "/usr/bin/ps": {
-          const result = await ps(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/free": {
-          const result = await free(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        case "/usr/bin/reset": {
-          const result = await reset(processManager, processId, args, env, fds);
-          Atomics.store(parentLck, 0, result);
-          Atomics.notify(parentLck, 0);
-          break;
-        }
-        default: {
-          isBrowserApp = false;
-          // Check did SigInt come.
-          // We can skip spawn child here and return to user space with appropriate exit code.
-          let events =
-            processManager.processInfos[processId].terminationNotifier;
-          let sigintOccurred =
-            events !== null
-              ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
-              : false;
-
-          if (sigintOccurred) {
-            await fds.tearDown();
-            Atomics.store(parentLck, 0, constants.EXIT_INTERRUPTED);
-            Atomics.notify(parentLck, 0);
-            break;
-          }
-
-          try {
-            const id = await processManager.spawnProcess(
-              processId,
-              background ? null : parentLck,
-              path,
-              fds,
-              args,
-              env,
-              background,
-              processManager.processInfos[processId].cwd
-            );
-            Atomics.store(childPID, 0, id);
-            if (env["DEBUG"] === "1") {
-              const newProcessName = path.split("/").slice(-1)[0];
-              console.log(
-                `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
-                "background:black; color: white;",
-                "background:black; color:yellow;",
-                "background: black; color:white;",
-                "background:default; color: default;"
-              );
-            }
-          } catch (_) {
-            console.log("Failed spawning process");
-          }
-          if (background) {
-            let exit_code = constants.EXIT_SUCCESS;
-            // We have already spawned  background process, SigInt doesn't terminate it.
-            // Wash should break execution of commands chain
-            let sigintOccurred =
-              events !== null
-                ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
-                : false;
-            if (sigintOccurred) {
-              exit_code = constants.EXIT_INTERRUPTED;
-            }
-
-            Atomics.store(parentLck, 0, exit_code);
-            Atomics.notify(parentLck, 0);
-          }
-        }
+      if (sigintOccurred) {
+        await fds.tearDown();
+        Atomics.store(parentLck, 0, constants.EXIT_INTERRUPTED);
+        Atomics.notify(parentLck, 0);
+        break;
       }
 
-      if (isBrowserApp) {
-        // Close stdout and stderr in browser apps
-        await fds.tearDown();
+      try {
+        const id = await processManager.spawnProcess(
+          processId,
+          background ? null : parentLck,
+          path,
+          fds,
+          args,
+          env,
+          background,
+          processManager.processInfos[processId].cwd,
+        );
+        Atomics.store(childPID, 0, id);
+        if (env["DEBUG"] === "1") {
+          const newProcessName = path.split("/").slice(-1)[0];
+          console.log(
+            `%c [dbg (%c${newProcessName}:${id}%c)] %c spawned by ${processName}:${processId}`,
+            "background:black; color: white;",
+            "background:black; color:yellow;",
+            "background: black; color:white;",
+            "background:default; color: default;",
+          );
+        }
+      } catch (_) {
+        console.log("Failed spawning process");
+      }
+      if (background) {
+        let exit_code = constants.EXIT_SUCCESS;
+        // We have already spawned  background process, SigInt doesn't terminate it.
+        // Wash should break execution of commands chain
+        let sigintOccurred =
+          events !== null
+            ? events.obtainEvents(constants.WASI_EXT_EVENT_SIGINT) != 0
+            : false;
+        if (sigintOccurred) {
+          exit_code = constants.EXIT_INTERRUPTED;
+        }
+
+        Atomics.store(parentLck, 0, exit_code);
+        Atomics.notify(parentLck, 0);
       }
 
       break;

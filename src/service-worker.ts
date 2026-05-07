@@ -6,7 +6,6 @@ const urlsToCache = [
   "./process-manager.js",
   "./types.js",
   "./devices.js",
-  "./browser-apps.js",
   "./filesystem/proc-filesystem/proc-filesystem.js",
   "./filesystem/proc-filesystem/proc-tree.js",
   "./filesystem/proc-filesystem/proc-descriptors.js",
