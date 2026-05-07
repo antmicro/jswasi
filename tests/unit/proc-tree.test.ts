@@ -134,4 +134,133 @@ describe("Test proc tree", () => {
     const wrongNode = topLevelNode.getNode(wrongSpecialFile);
     expect(wrongNode.err).toBe(constants.WASI_ENOENT);
   });
+
+  test("Cwd symlink should work", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const procDirectory = topLevelNode.getNode(String(pid))
+      .node! as proc.ProcDirectory;
+
+    const cwdFile = procDirectory.getNode("cwd");
+    expect(cwdFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const filestat = cwdFile.node!.getFilestat();
+    expect(filestat.filetype).toBe(constants.WASI_FILETYPE_SYMBOLIC_LINK);
+
+    expect((cwdFile.node! as proc.ProcSymlink).read()).toBe(
+      processManager.processInfos[pid].cwd,
+    );
+  });
+
+  test("Environ file should work", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const procDirectory = topLevelNode.getNode(String(pid))
+      .node! as proc.ProcDirectory;
+
+    const environFile = procDirectory.getNode("environ");
+    expect(environFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const filestat = environFile.node!.getFilestat();
+    expect(filestat.filetype).toBe(constants.WASI_FILETYPE_REGULAR_FILE);
+
+    const contents = (environFile.node! as proc.ProcFile).read();
+    const expectedEnv = processManager.processInfos[pid].env;
+
+    for (const [key, value] of Object.entries(expectedEnv)) {
+      expect(contents).toContain(`${key}=${value}\0`);
+    }
+  });
+
+  test("Meminfo file should not exist on unsupported browsers", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const nodes = topLevelNode.listNodes();
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+    expect(Object.keys(nodes.nodes)).not.toContain("meminfo");
+
+    const meminfoFile = topLevelNode.getNode("meminfo");
+    expect(meminfoFile.err).toBe(constants.WASI_ENOENT);
+    expect(meminfoFile.node).toBe(undefined);
+  });
+
+  test("Meminfo file should work on supported browsers", () => {
+    const memoryMock = {
+      jsHeapSizeLimit: 4096,
+      usedJSHeapSize: 1024,
+    };
+
+    Object.defineProperty(global.performance, "memory", {
+      value: memoryMock,
+      configurable: true,
+    });
+
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const nodes = topLevelNode.listNodes();
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+    expect(Object.keys(nodes.nodes)).toContain("meminfo");
+
+    const meminfoFile = topLevelNode.getNode("meminfo");
+    expect(meminfoFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const contents = (meminfoFile.node as proc.ProcFile).read();
+
+    expect(contents).toContain("MemTotal:              4 kB");
+    expect(contents).toContain("MemFree:               3 kB");
+    expect(contents).toContain("MemAvailable:          3 kB");
+
+    delete (global.performance as any).memory;
+  });
+
+  test("Status file should contain basic info", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const procDirectory = topLevelNode.getNode(String(pid))
+      .node! as proc.ProcDirectory;
+
+    const statusFile = procDirectory.getNode("status");
+    expect(statusFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const filestat = statusFile.node!.getFilestat();
+    expect(filestat.filetype).toBe(constants.WASI_FILETYPE_REGULAR_FILE);
+
+    const contents = (statusFile.node! as proc.ProcFile).read();
+
+    expect(contents).toContain(
+      `Name:\t${processManager.processInfos[pid].cmd}`,
+    );
+    expect(contents).toContain(`Pid:\t${pid}`);
+  });
+
+  test("Stat file should exist and be not empty", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    const procDirectory = topLevelNode.getNode(String(pid))
+      .node! as proc.ProcDirectory;
+
+    const statFile = procDirectory.getNode("stat");
+    expect(statFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const filestat = statFile.node!.getFilestat();
+    expect(filestat.filetype).toBe(constants.WASI_FILETYPE_REGULAR_FILE);
+
+    const contents = (statFile.node! as proc.ProcFile).read();
+    const info = processManager.processInfos[pid];
+
+    // At least starts with process pid
+    expect(contents).toMatch(new RegExp(`^${info.id}`));
+  });
 });

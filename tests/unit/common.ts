@@ -20,11 +20,15 @@ export function dummyProcessInfos(pid: number): Record<number, ProcessInfo> {
     parentId: null,
     parentLock: null,
     callback: async () => {},
-    env: {},
+    env: {
+      foo: "bar",
+      bar: "baz",
+    },
     cwd: "bar",
     isJob: false,
-    foreground: null
-  }
+    foreground: null,
+    children: [],
+  };
 
   return pinfos;
 }
