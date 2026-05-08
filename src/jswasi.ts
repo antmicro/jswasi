@@ -199,7 +199,7 @@ export class Jswasi {
 
     // This is a hacky way of adding a foreground to a process
     const __res = await this.topLevelFs.open("/dev/ttyH0");
-    const foreground = __res.err === constants.WASI_ESUCCESS ?
+    const tty = __res.err === constants.WASI_ESUCCESS ?
       { maj: major.MAJ_HTERM, min: 0 } : null;
 
     this.__printk('Starting init');
@@ -214,7 +214,8 @@ export class Jswasi {
       DEFAULT_ENV,
       false,
       DEFAULT_WORK_DIR,
-      foreground
+      tty,
+      true
     );
   }
 }

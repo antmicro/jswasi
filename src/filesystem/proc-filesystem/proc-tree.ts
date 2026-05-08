@@ -190,7 +190,7 @@ class StatFile extends AbstractProcFile {
     let cutime = 0;
     const cstime = cutime;
 
-    let tty = info.foreground;
+    let tty = info.tty;
     let ttyNumber = 0;
 
     if (tty !== null) {

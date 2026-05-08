@@ -26,7 +26,8 @@ export function dummyProcessInfos(pid: number): Record<number, ProcessInfo> {
     },
     cwd: "bar",
     isJob: false,
-    foreground: null,
+    tty: null,
+    isForeground: false,
     children: [],
   };
 

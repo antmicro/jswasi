@@ -164,7 +164,7 @@ export class FdTable {
   }
 }
 
-type Foreground = { maj: number; min: number } | null;
+type TTY = { maj: number; min: number } | null;
 
 export class ProcessInfo {
   public shouldEcho = true;
@@ -186,7 +186,8 @@ export class ProcessInfo {
     public env: Record<string, string>,
     public cwd: string,
     public isJob: boolean,
-    public foreground: Foreground
+    public tty: TTY,
+    public isForeground: boolean,
   ) {
     this.timestamp = new Date().getTime();
     this.children = [];
@@ -232,21 +233,23 @@ export default class ProcessManager {
     env: Record<string, string>,
     isJob: boolean,
     workingDir: string,
-    foreground: Foreground = null
+    tty: TTY = null,
+    isForeground: boolean = false,
   ): Promise<number> {
     const id = this.nextProcessId;
     this.nextProcessId += 1;
     const worker = new Worker(this.scriptName, { type: "module" });
 
-    if (foreground === null) {
-      if (this.processInfos[parentId] != undefined) 
-        foreground = this.processInfos[parentId].foreground;
+    if (tty === null) {
+      if (this.processInfos[parentId] != undefined)
+        tty = this.processInfos[parentId].tty;
+        isForeground = true;
     }
 
     if (parentId !== null) {
       this.processInfos[parentId].children.push(id);
 
-      if (parentLock !== null) this.processInfos[parentId].foreground = null;
+      if (parentLock !== null) this.processInfos[parentId].isForeground = false;
     }
 
     this.processInfos[id] = new ProcessInfo(
@@ -260,15 +263,15 @@ export default class ProcessManager {
       env,
       workingDir,
       isJob,
-      foreground
+      tty,
+      isForeground,
     );
     worker.onmessage = (event) => this.syscallCallback(event, this);
 
-    if (foreground !== null) {
-      const __driver = this.driverManager.getDriver(foreground.maj);
-      const term = (__driver as TerminalDriver).terminals[foreground.min];
-      if (term != null)
-        term.foregroundPid = id;
+    if (isForeground && tty !== null) {
+      const __driver = this.driverManager.getDriver(tty.maj);
+      const term = (__driver as TerminalDriver).terminals[tty.min];
+      if (term != null) term.foregroundPid = id;
     }
 
     let hasShebang = false;
@@ -426,19 +429,18 @@ export default class ProcessManager {
     this.processInfos[id].fds.tearDown();
 
     if (process.parentId !== null) {
-      this.processInfos[this.processInfos[id].parentId].foreground =
-        process.foreground;
+      this.processInfos[this.processInfos[id].parentId].isForeground =
+        process.isForeground;
       this.processInfos[process.parentId].children.splice(
         process.children.indexOf(id),
         1
       );
 
       // Pass foreground process id to the terminal driver
-      if (process.foreground !== null) {
-        const __driver = this.driverManager.getDriver(process.foreground.maj);
-        (__driver as TerminalDriver).terminals[
-          process.foreground.min
-        ].foregroundPid = process.parentId;
+      if (process.isForeground && process.tty !== null) {
+        const __driver = this.driverManager.getDriver(process.tty.maj);
+        (__driver as TerminalDriver).terminals[process.tty.min].foregroundPid =
+          process.parentId;
       }
     }
 
