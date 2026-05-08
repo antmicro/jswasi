@@ -78,13 +78,10 @@ export class ProcFileDescriptor extends AbstractFileDescriptor {
   }
 
   pwrite(
-    _buffer: ArrayBuffer,
+    buffer: ArrayBuffer,
     _offset: bigint
   ): Promise<{ err: number; written: bigint }> {
-    return Promise.resolve({
-      err: constants.WASI_EACCES,
-      written: 0n,
-    });
+    return Promise.resolve(this.procNode.write(buffer));
   }
 
   read(
@@ -174,11 +171,8 @@ export class ProcFileDescriptor extends AbstractFileDescriptor {
     });
   }
 
-  write(_buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
-    return Promise.resolve({
-      err: constants.WASI_EACCES,
-      written: 0n,
-    });
+  write(buffer: ArrayBuffer): Promise<{ err: number; written: bigint }> {
+    return Promise.resolve(this.procNode.write(buffer));
   }
 }
 

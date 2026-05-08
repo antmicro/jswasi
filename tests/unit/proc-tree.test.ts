@@ -263,4 +263,39 @@ describe("Test proc tree", () => {
     // At least starts with process pid
     expect(contents).toMatch(new RegExp(`^${info.id}`));
   });
+
+  test("Reset should work", () => {
+    const reloadMock = jest.fn();
+
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyProcessInfos(pid));
+
+    Object.defineProperty(global, "location", {
+      value: { reload: reloadMock },
+    });
+
+    const sysDirectory = topLevelNode.getNode("sys");
+    expect(sysDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const sysFilestat = sysDirectory.node!.getFilestat();
+    expect(sysFilestat.filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+
+    const resetFile = (sysDirectory.node! as proc.ProcDirectory).getNode(
+      "reset",
+    );
+    expect(resetFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const resetFilestat = resetFile.node!.getFilestat();
+    expect(resetFilestat.filetype).toBe(constants.WASI_FILETYPE_REGULAR_FILE);
+
+    const buffer = new TextEncoder().encode("test");
+    const res = (resetFile.node! as proc.ProcFile).write(buffer.buffer);
+    expect(res.err).toBe(constants.WASI_ESUCCESS);
+    expect(res.written).toBe(BigInt(buffer.byteLength));
+
+    expect(reloadMock).toHaveBeenCalled();
+
+    Object.defineProperty(global, "location", {});
+  });
 });

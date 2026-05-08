@@ -39,6 +39,13 @@ class DummyProcFile implements proc.ProcFile {
   read(): string {
     return this.contents;
   }
+
+  write(_buffer: ArrayBuffer): { err: number; written: bigint } {
+    return {
+      err: constants.WASI_EACCES,
+      written: 0n,
+    };
+  }
 }
 
 class DummyProcDirectory implements proc.ProcDirectory {
@@ -95,6 +102,13 @@ class DummyProcSymlink implements proc.ProcSymlink {
 
   read(): string {
     return this.target;
+  }
+
+  write(_buffer: ArrayBuffer): { err: number; written: bigint } {
+    return {
+      err: constants.WASI_EACCES,
+      written: 0n,
+    };
   }
 }
 

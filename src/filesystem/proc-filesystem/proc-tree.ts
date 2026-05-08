@@ -23,10 +23,12 @@ export interface ProcDirectory extends ProcNode {
 
 export interface ProcFile extends ProcNode {
   read(): string;
+  write(buffer: ArrayBuffer): { err: number; written: bigint };
 }
 
 export interface ProcSymlink extends ProcNode {
   read(): string;
+  write(buffer: ArrayBuffer): { err: number; written: bigint };
 }
 
 abstract class AbstractProcSymlink implements ProcSymlink {
@@ -50,6 +52,13 @@ abstract class AbstractProcSymlink implements ProcSymlink {
   }
 
   abstract read(): string;
+
+  write(_buffer: ArrayBuffer): { err: number; written: bigint } {
+    return {
+      err: constants.WASI_EACCES,
+      written: 0n,
+    };
+  }
 }
 
 abstract class AbstractProcFile implements ProcFile {
@@ -71,6 +80,13 @@ abstract class AbstractProcFile implements ProcFile {
   }
 
   abstract read(): string;
+
+  write(_buffer: ArrayBuffer): { err: number; written: bigint } {
+    return {
+      err: constants.WASI_EACCES,
+      written: 0n,
+    };
+  }
 }
 
 abstract class AbstractProcDirectory implements ProcDirectory {
@@ -223,9 +239,63 @@ class CwdSymlink extends AbstractProcSymlink {
   }
 }
 
+class ResetFile extends AbstractProcFile {
+  constructor() {
+    super();
+  }
+
+  read(): string {
+    return "";
+  }
+
+  override write(buffer: ArrayBuffer): { err: number; written: bigint } {
+    location.reload();
+    return {
+      err: constants.WASI_ESUCCESS,
+      written: BigInt(buffer.byteLength),
+    };
+  }
+}
+
+class SysDirectory extends AbstractProcDirectory implements ProcNode {
+  static specialNodes: Record<string, new (pid: number) => ProcNode> = {
+    reset: ResetFile,
+  };
+
+  listNodes(): { err: number; nodes: Record<string, ProcNode> } {
+    let nodes: Record<string, ProcNode> = {};
+
+    for (const [name, callback] of Object.entries(SysDirectory.specialNodes))
+      nodes[name] = new callback(this.pid);
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      nodes,
+    };
+  }
+
+  getNode(name: string): { err: number; node?: ProcNode } {
+    if (name === "") {
+      return { err: constants.WASI_ESUCCESS, node: this };
+    }
+
+    if (name === "reset") {
+      return {
+        err: constants.WASI_ESUCCESS,
+        node: new ResetFile(),
+      };
+    }
+    return {
+      err: constants.WASI_ENOENT,
+      node: undefined,
+    };
+  }
+}
+
 export class TopLevelDirectory extends AbstractProcDirectory {
   static specialNodes: Record<string, new (pid: number) => ProcNode> = {
     self: SelfSymlink,
+    sys: SysDirectory,
   };
 
   listNodes(): { err: number; nodes: Record<string, ProcNode> } {
@@ -276,6 +346,11 @@ export class TopLevelDirectory extends AbstractProcDirectory {
       return {
         err: constants.WASI_ESUCCESS,
         node: new MeminfoFile(),
+      };
+    } else if (name === "sys") {
+      return {
+        err: constants.WASI_ESUCCESS,
+        node: new SysDirectory(this.pid),
       };
     }
     return {
