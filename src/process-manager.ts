@@ -188,7 +188,7 @@ export class ProcessInfo {
     public isJob: boolean,
     public foreground: Foreground
   ) {
-    this.timestamp = Math.floor(new Date().getTime() / 1000);
+    this.timestamp = new Date().getTime();
     this.children = [];
   }
 }

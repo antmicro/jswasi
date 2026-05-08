@@ -31,7 +31,7 @@ export interface ProcSymlink extends ProcNode {
 
 abstract class AbstractProcSymlink implements ProcSymlink {
   private static get filestat() {
-    return{
+    return {
       dev: 1n,
       ino: getInodeRandom(),
       filetype: constants.WASI_FILETYPE_SYMBOLIC_LINK,
@@ -126,7 +126,7 @@ export class TopLevelDirectory extends AbstractProcDirectory {
     let nodes: Record<string, ProcNode> = {};
 
     for (const [name, callback] of Object.entries(
-      TopLevelDirectory.specialNodes
+      TopLevelDirectory.specialNodes,
     ))
       nodes[name] = new callback(this.pid);
 
@@ -174,7 +174,7 @@ class ProcessDirectory extends AbstractProcDirectory implements ProcNode {
     let nodes: Record<string, ProcNode> = {};
 
     for (const [name, callback] of Object.entries(
-      ProcessDirectory.specialNodes
+      ProcessDirectory.specialNodes,
     ))
       nodes[name] = new callback(this.pid);
 
