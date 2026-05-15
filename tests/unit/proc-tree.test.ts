@@ -201,15 +201,25 @@ describe("Test proc tree", () => {
       configurable: true,
     });
 
+    let topLevelNode;
+
+    jest.isolateModules(() => {
+      // Used to reload the specialNodes records with performance.memory available
+      const isolatedProc = require("../../src/filesystem/proc-filesystem/proc-tree");
+      isolatedProc.initialize(processManager);
+
+      topLevelNode = isolatedProc.getTopLevelNode(pid);
+    });
+
     jest
       .spyOn(processManager, "processInfos", "get")
       .mockReturnValue(dummyProcessInfos(pid));
 
-    const nodes = topLevelNode.listNodes();
+    const nodes = topLevelNode!.listNodes();
     expect(nodes.err).toBe(constants.WASI_ESUCCESS);
     expect(Object.keys(nodes.nodes)).toContain("meminfo");
 
-    const meminfoFile = topLevelNode.getNode("meminfo");
+    const meminfoFile = topLevelNode!.getNode("meminfo");
     expect(meminfoFile.err).toBe(constants.WASI_ESUCCESS);
 
     const contents = (meminfoFile.node as proc.ProcFile).read();

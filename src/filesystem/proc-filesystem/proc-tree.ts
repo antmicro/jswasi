@@ -105,12 +105,46 @@ abstract class AbstractProcDirectory implements ProcDirectory {
 
   constructor(protected pid: number) {}
 
+  protected abstract getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  >;
+
   getFilestat(): Filestat {
     return AbstractProcDirectory.filestat;
   }
 
-  abstract listNodes(): { err: number; nodes: Record<string, ProcNode> };
-  abstract getNode(path: string): { err: number; node?: ProcNode };
+  listNodes(): { err: number; nodes: Record<string, ProcNode> } {
+    let nodes: Record<string, ProcNode> = {};
+
+    for (const [name, callback] of Object.entries(this.getSpecialNodes()))
+      nodes[name] = new callback(this.pid);
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      nodes,
+    };
+  }
+
+  getNode(name: string): { err: number; node?: ProcNode } {
+    if (name === "")
+      return {
+        err: constants.WASI_ESUCCESS,
+        node: this,
+      };
+
+    if (name in this.getSpecialNodes()) {
+      return {
+        err: constants.WASI_ESUCCESS,
+        node: new (this.getSpecialNodes()[name])(this.pid),
+      };
+    } else {
+      return {
+        err: constants.WASI_ENOENT,
+        node: undefined,
+      };
+    }
+  }
 }
 
 class MountinfoFile extends AbstractProcFile {
@@ -258,62 +292,47 @@ class ResetFile extends AbstractProcFile {
 }
 
 class SysDirectory extends AbstractProcDirectory implements ProcNode {
-  static specialNodes: Record<string, new (pid: number) => ProcNode> = {
+  private static readonly specialNodes: Record<
+    string,
+    new (pid: number) => ProcNode
+  > = {
     reset: ResetFile,
   };
 
-  listNodes(): { err: number; nodes: Record<string, ProcNode> } {
-    let nodes: Record<string, ProcNode> = {};
-
-    for (const [name, callback] of Object.entries(SysDirectory.specialNodes))
-      nodes[name] = new callback(this.pid);
-
-    return {
-      err: constants.WASI_ESUCCESS,
-      nodes,
-    };
-  }
-
-  getNode(name: string): { err: number; node?: ProcNode } {
-    if (name === "") {
-      return { err: constants.WASI_ESUCCESS, node: this };
-    }
-
-    if (name === "reset") {
-      return {
-        err: constants.WASI_ESUCCESS,
-        node: new ResetFile(),
-      };
-    }
-    return {
-      err: constants.WASI_ENOENT,
-      node: undefined,
-    };
+  protected override getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  > {
+    return SysDirectory.specialNodes;
   }
 }
 
 export class TopLevelDirectory extends AbstractProcDirectory {
-  static specialNodes: Record<string, new (pid: number) => ProcNode> = {
+  private static readonly specialNodes: Record<
+    string,
+    new (pid: number) => ProcNode
+  > = {
     self: SelfSymlink,
     sys: SysDirectory,
+    // Add meminfo only for browsers that support performance.memory API
+    // (so Chromium based)
+    ...((performance as any).memory !== undefined
+      ? { meminfo: MeminfoFile }
+      : {}),
   };
 
-  listNodes(): { err: number; nodes: Record<string, ProcNode> } {
-    let nodes: Record<string, ProcNode> = {};
+  protected override getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  > {
+    return TopLevelDirectory.specialNodes;
+  }
 
-    for (const [name, callback] of Object.entries(
-      TopLevelDirectory.specialNodes,
-    ))
-      nodes[name] = new callback(this.pid);
+  override listNodes(): { err: number; nodes: Record<string, ProcNode> } {
+    let nodes: Record<string, ProcNode> = super.listNodes().nodes;
 
     for (const pid of Object.keys(processManager.processInfos))
       nodes[pid.toString()] = new ProcessDirectory(Number(pid));
-
-    if ((performance as any).memory !== undefined) {
-      // Add meminfo only for browsers that support memory.performance API
-      // (so Chromium-based)
-      nodes["meminfo"] = new MeminfoFile();
-    }
 
     return {
       err: constants.WASI_ESUCCESS,
@@ -321,7 +340,7 @@ export class TopLevelDirectory extends AbstractProcDirectory {
     };
   }
 
-  getNode(name: string): { err: number; node?: ProcNode } {
+  override getNode(name: string): { err: number; node?: ProcNode } {
     if (name === "") {
       return { err: constants.WASI_ESUCCESS, node: this };
     }
@@ -334,34 +353,17 @@ export class TopLevelDirectory extends AbstractProcDirectory {
           node: new ProcessDirectory(num),
         };
       }
-    } else if (name === "self") {
-      return {
-        err: constants.WASI_ESUCCESS,
-        node: new SelfSymlink(this.pid),
-      };
-    } else if (
-      name === "meminfo" &&
-      (performance as any).memory !== undefined
-    ) {
-      return {
-        err: constants.WASI_ESUCCESS,
-        node: new MeminfoFile(),
-      };
-    } else if (name === "sys") {
-      return {
-        err: constants.WASI_ESUCCESS,
-        node: new SysDirectory(this.pid),
-      };
     }
-    return {
-      err: constants.WASI_ENOENT,
-      node: undefined,
-    };
+
+    return super.getNode(name);
   }
 }
 
 class ProcessDirectory extends AbstractProcDirectory implements ProcNode {
-  static specialNodes: Record<string, new (pid: number) => ProcNode> = {
+  private static readonly specialNodes: Record<
+    string,
+    new (pid: number) => ProcNode
+  > = {
     mountinfo: MountinfoFile,
     status: StatusFile,
     environ: EnvironFile,
@@ -369,52 +371,10 @@ class ProcessDirectory extends AbstractProcDirectory implements ProcNode {
     cwd: CwdSymlink,
   };
 
-  listNodes(): { err: number; nodes: Record<string, ProcNode> } {
-    let nodes: Record<string, ProcNode> = {};
-
-    for (const [name, callback] of Object.entries(
-      ProcessDirectory.specialNodes,
-    ))
-      nodes[name] = new callback(this.pid);
-
-    return {
-      err: constants.WASI_ESUCCESS,
-      nodes,
-    };
-  }
-
-  getNode(name: string): { err: number; node?: ProcNode } {
-    switch (name) {
-      case "mountinfo":
-        return {
-          err: constants.WASI_ESUCCESS,
-          node: new MountinfoFile(),
-        };
-      case "status":
-        return {
-          err: constants.WASI_ESUCCESS,
-          node: new StatusFile(this.pid),
-        };
-      case "environ":
-        return {
-          err: constants.WASI_ESUCCESS,
-          node: new EnvironFile(this.pid),
-        };
-      case "stat":
-        return {
-          err: constants.WASI_ESUCCESS,
-          node: new StatFile(this.pid),
-        };
-      case "cwd":
-        return {
-          err: constants.WASI_ESUCCESS,
-          node: new CwdSymlink(this.pid),
-        };
-      default:
-        return {
-          err: constants.WASI_ENOENT,
-          node: undefined,
-        };
-    }
+  protected override getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  > {
+    return ProcessDirectory.specialNodes;
   }
 }
