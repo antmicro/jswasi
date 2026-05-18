@@ -1907,7 +1907,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
-    workerConsoleLog(`fd_renumber returned error: ${err}`);
+    workerConsoleLog(`fd_renumber returned ${err}`);
     return err;
   }
 
