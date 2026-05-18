@@ -41,6 +41,7 @@ function onSocketMessage(connection: WebsocketConnection, event: MessageEvent): 
     buf: eventData,
   };
 
+  // Drain pending requests
   while (message.start < message.buf.byteLength && connection.requestQueue.length > 0) {
     const req = connection.requestQueue.shift();
     const returnBuffer = eventData.slice(message.start, message.start + req.len);
@@ -49,23 +50,26 @@ function onSocketMessage(connection: WebsocketConnection, event: MessageEvent): 
       buffer: returnBuffer,
     })
 
-    message.start += req.len
+    message.start += returnBuffer.byteLength;
   }
 
+  // If fully consumed, exit early
   if (message.start >= message.buf.byteLength) {
     return
   }
 
+  // Otherwise, buffer the remaining data for future requests
   connection.msgBuffer.push({
-    start: 0,
+    start: message.start,
     buf: eventData
   });
 
+  // Notify pending poll subs that data is available to read
   for (let req = connection.pollQueue.shift(); req !== undefined; req = connection.pollQueue.shift()) {
     req.resolve({
       userdata: req.userdata,
       error: constants.WASI_ESUCCESS,
-      nbytes: BigInt(eventData.byteLength),
+      nbytes: BigInt(eventData.byteLength - message.start),
       eventType: constants.WASI_EVENTTYPE_FD_READ,
     });
   }
@@ -195,7 +199,7 @@ export class WebsocketDevice
     let socket: WebSocket;
     try {
       socket = new WebSocket(__url);
-    } catch (SyntaxError) {
+    } catch (error) {
       return Promise.resolve({
         err: constants.WASI_EINVAL,
         written: -1n,
