@@ -16,6 +16,7 @@ const config: Config.InitialOptions = {
   moduleNameMapper: {
     "../../third_party/idb-keyval.js": "<rootDir>/mock-idb.ts",
     "^(\\.{1,2}/(?!.*third_party).*)\\.js$": "$1",
+    "(third_party/.*\\.js)$": "<rootDir>/../../$1"
   },
 };
 
