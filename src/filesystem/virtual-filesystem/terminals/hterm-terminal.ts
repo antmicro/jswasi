@@ -384,7 +384,8 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
         err = constants.WASI_ESUCCESS;
         break;
       }
-      case ioctlRequests.TCSETS: {
+      case ioctlRequests.TCSETS:
+      case ioctlRequests.TCSETSW: {
         if (buf.byteLength < 16) break;
 
         const __buf = new Int32Array(buf.buffer, buf.byteOffset);
