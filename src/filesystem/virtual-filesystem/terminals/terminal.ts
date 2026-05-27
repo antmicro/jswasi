@@ -604,7 +604,9 @@ export abstract class AbstractTermiosTerminal implements Terminal {
   }
 
   public sendTerminalOutput(data: string): string {
-    if ((this.termios.oFlag & termios.ONLCR) !== 0) {
+    if (
+      (this.termios.oFlag & termios.OPOST) !== 0 &&
+      (this.termios.oFlag & termios.ONLCR) !== 0) {
       data = data.replaceAll("\n", "\r\n");
     }
     this.printTerminal(data);
