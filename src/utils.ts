@@ -161,3 +161,19 @@ export function printk(msg: string): string {
   const time = String((window.performance.now() / 1000).toFixed(6)).padStart(12, " ");
   return `[${time}] ${msg}`;
 }
+
+export function readLEB128(bytes: Uint8Array, offset: number = 0) {
+  let result = 0;
+  let shift = 0;
+  let bytesRead = 0;
+  let byte;
+
+  do {
+    byte = bytes[offset + bytesRead];
+    result |= (byte & 0x7f) << shift;
+    shift += 7;
+    bytesRead++;
+  } while (byte >= 0x80);
+
+  return { value: result, bytesRead };
+}

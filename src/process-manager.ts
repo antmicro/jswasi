@@ -10,6 +10,10 @@ import {
 } from "./filesystem/virtual-filesystem/devices/driver-manager.js";
 import { TerminalDriver } from "./filesystem/virtual-filesystem/terminals/terminal.js";
 import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
+import {
+  getWasmImportedMemoryInfo,
+  ModuleMemoryInfo,
+} from "./memory-import.js";
 
 export const DEFAULT_WORK_DIR = "/home/ant";
 export const DEFAULT_ENV = {
@@ -28,8 +32,8 @@ export const DEFAULT_ENV = {
   PS2: "> ",
 };
 
-const WASM_EXECUTABLE_MAGICNUMBER = 0x6D736100; // \0asm
-const SHELL_SCRIPT_MAGICNUMBER = 8483; // bytes of a shebang
+export const WASM_EXECUTABLE_MAGICNUMBER = 0x6D736100; // \0asm
+export const SHELL_SCRIPT_MAGICNUMBER = 8483; // bytes of a shebang
 
 export class DescriptorEntry {
   desc: Descriptor;
@@ -197,7 +201,7 @@ export class ProcessInfo {
 export default class ProcessManager {
   public nextProcessId = 0;
   public compiledModules: Record<string, WebAssembly.Module> = {};
-  public memory: WebAssembly.Memory = undefined;
+  public moduleMemoryInfos: Record<string, ModuleMemoryInfo> = {};
 
   constructor(
     private readonly scriptName: string,
@@ -353,21 +357,23 @@ export default class ProcessManager {
             await interpreterDesc.close();
 
             if (!this.compiledModules[interpreter]) {
-              this.compiledModules[interpreter] = await WebAssembly.compile(buffer);
+              this.moduleMemoryInfos[interpreter] =
+                getWasmImportedMemoryInfo(buffer);
+              this.compiledModules[interpreter] =
+                await WebAssembly.compile(buffer);
             }
-          }
-          else {
+          } else {
             console.error(`No such shell: ${interpreter}`);
             await this.terminateProcess(id, constants.WASI_ENOENT);
             return constants.WASI_ENOENT;
           }
-        }
-        else if (isExecutable) {
+        } else if (isExecutable) {
           const buffer = (await desc.arrayBuffer()).buffer;
           await desc.close();
+          this.moduleMemoryInfos[command] = getWasmImportedMemoryInfo(buffer);
           this.compiledModules[command] = await WebAssembly.compile(buffer);
         }
-     }
+      }
     } catch (e) {
       let errno;
       if (
@@ -417,6 +423,7 @@ export default class ProcessManager {
         id,
         args,
         env,
+        this.moduleMemoryInfos[command],
       ]);
     }
 
