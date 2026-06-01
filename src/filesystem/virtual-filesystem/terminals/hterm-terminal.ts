@@ -419,12 +419,9 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
       }
       default: {
         if (
-          ioctlRequests.TCGETS <= request &&
-          request <= ioctlRequests.FIOQSIZE &&
-          ioctlRequests.TIOCGPTN <= request &&
-          request <= ioctlRequests.TIOCGEXCL &&
-          ioctlRequests.FIOSETOWN <= request &&
-          request <= ioctlRequests.SIOCGSTAMPNS
+          (ioctlRequests.TCGETS <= request && request <= ioctlRequests.FIOQSIZE) ||
+          (ioctlRequests.TIOCGPTN <= request && request <= ioctlRequests.TIOCGEXCL) ||
+          (ioctlRequests.FIOSETOWN <= request && request <= ioctlRequests.SIOCGSTAMPNS)
         ) {
           err = constants.WASI_ENOTSUP;
         } else {
