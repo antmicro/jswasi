@@ -263,7 +263,7 @@ export class TerminalBuffer {
       return this.end - this.start
     } else {
       const fullBuffersLen = this.buffers.length > 2 ?
-        this.buffers.length * this.bufSize :
+        (this.buffers.length - 2) * this.bufSize :
         0;
       return this.bufSize - this.start + this.end + fullBuffersLen;
     }
