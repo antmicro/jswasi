@@ -352,7 +352,7 @@ class VirtualHtermDescriptor extends AbstractVirtualDeviceDescriptor {
       };
     } else if (this.fdstat.fs_flags & constants.WASI_FDFLAG_NONBLOCK) {
       return {
-        err: constants.WASI_ESUCCESS,
+        err: constants.WASI_EAGAIN,
         buffer: new ArrayBuffer(0),
       };
     } else {
