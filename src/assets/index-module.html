@@ -22,19 +22,39 @@
           }
         return null;
       };
-      Promise.all([hterm.initPromise, lib.initPromise]).then(async () => {
-        lib.antmicroStyle["screen-padding-size"] = "8";
-        lib.setAntmicroStyle();
-        // hterm prints warnings that we don't really care about
-        let tempWarnlog = console.warn;
-        console.warn = () => {};
-        const terminal = new hterm.Terminal();
-        terminal.decorate(document.querySelector("#terminal"));
-        console.warn = tempWarnlog;
-        const jswasi = new Jswasi();
-        await jswasi.attachDevice({terminal}, 1);
-        await jswasi.init();
+      await Promise.all([hterm.initPromise, lib.initPromise]);
+
+      lib.antmicroStyle["screen-padding-size"] = "8";
+      lib.setAntmicroStyle();
+
+      // hterm prints warnings that we don't really care about
+      let tempWarnlog = console.warn;
+      console.warn = () => {};
+
+      let releaseStorage;
+      const screenReady = new Promise((resolve) => {
+        releaseStorage = resolve;
       });
+
+      class ScreenReadyStorage extends lib.Storage.Local {
+        async getItems(keys) {
+          await screenReady;
+          return super.getItems(keys);
+        }
+      }
+
+      const terminal = new hterm.Terminal({
+        storage: new ScreenReadyStorage(),
+      });
+
+      terminal.decorate(document.querySelector("#terminal"));
+      await terminal.screenReady();
+      releaseStorage();
+      console.warn = tempWarnlog;
+
+      const jswasi = new Jswasi();
+      await jswasi.attachDevice({terminal}, 1);
+      await jswasi.init();
     </script>
     <div id="terminal"></div>
   </body>
