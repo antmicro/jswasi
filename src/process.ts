@@ -352,30 +352,29 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     const view = new DataView(memory.buffer);
 
     let writeLen = 0;
-    const bufferBytes: number[] = [];
+    const contents: Uint8Array[] = [];
+
     for (let i = 0; i < iovsLen; i += 1) {
       const ptr_pos = iovs + i * 8;
       const buf = view.getUint32(ptr_pos, true);
       const bufLen = view.getUint32(ptr_pos + 4, true);
 
-      const iov = new Uint8Array(
-        memory.buffer,
-        buf,
-        bufLen
-      );
+      const content = new Uint8Array(memory.buffer, buf, bufLen);
+      contents.push(content);
 
-      for (let b = 0; b < iov.byteLength; b += 1) {
-        bufferBytes.push(iov[b]);
-      }
-      writeLen += iov.byteLength;
+      writeLen += content.byteLength;
     }
 
     const sharedBuffer = new SharedArrayBuffer(4 + 4 + writeLen); // lock + written + content
     const lck = new Int32Array(sharedBuffer, 0, 1);
     const written = new Int32Array(sharedBuffer, 4, 1);
     lck[0] = -1;
-    let content = Uint8Array.from(bufferBytes);
-    sendToKernel(["fd_write", { sharedBuffer, fd, content } as FdWriteArgs]);
+
+    sendToKernel([
+      "fd_write",
+      { sharedBuffer, fd, contents, size: writeLen } as FdWriteArgs,
+    ]);
+
     Atomics.wait(lck, 0, -1);
 
     const err = Atomics.load(lck, 0);
