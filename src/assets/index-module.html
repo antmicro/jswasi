@@ -10,18 +10,6 @@
       import { hterm, lib } from "../third_party/hterm.js"
       import { Jswasi } from "./jswasi.js";
 
-      window.buffer = "";
-      window.alive = true;
-      window.exitCode = 0;
-      window.stdoutReadData = function () {
-        if (window.stdoutAttached !== undefined)
-          if (window.stdoutAttached && buffer.length > 0) {
-            let tmp = window.buffer;
-            window.buffer = "";
-            return tmp;
-          }
-        return null;
-      };
       await Promise.all([hterm.initPromise, lib.initPromise]);
 
       lib.antmicroStyle["screen-padding-size"] = "8";
