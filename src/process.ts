@@ -51,9 +51,6 @@ import {
 type ptr = number;
 
 type WASICallbacks = {
-  // helper
-  setModuleInstance: (instance: WebAssembly.Instance) => void;
-
   // official syscalls
   environ_sizes_get: (environCountPtr: ptr, environSizePtr: ptr) => number;
   environ_get: (environ: ptr, environBuf: ptr) => number;
@@ -189,6 +186,7 @@ let mod: string;
 let myself: number;
 let programArgs: string[];
 let env: Record<string, string>;
+let memory: WebAssembly.Memory;
 
 onmessage = async (e) => {
   if (!started) {
@@ -235,12 +233,6 @@ const whenceMap: Record<number, number> = {
 };
 
 function WASI(snapshot0: boolean = false): WASICallbacks {
-  let moduleInstanceExports: WebAssembly.Exports;
-
-  function setModuleInstance(instance: WebAssembly.Instance): void {
-    moduleInstanceExports = instance.exports;
-  }
-
   function environ_sizes_get(environCountPtr: ptr, environSizePtr: ptr) {
     workerConsoleLog(
       `environ_sizes_get(0x${environCountPtr.toString(
@@ -248,9 +240,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       )}, 0x${environSizePtr.toString(16)})`
     );
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     const environCount = Object.keys(env).length;
     view.setUint32(environCountPtr, environCount, true);
@@ -270,12 +260,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       `environ_get(${environ.toString(16)}, ${environBuf.toString(16)})`
     );
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     Object.entries(env).forEach(([key, val], i) => {
       // set pointer address to beginning of next key value pair
@@ -295,9 +281,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       `args_sizes_get(${argc.toString(16)}, ${argvBufSize.toString(16)})`
     );
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     view.setUint32(argc, programArgs.length, true);
     view.setUint32(
@@ -313,12 +297,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function args_get(argv: ptr, argvBuf: ptr) {
     workerConsoleLog(`args_get(${argv}, 0x${argvBuf.toString(16)})`);
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     programArgs.forEach((arg, i) => {
       // set pointer address to beginning of next key value pair
@@ -336,9 +316,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function fd_fdstat_get(fd: number, buf: ptr) {
     workerConsoleLog(`fd_fdstat_get(${fd}, 0x${buf.toString(16)})`);
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     // lock, filetype, rights base, rights inheriting, fd flags
     const sharedBuffer = new SharedArrayBuffer(4 + 24);
@@ -371,9 +349,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function fd_write(fd: number, iovs: ptr, iovsLen: number, nWritten: ptr) {
     workerConsoleLog(`fd_write(${fd}, ${iovs}, ${iovsLen}, ${nWritten})`);
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     let writeLen = 0;
     const bufferBytes: number[] = [];
@@ -383,7 +359,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       const bufLen = view.getUint32(ptr_pos + 4, true);
 
       const iov = new Uint8Array(
-        (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
+        memory.buffer,
         buf,
         bufLen
       );
@@ -419,9 +395,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function random_get(bufPtr: ptr, bufLen: number) {
     workerConsoleLog(`random_get(${bufPtr}, ${bufLen})`);
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
     const numbers = new Uint8Array(bufLen);
     crypto.getRandomValues(numbers);
     view8.set(numbers, bufPtr);
@@ -434,9 +408,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function clock_time_get(clockId: number, precision: number, time: ptr) {
     workerConsoleLog(`clock_time_get(${clockId}, ${precision}, ${time})`);
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     view.setBigUint64(time, utils.now(clockId, CPUTIME_START), true);
     return constants.WASI_ESUCCESS;
@@ -457,9 +429,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function fd_filestat_get(fd: number, buf: ptr) {
     workerConsoleLog(`fd_filestat_get(${fd}, 0x${buf.toString(16)})`);
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     const sharedBuffer = new SharedArrayBuffer(4 + 64); // lock, stat buffer
     const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -513,12 +483,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function fd_read(fd: number, iovs: ptr, iovsLen: number, nRead: ptr) {
     workerConsoleLog(`fd_read(${fd}, ${iovs}, ${iovsLen}, ${nRead})`);
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     let read = 0;
     for (let i = 0; i < iovsLen; i += 1) {
@@ -561,12 +527,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     if (fd > 2)
       workerConsoleLog(`fd_pread(${fd}, ${iovs}, ${iovsLen}, ${nRead})`);
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     let read = 0;
     for (let i = 0; i < iovsLen; i += 1) {
@@ -609,12 +571,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       `fd_readdir(${fd}, ${buf}, ${bufLen}, ${cookie}, ${bufUsedPtr})`
     );
 
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufLen); // lock, buf_used, buf
     const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -641,9 +599,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function fd_seek(fd: number, offset: BigInt, whence: number, newOffset: ptr) {
     workerConsoleLog(`fd_seek(${fd}, ${offset}, ${whence}, ${newOffset})`);
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     const sharedBuffer = new SharedArrayBuffer(4 + 4 + 8); // lock, _padding, file_pos
     const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -668,9 +624,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   function path_create_directory(fd: number, pathPtr: ptr, pathLen: number) {
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
@@ -700,12 +654,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     pathLen: number,
     buf: ptr
   ) {
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
@@ -776,12 +726,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     fdFlags: number,
     openedFdPtr: ptr
   ) {
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
+    const view8 = new Uint8Array(memory.buffer);
 
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
@@ -842,11 +788,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       buf_ptr: number;
     } = JSON.parse(syscallDataJson);
     const json = new TextDecoder().decode(
-      new Uint8Array(
-        (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
-        buf_ptr,
-        buf_len
-      )
+      new Uint8Array(memory.buffer, buf_ptr, buf_len).slice(0),
     );
     switch (command) {
       case "spawn": {
@@ -882,9 +824,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           `${path} ${args} ${extended_env} ${background} ${redirects_ptr}, ${n_redirects}`
         );
 
-        const view = new DataView(
-          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-        );
+        const view = new DataView(memory.buffer);
         let redirects: Redirect[] = [];
         let redirectsPtr = redirects_ptr;
 
@@ -911,7 +851,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
               let path_ptr = view.getUint32(data_ptr, true);
               let path_len = view.getUint32(data_ptr + 4, true);
               let path = new TextDecoder().decode(
-                view.buffer.slice(path_ptr, path_ptr + path_len)
+                new Uint8Array(memory.buffer, path_ptr, path_len).slice(0),
               );
 
               redirect.path = path;
@@ -1317,9 +1257,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           data_len: number;
         } = JSON.parse(json);
 
-        const view8 = new Uint8Array(
-          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-        );
+        const view8 = new Uint8Array(memory.buffer);
 
         const sourcePath = new TextDecoder().decode(
           view8.slice(source, source + source_len)
@@ -1374,9 +1312,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
           path_len: number;
         } = JSON.parse(json);
 
-        const view8 = new Uint8Array(
-          (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-        );
+        const view8 = new Uint8Array(memory.buffer);
 
         const path_ = new TextDecoder().decode(
           view8.slice(path, path + path_len)
@@ -1494,12 +1430,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(
       `path_readlink(${fd}, ${pathPtr}, ${pathLen}, ${bufferPtr}, ${bufferLen}, ${bufferUsedPtr})`
     );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
+    const view = new DataView(memory.buffer);
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
     );
@@ -1508,11 +1440,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     if (path[0] === "!") {
       const outputBuffer =
         bufferPtr !== 0
-          ? new Uint8Array(
-              (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
-              bufferPtr,
-              bufferLen
-            )
+          ? new Uint8Array(memory.buffer, bufferPtr, bufferLen)
           : new Uint8Array();
 
       const { exitStatus, outputSize } = specialParse(
@@ -1557,9 +1485,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function path_remove_directory(fd: number, pathPtr: ptr, pathLen: number) {
     workerConsoleLog(`path_remove_directory(${fd}, ${pathPtr}, ${pathLen})`);
 
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
@@ -1586,9 +1512,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     newPathPtr: ptr,
     newPathLen: number
   ) {
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
     const oldPath = new TextDecoder().decode(
       view8.slice(oldPathPtr, oldPathPtr + oldPathLen)
     );
@@ -1615,9 +1539,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   function path_unlink_file(fd: number, pathPtr: ptr, pathLen: number) {
     workerConsoleLog(`path_unlink_file(${fd}, ${pathPtr}, ${pathLen})`);
 
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const path = new TextDecoder().decode(
       view8.slice(pathPtr, pathPtr + pathLen)
@@ -1642,9 +1564,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function fd_prestat_get(fd: number, buf: ptr) {
     workerConsoleLog(`fd_prestat_get(${fd}, 0x${buf.toString(16)})`);
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     const sharedBuffer = new SharedArrayBuffer(4 + 4 + 1); // lock, name length, preopen_type
     const lck = new Int32Array(sharedBuffer, 0, 1);
@@ -1672,10 +1592,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(
       `fd_prestat_dir_name(${fd}, 0x${pathPtr.toString(16)}, ${pathLen})`
     );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
-
+    const view8 = new Uint8Array(memory.buffer);
     const sharedBuffer = new SharedArrayBuffer(4 + pathLen); // lock, path
     const lck = new Int32Array(sharedBuffer, 0, 1);
     lck[0] = -1;
@@ -1724,9 +1641,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
         16
       )}, ${oldPathLen}, ${newFd}, 0x${newPathPtr.toString(16)}, ${newPathLen})`
     );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const oldPath = new TextDecoder().decode(
       view8.slice(oldPathPtr, oldPathPtr + oldPathLen)
@@ -1770,9 +1685,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       `path_link(${oldFd}, ${oldFlags}, ${oldPathPtr}, ${oldPathLen}, ${newFd}, ${newPathPtr}, ${newPathLen})`
     );
 
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const oldPath = new TextDecoder().decode(
       view8.slice(oldPathPtr, oldPathPtr + oldPathLen)
@@ -1813,9 +1726,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(
       `poll_oneoff(${subscriptionsPtr}, ${eventsPtr}, ${nSubscriptions}, ${nEvents})`
     );
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
     // Buffer for sending occured events from kernel back to the process
     // it can hold up to nSubscriptions events
     const eventBuf = new SharedArrayBuffer(POLL_EVENT_BUFSIZE * nSubscriptions);
@@ -1915,11 +1826,9 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     }
 
     const nOccured = lock[1];
-    new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer,
-      eventsPtr,
-      nOccured * POLL_EVENT_BUFSIZE
-    ).set(new Uint8Array(eventBuf, 0, nOccured * POLL_EVENT_BUFSIZE));
+    new Uint8Array(memory.buffer, eventsPtr, nOccured * POLL_EVENT_BUFSIZE).set(
+      new Uint8Array(eventBuf, 0, nOccured * POLL_EVENT_BUFSIZE),
+    );
 
     view.setInt32(nEvents, nOccured, true);
     return constants.WASI_ESUCCESS;
@@ -1988,9 +1897,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
   function fd_tell(fd: number, pos: ptr) {
     workerConsoleLog(`fd_tell(${fd}, 0x${pos.toString(16)})`);
-    const view = new DataView(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view = new DataView(memory.buffer);
 
     const sharedBuffer = new SharedArrayBuffer(8 + 4); // offset, lock
     const offset = new BigInt64Array(sharedBuffer, 0, 1);
@@ -2022,9 +1929,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     workerConsoleLog(
       `path_filestat_set_times(${fd}, ${flags}, ${path}, ${path_len}, ${st_atim}, ${st_mtim}, ${fst_flags})`
     );
-    const view8 = new Uint8Array(
-      (moduleInstanceExports["memory"] as WebAssembly.Memory).buffer
-    );
+    const view8 = new Uint8Array(memory.buffer);
 
     const path_ = new TextDecoder().decode(view8.slice(path, path + path_len));
     const sharedBuffer = new SharedArrayBuffer(4);
@@ -2101,8 +2006,6 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   }
 
   return {
-    setModuleInstance,
-
     environ_sizes_get,
     args_sizes_get,
     fd_prestat_get,
@@ -2159,24 +2062,46 @@ async function importWasmModule(
 ) {
   let imps = WebAssembly.Module.imports(module);
   let wasiCallbacks;
-  if (imps[0].module === "wasi_unstable") {
-    wasiCallbacks = wasiCallbacksConstructor(true);
-  } else if (imps[0].module === "wasi_snapshot_preview1") {
-    wasiCallbacks = wasiCallbacksConstructor(false);
-  } else {
-    throw Error("Unsupported wasm format");
+  let supportsSharedMemory = false;
+
+  for (const imp of imps) {
+    if (imp.module === "env" && imp.name === "memory") {
+      supportsSharedMemory = true;
+    } else if (wasiCallbacks === undefined) {
+      if (imp.module === "wasi_unstable")
+        wasiCallbacks = wasiCallbacksConstructor(true);
+      else if (imp.module === "wasi_snapshot_preview1")
+        wasiCallbacks = wasiCallbacksConstructor(false);
+      else throw Error("Unsupported wasm format");
+    } else if (supportsSharedMemory) break;
   }
+
   const moduleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,
+    env: {
+      memory,
+    },
   };
+
+  if (supportsSharedMemory) {
+    // TODO: Check needed initial memory dynamically
+    memory = new WebAssembly.Memory({
+      initial: 32,
+      maximum: 65536,
+      shared: supportsSharedMemory,
+    });
+    moduleImports.env.memory = memory;
+  }
 
   if (WebAssembly.instantiate) {
     workerConsoleLog("WebAssembly.instantiate");
 
     const instance = await WebAssembly.instantiate(module, moduleImports);
 
-    wasiCallbacks.setModuleInstance(instance);
+    if (!supportsSharedMemory)
+      memory = instance.exports["memory"] as WebAssembly.Memory;
+
     try {
       // @ts-ignore
       // eslint-disable-next-line no-underscore-dangle

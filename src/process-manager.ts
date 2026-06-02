@@ -197,6 +197,7 @@ export class ProcessInfo {
 export default class ProcessManager {
   public nextProcessId = 0;
   public compiledModules: Record<string, WebAssembly.Module> = {};
+  public memory: WebAssembly.Memory = undefined;
 
   constructor(
     private readonly scriptName: string,
