@@ -51,6 +51,14 @@ import { ModuleMemoryInfo } from "./memory-import.js";
 
 type ptr = number;
 
+type WASIModuleImports = {
+  wasi_snapshot_preview1: WASICallbacks;
+  wasi_unstable: WASICallbacks;
+  env?: {
+    memory: WebAssembly.Memory;
+  };
+};
+
 type WASICallbacks = {
   // official syscalls
   environ_sizes_get: (environCountPtr: ptr, environSizePtr: ptr) => number;
@@ -2069,12 +2077,6 @@ async function importWasmModule(
   let wasiCallbacks;
 
   for (const imp of imps) {
-    console.log(imp);
-  }
-
-  console.log("imported memory");
-
-  for (const imp of imps) {
     if (imp.module === "wasi_snapshot_preview1") {
       wasiCallbacks = wasiCallbacksConstructor(false);
       break;
@@ -2086,12 +2088,9 @@ async function importWasmModule(
 
   if (wasiCallbacks === undefined) throw Error("Unsupported wasm format");
 
-  const moduleImports = {
+  const moduleImports: WASIModuleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,
-    env: {
-      memory,
-    },
   };
 
   if (memoryInfo?.isShared) {
@@ -2100,7 +2099,7 @@ async function importWasmModule(
       maximum: 65536,
       shared: true,
     });
-    moduleImports.env.memory = memory;
+    moduleImports.env = { memory };
   }
 
   if (WebAssembly.instantiate) {
