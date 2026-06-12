@@ -2073,6 +2073,11 @@ async function importWasmModule(
   module: WebAssembly.Module,
   wasiCallbacksConstructor: (snapshot0: boolean) => WASICallbacks,
 ) {
+  if (!WebAssembly.instantiate) {
+    console.error("WebAssembly.instantiate is not supported");
+    return;
+  }
+
   let imps = WebAssembly.Module.imports(module);
   let wasiCallbacks;
 
@@ -2102,24 +2107,20 @@ async function importWasmModule(
     moduleImports.env = { memory };
   }
 
-  if (WebAssembly.instantiate) {
-    workerConsoleLog("WebAssembly.instantiate");
+  workerConsoleLog("WebAssembly.instantiate");
 
-    const instance = await WebAssembly.instantiate(module, moduleImports);
-    if (!memoryInfo?.isShared)
-      memory = instance.exports["memory"] as WebAssembly.Memory;
+  const instance = await WebAssembly.instantiate(module, moduleImports);
+  if (!memoryInfo?.isShared)
+    memory = instance.exports["memory"] as WebAssembly.Memory;
 
-    try {
-      // @ts-ignore
-      // eslint-disable-next-line no-underscore-dangle
-      instance.exports._start();
-      doExit(0);
-    } catch (error: any) {
-      workerConsoleLog(`error: ${error}`);
-      doExit(255);
-    }
-  } else {
-    workerConsoleLog("WebAssembly.instantiate is not supported");
+  try {
+    // @ts-ignore
+    // eslint-disable-next-line no-underscore-dangle
+    instance.exports._start();
+    doExit(0);
+  } catch (error: any) {
+    workerConsoleLog(`error: ${error}`);
+    doExit(255);
   }
 }
 
