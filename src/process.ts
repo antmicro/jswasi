@@ -54,6 +54,9 @@ type ptr = number;
 type WASIModuleImports = {
   wasi_snapshot_preview1: WASICallbacks;
   wasi_unstable: WASICallbacks;
+  wasi: {
+    "thread-spawn": (startArgs: ptr) => number;
+  };
   env?: {
     memory: WebAssembly.Memory;
   };
@@ -2096,6 +2099,12 @@ async function importWasmModule(
   const moduleImports: WASIModuleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,
+    wasi: {
+      "thread-spawn": (_startArgs: ptr) => {
+        console.error("thread-spawn is not yet implemented");
+        return -constants.WASI_ENOTSUP;
+      },
+    },
   };
 
   if (memoryInfo?.isShared) {
