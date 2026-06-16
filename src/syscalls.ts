@@ -41,6 +41,7 @@ import {
   MknodArgs,
   UnameArgs,
   UnameNameType,
+  ThreadSpawnArgs,
 } from "./types.js";
 import ProcessManager, { DescriptorEntry } from "./process-manager.js";
 import { EventSource } from "./devices.js";
@@ -1330,6 +1331,16 @@ export default async function syscallCallback(
         name.set(new TextEncoder().encode(nameVal), 0);
       }
       Atomics.store(lck, 0, err);
+      Atomics.notify(lck, 0);
+      break;
+    }
+
+    case "thread-spawn": {
+      const { sharedBuffer, processMemory, startArgsPtr } = data as ThreadSpawnArgs; 
+      const lck = new Int32Array(sharedBuffer, 0, 1);
+      const tid = await processManager.spawnThread(processId, processMemory, startArgsPtr);
+
+      Atomics.store(lck, 0, tid);
       Atomics.notify(lck, 0);
       break;
     }

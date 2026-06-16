@@ -430,6 +430,46 @@ export default class ProcessManager {
     return id;
   }
 
+  async spawnThread(
+    processId: number,
+    processMemory: WebAssembly.Memory,
+    startArgsPtr: number
+  ): Promise<number> {
+    const id = this.nextProcessId++;
+    const worker = new Worker(this.scriptName, { type: "module" });
+
+    const process = this.processInfos[processId];
+
+    this.processInfos[id] = new ProcessInfo(
+      id,
+      process.cmd,
+      worker,
+      process.fds.clone(),
+      process.id,
+      process.parentLock,
+      this.syscallCallback,
+      process.env,
+      process.cwd,
+      false,
+      null,
+      false,
+    );
+
+    worker.onmessage = (event) => this.syscallCallback(event, this);
+    const module = this.compiledModules[process.cmd];
+
+    this.processInfos[id].worker.postMessage([
+      "start_thread",
+      module,
+      id,
+      processMemory,
+      startArgsPtr,
+      process.env,
+    ]);
+
+    return id;
+  }
+
   async terminateProcess(id: number, exitNo: number = 0) {
     const process = this.processInfos[id];
 

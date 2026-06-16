@@ -46,6 +46,7 @@ import {
   UmountArgs,
   MknodArgs,
   UnameArgs,
+  ThreadSpawnArgs,
 } from "./types.js";
 import { ModuleMemoryInfo } from "./memory-import.js";
 
@@ -54,9 +55,7 @@ type ptr = number;
 type WASIModuleImports = {
   wasi_snapshot_preview1: WASICallbacks;
   wasi_unstable: WASICallbacks;
-  wasi: {
-    "thread-spawn": (startArgs: ptr) => number;
-  };
+  wasi: WASIThreadsCallbacks,
   env?: {
     memory: WebAssembly.Memory;
   };
@@ -191,6 +190,10 @@ type WASICallbacks = {
   proc_exit: (exitCode: number) => void;
 };
 
+type WASIThreadsCallbacks = {
+  "thread-spawn": (startArgs: ptr) => number;
+}
+
 const CPUTIME_START = utils.msToNs(performance.now());
 
 let started: boolean;
@@ -200,6 +203,7 @@ let programArgs: string[];
 let env: Record<string, string>;
 let memory: WebAssembly.Memory;
 let memoryInfo: ModuleMemoryInfo | null;
+let threadStartArgs: ptr | undefined = undefined;
 
 onmessage = async (e) => {
   if (!started) {
@@ -212,6 +216,10 @@ onmessage = async (e) => {
       } catch (err) {
         sendToKernel(["console", `Worker failed: ${err}`]);
       }
+    } else if (e.data[0] === "start_thread") {
+      started = true;
+      [, mod, myself, memory, threadStartArgs, env] = e.data;
+      await start_wasm();
     }
   }
 };
@@ -2072,6 +2080,35 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
   };
 }
 
+function WASIThreads(): WASIThreadsCallbacks {
+  function thread_spawn(startArgs: ptr): number {
+    workerConsoleLog(`thread_spawn for pid ${myself}`);
+    const sharedBuffer = new SharedArrayBuffer(4);
+    const lck = new Int32Array(sharedBuffer, 0, 1);
+    lck[0] = -1;
+
+    sendToKernel(["thread-spawn",
+                 { sharedBuffer, processMemory: memory, startArgsPtr: startArgs } as ThreadSpawnArgs]);
+    Atomics.wait(lck, 0, -1);
+
+    const tid = Atomics.load(lck, 0);
+    return tid;
+  }
+
+  return {
+    "thread-spawn": thread_spawn,
+  }
+}
+
+async function startThread(module: WebAssembly.Module, moduleImports: WASIModuleImports) {
+  moduleImports.env = { memory };
+  workerConsoleLog(`WebAssembly.instantiate thread`);
+  const instance = await WebAssembly.instantiate(module, moduleImports);
+
+  // @ts-ignore
+  instance.exports.wasi_thread_start(myself, threadStartArgs);
+ }
+
 async function importWasmModule(
   module: WebAssembly.Module,
   wasiCallbacksConstructor: (snapshot0: boolean) => WASICallbacks,
@@ -2099,15 +2136,23 @@ async function importWasmModule(
   const moduleImports: WASIModuleImports = {
     wasi_snapshot_preview1: wasiCallbacks,
     wasi_unstable: wasiCallbacks,
-    wasi: {
-      "thread-spawn": (_startArgs: ptr) => {
-        console.error("thread-spawn is not yet implemented");
-        return -constants.WASI_ENOTSUP;
-      },
-    },
+    wasi: WASIThreads(),
   };
 
+  if (threadStartArgs) {
+    try {
+      await startThread(module, moduleImports);
+      doExit(0);
+    } catch (error) {
+      workerConsoleLog(`Error while starting thread: ${error}`)
+      doExit(255);
+    }
+
+    return;
+  }
+
   if (memoryInfo?.isShared) {
+    workerConsoleLog("Process will use shared memory");
     memory = new WebAssembly.Memory({
       initial: memoryInfo.pages,
       maximum: 65536,

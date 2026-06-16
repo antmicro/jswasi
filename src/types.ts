@@ -267,3 +267,9 @@ export type UnameArgs = {
   nameType: number;
   bufLen: number;
 };
+
+export type ThreadSpawnArgs = {
+  sharedBuffer: SharedArrayBuffer;
+  processMemory: WebAssembly.Memory;
+  startArgsPtr: number;
+};
