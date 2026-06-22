@@ -452,7 +452,7 @@ export default class ProcessManager {
       process.id,
       process.cmd,
       worker,
-      process.fds.clone(),
+      process.fds,
       process.id,
       null,
       this.syscallCallback,
@@ -491,7 +491,8 @@ export default class ProcessManager {
     }
 
     // close/flush all opened files to make sure written contents are saved to persistent storage
-    this.processInfos[id].fds.tearDown();
+    if (process.id === process.tgid)
+      this.processInfos[id].fds.tearDown();
 
     if (process.parentId !== null && this.processInfos[process.parentId] !== undefined) {
       this.processInfos[this.processInfos[id].parentId].isForeground =
