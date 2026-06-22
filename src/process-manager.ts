@@ -178,6 +178,7 @@ export class ProcessInfo {
 
   constructor(
     public id: number,
+    public tgid: number,
     public cmd: string,
     public worker: Worker,
     public fds: FdTable,
@@ -242,6 +243,7 @@ export default class ProcessManager {
     isForeground: boolean = false,
   ): Promise<number> {
     const id = this.nextProcessId;
+    const tgid = id;
     this.nextProcessId += 1;
     const worker = new Worker(this.scriptName, { type: "module" });
 
@@ -259,6 +261,7 @@ export default class ProcessManager {
 
     this.processInfos[id] = new ProcessInfo(
       id,
+      tgid,
       command,
       worker,
       fds,
@@ -433,20 +436,25 @@ export default class ProcessManager {
   async spawnThread(
     processId: number,
     processMemory: WebAssembly.Memory,
-    startArgsPtr: number
+    startArgsPtr: number,
   ): Promise<number> {
     const id = this.nextProcessId++;
     const worker = new Worker(this.scriptName, { type: "module" });
 
     const process = this.processInfos[processId];
 
+    if (process === undefined) {
+      return -constants.WASI_ENOENT;
+    }
+
     this.processInfos[id] = new ProcessInfo(
       id,
+      process.id,
       process.cmd,
       worker,
       process.fds.clone(),
       process.id,
-      process.parentLock,
+      null,
       this.syscallCallback,
       process.env,
       process.cwd,
@@ -454,6 +462,8 @@ export default class ProcessManager {
       null,
       false,
     );
+
+    process["children"].push(id);
 
     worker.onmessage = (event) => this.syscallCallback(event, this);
     const module = this.compiledModules[process.cmd];
@@ -473,10 +483,17 @@ export default class ProcessManager {
   async terminateProcess(id: number, exitNo: number = 0) {
     const process = this.processInfos[id];
 
+    // We are exiting normally, but were killed with SIGKILL by the parent
+    // or the other way around. This might happen when killing a process that
+    // is waiting for its threads to finish
+    if (process === undefined) {
+        return;
+    }
+
     // close/flush all opened files to make sure written contents are saved to persistent storage
     this.processInfos[id].fds.tearDown();
 
-    if (process.parentId !== null) {
+    if (process.parentId !== null && this.processInfos[process.parentId] !== undefined) {
       this.processInfos[this.processInfos[id].parentId].isForeground =
         process.isForeground;
       this.processInfos[process.parentId].children.splice(
