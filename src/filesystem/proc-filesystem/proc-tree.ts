@@ -194,6 +194,7 @@ class StatusFile extends AbstractProcFile {
     const status =
       `Name:\t${name}\n` +
       `State:\tR (running)\n` +
+      `Tgid:\t${processInfo.tgid}\n` +
       `Pid:\t${this.pid}\n` +
       `PPid:\t${processInfo.parentId ?? -1}\n`;
 
@@ -224,6 +225,10 @@ class StatFile extends AbstractProcFile {
     let cutime = 0;
     const cstime = cutime;
 
+    // process group ID and terminal process group ID are the same for now - it means that the process is in the foreground of its terminal
+    const pgrp = info.tgid;
+    const tpgid = pgrp;
+
     let tty = info.tty;
     let ttyNumber = 0;
 
@@ -233,7 +238,7 @@ class StatFile extends AbstractProcFile {
       ttyNumber |= (tty.min & ~0xff) << 12;
     }
 
-    return `${info.id} (${comm}) R ${info.parentId ?? -1} 0 0 ${ttyNumber} 0 0 0 0 0 0 ${utime} ${stime} ${cutime} ${cstime} -2 0 1 0 ${startTime}\n`;
+    return `${info.id} (${comm}) R ${info.parentId ?? -1} ${pgrp} 0 ${ttyNumber} ${tpgid} 0 0 0 0 0 ${utime} ${stime} ${cutime} ${cstime} -2 0 1 0 ${startTime}\n`;
   }
 }
 
@@ -331,8 +336,14 @@ export class TopLevelDirectory extends AbstractProcDirectory {
   override listNodes(): { err: number; nodes: Record<string, ProcNode> } {
     let nodes: Record<string, ProcNode> = super.listNodes().nodes;
 
-    for (const pid of Object.keys(processManager.processInfos))
-      nodes[pid.toString()] = new ProcessDirectory(Number(pid));
+    for (const [pid, process] of Object.entries(processManager.processInfos)) {
+      const numPid = Number(pid)
+      // Linux does not show lightweight processes when
+      // listing the contents of /proc, even though they can be
+      // entered and read
+      if (numPid === process.tgid)
+        nodes[pid.toString()] = new ProcessDirectory(numPid);
+    }
 
     return {
       err: constants.WASI_ESUCCESS,
@@ -359,8 +370,60 @@ export class TopLevelDirectory extends AbstractProcDirectory {
   }
 }
 
-class ProcessDirectory extends AbstractProcDirectory implements ProcNode {
-  private static readonly specialNodes: Record<
+class TaskListDirectory extends AbstractProcDirectory {
+  constructor(private tgid: number) {
+    super(tgid);
+  }
+
+  override listNodes(): { err: number; nodes: Record<string, ProcNode> } {
+    const nodes: Record<string, ProcNode> = {};
+
+    for (const [pid, proc] of Object.entries(processManager.processInfos))
+      if (proc.tgid === this.tgid) nodes[pid.toString()] = new TaskDirectory(Number(pid));
+
+    return {
+      err: constants.WASI_ESUCCESS,
+      nodes,
+    };
+  }
+
+  override getNode(name: string): { err: number; node?: ProcNode } {
+    const numPid = Number(name);
+    if (isNaN(numPid))
+      return {
+        err: constants.WASI_ENOENT,
+        node: undefined,
+      };
+
+    const process = processManager.processInfos[numPid];
+    if (process === undefined)
+      return {
+        err: constants.WASI_ENOENT,
+        node: undefined,
+      };
+
+    if (process.tgid === this.tgid)
+      return {
+        err: constants.WASI_ESUCCESS,
+        node: new TaskDirectory(numPid),
+      };
+
+    return {
+      err: constants.WASI_ENOENT,
+      node: undefined,
+    };
+  }
+
+  protected override getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  > {
+    return {};
+  }
+}
+
+class TaskDirectory extends AbstractProcDirectory implements ProcNode {
+  protected static readonly specialNodes: Record<
     string,
     new (pid: number) => ProcNode
   > = {
@@ -369,6 +432,23 @@ class ProcessDirectory extends AbstractProcDirectory implements ProcNode {
     environ: EnvironFile,
     stat: StatFile,
     cwd: CwdSymlink,
+  };
+
+  protected override getSpecialNodes(): Record<
+    string,
+    new (pid: number) => ProcNode
+  > {
+    return TaskDirectory.specialNodes;
+  }
+}
+
+class ProcessDirectory extends TaskDirectory implements ProcNode {
+  protected static override readonly specialNodes: Record<
+    string,
+    new (pid: number) => ProcNode
+  > = {
+    ...TaskDirectory.specialNodes,
+    task: TaskListDirectory,
   };
 
   protected override getSpecialNodes(): Record<

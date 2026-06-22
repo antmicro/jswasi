@@ -1,4 +1,4 @@
-import ProcessManager from "../../src/process-manager";
+import ProcessManager, { type ProcessInfo } from "../../src/process-manager";
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
 import { DriverManager } from "../../src/filesystem/virtual-filesystem/devices/driver-manager";
 import * as proc from "../../src/filesystem/proc-filesystem/proc-tree";
@@ -7,7 +7,7 @@ import { Filesystem } from "../../src/filesystem/filesystem";
 
 import { jest, test, expect, describe, afterEach, beforeEach, beforeAll } from "@jest/globals";
 
-import { dummyProcessInfos, DummyFilesystem } from "./common";
+import { dummyProcessInfos, DummyFilesystem, dummyThreadInfos } from "./common";
 
 jest.mock("../../src/process-manager");
 jest.mock("../../src/filesystem/top-level-fs");
@@ -19,6 +19,9 @@ describe("Test proc tree", () => {
   const processManager = new ProcessManager("foo", topLevelFs, driverManager);
 
   const pid = 1;
+  const tgid = pid;
+  const tid = tgid + 1;
+
   let topLevelNode: proc.ProcDirectory;
 
   beforeAll(() => {
@@ -80,6 +83,119 @@ describe("Test proc tree", () => {
     const filestat = procDirectory.node!.getFilestat();
     expect(filestat.filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
   });
+
+  test("Process directory should be listed but thread directory should not be listed", () => {
+    const mockedProcessInfos: Record<number, ProcessInfo> = {
+      ...dummyProcessInfos(tgid),
+      ...dummyThreadInfos(tgid, tid),
+    };
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(mockedProcessInfos);
+
+    const nodes = topLevelNode.listNodes();
+
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+    expect(Object.keys(nodes.nodes)).toContain(String(tgid));
+    expect(Object.keys(nodes.nodes)).not.toContain(String(tid));
+  })
+
+  test("Thread directory contents should be listable", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyThreadInfos(tgid, tid));
+
+    const expectedNodes = ["mountinfo", "status", "cwd", "environ", "stat", "task"];
+    const threadDirectory = topLevelNode.getNode(String(tid));
+    expect(threadDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const nodes = (threadDirectory.node! as proc.ProcDirectory).listNodes();
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+
+    expect(Object.keys(nodes.nodes).length).toBeGreaterThan(0);
+    for (const node of Object.keys(nodes.nodes)) {
+      expect(expectedNodes).toContain(node);
+    }
+  })
+
+  test("Task list directory should work", () => {
+    const mockedTgid = 1;
+    const mockedTid = 2;
+
+    const mockedProcessInfos: Record<number, ProcessInfo> = {
+      ...dummyProcessInfos(mockedTgid),
+      ...dummyThreadInfos(mockedTgid, mockedTid),
+    };
+
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(mockedProcessInfos);
+
+    const parentDirectory = topLevelNode.getNode(String(mockedTgid));
+    expect(parentDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const taskListDirectory = (parentDirectory.node! as proc.ProcDirectory).getNode("task");
+    expect(taskListDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const expectedNodes = [mockedTgid.toString(), mockedTid.toString()];
+    const nodes = (taskListDirectory.node! as proc.ProcDirectory).listNodes();
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+
+    expect(Object.keys(nodes.nodes).length).toBeGreaterThan(0);
+    for (const node of Object.keys(nodes.nodes)) {
+      expect(expectedNodes).toContain(node);
+    }
+  })
+
+  test("Task directory should work", () => {
+    const mockedTgid = 1;
+    const mockedTid = 2;
+
+    const mockedProcessInfos: Record<number, ProcessInfo> = {
+      ...dummyProcessInfos(mockedTgid),
+      ...dummyThreadInfos(mockedTgid, mockedTid),
+    };
+
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(mockedProcessInfos);
+
+    const parentDirectory = topLevelNode.getNode(String(mockedTgid));
+    expect(parentDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const taskListDirectory = (parentDirectory.node! as proc.ProcDirectory).getNode("task");
+    expect(taskListDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const taskDirectory = (taskListDirectory.node! as proc.ProcDirectory).getNode(mockedTgid.toString());
+    expect(taskDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const expectedNodes = ["mountinfo", "status", "cwd", "environ", "stat"];
+    const nodes = (taskDirectory.node! as proc.ProcDirectory).listNodes();
+    expect(nodes.err).toBe(constants.WASI_ESUCCESS);
+
+    expect(Object.keys(nodes.nodes).length).toBeGreaterThan(0);
+    for (const node of Object.keys(nodes.nodes)) {
+      expect(expectedNodes).toContain(node);
+    }
+
+    expect((taskDirectory.node! as proc.ProcDirectory).getNode("stat").err).toBe(constants.WASI_ESUCCESS);
+  })
+
+  test("Thread status file should have valid PID and TGID", () => {
+    jest
+      .spyOn(processManager, "processInfos", "get")
+      .mockReturnValue(dummyThreadInfos(tgid, tid));
+
+    const threadDirectory = topLevelNode.getNode(String(tid));
+    expect(threadDirectory.err).toBe(constants.WASI_ESUCCESS);
+
+    const statusFile = (threadDirectory.node! as proc.ProcDirectory).getNode("status");
+    expect(statusFile.err).toBe(constants.WASI_ESUCCESS);
+
+    const contents = (statusFile.node! as proc.ProcFile).read();
+    expect(contents).toContain(`Pid:\t${tid}`);
+    expect(contents).toContain(`Tgid:\t${tgid}`);
+  })
 
   test("Mountinfo file should work", () => {
     jest
@@ -171,6 +287,7 @@ describe("Test proc tree", () => {
     const contents = (environFile.node! as proc.ProcFile).read();
     const expectedEnv = processManager.processInfos[pid].env;
 
+    expect(Object.keys(expectedEnv).length).toBeGreaterThan(0);
     for (const [key, value] of Object.entries(expectedEnv)) {
       expect(contents).toContain(`${key}=${value}\0`);
     }

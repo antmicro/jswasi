@@ -13,6 +13,7 @@ export function dummyProcessInfos(pid: number): Record<number, ProcessInfo> {
 
   pinfos[pid] = {
     pid: pid,
+    tgid: pid,
     cmd: "foo",
     // @ts-ignore
     worker: undefined,
@@ -32,4 +33,34 @@ export function dummyProcessInfos(pid: number): Record<number, ProcessInfo> {
   };
 
   return pinfos;
+}
+
+export function dummyThreadInfos(tgid: number, pid: number): Record<number, ProcessInfo> {
+  if (tgid === pid)
+    throw new RangeError("Thread should have different tgid and pid");
+
+  let pinfos: Record<number, ProcessInfo> = {};
+
+  pinfos[pid] = {
+    pid: pid,
+    tgid: tgid,
+    cmd: "oof",
+    // @ts-ignore
+    worker: undefined,
+    fds: new FdTable({}),
+    parentId: null,
+    parentLock: null,
+    callback: async () => {},
+    env: {
+      foo: "bar",
+      bar: "baz",
+    },
+    cwd: "bar",
+    isJob: false,
+    tty: null,
+    isForeground: false,
+    children: [],
+  }
+
+  return pinfos
 }
