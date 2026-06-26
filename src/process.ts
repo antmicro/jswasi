@@ -1747,7 +1747,7 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
     // it can hold up to nSubscriptions events
     const eventBuf = new SharedArrayBuffer(POLL_EVENT_BUFSIZE * nSubscriptions);
 
-    var minWaitEnd = BigInt(Number.MAX_SAFE_INTEGER);
+    var minWaitEnd = BigInt((1n << 63n) - 1n);
 
     const fdSubs = new Array<FdEventSub>();
 
