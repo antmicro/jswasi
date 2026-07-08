@@ -8,7 +8,7 @@ import {
   DriverManager,
   major,
 } from "./filesystem/virtual-filesystem/devices/driver-manager.js";
-import { printk } from "./utils.js";
+import { formatKernelLog } from "./utils.js";
 // @ts-ignore
 import untar from "./third_party/js-untar.js";
 import { HtermDeviceDriver } from "./filesystem/virtual-filesystem/terminals/hterm-terminal.js";
@@ -33,7 +33,11 @@ export class Jswasi {
   private __printk(msg: string) {
     try {
       const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
-      term.io.println(printk(msg));
+      if (msg === "") {
+        term.io.println("");
+      } else {
+        term.io.println(formatKernelLog(msg));
+      }
     } catch (_) { }
   }
 
@@ -52,7 +56,7 @@ export class Jswasi {
     return this.driverManager.attachDevice(device, major);
   }
 
-  public async tearDown(println: (a: string) => void) {
+  public async tearDown(println: (msg: string) => void) {
     println("Starting purge...");
     const handle = await navigator.storage.getDirectory();
 
@@ -139,40 +143,39 @@ export class Jswasi {
 
       const rootfsTarResponse = await fetch(__rootfs);
       const contentEncoding = rootfsTarResponse.headers.get("Content-Encoding");
+      const contentType = rootfsTarResponse.headers.get("Content-Type");
       let tarStream = rootfsTarResponse.body;
 
-      if (contentEncoding === "gzip") {
+      if (contentEncoding === "gzip" || contentType.includes("gzip")) {
         tarStream = gunzip(tarStream);
-      } else if (!contentEncoding) {
-        const contentType = rootfsTarResponse.headers.get("Content-Type");
-        if (contentType === "application/gzip" || contentType === "application/x-gzip")
-          tarStream = gunzip(tarStream);
       }
 
+      let errMsg = '';
       if (err === constants.WASI_ENOTRECOVERABLE) {
         this.__printk('Root filesystem corrupted, attempting recovery mode');
         this.topLevelFs.removeMount("/");
-        const conf = RECOVERY_MOUNT_CONFIG;
 
         // If there is an error, nothing can be done
-        await mountRootfs(this.topLevelFs, conf);
+        await mountRootfs(this.topLevelFs, RECOVERY_MOUNT_CONFIG);
         this.__printk('VirtualFilesystem mounted on /');
 
-        let initErr = await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
-        if (initErr !== constants.WASI_ESUCCESS) {
-          this.__printk('Could not initialize rootfs in recovery mode. Trying to purge.');
-          await this.tearDown((a: string) => this.__printk(a));
-          return;
-        }
-        await recoveryMotd(this.topLevelFs);
-      } else {
-        let initErr = await initFs(this.topLevelFs, await new Response(tarStream).arrayBuffer());
-        if (initErr !== constants.WASI_ESUCCESS) {
-          this.__printk('Could not initialize rootfs. Trying to purge.');
-          await this.tearDown((a: string) => this.__printk(a));
-          return;
-        }
+        errMsg = 'Could not initialize rootfs in recovery mode. Trying to purge.';
       }
+
+      const tarBuffer = await new Response(tarStream).arrayBuffer();
+      const initErr = await this.initFs(this.topLevelFs, tarBuffer);
+
+      if (initErr !== constants.WASI_ESUCCESS) {
+        errMsg = errMsg || 'Could not initialize rootfs. Trying to purge.';
+        this.__printk(errMsg);
+        await this.tearDown((msg: string) => this.__printk(msg));
+        return;
+      }
+
+      if (err === constants.WASI_ENOTRECOVERABLE) {
+        await recoveryMotd(this.topLevelFs);
+      }
+
       this.__printk('Rootfs initialized');
     }
 
@@ -217,6 +220,69 @@ export class Jswasi {
       tty,
       true
     );
+  }
+
+  // setup filesystem
+  private async initFs(fs: TopLevelFs, tar: ArrayBuffer) : Promise<number> {
+    const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
+
+    this.__printk("Extracting rootfs");
+    const untared = await untar(tar);
+    this.__printk("Extracted rootfs, writing to filesystem");
+
+    term.io.print(formatKernelLog(""));
+    const startColumn = term.getCursorColumn();
+
+    function printProgress(msg: string) {
+      try {
+        const lastColumn = term.getCursorColumn();
+        term.setCursorColumn(startColumn);
+        term.setInsertMode(false);
+        const padding = " ".repeat(Math.max(0, lastColumn - startColumn - msg.length));
+        term.io.print(msg + padding);
+        term.setInsertMode(true);
+      } catch (_) { }
+    }
+
+    for (let i = 0; i < untared.length; i++) {
+      if (i % 50 === 0 || i === untared.length - 1) {
+        printProgress(`Written ${i} of ${untared.length} files...`);
+      }
+      const entry = untared[i];
+      switch (entry.type) {
+        case "":
+        case TAR_FILETYPE.FILE: {
+          let { err, desc } = await fs.open(
+            entry.name, 0, constants.WASI_O_CREAT);
+
+          if (err !== constants.WASI_ESUCCESS)
+            return err;
+
+          const stream = (await desc.writableStream()).stream;
+          await entry.blob.stream().pipeTo(stream);
+
+          await desc.close();
+          break;
+        }
+        case TAR_FILETYPE.DIRECTORY: {
+          const err = await fs.createDir(entry.name)
+          if (err !== constants.WASI_ESUCCESS)
+            return err;
+
+          break;
+        }
+        case TAR_FILETYPE.SYMLINK: {
+          let err = await fs.addSymlink(entry.linkname, entry.name);
+          if (err !== constants.WASI_ESUCCESS)
+            return err;
+
+          break;
+        }
+      }
+    }
+    printProgress(`Written ${untared.length} of ${untared.length} files...`);
+    this.__printk("");
+    return constants.WASI_ESUCCESS;
   }
 }
 
@@ -293,45 +359,6 @@ function gunzip(tarStream: ReadableStream): ReadableStream {
   // @ts-ignore
   const stream = new DecompressionStream("gzip");
   return tarStream.pipeThrough(stream);
-}
-
-// setup filesystem
-async function initFs(fs: TopLevelFs, tar: ArrayBuffer) : Promise<number> {
-  const untared = await untar(tar);
-
-  for (const entry of untared) {
-    switch (entry.type) {
-      case "":
-      case TAR_FILETYPE.FILE: {
-        let { err, desc } = await fs.open(
-          entry.name, 0, constants.WASI_O_CREAT);
-
-        if (err !== constants.WASI_ESUCCESS)
-          return err;
-
-        const stream = (await desc.writableStream()).stream;
-        await entry.blob.stream().pipeTo(stream);
-
-        await desc.close();
-        break;
-      }
-      case TAR_FILETYPE.DIRECTORY: {
-        const err = await fs.createDir(entry.name)
-        if (err !== constants.WASI_ESUCCESS)
-          return err;
-
-        break;
-      }
-      case TAR_FILETYPE.SYMLINK: {
-        let err = await fs.addSymlink(entry.linkname, entry.name);
-        if (err !== constants.WASI_ESUCCESS)
-          return err;
-
-        break;
-      }
-    }
-  }
-  return constants.WASI_ESUCCESS;
 }
 
 function initServiceWorker(): Promise<boolean> {
