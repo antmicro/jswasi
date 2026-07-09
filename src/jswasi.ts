@@ -245,9 +245,7 @@ export class Jswasi {
     }
 
     for (let i = 0; i < untared.length; i++) {
-      if (i % 50 === 0 || i === untared.length - 1) {
-        printProgress(`Written ${i} of ${untared.length} files...`);
-      }
+      printProgress(`Written ${i} of ${untared.length} files...`);
       const entry = untared[i];
       switch (entry.type) {
         case "":
