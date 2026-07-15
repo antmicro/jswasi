@@ -39,7 +39,7 @@ export class WgetDeviceDriver implements DeviceDriver {
 
   async makeRequest(url: string): Promise<{ err: number; minor: number }> {
     try {
-      this.responses[this.topResponseId] = await fetch(url);
+      this.responses[this.topResponseId] = await fetch(url, { credentials: 'include'});
       this.devfs.mknodat(
         undefined,
         `wget0r${this.topResponseId}`,
