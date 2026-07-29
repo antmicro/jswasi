@@ -114,7 +114,7 @@ export class HtermDeviceDriver implements TerminalDriver {
     const __args = args as InitDriverArgs;
 
     this.processManager = __args.processManager;
-    this.terminals = [];
+    this.terminals = {};
     this.freedTerminals = [];
     this.maxTty = 0;
     return constants.WASI_ESUCCESS;

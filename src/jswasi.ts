@@ -30,15 +30,23 @@ export class Jswasi {
   private devFsPromise: Promise<void>;
   public jsInterface: JsInterface;
 
+  private getFirstTerminal() {
+    const driver = this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver;
+    return driver.terminals[0]?.terminal;
+  }
+
   private __printk(msg: string) {
-    try {
-      const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
-      if (msg === "") {
-        term.io.println("");
-      } else {
-        term.io.println(formatKernelLog(msg));
-      }
-    } catch (_) { }
+    const term = this.getFirstTerminal();
+    if (!term) {
+      console.log(msg);
+      return;
+    }
+
+    if (msg === "") {
+      term.io.println("");
+    } else {
+      term.io.println(formatKernelLog(msg));
+    }
   }
 
   constructor() {
@@ -224,7 +232,11 @@ export class Jswasi {
 
   // setup filesystem
   private async initFs(fs: TopLevelFs, tar: ArrayBuffer) : Promise<number> {
-    const term = (this.driverManager.getDriver(major.MAJ_HTERM) as HtermDeviceDriver).terminals[0].terminal
+    const term = this.getFirstTerminal();
+    if (!term) {
+      this.__printk("No terminal available, cannot initialize filesystem");
+      return constants.WASI_EINVAL;
+    }
 
     this.__printk("Extracting rootfs");
     const untared = await untar(tar);
