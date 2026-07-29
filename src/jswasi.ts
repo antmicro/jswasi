@@ -233,31 +233,22 @@ export class Jswasi {
   // setup filesystem
   private async initFs(fs: TopLevelFs, tar: ArrayBuffer) : Promise<number> {
     const term = this.getFirstTerminal();
-    if (!term) {
-      this.__printk("No terminal available, cannot initialize filesystem");
-      return constants.WASI_EINVAL;
-    }
 
     this.__printk("Extracting rootfs");
     const untared = await untar(tar);
     this.__printk("Extracted rootfs, writing to filesystem");
 
-    term.io.print(formatKernelLog(""));
-    const startColumn = term.getCursorColumn();
+    const msgHeader = formatKernelLog("");
 
-    function printProgress(msg: string) {
-      try {
-        const lastColumn = term.getCursorColumn();
-        term.setCursorColumn(startColumn);
-        term.setInsertMode(false);
-        const padding = " ".repeat(Math.max(0, lastColumn - startColumn - msg.length));
-        term.io.print(msg + padding);
-        term.setInsertMode(true);
-      } catch (_) { }
+    function printProgress(i: number) {
+      if (term) {
+        const msg = `\r\x1b[2K${msgHeader}Written ${i} of ${untared.length} files...`
+        term.io.print(msg);
+      }
     }
 
     for (let i = 0; i < untared.length; i++) {
-      printProgress(`Written ${i} of ${untared.length} files...`);
+      printProgress(i);
       const entry = untared[i];
       switch (entry.type) {
         case "":
@@ -290,7 +281,7 @@ export class Jswasi {
         }
       }
     }
-    printProgress(`Written ${untared.length} of ${untared.length} files...`);
+    printProgress(untared.length);
     this.__printk("");
     return constants.WASI_ESUCCESS;
   }
