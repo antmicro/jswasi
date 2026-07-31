@@ -403,7 +403,7 @@ export default async function syscallCallback(
       let err;
       const { fds } = processManager.processInfos[processId];
       if (fds.getDesc(oldFd) !== undefined) {
-        const arr = new TextEncoder().encode("hard links are not supported");
+        const arr = new TextEncoder().encode("hard links are not supported\n");
         err = (
           await fds
             .getDesc(constants.WASI_FD_STDERR)
