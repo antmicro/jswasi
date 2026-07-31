@@ -319,13 +319,15 @@ export class TopLevelFs {
     const __target = this.abspath(desc_t, target);
     const __target_dirname = dirname(__target);
 
+    const isTargetSubdirOfSource = __target === __source || __target.startsWith(__source + "/");
+
     // If any mount point starts with the source path
     // or if target path is starts with source path, return EBUSY
     if (
       Object.keys(this.mounts).some((key) => {
         key.startsWith(__source);
       }) ||
-      __source.startsWith(__target)
+      isTargetSubdirOfSource
     )
       return constants.WASI_EBUSY;
 
