@@ -255,7 +255,7 @@ export class HtermDeviceDriver implements TerminalDriver {
       () => {},
       this.processManager
     );
-    return constants.WASI_ESUCCESS;
+    return __ttyMin;
   }
 
   async teardownDevice(min: number): Promise<number> {
