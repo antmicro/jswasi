@@ -1,6 +1,9 @@
 import { Descriptor } from "./filesystem/filesystem.js";
 import * as constants from "./constants.js";
 import { TopLevelFs } from "./filesystem/top-level-fs";
+// @ts-ignore
+import * as vfs from "./third_party/vfs.js";
+import { major } from "./filesystem/virtual-filesystem/devices/driver-manager.js";
 
 const WRITE_FIFO_PATH = "/dev/initr.kfifo";
 const READ_FIFO_PATH = "/dev/initw.kfifo";
@@ -80,5 +83,27 @@ export class JsInterface {
     const stderr = resp.desc;
 
     return { stdin, stdout, stderr, pid };
+  }
+
+  public async startTerminalProcess(cmd: string , args: string[], min: number): Promise<number> {
+    const ttyPath = `/dev/ttyH${min}`
+    const err = await this.tfs.mknodat(undefined, ttyPath, vfs.mkDev(major.MAJ_HTERM, min), -1);
+    if (err !== constants.WASI_ESUCCESS && err !== constants.WASI_EEXIST)
+      return err;
+
+    const arr = new TextEncoder().encode(JSON.stringify({
+      Spawn: {
+        cmd,
+        args,
+        stdin: ttyPath,
+        stdout: ttyPath,
+        stderr: ttyPath,
+        kern: false,
+      }
+    }));
+    await this.fifow.write(arr.buffer as ArrayBuffer);
+    await this.fifor.read(64);
+
+    return constants.WASI_ESUCCESS;
   }
 }
