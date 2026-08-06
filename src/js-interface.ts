@@ -50,13 +50,13 @@ export class JsInterface {
     return constants.WASI_ESUCCESS;
   }
 
-  public async spawn(cmd: string, args: string[]): Promise<{
+  public async spawn(cmd: string, args: string[], env?: Record<string, string>): Promise<{
     stdin: Descriptor;
     stdout: Descriptor;
     stderr: Descriptor;
     pid: number;
   }> {
-    const arr = new TextEncoder().encode(JSON.stringify({ Spawn: { cmd, args, kern: true } }));
+    const arr = new TextEncoder().encode(JSON.stringify({ Spawn: { cmd, args, env, kern: true } }));
     await this.fifow.write(arr.buffer as ArrayBuffer);
 
     const { err, buffer } = await this.fifor.read(64);
@@ -85,7 +85,7 @@ export class JsInterface {
     return { stdin, stdout, stderr, pid };
   }
 
-  public async startTerminalProcess(cmd: string , args: string[], min: number): Promise<number> {
+  public async startTerminalProcess(cmd: string , args: string[], min: number, env?: Record<string, string>): Promise<number> {
     const ttyPath = `/dev/ttyH${min}`
     const err = await this.tfs.mknodat(undefined, ttyPath, vfs.mkDev(major.MAJ_HTERM, min), -1);
     if (err !== constants.WASI_ESUCCESS && err !== constants.WASI_EEXIST)
@@ -95,6 +95,7 @@ export class JsInterface {
       Spawn: {
         cmd,
         args,
+        env,
         stdin: ttyPath,
         stdout: ttyPath,
         stderr: ttyPath,
