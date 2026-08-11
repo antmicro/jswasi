@@ -452,9 +452,9 @@ class VirtualFilesystemFileDescriptor
   }
 
   async read_str(): Promise<{ err: number; content: string }> {
-    let content;
+    let content: string;
     if (this.fdstat.fs_filetype === constants.WASI_FILETYPE_REGULAR_FILE) {
-      new TextDecoder().decode((content = this.desc._iNode._data));
+      content = new TextDecoder().decode(this.desc._iNode._data);
     } else {
       content = this.desc._iNode._link;
     }
