@@ -166,4 +166,8 @@ export class JsInterface {
       await desc.close();
     }
   }
+
+  public async createDirectory(path: string): Promise<number> {
+    return await this.tfs.createDir(path);
+  }
 }

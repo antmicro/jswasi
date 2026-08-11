@@ -163,4 +163,24 @@ describe("JsInterface", () => {
       expect(pid).toBe(43);
     });
   });
+
+  describe("createDirectory", () => {
+    test("should successfully create a directory", async () => {
+      const dirPath = "/new_directory";
+      const err = await jsInterface.createDirectory(dirPath);
+      expect(err).toBe(constants.WASI_ESUCCESS);
+
+      const openRes = await tfs.open(dirPath);
+      expect(openRes.err).toBe(constants.WASI_ESUCCESS);
+      expect(openRes.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+    });
+
+    test("should return WASI_EEXIST if directory already exists", async () => {
+      const dirPath = "/existing_dir";
+      await jsInterface.createDirectory(dirPath);
+
+      const err = await jsInterface.createDirectory(dirPath);
+      expect(err).toBe(constants.WASI_EEXIST);
+    });
+  });
 });
