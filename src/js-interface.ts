@@ -8,11 +8,19 @@ import { major } from "./filesystem/virtual-filesystem/devices/driver-manager.js
 const WRITE_FIFO_PATH = "/dev/initr.kfifo";
 const READ_FIFO_PATH = "/dev/initw.kfifo";
 
-export type Command = {
-  stdin: WritableStream,
-  stdout: ReadableStream,
-  stderr: ReadableStream,
-};
+type Operation = {
+  Spawn: SpawnArgs,
+}
+
+type SpawnArgs = {
+  cmd: string,
+  stdin?: string,
+  stdout?: string,
+  stderr?: string,
+  args: string[],
+  env?: Record<string, string>,
+  kern: boolean,
+}
 
 export class JsInterface {
   private fifow: Descriptor;
@@ -56,7 +64,15 @@ export class JsInterface {
     stderr: Descriptor;
     pid: number;
   }> {
-    const arr = new TextEncoder().encode(JSON.stringify({ Spawn: { cmd, args, env, kern: true } }));
+    const operation: Operation = {
+      Spawn: {
+        cmd,
+        args,
+        env,
+        kern: true,
+      },
+    };
+    const arr = new TextEncoder().encode(JSON.stringify(operation));
     await this.fifow.write(arr.buffer as ArrayBuffer);
 
     const { err, buffer } = await this.fifor.read(64);
@@ -91,7 +107,7 @@ export class JsInterface {
     if (err !== constants.WASI_ESUCCESS && err !== constants.WASI_EEXIST)
       throw new Error("Could not setup terminal");
 
-    const arr = new TextEncoder().encode(JSON.stringify({
+    const operation: Operation = {
       Spawn: {
         cmd,
         args,
@@ -101,7 +117,8 @@ export class JsInterface {
         stderr: ttyPath,
         kern: false,
       }
-    }));
+    };
+    const arr = new TextEncoder().encode(JSON.stringify(operation));
 
     let rw = await this.fifow.write(arr.buffer as ArrayBuffer);
     if (rw.err !== constants.WASI_ESUCCESS)
