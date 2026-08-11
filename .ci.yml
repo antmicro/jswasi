@@ -1,1 +1,3 @@
-include: jswasi-ci-scripts@main:jswasi.yml
+include:
+  - 'jswasi-ci-scripts@main:jswasi.yml'
+  - 'jswasi-ci-scripts@main:github-workflow.yml'
