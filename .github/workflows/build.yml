@@ -21,7 +21,7 @@ jobs:
       - name: Install TypeScript
         run: npm install -g typescript@$TYPESCRIPT_VERSION
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Build jswasi
         run: make MINIFY=1 standalone
       - name: Test jswasi
