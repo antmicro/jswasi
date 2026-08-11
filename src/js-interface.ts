@@ -145,4 +145,25 @@ export class JsInterface {
 
     return true;
   }
+
+  public async createTextFile(path: string, content: string): Promise<number> {
+    const { err, desc } = await this.tfs.open(
+      path,
+      constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
+      constants.WASI_O_CREAT | constants.WASI_O_TRUNC
+    );
+    if (err !== constants.WASI_ESUCCESS)
+      return err;
+
+    try {
+      const arr = new TextEncoder().encode(content);
+      const writeRes = await desc.write(arr.buffer as ArrayBuffer);
+      if (writeRes.err !== constants.WASI_ESUCCESS)
+        return writeRes.err;
+
+      return constants.WASI_ESUCCESS;
+    } finally {
+      await desc.close();
+    }
+  }
 }
