@@ -12,12 +12,13 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     env:
-      TYPESCRIPT_VERSION: "5.8.3"
+      DEBIAN_FRONTEND: "noninteractive"
+      TYPESCRIPT_VERSION: "7.0.2"
     container:
-      image: debian:bookworm
+      image: debian:trixie
     steps:
       - name: Install dependencies
-        run: apt-get -qqy update && apt-get -qqy install node-typescript make gettext-base npm wget esbuild
+        run: apt-get -qqy update > /dev/null && apt-get -qqy install node-typescript make esbuild gettext-base npm wget > /dev/null
       - name: Install TypeScript
         run: npm install -g typescript@$TYPESCRIPT_VERSION
       - name: Checkout sources
