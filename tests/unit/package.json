@@ -11,6 +11,7 @@
     "test": "jest --config=./jest.config.ts"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0"
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2"
   }
 }
