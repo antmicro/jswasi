@@ -89,7 +89,7 @@ export class JsInterface {
     const ttyPath = `/dev/ttyH${min}`
     const err = await this.tfs.mknodat(undefined, ttyPath, vfs.mkDev(major.MAJ_HTERM, min), -1);
     if (err !== constants.WASI_ESUCCESS && err !== constants.WASI_EEXIST)
-      return err;
+      throw new Error("Could not setup terminal");
 
     const arr = new TextEncoder().encode(JSON.stringify({
       Spawn: {
@@ -102,9 +102,20 @@ export class JsInterface {
         kern: false,
       }
     }));
-    await this.fifow.write(arr.buffer as ArrayBuffer);
-    await this.fifor.read(64);
 
-    return constants.WASI_ESUCCESS;
+    let rw = await this.fifow.write(arr.buffer as ArrayBuffer);
+    if (rw.err !== constants.WASI_ESUCCESS)
+      throw new Error("Could not spawn process");
+
+    let rr = await this.fifor.read(64);
+    if (rr.err !== constants.WASI_ESUCCESS)
+      throw new Error("Could not spawn process");
+
+    try {
+      const __split = new TextDecoder().decode(rr.buffer).split(" ");
+      return Number(__split[1]);
+    } catch (_) {
+      throw new Error("Could not read pid");
+    }
   }
 }
