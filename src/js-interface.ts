@@ -4,6 +4,7 @@ import { TopLevelFs } from "./filesystem/top-level-fs";
 // @ts-ignore
 import * as vfs from "./third_party/vfs.js";
 import { major } from "./filesystem/virtual-filesystem/devices/driver-manager.js";
+import { dirname } from "./utils.js";
 
 const WRITE_FIFO_PATH = "/dev/initr.kfifo";
 const READ_FIFO_PATH = "/dev/initw.kfifo";
@@ -147,6 +148,10 @@ export class JsInterface {
   }
 
   public async createTextFile(path: string, content: string): Promise<number> {
+    const e = await this.createDirectory(dirname(path));
+    if (e !== constants.WASI_ESUCCESS && e !== constants.WASI_EEXIST)
+      return e;
+
     const { err, desc } = await this.tfs.open(
       path,
       constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW,
@@ -168,6 +173,27 @@ export class JsInterface {
   }
 
   public async createDirectory(path: string): Promise<number> {
-    return await this.tfs.createDir(path);
+    const subdirs = path.split("/").filter((dir) => dir !== "");
+    if (subdirs.length === 0) {
+      return constants.WASI_ESUCCESS;
+    }
+
+    let p = "";
+    for (let i = 0; i < subdirs.length; i++) {
+      const dir = subdirs[i];
+      p = `${p}/${dir}`;
+      const err = await this.tfs.createDir(p);
+      const isLast = i === subdirs.length - 1;
+
+      if (isLast) {
+        return err;
+      }
+
+      if (err !== constants.WASI_EEXIST && err !== constants.WASI_ESUCCESS) {
+        return err;
+      }
+    }
+
+    return constants.WASI_ESUCCESS;
   }
 }
