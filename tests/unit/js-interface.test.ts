@@ -119,6 +119,24 @@ describe("JsInterface", () => {
       const err = await jsInterface.createTextFile(dirPath, "content");
       expect(err).toBe(constants.WASI_EISDIR);
     });
+
+    test("should create parent directories and add multiple files", async () => {
+      const file1 = "/auto/nested/file1.txt";
+      const file2 = "/auto/nested/file2.txt";
+
+      expect(await jsInterface.createTextFile(file1, "content1")).toBe(constants.WASI_ESUCCESS);
+      expect(await jsInterface.createTextFile(file2, "content2")).toBe(constants.WASI_ESUCCESS);
+
+      const res1 = await tfs.open(file1);
+      expect(res1.err).toBe(constants.WASI_ESUCCESS);
+      expect(await res1.desc.read_str()).toEqual({ err: constants.WASI_ESUCCESS, content: "content1" });
+      await res1.desc.close();
+
+      const res2 = await tfs.open(file2);
+      expect(res2.err).toBe(constants.WASI_ESUCCESS);
+      expect(await res2.desc.read_str()).toEqual({ err: constants.WASI_ESUCCESS, content: "content2" });
+      await res2.desc.close();
+    });
   });
 
   describe("spawn and startTerminalProcess", () => {
@@ -182,5 +200,41 @@ describe("JsInterface", () => {
       const err = await jsInterface.createDirectory(dirPath);
       expect(err).toBe(constants.WASI_EEXIST);
     });
+
+    test("should successfully create deeply nested subdirectories", async () => {
+      const nestedPath = "/a/b/c/d";
+      const err = await jsInterface.createDirectory(nestedPath);
+      expect(err).toBe(constants.WASI_ESUCCESS);
+
+      for (const checkPath of ["/a", "/a/b", "/a/b/c", "/a/b/c/d"]) {
+        const res = await tfs.open(checkPath);
+        expect(res.err).toBe(constants.WASI_ESUCCESS);
+        expect(res.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+        await res.desc.close();
+      }
+    });
+
+    test("should create subdirectories when intermediate parent directories already exist", async () => {
+      await jsInterface.createDirectory("/parent/sub1");
+      const err = await jsInterface.createDirectory("/parent/sub1/sub2/target");
+      expect(err).toBe(constants.WASI_ESUCCESS);
+
+      const res = await tfs.open("/parent/sub1/sub2/target");
+      expect(res.err).toBe(constants.WASI_ESUCCESS);
+      expect(res.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+      await res.desc.close();
+    });
+
+    test("should return WASI_EEXIST if final target directory already exists in a nested path", async () => {
+      await jsInterface.createDirectory("/parent/target");
+      const err = await jsInterface.createDirectory("/parent/target");
+      expect(err).toBe(constants.WASI_EEXIST);
+    });
+
+    test("should return WASI_ESUCCESS when called on root or empty path", async () => {
+      expect(await jsInterface.createDirectory("/")).toBe(constants.WASI_ESUCCESS);
+      expect(await jsInterface.createDirectory("")).toBe(constants.WASI_ESUCCESS);
+    });
+
   });
 });
