@@ -118,4 +118,14 @@ export class JsInterface {
       throw new Error("Could not read pid");
     }
   }
+
+  public async fileExists(path: string): Promise<boolean> {
+    const res = await this.tfs.open(path, constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW);
+    if (res.err !== constants.WASI_ESUCCESS)
+      return false;
+
+    await res.desc.close();
+
+    return true;
+  }
 }
