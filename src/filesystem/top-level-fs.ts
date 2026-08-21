@@ -395,6 +395,9 @@ export class TopLevelFs {
 
         // if the target directory is not empty, return ENOTEMPTY
         if (dirents.length !== 0) return constants.WASI_ENOTEMPTY;
+      } else if (filestat1.filetype === constants.WASI_FILETYPE_DIRECTORY) {
+        // If source is a directory and target is a regular file, return with ENOTDIR
+        return constants.WASI_ENOTDIR;
       }
     }
     return dinfo2.fs.renameat(

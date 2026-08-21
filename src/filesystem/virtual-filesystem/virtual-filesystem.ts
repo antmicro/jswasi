@@ -311,7 +311,11 @@ export class VirtualFilesystem implements Filesystem {
         return constants.WASI_ENOENT;
       }
     } else {
-      return constants.WASI_EEXIST;
+      if (oldNavigated.target === newNavigated.target) {
+        return constants.WASI_ESUCCESS;
+      }
+      const targetIndex = newNavigated.dir.getEntryIndex(newNavigated.name);
+      newNavigated.dir.deleteEntry(newNavigated.name, targetIndex);
     }
 
     const index = oldNavigated.dir.getEntryIndex(oldNavigated.name);
