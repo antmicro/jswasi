@@ -14,6 +14,13 @@ export type Result<T> = Success<T> | Failure;
 export const success = <T>(value: T): Success<T> => ({ ok: true, value });
 export const failure = (error: JswasiError): Failure => ({ ok: false, error });
 
+export type ProcessStream = {
+  stdin: Descriptor,
+  stdout: Descriptor,
+  stderr: Descriptor,
+  pid: number;
+};
+
 type Operation = {
   Spawn: SpawnArgs,
 }
@@ -67,12 +74,7 @@ export class JsInterface {
     return constants.WASI_ESUCCESS;
   }
 
-  public async spawn(cmd: string, args: string[], env?: Record<string, string>): Promise<{
-    stdin: Descriptor;
-    stdout: Descriptor;
-    stderr: Descriptor;
-    pid: number;
-  }> {
+  public async spawn(cmd: string, args: string[], env?: Record<string, string>): Promise<ProcessStream> {
     const operation: Operation = {
       Spawn: {
         cmd,
