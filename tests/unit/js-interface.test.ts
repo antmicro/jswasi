@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, jest } from "@jest/globals";
-import { JsInterface } from "../../src/js-interface";
+import { JsInterface, success } from "../../src/js-interface";
 import { TopLevelFs } from "../../src/filesystem/top-level-fs";
 import { VirtualFilesystem } from "../../src/filesystem/virtual-filesystem/virtual-filesystem";
 import * as constants from "../../src/constants";
@@ -21,21 +21,23 @@ describe("JsInterface", () => {
   });
 
   describe("initialize", () => {
-    test("should return error if FIFOs do not exist", async () => {
+    test("should return failure if FIFOs do not exist", async () => {
       const freshJsInterface = new JsInterface();
-      const uninitTfs = new TopLevelFs();
+      const freshTfs = new TopLevelFs();
       const vfs = new VirtualFilesystem();
       await vfs.initialize({});
-      await uninitTfs.addMountFs("/", vfs);
+      await freshTfs.addMountFs("/", vfs);
 
-      const err = await freshJsInterface.initialize(uninitTfs);
-      expect(err).not.toBe(constants.WASI_ESUCCESS);
+      const result = await freshJsInterface.initialize(freshTfs);
+      expect(result).toMatchObject({
+        ok: false,
+      });
     });
 
     test("should initialize successfully when FIFOs exist", async () => {
       const freshJsInterface = new JsInterface();
-      const err = await freshJsInterface.initialize(tfs);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await freshJsInterface.initialize(tfs);
+      expect(result).toEqual(success(undefined));
     });
   });
 
@@ -44,8 +46,8 @@ describe("JsInterface", () => {
       const path = "/hello.txt";
       const content = "Hello World!";
 
-      const err = await jsInterface.createTextFile(path, content);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createTextFile(path, content);
+      expect(result).toEqual(success(undefined));
 
       const openRes = await tfs.open(path);
       expect(openRes.err).toBe(constants.WASI_ESUCCESS);
@@ -61,8 +63,8 @@ describe("JsInterface", () => {
       const path = "/empty.txt";
       const content = "";
 
-      const err = await jsInterface.createTextFile(path, content);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createTextFile(path, content);
+      expect(result).toEqual(success(undefined));
 
       const openRes = await tfs.open(path);
       expect(openRes.err).toBe(constants.WASI_ESUCCESS);
@@ -79,8 +81,8 @@ describe("JsInterface", () => {
       await jsInterface.createTextFile(path, "Initial content");
 
       const newContent = "Updated content";
-      const err = await jsInterface.createTextFile(path, newContent);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createTextFile(path, newContent);
+      expect(result).toEqual(success(undefined));
 
       const openRes = await tfs.open(path);
       expect(openRes.err).toBe(constants.WASI_ESUCCESS);
@@ -99,8 +101,8 @@ describe("JsInterface", () => {
       const path = "/nested/dir/test.json";
       const content = JSON.stringify({ key: "value", number: 42 });
 
-      const err = await jsInterface.createTextFile(path, content);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createTextFile(path, content);
+      expect(result).toEqual(success(undefined));
 
       const openRes = await tfs.open(path);
       expect(openRes.err).toBe(constants.WASI_ESUCCESS);
@@ -112,20 +114,23 @@ describe("JsInterface", () => {
       await openRes.desc.close();
     });
 
-    test("should return error if path is a directory", async () => {
+    test("should fail if path is a directory", async () => {
       const dirPath = "/testdir";
       await tfs.createDir(dirPath);
 
-      const err = await jsInterface.createTextFile(dirPath, "content");
-      expect(err).toBe(constants.WASI_EISDIR);
+      const result = await jsInterface.createTextFile(dirPath, "content");
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: constants.WASI_EISDIR },
+      });
     });
 
     test("should create parent directories and add multiple files", async () => {
       const file1 = "/auto/nested/file1.txt";
       const file2 = "/auto/nested/file2.txt";
 
-      expect(await jsInterface.createTextFile(file1, "content1")).toBe(constants.WASI_ESUCCESS);
-      expect(await jsInterface.createTextFile(file2, "content2")).toBe(constants.WASI_ESUCCESS);
+      expect(await jsInterface.createTextFile(file1, "content1")).toEqual(success(undefined));
+      expect(await jsInterface.createTextFile(file2, "content2")).toEqual(success(undefined));
 
       const res1 = await tfs.open(file1);
       expect(res1.err).toBe(constants.WASI_ESUCCESS);
@@ -152,20 +157,29 @@ describe("JsInterface", () => {
       await tfs.open("/dev/spawn_stderr.1", 0, constants.WASI_O_CREAT);
 
       const res = await jsInterface.spawn("ls", ["-la"], { PATH: "/bin" });
-      expect(res.pid).toBe(42);
-      expect(res.stdin).toBeDefined();
-      expect(res.stdout).toBeDefined();
-      expect(res.stderr).toBeDefined();
+      expect(res).toMatchObject({
+        ok: true,
+        value: {
+          pid: 42,
+          stdin: expect.anything(),
+          stdout: expect.anything(),
+          stderr: expect.anything(),
+        },
+      });
     });
 
-    test("spawn should throw error if fifo read fails", async () => {
+    test("spawn should fail if fifo read fails", async () => {
       const fifor = (jsInterface as any).fifor;
       jest.spyOn(fifor, "read").mockResolvedValueOnce({
         err: constants.WASI_EIO,
         buffer: undefined as any,
       });
 
-      await expect(jsInterface.spawn("cmd", [])).rejects.toThrow("Could not spawn process");
+      const res = await jsInterface.spawn("cmd", []);
+      expect(res).toMatchObject({
+        ok: false,
+        error: { code: constants.WASI_EIO },
+      });
     });
 
     test("startTerminalProcess should return PID", async () => {
@@ -177,34 +191,37 @@ describe("JsInterface", () => {
         buffer: new TextEncoder().encode("1 43").buffer as ArrayBuffer,
       });
 
-      const pid = await jsInterface.startTerminalProcess("sh", [], 0);
-      expect(pid).toBe(43);
+      const res = await jsInterface.startTerminalProcess("sh", [], 0);
+      expect(res).toMatchObject({
+        ok: true,
+        value: 43,
+      });
     });
   });
 
   describe("createDirectory", () => {
     test("should successfully create a directory", async () => {
       const dirPath = "/new_directory";
-      const err = await jsInterface.createDirectory(dirPath);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createDirectory(dirPath);
+      expect(result).toEqual(success(true));
 
       const openRes = await tfs.open(dirPath);
       expect(openRes.err).toBe(constants.WASI_ESUCCESS);
       expect(openRes.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
     });
 
-    test("should return WASI_EEXIST if directory already exists", async () => {
+    test("should return success(false) if directory already exists", async () => {
       const dirPath = "/existing_dir";
       await jsInterface.createDirectory(dirPath);
 
-      const err = await jsInterface.createDirectory(dirPath);
-      expect(err).toBe(constants.WASI_EEXIST);
+      const res = await jsInterface.createDirectory(dirPath);
+      expect(res).toEqual(success(false));
     });
 
     test("should successfully create deeply nested subdirectories", async () => {
       const nestedPath = "/a/b/c/d";
-      const err = await jsInterface.createDirectory(nestedPath);
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createDirectory(nestedPath);
+      expect(result).toEqual(success(true));
 
       for (const checkPath of ["/a", "/a/b", "/a/b/c", "/a/b/c/d"]) {
         const res = await tfs.open(checkPath);
@@ -216,8 +233,8 @@ describe("JsInterface", () => {
 
     test("should create subdirectories when intermediate parent directories already exist", async () => {
       await jsInterface.createDirectory("/parent/sub1");
-      const err = await jsInterface.createDirectory("/parent/sub1/sub2/target");
-      expect(err).toBe(constants.WASI_ESUCCESS);
+      const result = await jsInterface.createDirectory("/parent/sub1/sub2/target");
+      expect(result).toEqual(success(true));
 
       const res = await tfs.open("/parent/sub1/sub2/target");
       expect(res.err).toBe(constants.WASI_ESUCCESS);
@@ -225,16 +242,15 @@ describe("JsInterface", () => {
       await res.desc.close();
     });
 
-    test("should return WASI_EEXIST if final target directory already exists in a nested path", async () => {
+    test("should return success(false) if final target directory already exists in a nested path", async () => {
       await jsInterface.createDirectory("/parent/target");
-      const err = await jsInterface.createDirectory("/parent/target");
-      expect(err).toBe(constants.WASI_EEXIST);
+      const result = await jsInterface.createDirectory("/parent/target");
+      expect(result).toEqual(success(false));
     });
 
-    test("should return WASI_ESUCCESS when called on root or empty path", async () => {
-      expect(await jsInterface.createDirectory("/")).toBe(constants.WASI_ESUCCESS);
-      expect(await jsInterface.createDirectory("")).toBe(constants.WASI_ESUCCESS);
+    test("should return success(false) when called on root or empty path", async () => {
+      expect(await jsInterface.createDirectory("/")).toEqual(success(false));
+      expect(await jsInterface.createDirectory("")).toEqual(success(false));
     });
-
   });
 });
