@@ -30,7 +30,7 @@ const fsaAdapter: FsTestAdapter = {
 
   defaultInitialize: async (
     fs: Filesystem,
-    mergeOpts: Record<string, string>,
+    mergeOpts?: Record<string, string>,
   ) => {
     const defaultOpts = {
       prompt: "false",

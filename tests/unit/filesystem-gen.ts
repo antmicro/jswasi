@@ -11,7 +11,10 @@ import {
 
 export interface FsTestAdapter {
   getFilesystem: () => Filesystem;
-  defaultInitialize: (fs: Filesystem, mergeOpts: Record<string, string>) => Promise<void>;
+  defaultInitialize: (
+    fs: Filesystem,
+    mergeOpts?: Record<string, string>,
+  ) => Promise<void>;
 
   setup: () => void;
   teardown: () => void;

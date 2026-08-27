@@ -8,7 +8,7 @@ const vfsAdapter: FsTestAdapter = {
 
   defaultInitialize: async (
     fs: Filesystem,
-    mergeOpts: Record<string, string>,
+    mergeOpts?: Record<string, string>,
   ) => {
     await fs.initialize({ ...mergeOpts });
   },
