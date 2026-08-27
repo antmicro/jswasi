@@ -159,6 +159,30 @@ const fsaAdapter: FsTestAdapter = {
       }),
     );
   },
+
+  mockRenameFile: () => {
+    const mockFileHandle = {
+      getFile: () =>
+        Promise.resolve({
+          size: 0,
+          slice: () => ({
+            arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+          }),
+        }),
+      createWritable: () =>
+        Promise.resolve({
+          write: () => Promise.resolve(),
+          close: () => Promise.resolve(),
+        }),
+    };
+
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
+      Promise.resolve({
+        getFileHandle: () => Promise.resolve(mockFileHandle),
+        removeEntry: () => Promise.resolve(),
+      } as any),
+    );
+  },
 };
 
 runFilesystemTests("fsa", fsaAdapter);

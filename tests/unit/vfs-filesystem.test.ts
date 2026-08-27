@@ -50,6 +50,11 @@ const vfsAdapter: FsTestAdapter = {
   mockRemoveFileEntry: (filename: string, fs: Filesystem) => {
     fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
   },
+
+  mockRenameFile: (oldName: string, _newName: string, fs: Filesystem) => {
+    fs.open(oldName, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  },
 };
 
 runFilesystemTests("vfs", vfsAdapter);
+

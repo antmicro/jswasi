@@ -28,6 +28,7 @@ export interface FsTestAdapter {
   mockGetUndefinedStoredData: () => void;
   mockDirectoryNotEmpty: (dirname: string, fs: Filesystem) => void;
   mockRemoveFileEntry: (filename: string, fs: Filesystem) => void;
+  mockRenameFile: (oldName: string, newName: string, fs: Filesystem) => void;
 }
 
 export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
@@ -229,6 +230,67 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
         await adapter.defaultInitialize(fs);
 
         const err = await fs.unlinkat(undefined, "test", false);
+        expect(err).toBe(constants.WASI_ESUCCESS);
+      });
+    });
+
+    describe("Test filesystem renameat", () => {
+      test("Renameat should fail if source file doesn't exist", async () => {
+        adapter.mockEmptyDisk();
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.renameat(
+          undefined,
+          "nonexistent",
+          undefined,
+          "destination",
+        );
+        expect(err).toBe(constants.WASI_ENOENT);
+      });
+
+      test("Renameat should fail if old descriptor is invalid", async () => {
+        adapter.mockFileExists("oldname", fs);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.renameat(
+          {} as any,
+          "oldname",
+          undefined,
+          "newname",
+        );
+        expect(err).toBe(constants.WASI_EINVAL);
+      });
+
+      test("Renameat should fail if new descriptor is invalid", async () => {
+        adapter.mockFileExists("oldname", fs);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.renameat(
+          undefined,
+          "oldname",
+          {} as any,
+          "newname",
+        );
+        expect(err).toBe(constants.WASI_EINVAL);
+      });
+
+      test("Renameat should work if target file exists", async () => {
+        const oldName = "oldname";
+        const newName = "newname";
+
+        adapter.mockRenameFile(oldName, newName, fs);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.renameat(
+          undefined,
+          oldName,
+          undefined,
+          newName,
+        );
         expect(err).toBe(constants.WASI_ESUCCESS);
       });
     });
