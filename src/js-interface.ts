@@ -43,7 +43,7 @@ export class JsInterface {
   private fifor: Descriptor;
   private tfs: TopLevelFs;
 
-  public async initialize(tfs: TopLevelFs): Promise<number> {
+  public async initialize(tfs: TopLevelFs): Promise<Result<void>> {
     this.tfs = tfs;
 
     let _res;
@@ -55,7 +55,7 @@ export class JsInterface {
       constants.WASI_EXT_RIGHTS_STDIN,
     );
     if (_res.err !== constants.WASI_ESUCCESS)
-      return _res.err;
+      return failure({ code: _res.err, msg: "Could not open read FIFO" });
 
     this.fifor = _res.desc;
 
@@ -67,14 +67,35 @@ export class JsInterface {
       constants.WASI_EXT_RIGHTS_STDOUT,
     );
     if (_res.err !== constants.WASI_ESUCCESS)
-      return _res.err;
+      return failure({ code: _res.err, msg: "Could not open write FIFO" });
 
     this.fifow = _res.desc;
 
-    return constants.WASI_ESUCCESS;
+    return success(undefined);
   }
 
-  public async spawn(cmd: string, args: string[], env?: Record<string, string>): Promise<ProcessStream> {
+  private async startProcess(operation: Operation): Promise<Result<{id: number, pid: number}>> {
+    const arr = new TextEncoder().encode(JSON.stringify(operation));
+
+    const { err: writeErr } = await this.fifow.write(arr.buffer as ArrayBuffer);
+    if (writeErr !== constants.WASI_ESUCCESS)
+      return failure({code: writeErr, msg: "Could not spawn process"});
+
+    const { err: readErr, buffer } = await this.fifor.read(64);
+    if (readErr !== constants.WASI_ESUCCESS)
+      return failure({code: readErr, msg: "Could not spawn process"});
+
+    try {
+      const _split = new TextDecoder().decode(buffer).split(" ");
+      const id = Number(_split[0]);
+      const pid = Number(_split[1]);
+      return success({ id, pid });
+    } catch (e) {
+      return failure({code: constants.WASI_EINVAL, msg: "Could not read process ID and PID"});
+    }
+  }
+
+  public async spawn(cmd: string, args: string[], env?: Record<string, string>): Promise<Result<ProcessStream>> {
     const operation: Operation = {
       Spawn: {
         cmd,
@@ -83,40 +104,32 @@ export class JsInterface {
         kern: true,
       },
     };
-    const arr = new TextEncoder().encode(JSON.stringify(operation));
-    await this.fifow.write(arr.buffer as ArrayBuffer);
+    const process = await this.startProcess(operation);
+    if (!process.ok) return process as Failure;
 
-    const { err, buffer } = await this.fifor.read(64);
-    if (err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not spawn process");
-
-    const __split = new TextDecoder().decode(buffer).split(" ");
-    const id = Number(__split[0]);
-    const pid = Number(__split[1]);
-
-    let resp = await this.tfs.open(`/dev/spawn_stdin.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDOUT);
+    let resp = await this.tfs.open(`/dev/spawn_stdin.${process.value.id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDOUT);
     if (resp.err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not open stdin descriptor");
+      return failure({code: resp.err, msg: "Could not open stdin descriptor"});
     const stdin = resp.desc;
 
-    resp = await this.tfs.open(`/dev/spawn_stdout.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
+    resp = await this.tfs.open(`/dev/spawn_stdout.${process.value.id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
     if (resp.err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not open stdout descriptor");
+      return failure({code: resp.err, msg: "Could not open stdout descriptor"});
     const stdout = resp.desc;
 
-    resp = await this.tfs.open(`/dev/spawn_stderr.${id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
+    resp = await this.tfs.open(`/dev/spawn_stderr.${process.value.id}`, 0, 0, 0, constants.WASI_EXT_RIGHTS_STDIN);
     if (resp.err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not open stderr descriptor");
+      return failure({code: resp.err, msg: "Could not open stderr descriptor"});
     const stderr = resp.desc;
 
-    return { stdin, stdout, stderr, pid };
+    return success({ stdin, stdout, stderr, pid: process.value.pid });
   }
 
-  public async startTerminalProcess(cmd: string , args: string[], min: number, env?: Record<string, string>): Promise<number> {
+  public async startTerminalProcess(cmd: string , args: string[], min: number, env?: Record<string, string>): Promise<Result<number>> {
     const ttyPath = `/dev/ttyH${min}`
     const err = await this.tfs.mknodat(undefined, ttyPath, vfs.mkDev(major.MAJ_HTERM, min), -1);
     if (err !== constants.WASI_ESUCCESS && err !== constants.WASI_EEXIST)
-      throw new Error("Could not setup terminal");
+      return failure({ code: err, msg: "Could not setup terminal" });
 
     const operation: Operation = {
       Spawn: {
@@ -129,38 +142,29 @@ export class JsInterface {
         kern: false,
       }
     };
-    const arr = new TextEncoder().encode(JSON.stringify(operation));
+    const process = await this.startProcess(operation);
+    if (!process.ok) return process as Failure;
 
-    let rw = await this.fifow.write(arr.buffer as ArrayBuffer);
-    if (rw.err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not spawn process");
+    return success(process.value.pid);
+  }
 
-    let rr = await this.fifor.read(64);
-    if (rr.err !== constants.WASI_ESUCCESS)
-      throw new Error("Could not spawn process");
-
-    try {
-      const __split = new TextDecoder().decode(rr.buffer).split(" ");
-      return Number(__split[1]);
-    } catch (_) {
-      throw new Error("Could not read pid");
+  public async fileExists(path: string): Promise<Result<boolean>> {
+    const res = await this.tfs.open(path, constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW);
+    if (res.desc) {
+      await res.desc.close();
+    }
+    if (res.err === constants.WASI_ESUCCESS) {
+      return success(true);
+    } else if (res.err === constants.WASI_ENOENT || res.err === constants.WASI_ENOTDIR) {
+      return success(false);
+    } else {
+      return failure({ code: res.err, msg: "Could not check if file exists" });
     }
   }
 
-  public async fileExists(path: string): Promise<boolean> {
-    const res = await this.tfs.open(path, constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW);
-    if (res.err !== constants.WASI_ESUCCESS)
-      return false;
-
-    await res.desc.close();
-
-    return true;
-  }
-
-  public async createTextFile(path: string, content: string): Promise<number> {
-    const e = await this.createDirectory(dirname(path));
-    if (e !== constants.WASI_ESUCCESS && e !== constants.WASI_EEXIST)
-      return e;
+  public async createTextFile(path: string, content: string): Promise<Result<void>> {
+    const result = await this.createDirectory(dirname(path));
+    if (!result.ok) return result as Failure;
 
     const { err, desc } = await this.tfs.open(
       path,
@@ -168,26 +172,27 @@ export class JsInterface {
       constants.WASI_O_CREAT | constants.WASI_O_TRUNC
     );
     if (err !== constants.WASI_ESUCCESS)
-      return err;
+      return failure({ code: err, msg: "Could not create file"});
 
     try {
       const arr = new TextEncoder().encode(content);
-      const writeRes = await desc.write(arr.buffer as ArrayBuffer);
-      if (writeRes.err !== constants.WASI_ESUCCESS)
-        return writeRes.err;
+      const {err: writeErr } = await desc.write(arr.buffer as ArrayBuffer);
+      if (writeErr !== constants.WASI_ESUCCESS)
+        return failure({ code: writeErr, msg: "Could not write to file" });
 
-      return constants.WASI_ESUCCESS;
+      return success(undefined);
     } finally {
       await desc.close();
     }
   }
 
-  public async createDirectory(path: string): Promise<number> {
+  public async createDirectory(path: string): Promise<Result<boolean>> {
     const subdirs = path.split("/").filter((dir) => dir !== "");
     if (subdirs.length === 0) {
-      return constants.WASI_ESUCCESS;
+      return success(false);
     }
 
+    let created = false;
     let p = "";
     for (let i = 0; i < subdirs.length; i++) {
       const dir = subdirs[i];
@@ -195,15 +200,13 @@ export class JsInterface {
       const err = await this.tfs.createDir(p);
       const isLast = i === subdirs.length - 1;
 
-      if (isLast) {
-        return err;
-      }
-
-      if (err !== constants.WASI_EEXIST && err !== constants.WASI_ESUCCESS) {
-        return err;
+      if (err === constants.WASI_ESUCCESS) {
+        if (isLast) created = true;
+      } else if (err !== constants.WASI_EEXIST) {
+        return failure({ code: err, msg: `Could not create directory ${p}` });
       }
     }
 
-    return constants.WASI_ESUCCESS;
+    return success(created);
   }
 }
