@@ -115,6 +115,9 @@ export class TopLevelFs {
         case constants.WASI_ESUCCESS:
         case constants.WASI_ENOTDIR: {
           // if some component in the middle of the path is a symlink
+          if (!desc) {
+            return { desc: undefined, err, fs, path: rpath };
+          }
           let fdstat = desc.getFdstat();
           if (
             fdstat !== undefined &&

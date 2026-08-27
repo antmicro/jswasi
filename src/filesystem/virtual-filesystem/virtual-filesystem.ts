@@ -169,95 +169,103 @@ export class VirtualFilesystem implements Filesystem {
     fdflags: Fdflags,
     _workerId: number
   ): Promise<{ err: number; index: number; desc: Descriptor }> {
-    const navigated = this.virtualFs._navigate(path, false);
-    if (navigated.target) {
-      let err: number, index: number;
-      if (navigated.remaining) {
-        err = constants.WASI_ENOTDIR;
-        // navigated.remaining doesn't include leading slash, hence -1
-        index = path.length - navigated.remaining.length - 1;
-      } else {
-        index = -1;
-        if (oflags & constants.WASI_O_CREAT && oflags & constants.WASI_O_EXCL) {
-          err = constants.WASI_EEXIST;
-        } else if (navigated.target instanceof vfs.Directory && oflags & constants.WASI_O_CREAT) {
-          err = constants.WASI_EISDIR;
+    try {
+      const navigated = this.virtualFs._navigate(path, false);
+      if (navigated.target) {
+        let err: number, index: number;
+        if (navigated.remaining) {
+          err = constants.WASI_ENOTDIR;
+          // navigated.remaining doesn't include leading slash, hence -1
+          index = path.length - navigated.remaining.length - 1;
         } else {
-          err = constants.WASI_ESUCCESS;
+          index = -1;
+          if (oflags & constants.WASI_O_CREAT && oflags & constants.WASI_O_EXCL) {
+            err = constants.WASI_EEXIST;
+          } else if (navigated.target instanceof vfs.Directory && oflags & constants.WASI_O_CREAT) {
+            err = constants.WASI_EISDIR;
+          } else {
+            err = constants.WASI_ESUCCESS;
+          }
         }
-      }
-      let desc;
-      if (navigated.target instanceof vfs.Directory) {
-        desc = new VirtualFilesystemDirectoryDescriptor(
-          fdflags,
-          fs_rights_base,
-          fs_rights_inheriting,
-          navigated.target,
-          this.virtualFs._iNodeMgr
-        );
-      } else {
-        if (
-          (navigated.target instanceof vfs.File ||
-            navigated.target instanceof vfs.Symlink) &&
-          !(oflags & constants.WASI_O_DIRECTORY)
-        ) {
-          desc = new VirtualFilesystemFileDescriptor(
+        let desc;
+        if (navigated.target instanceof vfs.Directory) {
+          desc = new VirtualFilesystemDirectoryDescriptor(
             fdflags,
             fs_rights_base,
             fs_rights_inheriting,
-            this.virtualFs._fdMgr.createFd(
-              navigated.target,
-              vfs.constants.O_RDWR
-            )[0]
+            navigated.target,
+            this.virtualFs._iNodeMgr
           );
         } else {
-          desc = new VirtualFilesystemDirectoryDescriptor(
+          if (
+            (navigated.target instanceof vfs.File ||
+              navigated.target instanceof vfs.Symlink) &&
+            !(oflags & constants.WASI_O_DIRECTORY)
+          ) {
+            desc = new VirtualFilesystemFileDescriptor(
+              fdflags,
+              fs_rights_base,
+              fs_rights_inheriting,
+              this.virtualFs._fdMgr.createFd(
+                navigated.target,
+                vfs.constants.O_RDWR
+              )[0]
+            );
+          } else {
+            desc = new VirtualFilesystemDirectoryDescriptor(
+              fdflags,
+              fs_rights_base,
+              fs_rights_inheriting,
+              navigated.dir,
+              this.virtualFs._iNodeMgr
+            );
+            if (oflags & constants.WASI_O_DIRECTORY) {
+              err = constants.WASI_ENOTDIR;
+            } else if (navigated.target instanceof vfs.CharacterDev || navigated.target instanceof vfs.Fifo) {
+              err = constants.WASI_ENODEV;
+            }
+          }
+        }
+        return { err, index, desc };
+      } else if (oflags & constants.WASI_O_CREAT) {
+        let [target, index] = this.virtualFs._iNodeMgr.createINode(vfs.File, {
+          mode: vfs.DEFAULT_FILE_PERM,
+          uid: 0,
+          gid: 0,
+        });
+        navigated.dir.addEntry(navigated.name, index);
+        const [__desc, _] = this.virtualFs._fdMgr.createFd(
+          target,
+          vfs.constants.O_RDWR
+        );
+        return {
+          err: constants.WASI_ESUCCESS,
+          index: -1,
+          desc: new VirtualFilesystemFileDescriptor(
+            fdflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            __desc
+          ),
+        };
+      } else {
+        return {
+          err: constants.WASI_ENOENT,
+          index: -1,
+          desc: new VirtualFilesystemDirectoryDescriptor(
             fdflags,
             fs_rights_base,
             fs_rights_inheriting,
             navigated.dir,
             this.virtualFs._iNodeMgr
-          );
-          if (oflags & constants.WASI_O_DIRECTORY) {
-            err = constants.WASI_ENOTDIR;
-          } else if (navigated.target instanceof vfs.CharacterDev || navigated.target instanceof vfs.Fifo) {
-            err = constants.WASI_ENODEV;
-          }
-        }
+          ),
+        };
       }
-      return { err, index, desc };
-    } else if (oflags & constants.WASI_O_CREAT) {
-      let [target, index] = this.virtualFs._iNodeMgr.createINode(vfs.File, {
-        mode: vfs.DEFAULT_FILE_PERM,
-        uid: 0,
-        gid: 0,
-      });
-      navigated.dir.addEntry(navigated.name, index);
-      const [__desc, _] = this.virtualFs._fdMgr.createFd(
-        target,
-        vfs.constants.O_RDWR
-      );
+    } catch (e: vfs.VirtualFSError) {
       return {
-        err: constants.WASI_ESUCCESS,
+        err: e.errno === 4 ? constants.WASI_ENOTDIR : e.errno,
         index: -1,
-        desc: new VirtualFilesystemFileDescriptor(
-          fdflags,
-          fs_rights_base,
-          fs_rights_inheriting,
-          __desc
-        ),
-      };
-    } else {
-      return {
-        err: constants.WASI_ENOENT,
-        index: -1,
-        desc: new VirtualFilesystemDirectoryDescriptor(
-          fdflags,
-          fs_rights_base,
-          fs_rights_inheriting,
-          navigated.dir,
-          this.virtualFs._iNodeMgr
-        ),
+        desc: undefined,
       };
     }
   }
