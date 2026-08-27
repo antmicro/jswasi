@@ -466,13 +466,28 @@ export class FsaFilesystem implements Filesystem {
     // TODO: remove this once fsapi implements renaming or use vfs temporary mount
     // in clang wrapper to avoid moving on fsa filesystem
     const BUFSIZE = 2048;
-    if (oldDesc !== undefined && !(oldDesc instanceof FsaDirectoryDescriptor))
-      return constants.WASI_EINVAL;
+    let oldStartHandle = undefined;
+    if (oldDesc !== undefined) {
+      if (oldDesc instanceof FsaDirectoryDescriptor) {
+        oldStartHandle = oldDesc.handle;
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
+
+    let newStartHandle = undefined;
+    if (newDesc !== undefined) {
+      if (newDesc instanceof FsaDirectoryDescriptor) {
+        newStartHandle = newDesc.handle;
+      } else {
+        return constants.WASI_EINVAL;
+      }
+    }
 
     const { handle: srcHandle, err: errSrc } = await this.getHandle(
       oldPath,
       false,
-      (oldDesc as FsaDirectoryDescriptor).handle
+      oldStartHandle
     );
     if (errSrc === constants.WASI_EISDIR) return constants.WASI_EXDEV;
     else if (errSrc !== constants.WASI_ESUCCESS) return errSrc;
@@ -494,13 +509,10 @@ export class FsaFilesystem implements Filesystem {
     if (srcFilestat.filestat.filetype === constants.WASI_FILETYPE_SYMBOLIC_LINK)
       return constants.WASI_EXDEV;
 
-    if (newDesc !== undefined && !(newDesc instanceof FsaDirectoryDescriptor))
-      return constants.WASI_EINVAL;
-
     const { handle: __destHandle, err: __errDest } = await this.getHandle(
       dirname(newPath),
       true,
-      (newDesc as FsaDirectoryDescriptor).handle
+      newStartHandle
     );
     if (__errDest !== constants.WASI_ESUCCESS) return __errDest;
 
@@ -522,13 +534,15 @@ export class FsaFilesystem implements Filesystem {
       if (buffer.byteLength === 0) break;
 
       const write = await destDesc.write(buffer);
-      if (write.err !== constants.WASI_ESUCCESS) return err;
+      if (write.err !== constants.WASI_ESUCCESS) return write.err;
     }
 
     await srcDesc.close();
     await destDesc.close();
 
-    await setStoredData(destDesc.metadataPath, srcFilestat.filestat);
+    if (this.keepMetadata) {
+      await setStoredData(destDesc.metadataPath, srcFilestat.filestat);
+    }
 
     await this.unlinkat(oldDesc, oldPath, false);
 
