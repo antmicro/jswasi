@@ -13,11 +13,8 @@ import {
 } from "@jest/globals";
 import { Filesystem } from "../../src/filesystem/filesystem";
 
-jest.mock("../../src/filesystem/fsa-filesystem/fsa-descriptors");
 jest.mock("../../src/filesystem/fsa-filesystem/metadata");
 jest.mock("../../src/filesystem/fsa-filesystem/utils");
-jest.mock("../../third_party/idb-keyval.js");
-jest.mock("../../src/filesystem/top-level-fs");
 
 class MockError extends DOMException {
   constructor(public errno: number) {
