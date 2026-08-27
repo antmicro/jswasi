@@ -7,7 +7,7 @@ const config: Config.InitialOptions = {
       "ts-jest",
       {
         useESM: true,
-        tsconfig: "<rootDir>/tsconfig.test.json",
+        tsconfig: "<rootDir>/tsconfig.json",
         isolatedModules: true,
       },
     ],

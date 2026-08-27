@@ -5,6 +5,7 @@
     "allowJs": true,
     "target": "esnext",
     "module": "esnext",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "removeComments": false,
     "skipLibCheck": true,
@@ -21,7 +22,7 @@
     "noUnusedParameters": false,
     "lib": ["dom", "dom.iterable", "esnext", "webworker"]
   },
-  "include": ["tests/**/*", "src/**/*", "third_party/**/*"],
-  "exclude": ["node_modules", "dist" ]
+  "include": ["**/*", "../../src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
 
