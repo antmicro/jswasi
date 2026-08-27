@@ -199,6 +199,31 @@ describe("JsInterface", () => {
     });
   });
 
+  describe("fileExists", () => {
+    test("should return success(true) if file exists", async () => {
+      await jsInterface.createTextFile("/exists.txt", "content");
+      const result = await jsInterface.fileExists("/exists.txt");
+      expect(result).toEqual(success(true));
+    });
+
+    test("should return success(true) if directory exists", async () => {
+      await jsInterface.createDirectory("/test_directory");
+      const result = await jsInterface.fileExists("/test_directory");
+      expect(result).toEqual(success(true));
+    });
+
+    test("should return success(false) if file does not exist", async () => {
+      const result = await jsInterface.fileExists("/nonexistent.txt");
+      expect(result).toEqual(success(false));
+    });
+
+    test("should return success(false) if parent path is a file", async () => {
+      await jsInterface.createTextFile("/somefile", "content");
+      const result = await jsInterface.fileExists("/somefile/subfile");
+      expect(result).toEqual(success(false));
+    });
+  });
+
   describe("createDirectory", () => {
     test("should successfully create a directory", async () => {
       const dirPath = "/new_directory";
