@@ -6,8 +6,13 @@ import * as vfs from "./third_party/vfs.js";
 import { major } from "./filesystem/virtual-filesystem/devices/driver-manager.js";
 import { dirname } from "./utils.js";
 
-const WRITE_FIFO_PATH = "/dev/initr.kfifo";
-const READ_FIFO_PATH = "/dev/initw.kfifo";
+// Result types
+export type JswasiError = { readonly code: number; readonly msg: string };
+export type Success<T> = { readonly ok: true; readonly value: T };
+export type Failure = { readonly ok: false; readonly error: JswasiError };
+export type Result<T> = Success<T> | Failure;
+export const success = <T>(value: T): Success<T> => ({ ok: true, value });
+export const failure = (error: JswasiError): Failure => ({ ok: false, error });
 
 type Operation = {
   Spawn: SpawnArgs,
@@ -22,6 +27,9 @@ type SpawnArgs = {
   env?: Record<string, string>,
   kern: boolean,
 }
+
+const WRITE_FIFO_PATH = "/dev/initr.kfifo";
+const READ_FIFO_PATH = "/dev/initw.kfifo";
 
 export class JsInterface {
   private fifow: Descriptor;
