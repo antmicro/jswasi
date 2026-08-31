@@ -165,7 +165,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
         await adapter.defaultInitialize(fs);
 
         const mkdiratErr = await fs.mkdirat(undefined, fileName);
-        expect(mkdiratErr).toBe(constants.WASI_ENOTDIR);
+        expect(mkdiratErr).toBe(constants.WASI_EEXIST);
       });
     });
 

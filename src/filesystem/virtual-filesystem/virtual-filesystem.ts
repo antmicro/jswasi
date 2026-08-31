@@ -84,14 +84,12 @@ export class VirtualFilesystem implements Filesystem {
         __desc = desc as VirtualFilesystemDirectoryDescriptor;
         navigated = this.virtualFs._navigateFrom(__desc.dir, path, false);
       } else {
-        return constants.WASI_EINVAL;
+        return constants.WASI_ENOTDIR;
       }
     }
 
     if (navigated.target) {
-      return (navigated.target instanceof vfs.Directory)
-      ? constants.WASI_EEXIST
-      : constants.WASI_ENOTDIR;
+      return constants.WASI_EEXIST;
     }
 
     const [_, index] = this.virtualFs._iNodeMgr.createINode(vfs.Directory, {

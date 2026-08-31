@@ -165,7 +165,7 @@ export class FsaFilesystem implements Filesystem {
       if (desc instanceof FsaDirectoryDescriptor) {
         start_handle = desc.handle;
       } else {
-        return constants.WASI_EINVAL;
+        return constants.WASI_ENOTDIR;
       }
     }
     let { err, handle } = await this.getHandle(
@@ -182,7 +182,7 @@ export class FsaFilesystem implements Filesystem {
       true,
       handle as FileSystemDirectoryHandle
     ));
-    if (err === constants.WASI_ESUCCESS) {
+    if (err === constants.WASI_ESUCCESS || err === constants.WASI_ENOTDIR) {
       return constants.WASI_EEXIST;
     }
     if (err !== constants.WASI_ENOENT) {
