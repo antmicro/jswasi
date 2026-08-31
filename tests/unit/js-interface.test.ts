@@ -277,5 +277,68 @@ describe("JsInterface", () => {
       expect(await jsInterface.createDirectory("/")).toEqual(success(false));
       expect(await jsInterface.createDirectory("")).toEqual(success(false));
     });
+
+    test("should create directory when one of the path components is a symlink to a directory", async () => {
+      await jsInterface.createDirectory("/a");
+      await tfs.addSymlink("/", "/a/b");
+
+      const result = await jsInterface.createDirectory("/a/b/c/d");
+      expect(result).toEqual(success(true));
+
+      for (const checkPath of ["/c", "/c/d"]) {
+        const res = await tfs.open(checkPath);
+        expect(res.err).toBe(constants.WASI_ESUCCESS);
+        expect(res.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+        await res.desc.close();
+      }
+
+      const resSymlink = await tfs.open(
+        "/a/b/c/d",
+        constants.WASI_LOOKUPFLAGS_SYMLINK_FOLLOW
+      );
+      expect(resSymlink.err).toBe(constants.WASI_ESUCCESS);
+      expect(resSymlink.desc.getFdstat().fs_filetype).toBe(constants.WASI_FILETYPE_DIRECTORY);
+      await resSymlink.desc.close();
+    });
+
+    test("should return success(false) when final component is an existing symlink", async () => {
+      await jsInterface.createDirectory("/dir");
+      await tfs.addSymlink("/dir", "/symlink_target");
+
+      const result = await jsInterface.createDirectory("/symlink_target");
+      expect(result).toEqual(success(false));
+    });
+
+    test("should fail when path prefix contains a broken symlink", async () => {
+      await tfs.addSymlink("/non_existent", "/broken_link");
+
+      const result = await jsInterface.createDirectory("/broken_link/subdir");
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: constants.WASI_ENOENT },
+      });
+    });
+
+    test("should fail with ENOTDIR when path prefix contains a symlink to a regular file", async () => {
+      await jsInterface.createTextFile("/file.txt", "hello");
+      await tfs.addSymlink("/file.txt", "/file_link");
+
+      const result = await jsInterface.createDirectory("/file_link/subdir");
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: constants.WASI_ENOTDIR },
+      });
+    });
+
+    test("should fail with ELOOP when path prefix contains a symlink loop", async () => {
+      await tfs.addSymlink("/loop1", "/loop2");
+      await tfs.addSymlink("/loop2", "/loop1");
+
+      const result = await jsInterface.createDirectory("/loop1/subdir");
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: constants.WASI_ELOOP },
+      });
+    });
   });
 });
