@@ -148,7 +148,7 @@ export class FsaFilesystem implements Filesystem {
       (handle as FileSystemDirectoryHandle).removeEntry(name, {
         recursive: false,
       });
-      await delStoredData(`${await initMetadataPath(handle)}/${path}`);
+      await delStoredData(`${await initMetadataPath(handle)}/${name}`);
       return constants.WASI_ESUCCESS;
     } catch (e) {
       let __err = constants.WASI_EINVAL;
@@ -190,7 +190,7 @@ export class FsaFilesystem implements Filesystem {
     }
     try {
       handle = await (handle as FileSystemDirectoryHandle).getDirectoryHandle(
-        path,
+        name,
         {
           create: true,
         }
@@ -250,7 +250,7 @@ export class FsaFilesystem implements Filesystem {
       return err;
     }
     let symlink = await (handle as FileSystemDirectoryHandle).getFileHandle(
-      linkpath,
+      name,
       {
         create: true,
       }
