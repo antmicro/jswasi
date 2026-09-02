@@ -50,13 +50,13 @@ export class TopLevelFs {
     this.mounts = {};
   }
 
-  abspath(desc: Descriptor, path: string): string {
+  abspath(desc: Descriptor | undefined, path: string): string {
     if (desc !== undefined && !path.startsWith("/")) {
-      const __path = desc.getPath();
+      const absPath = desc.getPath();
       if (path.length === 0) {
-        return __path;
+        return absPath;
       }
-      return `${__path === "/" ? "" : __path}/${path}`;
+      return `${absPath === "/" ? "" : absPath}/${path}`;
     }
     return path;
   }
