@@ -523,7 +523,7 @@ describe("Test WebsocketConnectionDevice", () => {
     let msg = "some data to read";
     websocketMock.onmessage({ data: msg });
 
-    [WebSocket.CLOSING, WebSocket.CLOSED].forEach(async (state) => {
+    for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       setWebsocketState(websocketMock, state);
       expect(connectionObject.msgBuffer.length).toBe(1);
 
@@ -541,12 +541,12 @@ describe("Test WebsocketConnectionDevice", () => {
         eventType: constants.WASI_EVENTTYPE_FD_READ,
         nbytes: BigInt(msg.length)
       });
-    });
+    }
   });
 
   test("WebsocketConnectionDevice imediatly resolves read poll when websocket is not open and there are no data to read", async () => {
 
-    [WebSocket.CLOSING, WebSocket.CLOSED].forEach(async (state) => {
+    for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       setWebsocketState(websocketMock, state);
       expect(connectionObject.msgBuffer.length).toBe(0);
 
@@ -563,7 +563,7 @@ describe("Test WebsocketConnectionDevice", () => {
         eventType: constants.WASI_EXT_NO_EVENT,
         nbytes: 0n
       });
-    });
+    }
   });
 
   test("WebsocketConnectionDevice imediatly resolves write polls", async () => {
@@ -582,7 +582,7 @@ describe("Test WebsocketConnectionDevice", () => {
       nbytes: BigInt(Number.MAX_SAFE_INTEGER),
     });
 
-    [WebSocket.CLOSING, WebSocket.CLOSED].forEach(async (state) => {
+    for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       setWebsocketState(websocketMock, state);
 
       let { userdata, eventType, workerId } = {
@@ -598,17 +598,17 @@ describe("Test WebsocketConnectionDevice", () => {
         eventType: constants.WASI_EXT_NO_EVENT,
         nbytes: 0n
       });
-    });
+    }
   });
 
   test("WebsocketConnectionDevice handles polls with other event flags than read and write", async () => {
     expect(connectionObject.pollQueue.length).toBe(0);
 
-    [
+    for (const event of [
       constants.WASI_EVENTTYPE_CLOCK,
       (1 << 3),
       (1 << 4),
-    ].forEach(async (event) => {
+    ]) {
       let { userdata, eventType, workerId } = {
         userdata: 1n,
         eventType: event,
@@ -622,7 +622,7 @@ describe("Test WebsocketConnectionDevice", () => {
         eventType: constants.WASI_EXT_NO_EVENT,
         nbytes: 0n
       });
-    });
+    }
   });
 
   test("WebsocketConnectionDevice increases fdCount on duplicateFd call", async () => {
@@ -684,7 +684,7 @@ describe("Test WebsocketConnectionDevice", () => {
     expect(websocketMock.close).toBeCalledWith(1000);
     expect(invaldiateMock).toBeCalledWith(minor);
 
-    [WebSocket.CLOSING, WebSocket.CLOSED].forEach(async (state) => {
+    for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       connectionObject.fdCount = 1;
       websocketMock.close.mockClear();
 
@@ -695,7 +695,7 @@ describe("Test WebsocketConnectionDevice", () => {
       expect(closeResult).toBe(constants.WASI_ESUCCESS);
       expect(websocketMock.close).not.toBeCalled();
       expect(invaldiateMock).toBeCalledWith(minor);
-    });
+    }
   });
 
   test("WebsocketConnectionDevice invalidator propagates errno", async () => {
@@ -730,11 +730,11 @@ describe("Test WebsocketConnectionDevice", () => {
 
     websocketMock.onclose();
 
-    readPromises.forEach(async (promise) => {
+    for (const promise of readPromises) {
       let readResult = await promise;
       expect(readResult.err).toBe(constants.WASI_ESUCCESS);
       expect(readResult.buffer.byteLength).toBe(0);
-    });
+    }
 
     for (let i = 0; i < pollIds.length; i++) {
       let pollResult = await readPollPromises[i];
@@ -769,11 +769,11 @@ describe("Test WebsocketConnectionDevice", () => {
 
     websocketMock.onerror();
 
-    readPromises.forEach(async (promise) => {
+    for (const promise of readPromises) {
       let readResult = await promise;
       expect(readResult.err).toBe(constants.WASI_ECONNABORTED);
       expect(readResult.buffer.byteLength).toBe(0);
-    });
+    }
 
     for (let i = 0; i < pollIds.length; i++) {
       let pollResult = await readPollPromises[i];
