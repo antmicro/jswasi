@@ -27,7 +27,7 @@ const filesystemMap: Record<string, new () => Filesystem> = {
   devfs: DeviceFilesystem,
 };
 
-export async function getFilesystem(
+export async function initFilesystem(
   fs: string,
   opts: Object
 ): Promise<{ err: number; filesystem: Filesystem }> {
@@ -446,11 +446,11 @@ export class TopLevelFs {
 
     let fs;
     if (__sourcePath === "") {
-      const getFilesystemErr = await getFilesystem(filesystemType, data);
-      if (getFilesystemErr.err !== constants.WASI_ESUCCESS)
-        return getFilesystemErr.err;
+      const initRes = await initFilesystem(filesystemType, data);
+      if (initRes.err !== constants.WASI_ESUCCESS)
+        return initRes.err;
 
-      fs = getFilesystemErr.filesystem;
+      fs = initRes.filesystem;
     } else {
       const dinfoSource = await this.getDescInfo(
         __sourcePath,

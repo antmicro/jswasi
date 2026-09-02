@@ -17,7 +17,7 @@ import {
 import { Fdflags, Rights, Descriptor } from "../../filesystem.js";
 import { UserData, EventType, PollEvent } from "../../../types.js";
 import * as constants from "../../../constants.js";
-import { getFilesystem } from "../../top-level-fs.js";
+import { initFilesystem } from "../../top-level-fs.js";
 import { AbstractVirtualDeviceDescriptor } from "../devices/abstract-device-descriptor.js";
 import ProcessManager from "../../../process-manager.js";
 
@@ -173,7 +173,7 @@ export class HtermDeviceDriver implements TerminalDriver {
             // TODO: use some kind of uuid in mount point names
             const tmp_mount = `/tmp/temp_mount_${handle.name}`;
             await processManager.filesystem.createDir(tmp_mount);
-            let { err, filesystem } = await getFilesystem("fsa", {
+            let { err, filesystem } = await initFilesystem("fsa", {
               dir: handle,
               keepMetadata: false,
             });
