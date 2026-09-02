@@ -540,6 +540,7 @@ class VirtualFilesystemFileDescriptor
   async truncate(size: bigint): Promise<number> {
     try {
       this.desc._iNode._data.resize(Number(size));
+      this.desc._iNode._metadata.size = Number(size);
       return constants.WASI_ESUCCESS;
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
