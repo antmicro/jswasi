@@ -114,7 +114,7 @@ export class TopLevelFs {
       switch (err) {
         case constants.WASI_ESUCCESS:
         case constants.WASI_ENOTDIR: {
-          // if some component in the middle of the path is a symlink
+          // If some component in the middle of the path is a symlink
           if (!desc) {
             return { desc: undefined, err, fs, path: rpath };
           }
@@ -141,7 +141,7 @@ export class TopLevelFs {
                 __path = content;
               }
             } else {
-              // replace symlink filename with it's content
+              // Replace symlink filename with its content
               let __index =
                 index === -1
                   ? desc.getPath().lastIndexOf("/")
