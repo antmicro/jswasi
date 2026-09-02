@@ -29,6 +29,8 @@ export interface FsTestAdapter {
   mockDirectoryNotEmpty: (dirname: string, fs: Filesystem) => Promise<void>
   mockRemoveFileEntry: (filename: string, fs: Filesystem) => Promise<void>
   mockRenameFile: (oldName: string, newName: string, fs: Filesystem) => Promise<void>
+  mockCreatableSymlink: (linkname: string) => Promise<void>
+  mockSymlinkExists: (linkname: string, fs: Filesystem) => Promise<void>
 }
 
 export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
@@ -292,6 +294,41 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
           newName,
         );
         expect(err).toBe(constants.WASI_ESUCCESS);
+      });
+    });
+
+    describe("Test filesystem symlinkat", () => {
+      test("Symlinks should be creatable", async () => {
+        const linkName = "linkname";
+
+        await adapter.mockCreatableSymlink(linkName);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.symlinkat("target", undefined, linkName);
+        expect(err).toBe(constants.WASI_ESUCCESS);
+      });
+
+      test("Symlink creation should fail if link already exists", async () => {
+        const linkName = "linkname";
+
+        await adapter.mockSymlinkExists(linkName, fs);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.symlinkat("target", undefined, linkName);
+        expect(err).toBe(constants.WASI_EEXIST);
+      });
+
+      test("Symlink creation should fail if descriptor is invalid", async () => {
+        const linkName = "linkname";
+
+        await adapter.mockCreatableSymlink(linkName);
+
+        await adapter.defaultInitialize(fs);
+
+        const err = await fs.symlinkat("target", {} as any, linkName);
+        expect(err).toBe(constants.WASI_EINVAL);
       });
     });
   });

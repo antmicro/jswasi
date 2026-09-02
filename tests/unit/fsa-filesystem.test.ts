@@ -183,6 +183,41 @@ const fsaAdapter: FsTestAdapter = {
       } as any),
     );
   },
+
+  mockCreatableSymlink: async () => {
+    const mockFileHandle = {
+      createWritable: () =>
+        Promise.resolve({
+          write: () => Promise.resolve(),
+          close: () => Promise.resolve(),
+        }),
+    };
+
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
+      Promise.resolve({
+        getDirectoryHandle: (_a: string, _b: Object) => {
+          throw new MockError(constants.WASI_ENOENT);
+        },
+        getFileHandle: (_a: string, b: { create?: boolean }) => {
+          if (b !== undefined && b.create === true) {
+            return Promise.resolve(mockFileHandle);
+          }
+          throw new MockError(constants.WASI_ENOENT);
+        },
+      }),
+    );
+  },
+
+  mockSymlinkExists: async () => {
+    jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
+      Promise.resolve({
+        getDirectoryHandle: () => {
+          throw new MockError(constants.WASI_ENOTDIR);
+        },
+        getFileHandle: () => Promise.resolve({}),
+      }),
+    );
+  },
 };
 
 runFilesystemTests("fsa", fsaAdapter);
