@@ -44,9 +44,9 @@ export function realpath(path: string, baseDir: string = "/"): string {
 
 export function msToNs(ms: number): bigint {
   const msInt = Math.trunc(ms);
-  const decimal = BigInt(Math.round((ms - msInt) * 1000000));
-  const ns = BigInt(msInt) * BigInt(1000000);
-  return ns + decimal;
+  const fracNs = BigInt(Math.round((ms - msInt) * 1_000_000));
+  const ns = BigInt(msInt) * 1_000_000n;
+  return ns + fracNs;
 }
 
 export function now(clockId: number, cpuTimeStart: bigint): bigint {
