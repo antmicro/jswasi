@@ -480,7 +480,7 @@ class VirtualFilesystemFileDescriptor
       this.cursor += written;
       return {
         err: constants.WASI_ESUCCESS,
-        written: written,
+        written: BigInt(written),
       };
     } catch (e: vfs.VirtualFSError) {
       return { err: e.errno, written: 0n };
@@ -492,9 +492,10 @@ class VirtualFilesystemFileDescriptor
     offset: bigint
   ): Promise<{ err: number; written: bigint }> {
     try {
+      const written = await this.desc._iNode.write(buffer, Number(offset));
       return {
         err: constants.WASI_ESUCCESS,
-        written: await this.desc._iNode.write(buffer, Number(offset)),
+        written: BigInt(written),
       };
     } catch (e: vfs.VirtualFSError) {
       return e.errno;
