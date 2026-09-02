@@ -561,19 +561,19 @@ export interface Filesystem {
   ): Promise<{ err: number; index: number; desc: Descriptor }>;
   unlinkat(desc: Descriptor | undefined, path: string, is_dir: boolean): Promise<number>;
   renameat(
-    oldDesc: Descriptor,
+    oldDesc: Descriptor | undefined,
     oldPath: string,
-    newDesc: Descriptor,
+    newDesc: Descriptor | undefined,
     newPath: string
   ): Promise<number>;
   symlinkat(
     target: string,
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     linkpath: string
   ): Promise<number>;
   initialize(opts: Object): Promise<number>;
   mknodat(
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     path: string,
     dev: number,
     args: Object

@@ -74,7 +74,7 @@ export class VirtualFilesystem implements Filesystem {
     return "VirtualFilesystem";
   }
 
-  async mkdirat(desc: Descriptor, path: string): Promise<number> {
+  async mkdirat(desc: Descriptor | undefined, path: string): Promise<number> {
     let navigated;
     let __desc;
     if (desc === undefined) {
@@ -121,7 +121,7 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async unlinkat(
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     path: string,
     is_dir: boolean
   ): Promise<number> {
@@ -269,9 +269,9 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async renameat(
-    oldDesc: Descriptor,
+    oldDesc: Descriptor | undefined,
     oldPath: string,
-    newDesc: Descriptor,
+    newDesc: Descriptor | undefined,
     newPath: string
   ): Promise<number> {
     let oldNavigated;
@@ -332,7 +332,7 @@ export class VirtualFilesystem implements Filesystem {
 
   async symlinkat(
     target: string,
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     linkpath: string
   ): Promise<number> {
     let navigated;
@@ -367,7 +367,7 @@ export class VirtualFilesystem implements Filesystem {
   }
 
   async mknodat(
-    _desc: Descriptor,
+    _desc: Descriptor | undefined,
     _path: string,
     _dev: number,
     _args: Object

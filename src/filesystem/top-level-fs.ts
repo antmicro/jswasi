@@ -72,7 +72,7 @@ export class TopLevelFs {
     symlink_depth: number = SYMBOLIC_LINK_DEPTH_LIMIT
   ): Promise<DescInfo> {
     let rpath = realpath(path);
-    let lastSeparator, fs;
+    let lastSeparator, fs: Filesystem | undefined;
     for (
       lastSeparator = rpath.length;
       lastSeparator > 0;
@@ -205,7 +205,7 @@ export class TopLevelFs {
   }
 
   async openat(
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     path: string,
     dirflags: LookupFlags = 0,
     oflags: OpenFlags = 0,
@@ -228,7 +228,7 @@ export class TopLevelFs {
 
   async createDir(
     path: string,
-    desc: Descriptor = undefined,
+    desc: Descriptor | undefined = undefined,
     workerId: number = -1
   ): Promise<number> {
     let __path = this.abspath(desc, path);
@@ -252,7 +252,7 @@ export class TopLevelFs {
   async addSymlink(
     target: string,
     linkpath: string,
-    linkdesc: Descriptor = undefined,
+    linkdesc: Descriptor | undefined = undefined,
     workerId: number = -1
   ): Promise<number> {
     let path;
@@ -271,7 +271,7 @@ export class TopLevelFs {
   }
 
   async mknodat(
-    start: Descriptor,
+    start: Descriptor | undefined,
     path: string,
     dev: number,
     workerId: number,
@@ -292,7 +292,7 @@ export class TopLevelFs {
   async removeEntry(
     path: string,
     is_dir: boolean,
-    desc: Descriptor = undefined,
+    desc: Descriptor | undefined = undefined,
     workerId: number = -1
   ): Promise<number> {
     let __path = this.abspath(desc, path);
@@ -311,9 +311,9 @@ export class TopLevelFs {
   }
 
   async move(
-    desc_s: Descriptor,
+    desc_s: Descriptor | undefined,
     source: string,
-    desc_t: Descriptor,
+    desc_t: Descriptor | undefined,
     target: string,
     workerId: number = -1
   ): Promise<number> {
@@ -412,9 +412,9 @@ export class TopLevelFs {
   }
 
   async addMount(
-    sourceDesc: Descriptor,
+    sourceDesc: Descriptor | undefined,
     sourcePath: string,
-    targetDesc: Descriptor,
+    targetDesc: Descriptor | undefined,
     targetPath: string,
     filesystemType: string,
     // mountFlags is not used but it is present in linux and might
@@ -523,7 +523,7 @@ export class TopLevelFs {
   }
 
   async readLink(
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     path: string,
     workerId: number = -1
   ): Promise<{ err: number; path: string }> {

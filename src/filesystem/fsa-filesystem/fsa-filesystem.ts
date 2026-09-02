@@ -115,7 +115,7 @@ export class FsaFilesystem implements Filesystem {
   }
 
   async unlinkat(
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     path: string,
     is_dir: boolean
   ): Promise<number> {
@@ -159,7 +159,7 @@ export class FsaFilesystem implements Filesystem {
     }
   }
 
-  async mkdirat(desc: Descriptor, path: string): Promise<number> {
+  async mkdirat(desc: Descriptor | undefined, path: string): Promise<number> {
     let start_handle = undefined;
     if (desc !== undefined) {
       if (desc instanceof FsaDirectoryDescriptor) {
@@ -218,7 +218,7 @@ export class FsaFilesystem implements Filesystem {
 
   async symlinkat(
     target: string,
-    desc: Descriptor,
+    desc: Descriptor | undefined,
     linkpath: string
   ): Promise<number> {
     let start_handle;
@@ -450,9 +450,9 @@ export class FsaFilesystem implements Filesystem {
   }
 
   async renameat(
-    oldDesc: Descriptor,
+    oldDesc: Descriptor | undefined,
     oldPath: string,
-    newDesc: Descriptor,
+    newDesc: Descriptor | undefined,
     newPath: string
   ): Promise<number> {
     // Filesystem Access API doesn't support renaming entries at this point
@@ -588,7 +588,7 @@ export class FsaFilesystem implements Filesystem {
   }
 
   async mknodat(
-    _desc: Descriptor,
+    _desc: Descriptor | undefined,
     _path: string,
     _dev: number,
     _args: Object
