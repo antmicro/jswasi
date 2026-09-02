@@ -43,9 +43,9 @@ import {
   UnameNameType,
   ThreadSpawnArgs,
 } from "./types.js";
-import ProcessManager, { DescriptorEntry } from "./process-manager.js";
+import ProcessManager, { DEFAULT_WORK_DIR, DescriptorEntry } from "./process-manager.js";
 import { EventSource } from "./devices.js";
-import { basename, msToNs } from "./utils.js";
+import { basename, msToNs, realpath } from "./utils.js";
 import { FsaFilesystem } from "./filesystem/fsa-filesystem/fsa-filesystem.js";
 
 declare global {
@@ -91,7 +91,9 @@ export default async function syscallCallback(
       const { dir, sharedBuffer } = data as ChdirArgs;
       const lock = new Int32Array(sharedBuffer, 0, 1);
 
-      processManager.processInfos[processId].cwd = dir;
+      const currentCwd = processManager.processInfos[processId].cwd ?? DEFAULT_WORK_DIR;
+      const newCwd = realpath(dir, currentCwd);
+      processManager.processInfos[processId].cwd = newCwd;
 
       Atomics.store(lock, 0, 0);
       Atomics.notify(lock, 0);
@@ -100,17 +102,17 @@ export default async function syscallCallback(
     case "getcwd": {
       const { bufLen, sharedBuffer } = data as GetCwdArgs;
       const lck = new Int32Array(sharedBuffer, 0, 1);
-      const cwd_len = new Uint32Array(sharedBuffer, 4, 1);
+      const cwdLen = new Uint32Array(sharedBuffer, 4, 1);
       const cwd = new Uint8Array(sharedBuffer, 8, bufLen);
 
       let err = constants.WASI_ESUCCESS;
-      const cwd_path = processManager.processInfos[processId].cwd;
-      if (bufLen < cwd_path.length) {
-        cwd_len[0] = bufLen;
+      const cwdPath = processManager.processInfos[processId].cwd;
+      if (bufLen < cwdPath.length) {
+        cwdLen[0] = bufLen;
         err = constants.WASI_ENOBUFS;
       } else {
-        cwd_len[0] = cwd_path.length;
-        cwd.set(new TextEncoder().encode(cwd_path), 0);
+        cwdLen[0] = cwdPath.length;
+        cwd.set(new TextEncoder().encode(cwdPath), 0);
       }
       Atomics.store(lck, 0, err);
       Atomics.notify(lck, 0);

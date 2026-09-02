@@ -18,34 +18,28 @@ export function parsePath(path: string): { parts: string[]; name: string } {
   return { parts, name };
 }
 
-export function realpath(path: string): string {
-  /* if (!path.startsWith("/")) {
-    throw Error("path must be absolute");
-  }*/
-  const result = [];
-  let resultPath = "";
-  let tmpPath = path;
-  let part = "";
-  let level = 0;
-  while (tmpPath !== "") {
-    if (tmpPath.indexOf("/") !== -1) {
-      part = tmpPath.substr(0, tmpPath.indexOf("/"));
-    } else part = tmpPath;
-    tmpPath = tmpPath.substr(part.length + 1);
-    if (part === "..") {
-      if (level > 0) level -= 1;
-    } else if (part === ".") {
-      // do nothing
+export function realpath(path: string, baseDir: string = "/"): string {
+  const isAbsolute = path.startsWith("/");
+  const target = isAbsolute ? path : `${baseDir}/${path}`;
+  const segments = target.split("/");
+  const stack: string[] = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+
+    if (segment === "" || segment === ".") {
+      continue;
+    }
+
+    if (segment === "..") {
+      // Clamps at root: /.. evaluates to /
+      stack.pop();
     } else {
-      if (part != "") {
-        result[level] = part;
-        level += 1;
-      }
+      stack.push(segment);
     }
   }
-  resultPath = `/${result.slice(0, level).join("/")}`;
-  resultPath = resultPath.replace("/./", "/");
-  return resultPath;
+
+  return `/${stack.join("/")}`;
 }
 
 export function msToNs(ms: number): bigint {
@@ -71,6 +65,7 @@ export function now(clockId: number, cpuTimeStart: bigint): bigint {
 }
 
 export function basename(path: string): string {
+  if (path.length === 0) return "";
   if (path == "/") {
     return "/";
   }
@@ -78,6 +73,7 @@ export function basename(path: string): string {
 }
 
 export function dirname(path: string): string {
+  if (path.length === 0) return "";
   let last_index = path.lastIndexOf("/");
   if (last_index < 1) {
     last_index++;

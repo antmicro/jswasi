@@ -952,9 +952,8 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
 
         const { dir }: { dir: string } = JSON.parse(json);
         workerConsoleLog(`chdir(${dir})`);
-        const dir_ = utils.realpath(dir);
 
-        sendToKernel(["chdir", { dir: dir_, sharedBuffer } as ChdirArgs]);
+        sendToKernel(["chdir", { dir, sharedBuffer } as ChdirArgs]);
 
         Atomics.wait(lck, 0, -1);
 
@@ -968,18 +967,18 @@ function WASI(snapshot0: boolean = false): WASICallbacks {
       }
 
       case "getcwd": {
-        const { buf_len }: { buf_len: number } = JSON.parse(json);
-        workerConsoleLog(`getcwd(${buf_len})`);
+        const { buf_len: bufLen }: { buf_len: number } = JSON.parse(json);
+        workerConsoleLog(`getcwd(${bufLen})`);
 
-        const sharedBuffer = new SharedArrayBuffer(4 + 4 + buf_len);
+        const sharedBuffer = new SharedArrayBuffer(4 + 4 + bufLen);
         const lck = new Int32Array(sharedBuffer, 0, 1);
         const cwd_len = new Uint32Array(sharedBuffer, 4, 1);
-        const cwd_buf = new Uint8Array(sharedBuffer, 8, buf_len);
+        const cwd_buf = new Uint8Array(sharedBuffer, 8, bufLen);
         lck[0] = -1;
 
         sendToKernel([
           "getcwd",
-          { bufLen: buf_len, sharedBuffer } as GetCwdArgs,
+          { bufLen, sharedBuffer } as GetCwdArgs,
         ]);
         Atomics.wait(lck, 0, -1);
         const err = Atomics.load(lck, 0);
