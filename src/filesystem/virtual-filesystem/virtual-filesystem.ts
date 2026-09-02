@@ -98,7 +98,7 @@ export class VirtualFilesystem implements Filesystem {
       gid: 0,
       parent: navigated.dir._dir["."],
     });
-    navigated.dir.addEntry(path, index);
+    navigated.dir.addEntry(navigated.name, index);
 
     return constants.WASI_ESUCCESS;
   }
@@ -358,7 +358,7 @@ export class VirtualFilesystem implements Filesystem {
       gid: 0,
       link: target,
     });
-    __desc.dir.addEntry(navigated.name, index);
+    navigated.dir.addEntry(navigated.name, index);
     return constants.WASI_ESUCCESS;
   }
 
