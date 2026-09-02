@@ -382,7 +382,7 @@ export abstract class AbstractFileDescriptor extends AbstractDescriptor {
 
 export abstract class AbstractDirectoryDescriptor extends AbstractDescriptor {
   async close(): Promise<number> {
-    return constants.WASI_EISDIR;
+    return constants.WASI_ESUCCESS;
   }
 
   async read(
