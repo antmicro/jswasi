@@ -16,40 +16,40 @@ export interface FsTestAdapter {
     mergeOpts?: Record<string, string>,
   ) => Promise<void>;
 
-  setup: () => void;
-  teardown: () => void;
+  setup: () => Promise<void>;
+  teardown: () => Promise<void>;
 
-  mockEmptyDisk: () => void;
-  mockCreateFile: (filename: string) => void;
-  mockFileExists: (filename: string, fs: Filesystem) => void;
-  mockDirectoryExists: (dirname: string, fs: Filesystem) => void;
-  mockCreatableDirectory: (dirname: string) => void;
-  mockGetFileStoredData: (filename: string, fs: Filesystem) => void;
-  mockGetUndefinedStoredData: () => void;
-  mockDirectoryNotEmpty: (dirname: string, fs: Filesystem) => void;
-  mockRemoveFileEntry: (filename: string, fs: Filesystem) => void;
-  mockRenameFile: (oldName: string, newName: string, fs: Filesystem) => void;
+  mockEmptyDisk: () => Promise<void>;
+  mockCreateFile: (filename: string) => Promise<void>
+  mockFileExists: (filename: string, fs: Filesystem) => Promise<void>
+  mockDirectoryExists: (dirname: string, fs: Filesystem) => Promise<void>
+  mockCreatableDirectory: (dirname: string) => Promise<void>
+  mockGetFileStoredData: (filename: string, fs: Filesystem) => Promise<void>
+  mockGetUndefinedStoredData: () => Promise<void>
+  mockDirectoryNotEmpty: (dirname: string, fs: Filesystem) => Promise<void>
+  mockRemoveFileEntry: (filename: string, fs: Filesystem) => Promise<void>
+  mockRenameFile: (oldName: string, newName: string, fs: Filesystem) => Promise<void>
 }
 
 export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
   describe(`Filesystem: ${name}`, () => {
     let fs: Filesystem;
 
-    beforeEach(() => {
-      adapter.setup();
+    beforeEach(async () => {
+      await adapter.setup();
       fs = adapter.getFilesystem();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       jest.clearAllMocks();
       jest.restoreAllMocks();
-      adapter.teardown();
+      await adapter.teardown();
     });
 
     describe("Test filesystem open", () => {
       test("Files should be openable", async () => {
         const fileName = "filename";
-        adapter.mockFileExists(fileName, fs);
+        await adapter.mockFileExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -60,7 +60,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Files should be creatable", async () => {
         const fileName = "filename";
 
-        adapter.mockCreateFile(fileName);
+        await adapter.mockCreateFile(fileName);
 
         await adapter.defaultInitialize(fs);
 
@@ -79,7 +79,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Files should not be openable with creat and excl", async () => {
         const fileName = "filename";
 
-        adapter.mockFileExists(fileName, fs);
+        await adapter.mockFileExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -98,7 +98,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Directories should be openable", async () => {
         const fileName = "dirname";
 
-        adapter.mockDirectoryExists(fileName, fs);
+        await adapter.mockDirectoryExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -117,7 +117,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Directories should not be openable with creat", async () => {
         const fileName = "dirname";
 
-        adapter.mockDirectoryExists(fileName, fs);
+        await adapter.mockDirectoryExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -138,7 +138,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Directories should be creatable", async () => {
         const dirName = "directory";
 
-        adapter.mockCreatableDirectory(dirName);
+        await adapter.mockCreatableDirectory(dirName);
 
         await adapter.defaultInitialize(fs);
 
@@ -149,7 +149,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Directory creation should fail if a directory exists", async () => {
         const fileName = "dirname";
 
-        adapter.mockDirectoryExists(fileName, fs);
+        await adapter.mockDirectoryExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -160,7 +160,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Directory creation should fail if a file exists", async () => {
         const fileName = "dirname";
 
-        adapter.mockFileExists(fileName, fs);
+        await adapter.mockFileExists(fileName, fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -173,7 +173,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Filestat data should be returned for files", async () => {
         const fileName = "filename";
 
-        adapter.mockGetFileStoredData(fileName, fs);
+        await adapter.mockGetFileStoredData(fileName, fs);
 
         await adapter.defaultInitialize(fs, {"keepMetadata": "true"});
 
@@ -187,7 +187,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       test("Filestat data should not be returned if file doesn't exist", async () => {
         const fileName = "filename";
 
-        adapter.mockGetUndefinedStoredData();
+        await adapter.mockGetUndefinedStoredData();
 
         await adapter.defaultInitialize(fs, {"keepMetadata": "true"});
 
@@ -198,7 +198,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
 
     describe("Test filesystem unlinkat", () => {
       test("Unlinkat should fail if file doesn't exist", async () => {
-        adapter.mockEmptyDisk();
+        await adapter.mockEmptyDisk();
 
         await adapter.defaultInitialize(fs);
 
@@ -207,7 +207,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       });
 
       test("Unlinkat should fail if directory doesn't exist", async () => {
-        adapter.mockEmptyDisk();
+        await adapter.mockEmptyDisk();
 
         await adapter.defaultInitialize(fs);
 
@@ -216,7 +216,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       });
 
       test("Unlinkat should fail if directory is not empty", async () => {
-        adapter.mockDirectoryNotEmpty("test", fs);
+        await adapter.mockDirectoryNotEmpty("test", fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -225,7 +225,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       });
 
       test("Unlinkat should work if file exists", async () => {
-        adapter.mockRemoveFileEntry("test", fs);
+        await adapter.mockRemoveFileEntry("test", fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -236,7 +236,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
 
     describe("Test filesystem renameat", () => {
       test("Renameat should fail if source file doesn't exist", async () => {
-        adapter.mockEmptyDisk();
+        await adapter.mockEmptyDisk();
 
         await adapter.defaultInitialize(fs);
 
@@ -250,7 +250,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       });
 
       test("Renameat should fail if old descriptor is invalid", async () => {
-        adapter.mockFileExists("oldname", fs);
+        await adapter.mockFileExists("oldname", fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -264,7 +264,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
       });
 
       test("Renameat should fail if new descriptor is invalid", async () => {
-        adapter.mockFileExists("oldname", fs);
+        await adapter.mockFileExists("oldname", fs);
 
         await adapter.defaultInitialize(fs);
 
@@ -281,7 +281,7 @@ export function runFilesystemTests(name: string, adapter: FsTestAdapter) {
         const oldName = "oldname";
         const newName = "newname";
 
-        adapter.mockRenameFile(oldName, newName, fs);
+        await adapter.mockRenameFile(oldName, newName, fs);
 
         await adapter.defaultInitialize(fs);
 

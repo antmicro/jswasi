@@ -13,46 +13,51 @@ const vfsAdapter: FsTestAdapter = {
     await fs.initialize({ ...mergeOpts });
   },
 
-  setup: () => {},
+  setup: async () => {},
 
-  teardown: () => {},
+  teardown: async () => {},
 
-  mockEmptyDisk: () => {},
+  mockEmptyDisk: async () => {},
 
-  mockCreateFile: (filename: string) => {},
+  mockCreateFile: async (_filename: string) => {},
 
-  mockFileExists: (filename: string, fs: Filesystem) => {
-    fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  mockFileExists: async (filename: string, fs: Filesystem) => {
+    const res = await fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+    await res.desc?.close();
   },
 
-  mockDirectoryExists: (dirname: string, fs: Filesystem) => {
-    fs.mkdirat(undefined, dirname);
+  mockDirectoryExists: async (dirname: string, fs: Filesystem) => {
+    await fs.mkdirat(undefined, dirname);
   },
 
-  mockCreatableDirectory: (dirname: string) => {
+  mockCreatableDirectory: async (_dirname: string) => {
     // e.g., vfsMock.mkdir(dirname);
   },
 
-  mockGetFileStoredData: (filename: string, fs: Filesystem) => {
-    fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  mockGetFileStoredData: async (filename: string, fs: Filesystem) => {
+    const res = await fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+    await res.desc?.close();
   },
 
-  mockGetUndefinedStoredData: () => {
+  mockGetUndefinedStoredData: async () => {
     // Ensure that the VFS returns undefined for non-existent files
     // e.g., vfsMock.clearDisk();
   },
 
-  mockDirectoryNotEmpty: (dirname: string, fs: Filesystem) => {
-    fs.mkdirat(undefined, dirname);
-    fs.open(`${dirname}/file`, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  mockDirectoryNotEmpty: async (dirname: string, fs: Filesystem) => {
+    await fs.mkdirat(undefined, dirname);
+    const res = await fs.open(`${dirname}/file`, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+    await res.desc?.close();
   },
 
-  mockRemoveFileEntry: (filename: string, fs: Filesystem) => {
-    fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  mockRemoveFileEntry: async (filename: string, fs: Filesystem) => {
+    const res = await fs.open(filename, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+    await res.desc?.close();
   },
 
-  mockRenameFile: (oldName: string, _newName: string, fs: Filesystem) => {
-    fs.open(oldName, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+  mockRenameFile: async (oldName: string, _newName: string, fs: Filesystem) => {
+    const res = await fs.open(oldName, 0, constants.WASI_O_CREAT, 0n, 0n, 0, 0);
+    await res.desc?.close();
   },
 };
 

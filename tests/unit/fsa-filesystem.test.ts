@@ -38,15 +38,15 @@ const fsaAdapter: FsTestAdapter = {
     await fs.initialize(opts);
   },
 
-  setup: () => {
+  setup: async () => {
     jest.spyOn(fsaUtils, "mapErr").mockImplementation((e: DOMException) => {
       return (e as MockError).errno;
     });
   },
 
-  teardown: () => {},
+  teardown: async () => {},
 
-  mockEmptyDisk: () => {
+  mockEmptyDisk: async () => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: () => {
@@ -59,7 +59,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockCreateFile: (filename: string) => {
+  mockCreateFile: async (filename: string) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: (_a: string, b: { create?: boolean }) => {
@@ -75,7 +75,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockFileExists: (filename: string, fs: Filesystem) => {
+  mockFileExists: async (filename: string, fs: Filesystem) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getDirectoryHandle: () => {
@@ -86,7 +86,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockDirectoryExists: (dirname: string, fs: Filesystem) => {
+  mockDirectoryExists: async (dirname: string, fs: Filesystem) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: (_a: string, _b: Object) => {
@@ -97,7 +97,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockCreatableDirectory: (dirname: string) => {
+  mockCreatableDirectory: async (dirname: string) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: (_a: string, _b: Object) => {
@@ -113,7 +113,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockGetFileStoredData: (filename: string, fs: Filesystem) => {
+  mockGetFileStoredData: async (filename: string, fs: Filesystem) => {
     jest.spyOn(metadata, "getStoredData").mockReturnValue(
       Promise.resolve({
         dev: 0n,
@@ -128,13 +128,13 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockGetUndefinedStoredData: () => {
+  mockGetUndefinedStoredData: async () => {
     jest
       .spyOn(metadata, "getStoredData")
       .mockReturnValue(Promise.resolve(undefined));
   },
 
-  mockDirectoryNotEmpty: (dirname: string) => {
+  mockDirectoryNotEmpty: async (dirname: string) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: (_a: string, _b: Object) => {
@@ -148,7 +148,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockRemoveFileEntry: (filename: string) => {
+  mockRemoveFileEntry: async (filename: string) => {
     jest.spyOn(fsaUtils, "getTopLevelHandle").mockReturnValue(
       Promise.resolve({
         getFileHandle: (_a: string, _b: Object) => Promise.resolve({}),
@@ -160,7 +160,7 @@ const fsaAdapter: FsTestAdapter = {
     );
   },
 
-  mockRenameFile: () => {
+  mockRenameFile: async () => {
     const mockFileHandle = {
       getFile: () =>
         Promise.resolve({
