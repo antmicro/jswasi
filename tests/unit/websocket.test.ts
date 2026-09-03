@@ -300,7 +300,7 @@ describe("Test WebsocketConnectionDevice", () => {
     jest.restoreAllMocks();
   });
 
-  test("WebsocketConnectionDevice fd count is grater than zero", () => {
+  test("WebsocketConnectionDevice fd count is greater than zero", () => {
     expect((<any>websocketConnectionDevice).connection.fdCount).toBeGreaterThan(0);
   });
 
@@ -450,7 +450,7 @@ describe("Test WebsocketConnectionDevice", () => {
     expect(noRead.buffer.byteLength).toBe(0);
   });
 
-  test("WebsocketConnectionDevice stores read poll subscribtions when there is no message to read and on message resolves them", async () => {
+  test("WebsocketConnectionDevice stores read poll subscriptions when there is no message to read and on message resolves them", async () => {
 
     let pollReads = [
       { userdata: 1n, eventType: constants.WASI_EVENTTYPE_FD_READ, workerId: 1 },
@@ -482,7 +482,7 @@ describe("Test WebsocketConnectionDevice", () => {
     }
   });
 
-  test("WebsocketConnectionDevice imediatly resolves read poll promises when there is a message to read", async () => {
+  test("WebsocketConnectionDevice immediately resolves read poll promises when there is a message to read", async () => {
 
     let msg = "some data to read";
     websocketMock.onmessage({ data: msg });
@@ -535,7 +535,7 @@ describe("Test WebsocketConnectionDevice", () => {
     }
   });
 
-  test("WebsocketConnectionDevice imediatly resolves read poll when websocket is not open and there are no data to read", async () => {
+  test("WebsocketConnectionDevice immediately resolves read poll when websocket is not open and there are no data to read", async () => {
 
     for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       setWebsocketState(websocketMock, state);
@@ -557,7 +557,7 @@ describe("Test WebsocketConnectionDevice", () => {
     }
   });
 
-  test("WebsocketConnectionDevice imediatly resolves write polls", async () => {
+  test("WebsocketConnectionDevice immediately resolves write polls", async () => {
 
     let { userdata, eventType, workerId } = {
       userdata: 1n,
@@ -642,15 +642,15 @@ describe("Test WebsocketConnectionDevice", () => {
 
     connectionObject.fdCount += 10;
 
-    let invaldiateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
-    invaldiateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_ESUCCESS)));
+    let invalidateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
+    invalidateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_ESUCCESS)));
 
     while (connectionObject.fdCount > 1) {
       closeResult = await websocketConnectionDevice.close();
 
       expect(closeResult).toBe(constants.WASI_ESUCCESS);
       expect(websocketMock.close).not.toBeCalled();
-      expect(invaldiateMock).not.toBeCalled();
+      expect(invalidateMock).not.toBeCalled();
     }
 
     expect(connectionObject.fdCount).toBe(1);
@@ -659,13 +659,13 @@ describe("Test WebsocketConnectionDevice", () => {
 
     expect(closeResult).toBe(constants.WASI_ESUCCESS);
     expect(websocketMock.close).toBeCalledWith(1000);
-    expect(invaldiateMock).toBeCalledWith(minor);
+    expect(invalidateMock).toBeCalledWith(minor);
     expect(connectionObject.fdCount).toBe(0);
   });
 
   test("WebsocketConnectionDevice closes websocket only when it is open", async () => {
-    let invaldiateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
-    invaldiateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_ESUCCESS)));
+    let invalidateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
+    invalidateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_ESUCCESS)));
 
     setWebsocketState(websocketMock, WebSocket.OPEN);
     expect(connectionObject.fdCount).toBe(1);
@@ -673,12 +673,12 @@ describe("Test WebsocketConnectionDevice", () => {
     let closeResult = await websocketConnectionDevice.close();
     expect(closeResult).toBe(constants.WASI_ESUCCESS);
     expect(websocketMock.close).toBeCalledWith(1000);
-    expect(invaldiateMock).toBeCalledWith(minor);
+    expect(invalidateMock).toBeCalledWith(minor);
 
     for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       connectionObject.fdCount = 1;
       websocketMock.close.mockClear();
-      invaldiateMock.mockClear();
+      invalidateMock.mockClear();
 
       setWebsocketState(websocketMock, state);
       expect(connectionObject.fdCount).toBe(1);
@@ -686,19 +686,19 @@ describe("Test WebsocketConnectionDevice", () => {
       let closeResult = await websocketConnectionDevice.close();
       expect(closeResult).toBe(constants.WASI_ESUCCESS);
       expect(websocketMock.close).not.toBeCalled();
-      expect(invaldiateMock).toBeCalledTimes(1);
-      expect(invaldiateMock).toBeCalledWith(minor);
+      expect(invalidateMock).toBeCalledTimes(1);
+      expect(invalidateMock).toBeCalledWith(minor);
     }
   });
 
   test("WebsocketConnectionDevice invalidator propagates errno", async () => {
-    let invaldiateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
-    invaldiateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_EINVAL)));
+    let invalidateMock = jest.spyOn(websocketDeviceDriver, "invalidateConnectionDevice");
+    invalidateMock.mockReturnValue(new Promise(resolve => resolve(constants.WASI_EINVAL)));
 
     expect(connectionObject.fdCount).toBe(1);
 
     let closeResult = await websocketConnectionDevice.close();
-    expect(invaldiateMock).toBeCalled();
+    expect(invalidateMock).toBeCalled();
     expect(closeResult).toBe(constants.WASI_EINVAL);
   });
 
