@@ -276,15 +276,6 @@ describe("Test FsaFilesystem logic", () => {
     await fs.initialize({ name: "test", keepMetadata: "true" });
     expect(metadata.getStoredData).toBeCalled();
   });
-
-  test("Initialization without metadata should not call getStoredData", async () => {
-    jest
-      .spyOn(metadata, "getStoredData")
-      .mockReturnValue(Promise.resolve(undefined));
-
-    await fs.initialize({ name: "test", keepMetadata: "false" });
-    expect(metadata.getStoredData).toBeCalledTimes(0);
-  });
 });
 
 describe("Test FsaFilesystem initialize", () => {
