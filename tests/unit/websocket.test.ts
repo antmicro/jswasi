@@ -5,12 +5,11 @@ import { major } from "../../src/filesystem/virtual-filesystem/devices/driver-ma
 
 import * as vfs from "../../third_party/vfs.js";
 
-import { jest, test, expect, describe, beforeAll, beforeEach, afterEach } from "@jest/globals";
+import { jest, test, expect, describe, beforeEach, afterEach } from "@jest/globals";
 
 // @ts-ignore
 import { WebSocket } from "ws";
 
-// @ts-ignore
 Object.assign(global, { WebSocket: require('ws') });
 
 jest.mock("../../src/filesystem/virtual-filesystem/devices/device-filesystem");
@@ -29,7 +28,7 @@ describe("Test WebsocketDeviceDriver", () => {
   let devfs: DeviceFilesystem;
   let websocketDeviceDriver: WebsocketDeviceDriver;
 
-  beforeAll(() => {
+  beforeEach(async () => {
     devfs = new DeviceFilesystem();
     websocketDeviceDriver = new WebsocketDeviceDriver();
 
@@ -41,9 +40,6 @@ describe("Test WebsocketDeviceDriver", () => {
       resolve(constants.WASI_ESUCCESS);
     }));
 
-  });
-
-  beforeEach(async () => {
     await websocketDeviceDriver.initDriver({ devfs });
   });
 
@@ -144,12 +140,9 @@ describe("Test WebsocketDevice", () => {
   let websocketDeviceDriver: WebsocketDeviceDriver;
   let websocketDevice: WebsocketDevice;
 
-  beforeAll(() => {
+  beforeEach(async () => {
     devfs = new DeviceFilesystem();
     websocketDeviceDriver = new WebsocketDeviceDriver();
-  });
-
-  beforeEach(async () => {
     await websocketDeviceDriver.initDriver({ devfs });
     websocketDevice = new WebsocketDevice(0, 0n, 0n, vfs.CharacterDev, websocketDeviceDriver);
   });
@@ -250,7 +243,7 @@ describe("Test WebsocketConnectionDevice", () => {
   // let mockFnInvalidate;
   let minor: number;
 
-  beforeAll(() => {
+  beforeEach(async () => {
     devfs = new DeviceFilesystem();
     websocketDeviceDriver = new WebsocketDeviceDriver();
 
@@ -261,9 +254,7 @@ describe("Test WebsocketConnectionDevice", () => {
     jest.spyOn(devfs, "unlinkat").mockReturnValue(new Promise((resolve) => {
       resolve(constants.WASI_ESUCCESS);
     }));
-  });
 
-  beforeEach(async () => {
     await websocketDeviceDriver.initDriver({ devfs });
     websocketDevice = new WebsocketDevice(0, 0n, 0n, vfs.CharacterDev, websocketDeviceDriver);
 
@@ -687,6 +678,7 @@ describe("Test WebsocketConnectionDevice", () => {
     for (const state of [WebSocket.CLOSING, WebSocket.CLOSED]) {
       connectionObject.fdCount = 1;
       websocketMock.close.mockClear();
+      invaldiateMock.mockClear();
 
       setWebsocketState(websocketMock, state);
       expect(connectionObject.fdCount).toBe(1);
@@ -694,6 +686,7 @@ describe("Test WebsocketConnectionDevice", () => {
       let closeResult = await websocketConnectionDevice.close();
       expect(closeResult).toBe(constants.WASI_ESUCCESS);
       expect(websocketMock.close).not.toBeCalled();
+      expect(invaldiateMock).toBeCalledTimes(1);
       expect(invaldiateMock).toBeCalledWith(minor);
     }
   });
